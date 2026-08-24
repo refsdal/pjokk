@@ -1,0 +1,49 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pjokk",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-08-04",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pjokk",
+      // Placeholder until `wrangler d1 create pjokk` at first deploy.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "pjokk-files"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      // Placeholder until `wrangler kv namespace create KV` at first deploy.
+      "id": "00000000000000000000000000000000"
+    }
+  ],
+  "triggers": {
+    // Nightly D1 export to R2 (03:15 UTC). Handler is a stub until Phase 5.
+    "crons": ["15 3 * * *"]
+  },
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    // Overridden per environment; secrets (GOOGLE_CLIENT_SECRET,
+    // BETTER_AUTH_SECRET) are set with `wrangler secret put`.
+    "APP_URL": "http://localhost:5173"
+  }
+  // Custom domain — enable once NORID activates pjokk.no:
+  // "routes": [{ "pattern": "pjokk.no", "custom_domain": true }]
+}
