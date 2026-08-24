@@ -83,11 +83,51 @@ const welcomeRoute = createRoute({
   component: WelcomeScreen,
 });
 
-// Operator console — lazy, role-guarded inside the component.
+// Operator console — its own layout with a bottom tab bar per concern.
+// Lazy chunks; role-guarded in the shell.
 const adminRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/admin",
-  component: lazyRouteComponent(() => import("@/screens/Admin"), "AdminScreen"),
+  component: lazyRouteComponent(
+    () => import("@/screens/admin/shell"),
+    "AdminShell",
+  ),
+});
+
+const adminOverviewRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: "/",
+  component: lazyRouteComponent(
+    () => import("@/screens/admin/Overview"),
+    "AdminOverview",
+  ),
+});
+
+const adminFamiliesRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: "/families",
+  component: lazyRouteComponent(
+    () => import("@/screens/admin/Families"),
+    "AdminFamilies",
+  ),
+});
+
+const adminUsersRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: "/users",
+  component: lazyRouteComponent(
+    () => import("@/screens/admin/Users"),
+    "AdminUsers",
+  ),
+});
+
+const adminAuditRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: "/audit",
+  component: lazyRouteComponent(
+    () => import("@/screens/admin/Audit"),
+    "AdminAudit",
+  ),
 });
 
 const routeTree = rootRoute.addChildren([
@@ -95,7 +135,12 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   joinRoute,
   welcomeRoute,
-  adminRoute,
+  adminRoute.addChildren([
+    adminOverviewRoute,
+    adminFamiliesRoute,
+    adminUsersRoute,
+    adminAuditRoute,
+  ]),
 ]);
 
 export const router = createRouter({ routeTree });
