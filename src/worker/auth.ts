@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { bearer, organization } from "better-auth/plugins";
+import { admin, bearer, organization } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import { eq } from "drizzle-orm";
 import { createDb, schema } from "./db";
@@ -65,6 +65,9 @@ export function createAuth(env: Env) {
       }),
       // Cookies for web, bearer tokens for a future Capacitor shell.
       bearer(),
+      // System-admin tooling (user.role === "admin"): list/ban users, revoke
+      // sessions, set passwords, impersonate. Family roles are unrelated.
+      admin(),
     ],
   });
 }

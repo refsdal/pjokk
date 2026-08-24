@@ -49,14 +49,15 @@ for (const table of [
 ])
   del(table);
 
-const user = (uid, name, email) => {
+const user = (uid, name, email, role = null) => {
   rows.push(
-    `INSERT INTO user (id, name, email, email_verified, created_at, updated_at) VALUES (${esc(uid)}, ${esc(name)}, ${esc(email)}, 1, ${now}, ${now});`,
+    `INSERT INTO user (id, name, email, email_verified, role, created_at, updated_at) VALUES (${esc(uid)}, ${esc(name)}, ${esc(email)}, 1, ${role ? esc(role) : "NULL"}, ${now}, ${now});`,
     `INSERT INTO account (id, issuer, account_id, provider_id, user_id, password, created_at, updated_at) VALUES (${esc(id("acc"))}, 'local:credential', ${esc(uid)}, 'credential', ${esc(uid)}, ${esc(hash)}, ${now}, ${now});`,
   );
 };
 
-user(ANDERS, "Anders", "anders@pjokk.local");
+// Anders is also the system admin in the dev rig.
+user(ANDERS, "Anders", "anders@pjokk.local", "admin");
 user(KRISTINE, "Kristine", "kristine@pjokk.local");
 
 rows.push(

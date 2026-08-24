@@ -194,6 +194,13 @@ sheet pattern — build the pattern well once.
 > toggle; dictionary in lib/i18n.ts), and read+write API keys for
 > HA/Grafana (pjk_ bearer keys, Settings → API keys). Still on the
 > Phase 7 backlog: PDF report, kiosk/PIN mode, Capacitor shell.
+> Phase 8 delivered the system-admin console at /admin (better-auth admin
+> plugin; user.role === "admin" ≠ family roles): platform stats, family
+> overview + cascade delete, user support (sessions/password/ban/delete),
+> impersonation with an in-app banner, and an append-only admin_audit
+> trail. Billing tools + coupons join it after Phase 9 (Stripe: freemium —
+> free core loop; Plus at 20 kr/mo · 200 kr/yr · 400 kr lifetime gating
+> growth charts, API keys, CSV export, stats month view).
 > Also already in place ahead of schedule: night mode (scheduled + manual),
 > minimal Settings (members, invite link w/ QR + revoke, night mode, sign
 > out), PWA update toast, offline persist + paused-mutation queue.

@@ -10,6 +10,8 @@ import { diapersApp } from "./routes/diapers";
 import { feedsApp } from "./routes/feeds";
 import { invitesAdminApp, invitesPublicApp } from "./routes/invites";
 import { apiKeyAuth, rejectApiKey } from "./middleware/api-key";
+import { requireSysadmin } from "./middleware/sysadmin";
+import { adminApp } from "./routes/admin";
 import { exportApp } from "./routes/export";
 import { keysApp } from "./routes/keys";
 import { otherLogsApp } from "./routes/other-logs";
@@ -79,7 +81,15 @@ app.doc("/api/openapi.json", {
 });
 app.get("/api/docs", Scalar({ url: "/api/openapi.json" }));
 
-const routes = app.route("/", invitesPublicApp).route("/", domainApp);
+// System-admin surface: session-authed, role-gated, never family-scoped.
+const adminBase = createApp<AppEnv>();
+adminBase.use("/api/admin/*", requireSysadmin);
+const adminRoutes = adminBase.route("/", adminApp);
+
+const routes = app
+  .route("/", invitesPublicApp)
+  .route("/", adminRoutes)
+  .route("/", domainApp);
 
 // The Hono RPC client derives its types from this.
 export type AppType = typeof routes;

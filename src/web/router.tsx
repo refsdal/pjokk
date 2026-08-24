@@ -83,11 +83,19 @@ const welcomeRoute = createRoute({
   component: WelcomeScreen,
 });
 
+// Operator console — lazy, role-guarded inside the component.
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin",
+  component: lazyRouteComponent(() => import("@/screens/Admin"), "AdminScreen"),
+});
+
 const routeTree = rootRoute.addChildren([
   appRoute.addChildren([homeRoute, timelineRoute, statsRoute, settingsRoute]),
   loginRoute,
   joinRoute,
   welcomeRoute,
+  adminRoute,
 ]);
 
 export const router = createRouter({ routeTree });

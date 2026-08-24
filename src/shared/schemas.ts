@@ -344,6 +344,52 @@ export const StatsSchema = z
   })
   .openapi("Stats");
 
+// --- System admin (Phase 8) ---
+
+export const AdminStatsSchema = z
+  .object({
+    families: z.number().int(),
+    users: z.number().int(),
+    babies: z.number().int(),
+    coreLogs: z.number().int(),
+    pushSubscriptions: z.number().int(),
+    usersLast7d: z.number().int(),
+  })
+  .openapi("AdminStats");
+
+export const AdminFamilySchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    slug: z.string(),
+    plan: z.string(),
+    createdAt: isoTime(),
+    members: z.number().int(),
+    babies: z.number().int(),
+    lastFeedAt: isoTime().nullable(),
+  })
+  .openapi("AdminFamily");
+
+export const AuditEntrySchema = z
+  .object({
+    id: z.string(),
+    adminId: z.string(),
+    adminName: z.string(),
+    action: z.string(),
+    target: z.string(),
+    detail: z.string().nullable(),
+    createdAt: isoTime(),
+  })
+  .openapi("AuditEntry");
+
+export const AuditNoteSchema = z
+  .object({
+    action: z.string().min(1).max(60),
+    target: z.string().min(1).max(200),
+    detail: z.string().max(500).optional(),
+  })
+  .openapi("AuditNote");
+
 // --- API keys (Phase 7) ---
 
 export const ApiKeySchema = z

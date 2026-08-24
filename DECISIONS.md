@@ -152,6 +152,23 @@ choices, noted so they can be revisited deliberately.
   SHA-256-stored/shown once (pjk_ prefix kept for the list UI), refuse
   admin + push endpoints, and track lastUsedAt coarsely (≥5 min apart).
 
+## Phase 8 (system admin)
+
+- **System admin = better-auth admin plugin** (user.role "admin"), fully
+  separate from per-family member roles. Bootstrap is a manual SQL UPDATE
+  (dev seed makes Anders admin; prod granted to andersro93@ros-nett.com).
+- **/admin is a lazy route**, English-only operator console, hidden behind a
+  Settings link + role guard client-side and requireSysadmin server-side.
+- **User support ops go through better-auth's /api/auth/admin/*** (list,
+  ban, revoke sessions, set password, impersonate, remove); custom
+  /api/admin/* covers what that plugin can't know: families, stats, audit.
+- **Audit trail**: server-side writes for our endpoints (family.delete);
+  better-auth admin ops are client-noted via POST /api/admin/audit —
+  sysadmins are trusted, the trail is for recall, not defense.
+- **Impersonation** shows a red in-app banner (session.impersonatedBy) with
+  a Stop button; every use is audited.
+- API keys can never be system admins (rejected before the role check).
+
 ## Infra
 
 - **Deployed to the Refsdal Holding AS Cloudflare account**

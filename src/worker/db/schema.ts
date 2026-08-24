@@ -284,6 +284,24 @@ export const pushPref = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.familyId] })],
 );
 
+// Audit trail for system-admin actions (Phase 8): impersonations, family
+// deletes, password sets, bans. Append-only.
+export const adminAudit = sqliteTable(
+  "admin_audit",
+  {
+    id: id(),
+    adminId: text("admin_id")
+      .notNull()
+      .references(() => user.id),
+    action: text("action").notNull(),
+    // Free-form target identifier (user id, family id, …) + context.
+    target: text("target").notNull(),
+    detail: text("detail"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("admin_audit_time_idx").on(t.createdAt)],
+);
+
 // Custom invite codes (QR-at-Sunday-dinner grain, not email-addressed).
 // Codes are credentials: the redeem endpoint is rate-limited.
 export const familyInvite = sqliteTable(

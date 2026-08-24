@@ -595,6 +595,15 @@ export function SettingsScreen() {
 
         <SectionTitle>{t("Account")}</SectionTitle>
         <Card className="space-y-3">
+          {(session?.user as { role?: string | null } | undefined)?.role ===
+            "admin" && (
+            <a
+              href="/admin"
+              className="block rounded-xl2 border border-line px-4 py-3 font-semibold text-ink active:bg-surface-2"
+            >
+              {t("Admin console")}
+            </a>
+          )}
           <p className="text-sm text-ink-soft">
             {session?.user.name}
             <span className="block text-xs text-muted">
