@@ -7,3 +7,4 @@ dist/
 coverage/
 dev.db*
 .seed.sql
+.idea/
