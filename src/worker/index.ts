@@ -9,6 +9,7 @@ import { babiesApp } from "./routes/babies";
 import { diapersApp } from "./routes/diapers";
 import { feedsApp } from "./routes/feeds";
 import { invitesAdminApp, invitesPublicApp } from "./routes/invites";
+import { otherLogsApp } from "./routes/other-logs";
 import { sleepApp } from "./routes/sleep";
 import { timelineApp } from "./routes/timeline";
 
@@ -45,6 +46,7 @@ const domainApp = domainBase
   .route("/", feedsApp)
   .route("/", diapersApp)
   .route("/", sleepApp)
+  .route("/", otherLogsApp)
   .route("/", timelineApp)
   .route("/", invitesAdminApp);
 

@@ -1,12 +1,19 @@
 import { and, desc, eq, isNull, lt } from "drizzle-orm";
+import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
 import type { Db } from "./index";
 import {
   baby,
+  bathLog,
   diaperLog,
   familyInvite,
   feedLog,
+  measurementLog,
+  medicineLog,
   member,
+  milestoneLog,
+  noteLog,
   organization,
+  pumpLog,
   sleepLog,
   user,
 } from "./schema";
@@ -46,6 +53,130 @@ const sleepCols = {
   endTime: sleepLog.endTime,
   location: sleepLog.location,
   notes: sleepLog.notes,
+};
+
+// The Phase 3 activity types share one structural shape (id, familyId,
+// babyId, caretakerId, time, …specifics, notes) — this generic CRUD is that
+// pattern built once. Row/Insert types are supplied per instantiation; the
+// narrow `as never` casts are the price of a table-generic drizzle query and
+// are contained here.
+
+type SimpleLogTable = SQLiteTable & {
+  id: SQLiteColumn;
+  familyId: SQLiteColumn;
+  babyId: SQLiteColumn;
+  caretakerId: SQLiteColumn;
+  time: SQLiteColumn;
+};
+
+export type ListOpts = { babyId?: string; limit?: number; before?: Date };
+
+export type LogCrud<Row, Insert> = {
+  list(opts?: ListOpts): Promise<Row[]>;
+  get(id: string): Promise<Row | null>;
+  create(
+    values: Insert & { babyId: string; caretakerId: string; time: Date },
+  ): Promise<Row | null>;
+  update(
+    id: string,
+    patch: Partial<Insert> & { time?: Date },
+  ): Promise<Row | null>;
+  del(id: string): Promise<boolean>;
+};
+
+function logCrud<Row, Insert>(
+  db: Db,
+  familyId: string,
+  table: SimpleLogTable,
+  extraCols: Record<string, SQLiteColumn>,
+): LogCrud<Row, Insert> {
+  const cols = {
+    id: table.id,
+    babyId: table.babyId,
+    caretakerId: table.caretakerId,
+    caretakerName: user.name,
+    time: table.time,
+    ...extraCols,
+  };
+  const scope = (babyId?: string) =>
+    and(
+      eq(table.familyId, familyId),
+      babyId ? eq(table.babyId, babyId) : undefined,
+    );
+  return {
+    async list(opts: ListOpts = {}) {
+      const rows = await db
+        .select(cols)
+        .from(table)
+        .innerJoin(user, eq(table.caretakerId, user.id))
+        .where(
+          and(
+            scope(opts.babyId),
+            opts.before ? lt(table.time, opts.before) : undefined,
+          ),
+        )
+        .orderBy(desc(table.time))
+        .limit(opts.limit ?? 50);
+      return rows as Row[];
+    },
+    async get(id: string) {
+      const rows = await db
+        .select(cols)
+        .from(table)
+        .innerJoin(user, eq(table.caretakerId, user.id))
+        .where(and(eq(table.id, id), eq(table.familyId, familyId)));
+      return (rows[0] as Row) ?? null;
+    },
+    async create(values) {
+      const rows = await db
+        .insert(table)
+        .values({ ...values, familyId } as never)
+        .returning({ id: table.id });
+      return this.get((rows[0] as { id: string }).id);
+    },
+    async update(id, patch) {
+      const rows = await db
+        .update(table)
+        .set(patch as never)
+        .where(and(eq(table.id, id), eq(table.familyId, familyId)))
+        .returning({ id: table.id });
+      return rows[0] ? this.get(id) : null;
+    },
+    async del(id) {
+      const rows = await db
+        .delete(table)
+        .where(and(eq(table.id, id), eq(table.familyId, familyId)))
+        .returning({ id: table.id });
+      return rows.length > 0;
+    },
+  };
+}
+
+type WithNotes = { notes?: string | null };
+
+export type MedicineRow = {
+  id: string;
+  babyId: string;
+  caretakerId: string;
+  caretakerName: string;
+  time: Date;
+  name: string;
+  amount: number | null;
+  unit: "ml" | "mg" | "drops" | "dose" | null;
+  notes: string | null;
+};
+
+export type BathRow = Omit<MedicineRow, "name" | "amount" | "unit">;
+export type NoteRow = BathRow & { content: string };
+export type MilestoneRow = BathRow & { title: string };
+export type MeasurementRow = BathRow & {
+  type: "weight" | "length" | "head";
+  value: number;
+};
+export type PumpRow = BathRow & {
+  side: "left" | "right" | "both" | null;
+  amountMl: number | null;
+  durationMin: number | null;
 };
 
 export function familyScope(db: Db, familyId: string) {
@@ -367,6 +498,62 @@ export function familyScope(db: Db, familyId: string) {
         lastSleep: sleeps[0] ?? null,
       };
     },
+
+    // --- Phase 3 activity types (generic CRUD instantiations) ---
+    medicine: logCrud<
+      MedicineRow,
+      WithNotes & {
+        name: string;
+        amount?: number | null;
+        unit?: "ml" | "mg" | "drops" | "dose" | null;
+      }
+    >(db, familyId, medicineLog, {
+      name: medicineLog.name,
+      amount: medicineLog.amount,
+      unit: medicineLog.unit,
+      notes: medicineLog.notes,
+    }),
+
+    bath: logCrud<BathRow, WithNotes>(db, familyId, bathLog, {
+      notes: bathLog.notes,
+    }),
+
+    note: logCrud<NoteRow, WithNotes & { content: string }>(
+      db,
+      familyId,
+      noteLog,
+      { content: noteLog.content, notes: noteLog.notes },
+    ),
+
+    milestone: logCrud<MilestoneRow, WithNotes & { title: string }>(
+      db,
+      familyId,
+      milestoneLog,
+      { title: milestoneLog.title, notes: milestoneLog.notes },
+    ),
+
+    measurement: logCrud<
+      MeasurementRow,
+      WithNotes & { type: "weight" | "length" | "head"; value: number }
+    >(db, familyId, measurementLog, {
+      type: measurementLog.type,
+      value: measurementLog.value,
+      notes: measurementLog.notes,
+    }),
+
+    pump: logCrud<
+      PumpRow,
+      WithNotes & {
+        side?: "left" | "right" | "both" | null;
+        amountMl?: number | null;
+        durationMin?: number | null;
+      }
+    >(db, familyId, pumpLog, {
+      side: pumpLog.side,
+      amountMl: pumpLog.amountMl,
+      durationMin: pumpLog.durationMin,
+      notes: pumpLog.notes,
+    }),
 
     // --- invites (create/list/revoke; redeem lives outside the scope) ---
     async createInvite(data: {

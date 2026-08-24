@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { organization, user } from "./auth-schema";
 
 export * from "./auth-schema";
@@ -103,6 +103,117 @@ export const diaperLog = sqliteTable(
     index("diaper_family_time_idx").on(t.familyId, t.time),
     index("diaper_baby_idx").on(t.babyId),
   ],
+);
+
+// --- Phase 3 activity types: structural copies of the Phase 1 log shape.
+// All share (id, familyId, babyId, caretakerId, time, …specifics, notes) and
+// are served by the generic CRUD in scoped.ts / routes/other-logs.ts.
+
+const babyId = () =>
+  text("baby_id")
+    .notNull()
+    .references(() => baby.id, { onDelete: "cascade" });
+
+const caretakerId = () =>
+  text("caretaker_id")
+    .notNull()
+    .references(() => user.id);
+
+const time = () => integer("time", { mode: "timestamp_ms" }).notNull();
+
+export const medicineLog = sqliteTable(
+  "medicine_log",
+  {
+    id: id(),
+    familyId: familyId(),
+    babyId: babyId(),
+    caretakerId: caretakerId(),
+    time: time(),
+    name: text("name").notNull(),
+    amount: real("amount"),
+    unit: text("unit", { enum: ["ml", "mg", "drops", "dose"] }),
+    notes: text("notes"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("medicine_family_time_idx").on(t.familyId, t.time)],
+);
+
+export const bathLog = sqliteTable(
+  "bath_log",
+  {
+    id: id(),
+    familyId: familyId(),
+    babyId: babyId(),
+    caretakerId: caretakerId(),
+    time: time(),
+    notes: text("notes"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("bath_family_time_idx").on(t.familyId, t.time)],
+);
+
+export const noteLog = sqliteTable(
+  "note_log",
+  {
+    id: id(),
+    familyId: familyId(),
+    babyId: babyId(),
+    caretakerId: caretakerId(),
+    time: time(),
+    content: text("content").notNull(),
+    notes: text("notes"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("note_family_time_idx").on(t.familyId, t.time)],
+);
+
+export const milestoneLog = sqliteTable(
+  "milestone_log",
+  {
+    id: id(),
+    familyId: familyId(),
+    babyId: babyId(),
+    caretakerId: caretakerId(),
+    time: time(),
+    title: text("title").notNull(),
+    notes: text("notes"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("milestone_family_time_idx").on(t.familyId, t.time)],
+);
+
+// Units are implied by type: weight in kg, length/head in cm.
+export const measurementLog = sqliteTable(
+  "measurement_log",
+  {
+    id: id(),
+    familyId: familyId(),
+    babyId: babyId(),
+    caretakerId: caretakerId(),
+    time: time(),
+    type: text("type", { enum: ["weight", "length", "head"] }).notNull(),
+    value: real("value").notNull(),
+    notes: text("notes"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("measurement_family_time_idx").on(t.familyId, t.time)],
+);
+
+export const pumpLog = sqliteTable(
+  "pump_log",
+  {
+    id: id(),
+    familyId: familyId(),
+    babyId: babyId(),
+    caretakerId: caretakerId(),
+    time: time(),
+    side: text("side", { enum: ["left", "right", "both"] }),
+    amountMl: integer("amount_ml"),
+    durationMin: integer("duration_min"),
+    notes: text("notes"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("pump_family_time_idx").on(t.familyId, t.time)],
 );
 
 // Custom invite codes (QR-at-Sunday-dinner grain, not email-addressed).

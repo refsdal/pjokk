@@ -7,15 +7,25 @@ import { StatusCard } from "@/components/StatusCard";
 import { Button } from "@/components/ui/button";
 import { DiaperSheet } from "@/components/sheets/DiaperSheet";
 import { FeedSheet } from "@/components/sheets/FeedSheet";
+import {
+  MoreSheet,
+  OtherLogSheet,
+} from "@/components/sheets/OtherLogSheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
 import { useSession } from "@/lib/auth-client";
-import { useBabies, useFeeds, useSummary, useWakeSleep } from "@/lib/data";
+import {
+  useBabies,
+  useFeeds,
+  useSummary,
+  useWakeSleep,
+  type OtherKind,
+} from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { useAppearance } from "@/lib/appearance";
 import { formatAge } from "@/lib/time";
 import { toast } from "@/lib/toast";
 
-type OpenSheet = "feed" | "diaper" | "sleep" | null;
+type OpenSheet = "feed" | "diaper" | "sleep" | "more" | "other" | null;
 
 function feedDetail(feed: {
   type: string;
@@ -38,6 +48,7 @@ export function HomeScreen() {
   const summary = useSummary(baby?.id);
   const feeds = useFeeds(baby?.id);
   const [sheet, setSheet] = useState<OpenSheet>(null);
+  const [otherKind, setOtherKind] = useState<OtherKind>("medicine");
   const { night } = useAppearance();
   const navigate = useNavigate();
 
@@ -150,7 +161,7 @@ export function HomeScreen() {
             icon={Plus}
             label={t("More")}
             tintClass="text-growth"
-            onClick={() => toast(t("More activity types come in phase 3"))}
+            onClick={() => setSheet("more")}
           />
         </div>
       </div>
@@ -172,6 +183,20 @@ export function HomeScreen() {
         onOpenChange={(o) => setSheet(o ? "sleep" : null)}
         babyId={baby.id}
         lastLocation={s?.lastSleep?.location ?? null}
+      />
+      <MoreSheet
+        open={sheet === "more"}
+        onOpenChange={(o) => setSheet(o ? "more" : null)}
+        onPick={(kind) => {
+          setOtherKind(kind);
+          setSheet("other");
+        }}
+      />
+      <OtherLogSheet
+        open={sheet === "other"}
+        onOpenChange={(o) => setSheet(o ? "other" : null)}
+        babyId={baby.id}
+        kind={otherKind}
       />
     </div>
   );

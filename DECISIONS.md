@@ -62,6 +62,26 @@ choices, noted so they can be revisited deliberately.
   wrangler.jsonc silently starts an empty local DB. Re-run
   `pnpm db:migrate:local && pnpm seed:local` after any id change.
 
+## Phase 3
+
+- **The six activity types are ONE pattern, instantiated:** a generic
+  `logCrud` (scoped.ts) + `makeLogRoutes` factory (other-logs.ts) + one
+  `OtherLogSheet` dispatcher component. Route *definitions* stay concretely
+  typed per instantiation (exact OpenAPI + RPC types); the factory's four
+  handler bodies use contained casts because zod-openapi's input inference
+  cannot follow type parameters. Runtime validation is unaffected.
+- **API paths:** /api/medicine, /api/baths, /api/notes, /api/milestones,
+  /api/measurements, /api/pumps.
+- **Measurement units are implied by type:** weight in kg, length/head in cm
+  (REAL values; steppers use 0.1 kg / 0.5 cm).
+- **Timeline `filter=other`** groups all six; the filter chip row is
+  All/Feeds/Sleep/Diapers/Other.
+- **Prefill for the new sheets reads the cached list only** (a cold first
+  open shows defaults; every later open prefills). Chosen over async prefill
+  plumbing.
+- Pump logs are tied to the baby (same scoping as everything else), even
+  though pumping is about the parent.
+
 ## Infra
 
 - **Deployed to the Refsdal Holding AS Cloudflare account**

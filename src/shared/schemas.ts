@@ -134,15 +134,152 @@ export const WakeSchema = z
   })
   .openapi("Wake");
 
+// --- Phase 3 activity types: same structural pattern as the core three ---
+
+export const medicineUnits = ["ml", "mg", "drops", "dose"] as const;
+export const measurementTypes = ["weight", "length", "head"] as const;
+
+const createBase = {
+  babyId: z.string(),
+  time: isoTime(),
+  notes: z.string().max(1000).optional(),
+};
+
+const patchBase = {
+  time: isoTime().optional(),
+  notes: z.string().max(1000).nullable().optional(),
+};
+
+export const MedicineLogSchema = z
+  .object({
+    ...logBase,
+    time: isoTime(),
+    name: z.string(),
+    amount: z.number().nullable(),
+    unit: z.enum(medicineUnits).nullable(),
+  })
+  .openapi("MedicineLog");
+
+export const CreateMedicineSchema = z
+  .object({
+    ...createBase,
+    name: z.string().min(1).max(100),
+    amount: z.number().min(0).max(1000).optional(),
+    unit: z.enum(medicineUnits).optional(),
+  })
+  .openapi("CreateMedicine");
+
+export const UpdateMedicineSchema = z
+  .object({
+    ...patchBase,
+    name: z.string().min(1).max(100).optional(),
+    amount: z.number().min(0).max(1000).nullable().optional(),
+    unit: z.enum(medicineUnits).nullable().optional(),
+  })
+  .openapi("UpdateMedicine");
+
+export const BathLogSchema = z
+  .object({ ...logBase, time: isoTime() })
+  .openapi("BathLog");
+
+export const CreateBathSchema = z.object(createBase).openapi("CreateBath");
+
+export const UpdateBathSchema = z.object(patchBase).openapi("UpdateBath");
+
+export const NoteLogSchema = z
+  .object({ ...logBase, time: isoTime(), content: z.string() })
+  .openapi("NoteLog");
+
+export const CreateNoteSchema = z
+  .object({ ...createBase, content: z.string().min(1).max(2000) })
+  .openapi("CreateNote");
+
+export const UpdateNoteSchema = z
+  .object({ ...patchBase, content: z.string().min(1).max(2000).optional() })
+  .openapi("UpdateNote");
+
+export const MilestoneLogSchema = z
+  .object({ ...logBase, time: isoTime(), title: z.string() })
+  .openapi("MilestoneLog");
+
+export const CreateMilestoneSchema = z
+  .object({ ...createBase, title: z.string().min(1).max(200) })
+  .openapi("CreateMilestone");
+
+export const UpdateMilestoneSchema = z
+  .object({ ...patchBase, title: z.string().min(1).max(200).optional() })
+  .openapi("UpdateMilestone");
+
+// Units implied by type: weight in kg, length/head in cm.
+export const MeasurementLogSchema = z
+  .object({
+    ...logBase,
+    time: isoTime(),
+    type: z.enum(measurementTypes),
+    value: z.number(),
+  })
+  .openapi("MeasurementLog");
+
+export const CreateMeasurementSchema = z
+  .object({
+    ...createBase,
+    type: z.enum(measurementTypes),
+    value: z.number().min(0).max(200),
+  })
+  .openapi("CreateMeasurement");
+
+export const UpdateMeasurementSchema = z
+  .object({
+    ...patchBase,
+    type: z.enum(measurementTypes).optional(),
+    value: z.number().min(0).max(200).optional(),
+  })
+  .openapi("UpdateMeasurement");
+
+export const PumpLogSchema = z
+  .object({
+    ...logBase,
+    time: isoTime(),
+    side: z.enum(feedSides).nullable(),
+    amountMl: z.number().int().nullable(),
+    durationMin: z.number().int().nullable(),
+  })
+  .openapi("PumpLog");
+
+export const CreatePumpSchema = z
+  .object({
+    ...createBase,
+    side: z.enum(feedSides).optional(),
+    amountMl: z.number().int().min(0).max(1000).optional(),
+    durationMin: z.number().int().min(0).max(600).optional(),
+  })
+  .openapi("CreatePump");
+
+export const UpdatePumpSchema = z
+  .object({
+    ...patchBase,
+    side: z.enum(feedSides).nullable().optional(),
+    amountMl: z.number().int().min(0).max(1000).nullable().optional(),
+    durationMin: z.number().int().min(0).max(600).nullable().optional(),
+  })
+  .openapi("UpdatePump");
+
 // --- Timeline: the merged, day-groupable feed of everything ---
 
-export const timelineFilters = ["feeds", "diapers", "sleep"] as const;
+// "other" = all Phase 3 activity types together.
+export const timelineFilters = ["feeds", "diapers", "sleep", "other"] as const;
 
 export const TimelineEntrySchema = z
   .discriminatedUnion("kind", [
     FeedLogSchema.extend({ kind: z.literal("feed") }),
     DiaperLogSchema.extend({ kind: z.literal("diaper") }),
     SleepLogSchema.extend({ kind: z.literal("sleep") }),
+    MedicineLogSchema.extend({ kind: z.literal("medicine") }),
+    BathLogSchema.extend({ kind: z.literal("bath") }),
+    NoteLogSchema.extend({ kind: z.literal("note") }),
+    MilestoneLogSchema.extend({ kind: z.literal("milestone") }),
+    MeasurementLogSchema.extend({ kind: z.literal("measurement") }),
+    PumpLogSchema.extend({ kind: z.literal("pump") }),
   ])
   .openapi("TimelineEntry");
 
@@ -255,3 +392,11 @@ export type DiaperType = (typeof diaperTypes)[number];
 export type TimelineEntry = z.infer<typeof TimelineEntrySchema>;
 export type Timeline = z.infer<typeof TimelineSchema>;
 export type TimelineFilter = (typeof timelineFilters)[number];
+export type MedicineLog = z.infer<typeof MedicineLogSchema>;
+export type BathLog = z.infer<typeof BathLogSchema>;
+export type NoteLog = z.infer<typeof NoteLogSchema>;
+export type MilestoneLog = z.infer<typeof MilestoneLogSchema>;
+export type MeasurementLog = z.infer<typeof MeasurementLogSchema>;
+export type PumpLog = z.infer<typeof PumpLogSchema>;
+export type MedicineUnit = (typeof medicineUnits)[number];
+export type MeasurementType = (typeof measurementTypes)[number];

@@ -9,6 +9,8 @@ import type {
   DiaperLog,
   FeedLog,
   Invite,
+  MeasurementType,
+  MedicineUnit,
   Member,
   SleepLog,
   Summary,
@@ -16,6 +18,39 @@ import type {
   TimelineFilter,
 } from "@shared/schemas";
 import { api, unwrap } from "./api";
+
+// --- Phase 3 activity types: one generic client path for all six ---
+
+export type OtherKind =
+  | "medicine"
+  | "bath"
+  | "note"
+  | "milestone"
+  | "measurement"
+  | "pump";
+
+// Heterogeneously typed hono-client sub-objects; dispatch is by kind and the
+// per-kind payload types below keep call sites honest.
+const otherApi: Record<
+  OtherKind,
+  {
+    $get: (args: { query: { babyId: string; limit: string } }) => Promise<Response>;
+    $post: (args: { json: unknown }) => Promise<Response>;
+  } & Record<
+    ":id",
+    {
+      $patch: (args: { param: { id: string }; json: unknown }) => Promise<Response>;
+      $delete: (args: { param: { id: string } }) => Promise<Response>;
+    }
+  >
+> = {
+  medicine: api.medicine as never,
+  bath: api.baths as never,
+  note: api.notes as never,
+  milestone: api.milestones as never,
+  measurement: api.measurements as never,
+  pump: api.pumps as never,
+};
 
 // --- queries ---
 
@@ -167,12 +202,66 @@ export interface DeleteVars {
   id: string;
 }
 
+// --- Phase 3 vars: discriminated by kind ---
+
+type OtherBase = { babyId: string; time: string; notes?: string };
+
+export type CreateOtherVars =
+  | ({ kind: "medicine" } & OtherBase & {
+      name: string;
+      amount?: number;
+      unit?: MedicineUnit;
+    })
+  | ({ kind: "bath" } & OtherBase)
+  | ({ kind: "note" } & OtherBase & { content: string })
+  | ({ kind: "milestone" } & OtherBase & { title: string })
+  | ({ kind: "measurement" } & OtherBase & {
+      type: MeasurementType;
+      value: number;
+    })
+  | ({ kind: "pump" } & OtherBase & {
+      side?: "left" | "right" | "both";
+      amountMl?: number;
+      durationMin?: number;
+    });
+
+export interface UpdateOtherVars {
+  kind: OtherKind;
+  id: string;
+  // Per-kind field set; omitted = untouched, null = cleared. Validated
+  // server-side by the kind's zod schema.
+  patch: Record<string, unknown>;
+}
+
+export interface DeleteOtherVars {
+  kind: OtherKind;
+  id: string;
+}
+
+export function useOtherList(
+  kind: OtherKind,
+  babyId: string | undefined,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ["other", kind, babyId],
+    enabled: enabled && !!babyId,
+    queryFn: async () =>
+      unwrap<Record<string, unknown>[]>(
+        await otherApi[kind].$get({
+          query: { babyId: babyId!, limit: "10" },
+        }),
+      ),
+  });
+}
+
 const invalidateLogs = (qc: QueryClient) => {
   void qc.invalidateQueries({ queryKey: ["summary"] });
   void qc.invalidateQueries({ queryKey: ["feeds"] });
   void qc.invalidateQueries({ queryKey: ["diapers"] });
   void qc.invalidateQueries({ queryKey: ["sleep"] });
   void qc.invalidateQueries({ queryKey: ["timeline"] });
+  void qc.invalidateQueries({ queryKey: ["other"] });
 };
 
 export function registerMutationDefaults(qc: QueryClient) {
@@ -233,6 +322,39 @@ export function registerMutationDefaults(qc: QueryClient) {
     mutationFn: async ({ id }: DeleteVars) =>
       unwrap(await api.sleep[":id"].$delete({ param: { id } })),
     onSettled: () => invalidateLogs(qc),
+  });
+  qc.setMutationDefaults(["createOther"], {
+    mutationFn: async ({ kind, ...body }: CreateOtherVars) =>
+      unwrap(await otherApi[kind].$post({ json: body })),
+    onSettled: () => invalidateLogs(qc),
+  });
+  qc.setMutationDefaults(["updateOther"], {
+    mutationFn: async ({ kind, id, patch }: UpdateOtherVars) =>
+      unwrap(await otherApi[kind][":id"].$patch({ param: { id }, json: patch })),
+    onSettled: () => invalidateLogs(qc),
+  });
+  qc.setMutationDefaults(["deleteOther"], {
+    mutationFn: async ({ kind, id }: DeleteOtherVars) =>
+      unwrap(await otherApi[kind][":id"].$delete({ param: { id } })),
+    onSettled: () => invalidateLogs(qc),
+  });
+}
+
+export function useCreateOther() {
+  return useMutation<unknown, Error, CreateOtherVars>({
+    mutationKey: ["createOther"],
+  });
+}
+
+export function useUpdateOther() {
+  return useMutation<unknown, Error, UpdateOtherVars>({
+    mutationKey: ["updateOther"],
+  });
+}
+
+export function useDeleteOther() {
+  return useMutation<unknown, Error, DeleteOtherVars>({
+    mutationKey: ["deleteOther"],
   });
 }
 

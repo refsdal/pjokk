@@ -3,6 +3,11 @@ import { useState } from "react";
 import type { TimelineEntry, TimelineFilter } from "@shared/schemas";
 import { DiaperSheet } from "@/components/sheets/DiaperSheet";
 import { FeedSheet } from "@/components/sheets/FeedSheet";
+import {
+  OtherLogSheet,
+  otherKindMeta,
+  type OtherEntry,
+} from "@/components/sheets/OtherLogSheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
 import { Button } from "@/components/ui/button";
 import { useBabies, useFeeds, useTimeline } from "@/lib/data";
@@ -25,12 +30,14 @@ function daySummary(entries: TimelineEntry[]): string {
   const feeds = entries.filter((e) => e.kind === "feed").length;
   const naps = entries.filter((e) => e.kind === "sleep").length;
   const diapers = entries.filter((e) => e.kind === "diaper").length;
+  const other = entries.length - feeds - naps - diapers;
   const parts = [
     feeds > 0 ? `${feeds} ${feeds === 1 ? t("feed") : t("feeds")}` : null,
     naps > 0 ? `${naps} ${naps === 1 ? t("nap") : t("naps")}` : null,
     diapers > 0
       ? `${diapers} ${diapers === 1 ? t("diaper") : t("diapers")}`
       : null,
+    other > 0 ? `${other} ${t("other")}` : null,
   ].filter(Boolean);
   return parts.join(" · ");
 }
@@ -60,22 +67,69 @@ function entryMain(e: TimelineEntry): { title: string; detail: string | null } {
   if (e.kind === "diaper") {
     return { title: t(diaperLabel[e.type] ?? "Diaper"), detail: null };
   }
-  const start = new Date(e.startTime);
-  if (!e.endTime) {
-    return { title: t("Sleep"), detail: `${t("since")} ${formatClock(start)}` };
+  if (e.kind === "sleep") {
+    const start = new Date(e.startTime);
+    if (!e.endTime) {
+      return {
+        title: t("Sleep"),
+        detail: `${t("since")} ${formatClock(start)}`,
+      };
+    }
+    const end = new Date(e.endTime);
+    return {
+      title: t("Sleep"),
+      detail: `${formatClock(start)}–${formatClock(end)} · ${formatDuration(end.getTime() - start.getTime())}`,
+    };
   }
-  const end = new Date(e.endTime);
+  if (e.kind === "medicine") {
+    return {
+      title: e.name,
+      detail: e.amount != null ? `${e.amount} ${e.unit ?? ""}`.trim() : null,
+    };
+  }
+  if (e.kind === "bath") {
+    return { title: t("Bath"), detail: null };
+  }
+  if (e.kind === "note") {
+    return { title: t("Note"), detail: e.content };
+  }
+  if (e.kind === "milestone") {
+    return { title: t("Milestone"), detail: e.title };
+  }
+  if (e.kind === "measurement") {
+    const label =
+      e.type === "weight"
+        ? t("Weight")
+        : e.type === "length"
+          ? t("Length")
+          : t("Head");
+    return {
+      title: label,
+      detail: `${e.value.toFixed(1)} ${e.type === "weight" ? "kg" : "cm"}`,
+    };
+  }
   return {
-    title: t("Sleep"),
-    detail: `${formatClock(start)}–${formatClock(end)} · ${formatDuration(end.getTime() - start.getTime())}`,
+    title: t("Pump"),
+    detail: [e.side, e.amountMl != null ? `${e.amountMl} ml` : null]
+      .filter(Boolean)
+      .join(" · "),
   };
 }
 
-const kindStyle = {
+const kindStyle: Record<
+  TimelineEntry["kind"],
+  { icon: typeof Milk; tint: string }
+> = {
   feed: { icon: Milk, tint: "text-feed" },
   diaper: { icon: Droplets, tint: "text-diaper" },
   sleep: { icon: Moon, tint: "text-sleep" },
-} as const;
+  medicine: otherKindMeta.medicine,
+  bath: otherKindMeta.bath,
+  note: otherKindMeta.note,
+  milestone: otherKindMeta.milestone,
+  measurement: otherKindMeta.measurement,
+  pump: otherKindMeta.pump,
+};
 
 function Row({
   entry,
@@ -165,11 +219,12 @@ export function TimelineScreen() {
     <div className="mx-auto max-w-md px-4 pt-safe">
       <h1 className="py-4 text-2xl font-extrabold text-ink">{t("Timeline")}</h1>
 
-      <div className="flex gap-2 pb-3">
+      <div className="flex gap-2 overflow-x-auto pb-3">
         {filterChip(null, t("All"))}
         {filterChip("feeds", t("Feeds"))}
         {filterChip("sleep", t("Sleep"))}
         {filterChip("diapers", t("Diapers"))}
+        {filterChip("other", t("Other"))}
       </div>
 
       <div className="pb-tabbar">
@@ -233,6 +288,24 @@ export function TimelineScreen() {
         lastLocation={null}
         edit={editEntry?.kind === "sleep" ? editEntry : null}
       />
+      {(() => {
+        const otherEdit =
+          editEntry &&
+          editEntry.kind !== "feed" &&
+          editEntry.kind !== "diaper" &&
+          editEntry.kind !== "sleep"
+            ? (editEntry as OtherEntry)
+            : null;
+        return (
+          <OtherLogSheet
+            open={!!otherEdit}
+            onOpenChange={(o) => !o && setEditEntry(null)}
+            babyId={baby?.id ?? ""}
+            kind={otherEdit?.kind ?? "medicine"}
+            edit={otherEdit}
+          />
+        );
+      })()}
     </div>
   );
 }

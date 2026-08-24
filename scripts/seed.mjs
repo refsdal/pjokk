@@ -30,6 +30,12 @@ for (const table of [
   "sleep_log",
   "feed_log",
   "diaper_log",
+  "medicine_log",
+  "bath_log",
+  "note_log",
+  "milestone_log",
+  "measurement_log",
+  "pump_log",
   "family_invite",
   "baby",
   "invitation",
@@ -93,6 +99,39 @@ diaper(4, KRISTINE, "dirty");
 feed(2.5, KRISTINE, "solids", { amountMl: 120 });
 diaper(1.2, ANDERS, "wet");
 feed(0.8, KRISTINE, "breast", { side: "right", durationMin: 15 });
+
+// Phase 3 activity types, sprinkled over the last days.
+const simple = (table, hoursAgo, by, cols) => {
+  const keys = Object.keys(cols);
+  rows.push(
+    `INSERT INTO ${table} (id, family_id, baby_id, caretaker_id, time${keys.length ? ", " + keys.map((k) => cols[k].col).join(", ") : ""}, created_at) VALUES (${esc(id("oth"))}, ${esc(FAM)}, ${esc(NORA)}, ${esc(by)}, ${ms(hoursAgo)}${keys.length ? ", " + keys.map((k) => cols[k].val).join(", ") : ""}, ${now});`,
+  );
+};
+simple("medicine_log", 12.8, ANDERS, {
+  name: { col: "name", val: esc("D-vitamin") },
+  amount: { col: "amount", val: 5 },
+  unit: { col: "unit", val: esc("drops") },
+});
+simple("bath_log", 26, KRISTINE, {});
+simple("note_log", 30, ANDERS, {
+  content: { col: "content", val: esc("Slept through the whole grocery run.") },
+});
+simple("milestone_log", 70, KRISTINE, {
+  title: { col: "title", val: esc("Started crawling") },
+});
+simple("measurement_log", 50, ANDERS, {
+  type: { col: "type", val: esc("weight") },
+  value: { col: "value", val: 8.4 },
+});
+simple("measurement_log", 50.05, ANDERS, {
+  type: { col: "type", val: esc("length") },
+  value: { col: "value", val: 71.5 },
+});
+simple("pump_log", 9, KRISTINE, {
+  side: { col: "side", val: esc("left") },
+  amountMl: { col: "amount_ml", val: 90 },
+  durationMin: { col: "duration_min", val: 15 },
+});
 
 writeFileSync(".seed.sql", rows.join("\n") + "\n");
 console.log(`wrote .seed.sql (${rows.length} statements)`);

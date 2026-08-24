@@ -165,12 +165,17 @@ sheet pattern — build the pattern well once.
 
 ## Phased roadmap
 
-> **Status (2026-08-24): Phases 1 and 2 SHIPPED** to https://app.pjokk.no
+> **Status (2026-08-24): Phases 1–3 SHIPPED** to https://app.pjokk.no
 > (custom domain; workers.dev fallback stays enabled; Refsdal Holding AS
 > account). Phase 2 delivered the day-grouped timeline (merged
 > `/api/timeline` endpoint with before-cursor pagination), edit/delete
 > through the same log sheets (incl. the notes field), filter chips, day
 > summaries, and dark mode (system/light/dark — night mode still overrides).
+> Phase 3 delivered the six extra activity types (medicine, bath, note,
+> milestone, measurement, pump) as ONE generic CRUD + route factory
+> (`scoped.ts logCrud` / `routes/other-logs.ts makeLogRoutes`) and ONE
+> dispatcher sheet (`OtherLogSheet`), reachable from the More button and the
+> timeline's new Other filter.
 > Also already in place ahead of schedule: night mode (scheduled + manual),
 > minimal Settings (members, invite link w/ QR + revoke, night mode, sign
 > out), PWA update toast, offline persist + paused-mutation queue.
