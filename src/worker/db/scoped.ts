@@ -1,0 +1,401 @@
+import { and, desc, eq, isNull } from "drizzle-orm";
+import type { Db } from "./index";
+import {
+  baby,
+  diaperLog,
+  familyInvite,
+  feedLog,
+  member,
+  organization,
+  sleepLog,
+  user,
+} from "./schema";
+
+// The ONLY sanctioned way to touch domain tables. Every query in here is
+// scoped to one familyId; handlers never build their own domain queries.
+
+const feedCols = {
+  id: feedLog.id,
+  babyId: feedLog.babyId,
+  caretakerId: feedLog.caretakerId,
+  caretakerName: user.name,
+  time: feedLog.time,
+  type: feedLog.type,
+  amountMl: feedLog.amountMl,
+  side: feedLog.side,
+  durationMin: feedLog.durationMin,
+  notes: feedLog.notes,
+};
+
+const diaperCols = {
+  id: diaperLog.id,
+  babyId: diaperLog.babyId,
+  caretakerId: diaperLog.caretakerId,
+  caretakerName: user.name,
+  time: diaperLog.time,
+  type: diaperLog.type,
+  notes: diaperLog.notes,
+};
+
+const sleepCols = {
+  id: sleepLog.id,
+  babyId: sleepLog.babyId,
+  caretakerId: sleepLog.caretakerId,
+  caretakerName: user.name,
+  startTime: sleepLog.startTime,
+  endTime: sleepLog.endTime,
+  location: sleepLog.location,
+  notes: sleepLog.notes,
+};
+
+export function familyScope(db: Db, familyId: string) {
+  const feedScope = (babyId?: string) =>
+    and(
+      eq(feedLog.familyId, familyId),
+      babyId ? eq(feedLog.babyId, babyId) : undefined,
+    );
+  const diaperScope = (babyId?: string) =>
+    and(
+      eq(diaperLog.familyId, familyId),
+      babyId ? eq(diaperLog.babyId, babyId) : undefined,
+    );
+  const sleepScope = (babyId?: string) =>
+    and(
+      eq(sleepLog.familyId, familyId),
+      babyId ? eq(sleepLog.babyId, babyId) : undefined,
+    );
+
+  return {
+    familyId,
+
+    // --- family ---
+    async family() {
+      const rows = await db
+        .select({
+          id: organization.id,
+          name: organization.name,
+          slug: organization.slug,
+          plan: organization.plan,
+        })
+        .from(organization)
+        .where(eq(organization.id, familyId));
+      return rows[0] ?? null;
+    },
+
+    async members() {
+      return db
+        .select({
+          userId: member.userId,
+          name: user.name,
+          email: user.email,
+          role: member.role,
+          image: user.image,
+        })
+        .from(member)
+        .innerJoin(user, eq(member.userId, user.id))
+        .where(eq(member.organizationId, familyId));
+    },
+
+    // --- babies ---
+    async listBabies() {
+      return db
+        .select()
+        .from(baby)
+        .where(eq(baby.familyId, familyId))
+        .orderBy(baby.createdAt);
+    },
+
+    async getBaby(id: string) {
+      const rows = await db
+        .select()
+        .from(baby)
+        .where(and(eq(baby.id, id), eq(baby.familyId, familyId)));
+      return rows[0] ?? null;
+    },
+
+    async createBaby(data: { name: string; birthDate: Date }) {
+      const rows = await db
+        .insert(baby)
+        .values({ ...data, familyId })
+        .returning();
+      return rows[0]!;
+    },
+
+    // --- feeds ---
+    async listFeeds(opts: { babyId?: string; limit?: number } = {}) {
+      return db
+        .select(feedCols)
+        .from(feedLog)
+        .innerJoin(user, eq(feedLog.caretakerId, user.id))
+        .where(feedScope(opts.babyId))
+        .orderBy(desc(feedLog.time))
+        .limit(opts.limit ?? 50);
+    },
+
+    async getFeed(id: string) {
+      const rows = await db
+        .select(feedCols)
+        .from(feedLog)
+        .innerJoin(user, eq(feedLog.caretakerId, user.id))
+        .where(and(eq(feedLog.id, id), eq(feedLog.familyId, familyId)));
+      return rows[0] ?? null;
+    },
+
+    async createFeed(data: {
+      babyId: string;
+      caretakerId: string;
+      time: Date;
+      type: "bottle" | "breast" | "solids";
+      amountMl?: number | null;
+      side?: "left" | "right" | "both" | null;
+      durationMin?: number | null;
+      notes?: string | null;
+    }) {
+      const rows = await db
+        .insert(feedLog)
+        .values({ ...data, familyId })
+        .returning({ id: feedLog.id });
+      return this.getFeed(rows[0]!.id);
+    },
+
+    async updateFeed(
+      id: string,
+      patch: Partial<{
+        time: Date;
+        type: "bottle" | "breast" | "solids";
+        amountMl: number | null;
+        side: "left" | "right" | "both" | null;
+        durationMin: number | null;
+        notes: string | null;
+      }>,
+    ) {
+      const rows = await db
+        .update(feedLog)
+        .set(patch)
+        .where(and(eq(feedLog.id, id), eq(feedLog.familyId, familyId)))
+        .returning({ id: feedLog.id });
+      return rows[0] ? this.getFeed(id) : null;
+    },
+
+    async deleteFeed(id: string) {
+      const rows = await db
+        .delete(feedLog)
+        .where(and(eq(feedLog.id, id), eq(feedLog.familyId, familyId)))
+        .returning({ id: feedLog.id });
+      return rows.length > 0;
+    },
+
+    // --- diapers ---
+    async listDiapers(opts: { babyId?: string; limit?: number } = {}) {
+      return db
+        .select(diaperCols)
+        .from(diaperLog)
+        .innerJoin(user, eq(diaperLog.caretakerId, user.id))
+        .where(diaperScope(opts.babyId))
+        .orderBy(desc(diaperLog.time))
+        .limit(opts.limit ?? 50);
+    },
+
+    async getDiaper(id: string) {
+      const rows = await db
+        .select(diaperCols)
+        .from(diaperLog)
+        .innerJoin(user, eq(diaperLog.caretakerId, user.id))
+        .where(and(eq(diaperLog.id, id), eq(diaperLog.familyId, familyId)));
+      return rows[0] ?? null;
+    },
+
+    async createDiaper(data: {
+      babyId: string;
+      caretakerId: string;
+      time: Date;
+      type: "wet" | "dirty" | "both";
+      notes?: string | null;
+    }) {
+      const rows = await db
+        .insert(diaperLog)
+        .values({ ...data, familyId })
+        .returning({ id: diaperLog.id });
+      return this.getDiaper(rows[0]!.id);
+    },
+
+    async updateDiaper(
+      id: string,
+      patch: Partial<{
+        time: Date;
+        type: "wet" | "dirty" | "both";
+        notes: string | null;
+      }>,
+    ) {
+      const rows = await db
+        .update(diaperLog)
+        .set(patch)
+        .where(and(eq(diaperLog.id, id), eq(diaperLog.familyId, familyId)))
+        .returning({ id: diaperLog.id });
+      return rows[0] ? this.getDiaper(id) : null;
+    },
+
+    async deleteDiaper(id: string) {
+      const rows = await db
+        .delete(diaperLog)
+        .where(and(eq(diaperLog.id, id), eq(diaperLog.familyId, familyId)))
+        .returning({ id: diaperLog.id });
+      return rows.length > 0;
+    },
+
+    // --- sleep ---
+    async listSleeps(opts: { babyId?: string; limit?: number } = {}) {
+      return db
+        .select(sleepCols)
+        .from(sleepLog)
+        .innerJoin(user, eq(sleepLog.caretakerId, user.id))
+        .where(sleepScope(opts.babyId))
+        .orderBy(desc(sleepLog.startTime))
+        .limit(opts.limit ?? 50);
+    },
+
+    async getSleep(id: string) {
+      const rows = await db
+        .select(sleepCols)
+        .from(sleepLog)
+        .innerJoin(user, eq(sleepLog.caretakerId, user.id))
+        .where(and(eq(sleepLog.id, id), eq(sleepLog.familyId, familyId)));
+      return rows[0] ?? null;
+    },
+
+    // The active session for a baby (endTime IS NULL), if any.
+    async activeSleep(babyId?: string) {
+      const rows = await db
+        .select(sleepCols)
+        .from(sleepLog)
+        .innerJoin(user, eq(sleepLog.caretakerId, user.id))
+        .where(and(sleepScope(babyId), isNull(sleepLog.endTime)))
+        .orderBy(desc(sleepLog.startTime))
+        .limit(1);
+      return rows[0] ?? null;
+    },
+
+    async createSleep(data: {
+      babyId: string;
+      caretakerId: string;
+      startTime: Date;
+      endTime?: Date | null;
+      location?: string | null;
+      notes?: string | null;
+    }) {
+      const rows = await db
+        .insert(sleepLog)
+        .values({ ...data, familyId })
+        .returning({ id: sleepLog.id });
+      return this.getSleep(rows[0]!.id);
+    },
+
+    // Ends the active session; the NULL guard makes double-wake harmless.
+    async wakeSleep(id: string, endTime: Date) {
+      const rows = await db
+        .update(sleepLog)
+        .set({ endTime })
+        .where(
+          and(
+            eq(sleepLog.id, id),
+            eq(sleepLog.familyId, familyId),
+            isNull(sleepLog.endTime),
+          ),
+        )
+        .returning({ id: sleepLog.id });
+      return rows[0] ? this.getSleep(id) : null;
+    },
+
+    async updateSleep(
+      id: string,
+      patch: Partial<{
+        startTime: Date;
+        endTime: Date | null;
+        location: string | null;
+        notes: string | null;
+      }>,
+    ) {
+      const rows = await db
+        .update(sleepLog)
+        .set(patch)
+        .where(and(eq(sleepLog.id, id), eq(sleepLog.familyId, familyId)))
+        .returning({ id: sleepLog.id });
+      return rows[0] ? this.getSleep(id) : null;
+    },
+
+    async deleteSleep(id: string) {
+      const rows = await db
+        .delete(sleepLog)
+        .where(and(eq(sleepLog.id, id), eq(sleepLog.familyId, familyId)))
+        .returning({ id: sleepLog.id });
+      return rows.length > 0;
+    },
+
+    // One query bundle for the home screen glance.
+    async summary(babyId: string) {
+      const [feeds, diapers, active, sleeps] = await Promise.all([
+        this.listFeeds({ babyId, limit: 1 }),
+        this.listDiapers({ babyId, limit: 1 }),
+        this.activeSleep(babyId),
+        this.listSleeps({ babyId, limit: 1 }),
+      ]);
+      return {
+        lastFeed: feeds[0] ?? null,
+        lastDiaper: diapers[0] ?? null,
+        activeSleep: active,
+        lastSleep: sleeps[0] ?? null,
+      };
+    },
+
+    // --- invites (create/list/revoke; redeem lives outside the scope) ---
+    async createInvite(data: {
+      role: "admin" | "member";
+      expiresAt: Date;
+      maxUses: number;
+      createdBy: string;
+    }) {
+      const code = generateInviteCode();
+      const rows = await db
+        .insert(familyInvite)
+        .values({ ...data, code, familyId })
+        .returning();
+      return rows[0]!;
+    },
+
+    async listInvites() {
+      return db
+        .select()
+        .from(familyInvite)
+        .where(eq(familyInvite.familyId, familyId))
+        .orderBy(desc(familyInvite.createdAt));
+    },
+
+    async revokeInvite(code: string) {
+      const rows = await db
+        .update(familyInvite)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(
+            eq(familyInvite.code, code),
+            eq(familyInvite.familyId, familyId),
+            isNull(familyInvite.revokedAt),
+          ),
+        )
+        .returning({ code: familyInvite.code });
+      return rows.length > 0;
+    },
+  };
+}
+
+export type FamilyScope = ReturnType<typeof familyScope>;
+
+// Unambiguous alphabet (no 0/O/1/I) — codes get read aloud across a dinner
+// table.
+const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
+export function generateInviteCode(length = 8) {
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join(
+    "",
+  );
+}

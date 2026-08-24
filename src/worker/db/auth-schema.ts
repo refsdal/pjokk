@@ -54,6 +54,10 @@ export const account = sqliteTable(
   "account",
   {
     id: text("id").primaryKey(),
+    // Added by hand: better-auth ≥1.7 requires account.issuer (the deprecated
+    // generate CLI emits a stale schema without it). Local credential accounts
+    // use "local:credential"; OAuth uses the provider's issuer namespace.
+    issuer: text("issuer").notNull(),
     accountId: text("account_id").notNull(),
     providerId: text("provider_id").notNull(),
     userId: text("user_id")
@@ -77,7 +81,13 @@ export const account = sqliteTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [index("account_userId_idx").on(table.userId)],
+  (table) => [
+    index("account_userId_idx").on(table.userId),
+    uniqueIndex("account_issuer_accountId_uidx").on(
+      table.issuer,
+      table.accountId,
+    ),
+  ],
 );
 
 export const verification = sqliteTable(
