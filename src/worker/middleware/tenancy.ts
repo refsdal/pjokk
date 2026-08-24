@@ -5,11 +5,14 @@ import { schema } from "../db";
 import { familyScope } from "../db/scoped";
 
 // Resolves the session once per request; never rejects (routes decide).
+// Skipped when API-key auth already populated a synthetic session.
 export const sessionMiddleware = createMiddleware<AppEnv>(async (c, next) => {
-  const session = await c.var.auth.api.getSession({
-    headers: c.req.raw.headers,
-  });
-  c.set("sessionData", session ?? null);
+  if (!c.get("sessionData")) {
+    const session = await c.var.auth.api.getSession({
+      headers: c.req.raw.headers,
+    });
+    c.set("sessionData", session ?? null);
+  }
   await next();
 });
 
@@ -46,6 +49,12 @@ export const requireFamily = createMiddleware<FamEnv>(async (c, next) => {
 });
 
 export const requireAdmin = createMiddleware<FamEnv>(async (c, next) => {
+  if (c.get("apiKeyAuth")) {
+    return c.json(
+      { error: "Not available to API keys", code: "FORBIDDEN" },
+      403,
+    );
+  }
   const role = c.var.memberRole;
   if (role !== "admin" && role !== "owner") {
     return c.json({ error: "Admin only", code: "FORBIDDEN" }, 403);

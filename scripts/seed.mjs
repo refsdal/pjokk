@@ -68,7 +68,7 @@ rows.push(
 // Nora, born ~10 months ago.
 const birth = now - Math.round(10 * 30.4 * 24) * H;
 rows.push(
-  `INSERT INTO baby (id, family_id, name, birth_date, created_at) VALUES (${esc(NORA)}, ${esc(FAM)}, 'Nora', ${birth}, ${now});`,
+  `INSERT INTO baby (id, family_id, name, birth_date, sex, created_at) VALUES (${esc(NORA)}, ${esc(FAM)}, 'Nora', ${birth}, 'girl', ${now});`,
 );
 
 const feed = (hoursAgo, by, type, extra) =>

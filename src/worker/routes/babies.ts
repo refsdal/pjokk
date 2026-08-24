@@ -5,6 +5,7 @@ import {
   ErrorSchema,
   MemberSchema,
   FamilySchema,
+  UpdateBabySchema,
 } from "@shared/schemas";
 import type { FamEnv } from "../context";
 import { createApp, jsonContent, serBaby } from "../lib";
@@ -27,6 +28,20 @@ const createBaby = createRoute({
   },
   responses: {
     201: jsonContent(BabySchema, "Created"),
+  },
+});
+
+const updateBaby = createRoute({
+  method: "patch",
+  path: "/api/babies/{id}",
+  tags: ["babies"],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { "application/json": { schema: UpdateBabySchema } } },
+  },
+  responses: {
+    200: jsonContent(BabySchema, "Updated"),
+    404: jsonContent(ErrorSchema, "Not found"),
   },
 });
 
@@ -59,8 +74,21 @@ export const babiesApp = createApp<FamEnv>()
     const created = await c.var.fam.createBaby({
       name: body.name,
       birthDate: new Date(body.birthDate),
+      sex: body.sex ?? null,
     });
     return c.json(serBaby(created), 201);
+  })
+  .openapi(updateBaby, async (c) => {
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
+    const updated = await c.var.fam.updateBaby(id, {
+      ...body,
+      birthDate: body.birthDate ? new Date(body.birthDate) : undefined,
+    });
+    if (!updated) {
+      return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+    }
+    return c.json(serBaby(updated), 200);
   })
   .openapi(listMembers, async (c) => {
     return c.json(await c.var.fam.members(), 200);

@@ -1,0 +1,127 @@
+import { describe, expect, it } from "vitest";
+import { api, rig } from "./helpers";
+import { SELF } from "cloudflare:test";
+
+const keyApi = (
+  path: string,
+  key: string,
+  opts: { method?: string; body?: unknown } = {},
+) =>
+  SELF.fetch(`http://localhost${path}`, {
+    method: opts.method ?? "GET",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${key}`,
+    },
+    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+  });
+
+describe("api keys", () => {
+  it("admin creates a key; the raw key appears exactly once", async () => {
+    const a = await rig();
+    const res = await api("/api/keys", {
+      method: "POST",
+      cookie: a.cookie,
+      body: { name: "Home Assistant" },
+    });
+    expect(res.status).toBe(201);
+    const created = (await res.json()) as { key: string; prefix: string };
+    expect(created.key.startsWith("pjk_")).toBe(true);
+    expect(created.key.startsWith(created.prefix)).toBe(true);
+
+    const list = (await (
+      await api("/api/keys", { cookie: a.cookie })
+    ).json()) as Record<string, unknown>[];
+    expect(list).toHaveLength(1);
+    expect(list[0]!.name).toBe("Home Assistant");
+    expect("key" in list[0]!).toBe(false);
+  });
+
+  it("keys read and write logs, attributed to the creator", async () => {
+    const a = await rig();
+    const { key } = (await (
+      await api("/api/keys", {
+        method: "POST",
+        cookie: a.cookie,
+        body: { name: "HA" },
+      })
+    ).json()) as { key: string };
+
+    const post = await keyApi("/api/feeds", key, {
+      method: "POST",
+      body: {
+        babyId: a.baby.id,
+        time: new Date().toISOString(),
+        type: "bottle",
+        amountMl: 140,
+      },
+    });
+    expect(post.status).toBe(201);
+    expect(
+      ((await post.json()) as { caretakerName: string }).caretakerName,
+    ).toBe("Rig admin");
+
+    const summary = await keyApi(`/api/summary?babyId=${a.baby.id}`, key);
+    expect(summary.status).toBe(200);
+    expect(
+      ((await summary.json()) as { lastFeed: { amountMl: number } }).lastFeed
+        .amountMl,
+    ).toBe(140);
+  });
+
+  it("keys are refused by admin and device-bound endpoints", async () => {
+    const a = await rig();
+    const { key } = (await (
+      await api("/api/keys", {
+        method: "POST",
+        cookie: a.cookie,
+        body: { name: "HA" },
+      })
+    ).json()) as { key: string };
+
+    expect(
+      (await keyApi("/api/keys", key, { method: "POST", body: { name: "x" } }))
+        .status,
+    ).toBe(403);
+    expect(
+      (await keyApi("/api/invites", key, { method: "POST", body: {} })).status,
+    ).toBe(403);
+    expect(
+      (
+        await keyApi("/api/push/test", key, { method: "POST", body: {} })
+      ).status,
+    ).toBe(403);
+  });
+
+  it("revoked and bogus keys get 401", async () => {
+    const a = await rig();
+    const created = (await (
+      await api("/api/keys", {
+        method: "POST",
+        cookie: a.cookie,
+        body: { name: "HA" },
+      })
+    ).json()) as { id: string; key: string };
+
+    expect((await keyApi("/api/babies", created.key)).status).toBe(200);
+    await api(`/api/keys/${created.id}`, { method: "DELETE", cookie: a.cookie });
+    expect((await keyApi("/api/babies", created.key)).status).toBe(401);
+    expect((await keyApi("/api/babies", "pjk_bogus")).status).toBe(401);
+  });
+});
+
+describe("baby sex", () => {
+  it("patches sex and reflects it in responses", async () => {
+    const a = await rig();
+    const patch = await api(`/api/babies/${a.baby.id}`, {
+      method: "PATCH",
+      cookie: a.cookie,
+      body: { sex: "girl" },
+    });
+    expect(patch.status).toBe(200);
+    const babies = (await (
+      await api("/api/babies", { cookie: a.cookie })
+    ).json()) as { sex: string | null }[];
+    expect(babies[0]!.sex).toBe("girl");
+  });
+});

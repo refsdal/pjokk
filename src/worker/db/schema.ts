@@ -36,9 +36,35 @@ export const baby = sqliteTable(
     familyId: familyId(),
     name: text("name").notNull(),
     birthDate: integer("birth_date", { mode: "timestamp_ms" }).notNull(),
+    // Needed for WHO growth percentiles; nullable so existing babies keep
+    // working until it's set.
+    sex: text("sex", { enum: ["girl", "boy"] }),
     createdAt: createdAt(),
   },
   (t) => [index("baby_family_idx").on(t.familyId)],
+);
+
+// API keys (Phase 7): per-family bearer keys for Home Assistant/Grafana.
+// The key itself is shown once; only its SHA-256 lands here. Keys act as the
+// creating caretaker (attribution) and can read + write logs, but never
+// touch admin/device endpoints.
+export const apiKey = sqliteTable(
+  "api_key",
+  {
+    id: id(),
+    familyId: familyId(),
+    name: text("name").notNull(),
+    keyHash: text("key_hash").notNull().unique(),
+    // First characters of the key, for recognizing it in the list UI.
+    prefix: text("prefix").notNull(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
+    lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
+    revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("api_key_family_idx").on(t.familyId)],
 );
 
 export const sleepLog = sqliteTable(

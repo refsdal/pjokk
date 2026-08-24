@@ -2,6 +2,7 @@ import { and, desc, eq, gt, gte, isNull, lt, or } from "drizzle-orm";
 import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
 import type { Db } from "./index";
 import {
+  apiKey,
   baby,
   bathLog,
   diaperLog,
@@ -244,12 +245,32 @@ export function familyScope(db: Db, familyId: string) {
       return rows[0] ?? null;
     },
 
-    async createBaby(data: { name: string; birthDate: Date }) {
+    async createBaby(data: {
+      name: string;
+      birthDate: Date;
+      sex?: "girl" | "boy" | null;
+    }) {
       const rows = await db
         .insert(baby)
         .values({ ...data, familyId })
         .returning();
       return rows[0]!;
+    },
+
+    async updateBaby(
+      id: string,
+      patch: Partial<{
+        name: string;
+        birthDate: Date;
+        sex: "girl" | "boy" | null;
+      }>,
+    ) {
+      const rows = await db
+        .update(baby)
+        .set(patch)
+        .where(and(eq(baby.id, id), eq(baby.familyId, familyId)))
+        .returning();
+      return rows[0] ?? null;
     },
 
     // --- feeds ---
@@ -604,6 +625,45 @@ export function familyScope(db: Db, familyId: string) {
       notes: pumpLog.notes,
     }),
 
+    // --- API keys (admin-managed; the raw key exists only in the return) ---
+    async createApiKey(data: { name: string; createdBy: string }) {
+      const raw = generateApiKey();
+      const rows = await db
+        .insert(apiKey)
+        .values({
+          familyId,
+          name: data.name,
+          createdBy: data.createdBy,
+          keyHash: await sha256Hex(raw),
+          prefix: raw.slice(0, 12),
+        })
+        .returning();
+      return { row: rows[0]!, key: raw };
+    },
+
+    async listApiKeys() {
+      return db
+        .select()
+        .from(apiKey)
+        .where(eq(apiKey.familyId, familyId))
+        .orderBy(desc(apiKey.createdAt));
+    },
+
+    async revokeApiKey(id: string) {
+      const rows = await db
+        .update(apiKey)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(
+            eq(apiKey.id, id),
+            eq(apiKey.familyId, familyId),
+            isNull(apiKey.revokedAt),
+          ),
+        )
+        .returning({ id: apiKey.id });
+      return rows.length > 0;
+    },
+
     // --- invites (create/list/revoke; redeem lives outside the scope) ---
     async createInvite(data: {
       role: "admin" | "member";
@@ -645,6 +705,25 @@ export function familyScope(db: Db, familyId: string) {
 }
 
 export type FamilyScope = ReturnType<typeof familyScope>;
+
+export async function sha256Hex(input: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(input),
+  );
+  return [...new Uint8Array(digest)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function generateApiKey(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  const b64 = btoa(String.fromCharCode(...bytes))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
+  return `pjk_${b64}`;
+}
 
 // Unambiguous alphabet (no 0/O/1/I) — codes get read aloud across a dinner
 // table.

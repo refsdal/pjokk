@@ -22,6 +22,13 @@
       "when": 1787601804628,
       "tag": "0002_phase5-push",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1787604337440,
+      "tag": "0003_phase7-sex-apikeys",
+      "breakpoints": true
     }
   ]
 }

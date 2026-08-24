@@ -9,7 +9,9 @@ import { babiesApp } from "./routes/babies";
 import { diapersApp } from "./routes/diapers";
 import { feedsApp } from "./routes/feeds";
 import { invitesAdminApp, invitesPublicApp } from "./routes/invites";
+import { apiKeyAuth, rejectApiKey } from "./middleware/api-key";
 import { exportApp } from "./routes/export";
+import { keysApp } from "./routes/keys";
 import { otherLogsApp } from "./routes/other-logs";
 import { pushApp } from "./routes/push";
 import { statsApp } from "./routes/stats";
@@ -35,6 +37,9 @@ app.on(["GET", "POST"], "/api/auth/*", (c) =>
   (c.var.auth as ReturnType<typeof createAuth>).handler(c.req.raw),
 );
 
+// pjk_ bearer keys resolve to a synthetic session; sessionMiddleware then
+// skips cookie/session resolution for those requests.
+app.use("/api/*", apiKeyAuth);
 app.use("/api/*", sessionMiddleware);
 
 // Everything below /api (except auth + public invite endpoints) requires an
@@ -45,6 +50,10 @@ const domainBase = createApp<FamEnv>();
 domainBase.use("/api/*", requireFamily);
 domainBase.use("/api/invites", requireAdmin);
 domainBase.use("/api/invites/*", requireAdmin);
+domainBase.use("/api/keys", requireAdmin);
+domainBase.use("/api/keys/*", requireAdmin);
+// Push subscriptions are device-bound; keys have no business there.
+domainBase.use("/api/push/*", rejectApiKey);
 const domainApp = domainBase
   .route("/", babiesApp)
   .route("/", feedsApp)
@@ -55,6 +64,7 @@ const domainApp = domainBase
   .route("/", statsApp)
   .route("/", exportApp)
   .route("/", pushApp)
+  .route("/", keysApp)
   .route("/", invitesAdminApp);
 
 // Docs are public: registered before the tenancy-gated domain mount so the

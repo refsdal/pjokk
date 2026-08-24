@@ -140,6 +140,21 @@ export function useStats(babyId: string | undefined, days: 7 | 30) {
   });
 }
 
+export function useMeasurements(babyId: string | undefined) {
+  return useQuery({
+    queryKey: ["other", "measurement", babyId, "all"],
+    enabled: !!babyId,
+    queryFn: async () =>
+      unwrap<
+        { time: string; type: "weight" | "length" | "head"; value: number }[]
+      >(
+        await api.measurements.$get({
+          query: { babyId: babyId!, limit: "200" },
+        }),
+      ),
+  });
+}
+
 export function useMembers() {
   return useQuery({
     queryKey: ["members"],

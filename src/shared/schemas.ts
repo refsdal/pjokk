@@ -12,11 +12,14 @@ const isoTime = () => z.iso.datetime({ offset: true });
 
 // --- Babies ---
 
+export const babySexes = ["girl", "boy"] as const;
+
 export const BabySchema = z
   .object({
     id: z.string(),
     name: z.string(),
     birthDate: isoTime(),
+    sex: z.enum(babySexes).nullable(),
   })
   .openapi("Baby");
 
@@ -24,8 +27,17 @@ export const CreateBabySchema = z
   .object({
     name: z.string().min(1).max(100),
     birthDate: isoTime(),
+    sex: z.enum(babySexes).optional(),
   })
   .openapi("CreateBaby");
+
+export const UpdateBabySchema = z
+  .object({
+    name: z.string().min(1).max(100).optional(),
+    birthDate: isoTime().optional(),
+    sex: z.enum(babySexes).nullable().optional(),
+  })
+  .openapi("UpdateBaby");
 
 // --- Logs ---
 
@@ -332,6 +344,28 @@ export const StatsSchema = z
   })
   .openapi("Stats");
 
+// --- API keys (Phase 7) ---
+
+export const ApiKeySchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    prefix: z.string(),
+    createdAt: isoTime(),
+    lastUsedAt: isoTime().nullable(),
+    revokedAt: isoTime().nullable(),
+  })
+  .openapi("ApiKey");
+
+export const CreateApiKeySchema = z
+  .object({ name: z.string().min(1).max(60) })
+  .openapi("CreateApiKey");
+
+// The full key appears here ONCE and is never retrievable again.
+export const ApiKeyCreatedSchema = ApiKeySchema.extend({
+  key: z.string(),
+}).openapi("ApiKeyCreated");
+
 // --- Web push (Phase 5) ---
 
 export const feedReminderChoices = [0, 3, 4, 6] as const;
@@ -464,3 +498,6 @@ export type MedicineUnit = (typeof medicineUnits)[number];
 export type MeasurementType = (typeof measurementTypes)[number];
 export type Stats = z.infer<typeof StatsSchema>;
 export type StatsDay = z.infer<typeof StatsDaySchema>;
+export type BabySex = (typeof babySexes)[number];
+export type ApiKey = z.infer<typeof ApiKeySchema>;
+export type ApiKeyCreated = z.infer<typeof ApiKeyCreatedSchema>;

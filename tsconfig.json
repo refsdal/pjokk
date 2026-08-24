@@ -29,7 +29,8 @@
       "@shared/*": [
         "./src/shared/*"
       ]
-    }
+    },
+    "resolveJsonModule": true
   },
   "include": [
     "src/web",

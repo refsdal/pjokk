@@ -133,6 +133,25 @@ choices, noted so they can be revisited deliberately.
   type icons as `Icon` from the package (function components, not
   ForwardRef like lucide).
 
+## Phase 7 (growth, Norwegian, API keys)
+
+- **WHO LMS data is real, sourced data** (never from model memory): the
+  weight-for-age tables came from GlobalStrategies/jsgrowup (repackaged WHO
+  igrowup tables; anchors verified against published medians, e.g. boys
+  birth M=3.3464). Bundled as a 3.2 kB JSON; percentile math is client-side
+  (LMS → z → Φ(z), Abramowitz–Stegun erf).
+- **baby.sex is nullable** ("girl"/"boy"); percentiles and the growth chart
+  simply don't render until it's set (Settings → Babies → tap → Edit).
+- **Language is device-local** (auto → nb for nb/nn/no devices, else en;
+  manual override in Settings). t() reads a module-level dictionary keyed by
+  the English source string; a state bump in AppearanceProvider re-renders
+  the tree on change. Dynamic keys (e.g. "Edit "+label) resolve because the
+  keys are built from English constants.
+- **API keys are read+write** (user's choice — enables HA automations that
+  log): they authenticate as the creating caretaker (attribution), are
+  SHA-256-stored/shown once (pjk_ prefix kept for the list UI), refuse
+  admin + push endpoints, and track lastUsedAt coarsely (≥5 min apart).
+
 ## Infra
 
 - **Deployed to the Refsdal Holding AS Cloudflare account**

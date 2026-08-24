@@ -13,6 +13,7 @@ export default defineConfig(async () => {
     resolve: {
       alias: {
         "@shared": path.resolve(import.meta.dirname, "src/shared"),
+        "@": path.resolve(import.meta.dirname, "src/web"),
       },
     },
     plugins: [

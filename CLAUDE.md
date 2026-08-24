@@ -188,7 +188,12 @@ sheet pattern — build the pattern well once.
 > Phase 6 delivered the full Tabler icon swap: lucide-react is gone, all
 > icons are @tabler/icons-react (Feed=baby-bottle, Diaper=diaper,
 > Pump=milk; the attached-note indicator and the Note activity now share
-> IconNote deliberately).
+> IconNote deliberately). Phase 7 (partial) delivered WHO growth
+> percentiles + growth chart (baby.sex field, bundled WHO LMS JSON,
+> client-side math), Norwegian translation (auto-from-device + manual
+> toggle; dictionary in lib/i18n.ts), and read+write API keys for
+> HA/Grafana (pjk_ bearer keys, Settings → API keys). Still on the
+> Phase 7 backlog: PDF report, kiosk/PIN mode, Capacitor shell.
 > Also already in place ahead of schedule: night mode (scheduled + manual),
 > minimal Settings (members, invite link w/ QR + revoke, night mode, sign
 > out), PWA update toast, offline persist + paused-mutation queue.

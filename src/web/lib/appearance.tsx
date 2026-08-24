@@ -6,6 +6,11 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import {
+  getLanguageMode,
+  setLanguageMode as applyLanguageMode,
+  type LanguageMode,
+} from "./i18n";
 import { useNight } from "./night";
 
 // Two independent layers:
@@ -31,6 +36,8 @@ type AppearanceValue = ReturnType<typeof useNight> & {
   themeMode: ThemeMode;
   setThemeMode: (m: ThemeMode) => void;
   dark: boolean;
+  languageMode: LanguageMode;
+  setLanguage: (m: LanguageMode) => void;
 };
 
 const AppearanceContext = createContext<AppearanceValue | null>(null);
@@ -82,9 +89,25 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     setThemeModeState(m);
   }, []);
 
+  // Language: t() reads a module-level dictionary; this state exists purely
+  // to re-render the tree when the language changes.
+  const [languageMode, setLanguageModeState] =
+    useState<LanguageMode>(getLanguageMode);
+  const setLanguage = useCallback((m: LanguageMode) => {
+    applyLanguageMode(m);
+    setLanguageModeState(m);
+  }, []);
+
   return (
     <AppearanceContext.Provider
-      value={{ ...nightValue, themeMode, setThemeMode, dark }}
+      value={{
+        ...nightValue,
+        themeMode,
+        setThemeMode,
+        dark,
+        languageMode,
+        setLanguage,
+      }}
     >
       {children}
     </AppearanceContext.Provider>

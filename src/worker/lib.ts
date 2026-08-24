@@ -51,6 +51,16 @@ export function serSleep<T extends { startTime: Date; endTime: Date | null }>(
   };
 }
 
-export function serBaby(row: { id: string; name: string; birthDate: Date }) {
-  return { id: row.id, name: row.name, birthDate: iso(row.birthDate) };
+export function serBaby(row: {
+  id: string;
+  name: string;
+  birthDate: Date;
+  sex: "girl" | "boy" | null;
+}) {
+  return {
+    id: row.id,
+    name: row.name,
+    birthDate: iso(row.birthDate),
+    sex: row.sex,
+  };
 }

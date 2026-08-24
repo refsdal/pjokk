@@ -11,6 +11,9 @@ export type AppEnv = {
     auth: Auth;
     db: Db;
     sessionData: SessionData | null;
+    // True when the request authenticated with a pjk_ API key rather than a
+    // browser session; admin + device-bound endpoints refuse these.
+    apiKeyAuth?: boolean;
   };
 };
 

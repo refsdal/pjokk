@@ -1,6 +1,7 @@
 import { Navigate, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { ChipGroup } from "@/components/Chips";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, unwrap } from "@/lib/api";
@@ -19,6 +20,7 @@ export function WelcomeScreen() {
   const [familyName, setFamilyName] = useState("");
   const [babyName, setBabyName] = useState("");
   const [birthDate, setBirthDate] = useState("");
+  const [sex, setSex] = useState<"girl" | "boy" | null>(null);
   const [busy, setBusy] = useState(false);
 
   if (!isPending && !session) {
@@ -53,6 +55,7 @@ export function WelcomeScreen() {
           json: {
             name: babyName.trim(),
             birthDate: new Date(birthDate).toISOString(),
+            ...(sex ? { sex } : {}),
           },
         }),
       );
@@ -107,6 +110,14 @@ export function WelcomeScreen() {
             placeholder={t("Baby's name")}
             value={babyName}
             onChange={(e) => setBabyName(e.target.value)}
+          />
+          <ChipGroup
+            options={[
+              { value: "girl", label: t("Girl") },
+              { value: "boy", label: t("Boy") },
+            ]}
+            value={sex}
+            onChange={setSex}
           />
           <label className="block text-sm font-medium text-ink-soft">
             {t("Birth date")}

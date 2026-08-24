@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
-import type { Invite } from "@shared/schemas";
+import type { ApiKey, ApiKeyCreated, Baby, Invite } from "@shared/schemas";
 import { ChipGroup } from "@/components/Chips";
+import { Sheet } from "@/components/Sheet";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { API_BASE, api, unwrap } from "@/lib/api";
 import { signOut, useSession } from "@/lib/auth-client";
 import { useBabies, useInvites, useMembers } from "@/lib/data";
@@ -17,7 +19,7 @@ import {
   pushSupported,
   sendTestPush,
 } from "@/lib/push";
-import { formatAge } from "@/lib/time";
+import { formatAge, formatRelative } from "@/lib/time";
 import { toast } from "@/lib/toast";
 
 function SectionTitle({ children }: { children: string }) {
@@ -42,6 +44,182 @@ function InviteQR({ url }: { url: string }) {
       alt={t("Invite QR code")}
       className="mx-auto h-48 w-48 rounded-xl"
     />
+  );
+}
+
+function BabyEditSheet({
+  baby,
+  onOpenChange,
+}: {
+  baby: Baby | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [name, setName] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [sex, setSex] = useState<"girl" | "boy" | null>(null);
+  const [wasOpen, setWasOpen] = useState(false);
+
+  if (baby && !wasOpen) {
+    setWasOpen(true);
+    setName(baby.name);
+    setBirthDate(new Date(baby.birthDate).toISOString().slice(0, 10));
+    setSex(baby.sex);
+  }
+  if (!baby && wasOpen) setWasOpen(false);
+
+  const save = useMutation({
+    mutationFn: async () =>
+      unwrap(
+        await api.babies[":id"].$patch({
+          param: { id: baby!.id },
+          json: {
+            name: name.trim(),
+            birthDate: new Date(birthDate).toISOString(),
+            sex,
+          },
+        }),
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["babies"] });
+      onOpenChange(false);
+    },
+    onError: (err) => toast(err.message, "error"),
+  });
+
+  return (
+    <Sheet open={!!baby} onOpenChange={onOpenChange} title={t("Edit baby")}>
+      <div className="space-y-5 pb-4">
+        <Input value={name} onChange={(e) => setName(e.target.value)} />
+        <ChipGroup
+          options={[
+            { value: "girl", label: t("Girl") },
+            { value: "boy", label: t("Boy") },
+          ]}
+          value={sex}
+          onChange={setSex}
+        />
+        <input
+          type="date"
+          value={birthDate}
+          max={new Date().toISOString().slice(0, 10)}
+          onChange={(e) => setBirthDate(e.target.value)}
+          className="h-12 w-full rounded-xl2 border border-line bg-surface px-4 text-base text-ink"
+        />
+        <Button
+          size="full"
+          onClick={() => save.mutate()}
+          disabled={save.isPending || name.trim().length === 0 || !birthDate}
+        >
+          {t("Save")}
+        </Button>
+        {!sex && (
+          <p className="text-xs text-muted">
+            {t("Sex is only used for WHO growth percentiles.")}
+          </p>
+        )}
+      </div>
+    </Sheet>
+  );
+}
+
+function ApiKeysSection() {
+  const queryClient = useQueryClient();
+  const [name, setName] = useState("");
+  const [freshKey, setFreshKey] = useState<ApiKeyCreated | null>(null);
+
+  const keys = useQuery({
+    queryKey: ["apiKeys"],
+    queryFn: async () => unwrap<ApiKey[]>(await api.keys.$get()),
+  });
+
+  const createKey = useMutation({
+    mutationFn: async () =>
+      unwrap<ApiKeyCreated>(
+        await api.keys.$post({ json: { name: name.trim() } }),
+      ),
+    onSuccess: (created) => {
+      setFreshKey(created);
+      setName("");
+      void queryClient.invalidateQueries({ queryKey: ["apiKeys"] });
+    },
+    onError: (err) => toast(err.message, "error"),
+  });
+
+  const revokeKey = useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await api.keys[":id"].$delete({ param: { id } })),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ["apiKeys"] }),
+  });
+
+  const activeKeys = (keys.data ?? []).filter((k) => !k.revokedAt);
+
+  return (
+    <Card className="space-y-4">
+      <p className="text-sm text-muted">
+        {t(
+          "Bearer keys for Home Assistant, Grafana & friends. Keys can read and log, but never manage the family.",
+        )}
+      </p>
+
+      {freshKey && (
+        <div className="space-y-2 rounded-xl2 bg-accent-soft p-3">
+          <p className="text-xs font-semibold text-accent">
+            {t("Copy this key now — it will never be shown again")}
+          </p>
+          <p className="font-mono text-xs break-all text-ink">{freshKey.key}</p>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() =>
+              void navigator.clipboard
+                .writeText(freshKey.key)
+                .then(() => toast(t("Key copied")))
+            }
+          >
+            {t("Copy key")}
+          </Button>
+        </div>
+      )}
+
+      {activeKeys.map((k) => (
+        <div key={k.id} className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-ink">{k.name}</p>
+            <p className="truncate font-mono text-xs text-muted">
+              {k.prefix}…{" · "}
+              {k.lastUsedAt
+                ? `${t("used")} ${formatRelative(new Date(k.lastUsedAt))}`
+                : t("never used")}
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-danger"
+            onClick={() => revokeKey.mutate(k.id)}
+          >
+            {t("Revoke")}
+          </Button>
+        </div>
+      ))}
+
+      <div className="flex gap-2">
+        <Input
+          placeholder={t("Key name (e.g. “Home Assistant”)")}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <Button
+          variant="secondary"
+          disabled={createKey.isPending || name.trim().length === 0}
+          onClick={() => createKey.mutate()}
+        >
+          {t("Create")}
+        </Button>
+      </div>
+    </Card>
   );
 }
 
@@ -156,8 +334,16 @@ export function SettingsScreen() {
   const queryClient = useQueryClient();
   const members = useMembers();
   const babies = useBabies();
-  const { mode, setMode, schedule, setSchedule, themeMode, setThemeMode } =
-    useAppearance();
+  const {
+    mode,
+    setMode,
+    schedule,
+    setSchedule,
+    themeMode,
+    setThemeMode,
+    languageMode,
+    setLanguage,
+  } = useAppearance();
 
   const myRole = members.data?.find(
     (m) => m.userId === session?.user.id,
@@ -166,6 +352,7 @@ export function SettingsScreen() {
 
   const invites = useInvites(isAdmin);
   const [shownInvite, setShownInvite] = useState<Invite | null>(null);
+  const [editBaby, setEditBaby] = useState<Baby | null>(null);
 
   const activeInvites = (invites.data ?? []).filter(
     (i) =>
@@ -288,12 +475,18 @@ export function SettingsScreen() {
         <SectionTitle>{t("Babies")}</SectionTitle>
         <Card className="divide-y divide-line p-0">
           {(babies.data ?? []).map((b) => (
-            <div key={b.id} className="flex items-center justify-between px-4 py-3">
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => setEditBaby(b)}
+              className="flex w-full items-center justify-between px-4 py-3 text-left active:bg-surface-2"
+            >
               <p className="font-semibold text-ink">{b.name}</p>
               <p className="text-sm text-muted">
                 {formatAge(new Date(b.birthDate))}
+                {b.sex ? "" : ` · ${t("sex not set")}`}
               </p>
-            </div>
+            </button>
           ))}
         </Card>
 
@@ -310,6 +503,19 @@ export function SettingsScreen() {
             ]}
             value={themeMode}
             onChange={setThemeMode}
+          />
+        </Card>
+
+        <SectionTitle>{t("Language")}</SectionTitle>
+        <Card>
+          <ChipGroup
+            options={[
+              { value: "auto", label: t("Auto") },
+              { value: "en", label: "English" },
+              { value: "nb", label: "Norsk" },
+            ]}
+            value={languageMode}
+            onChange={setLanguage}
           />
         </Card>
 
@@ -366,6 +572,13 @@ export function SettingsScreen() {
           )}
         </Card>
 
+        {isAdmin && (
+          <>
+            <SectionTitle>{t("API keys")}</SectionTitle>
+            <ApiKeysSection />
+          </>
+        )}
+
         <SectionTitle>{t("Data")}</SectionTitle>
         <Card className="space-y-3">
           <p className="text-sm text-muted">
@@ -405,6 +618,11 @@ export function SettingsScreen() {
           </a>
           {" · Pjokk 0.1"}
         </p>
+
+        <BabyEditSheet
+          baby={editBaby}
+          onOpenChange={(o) => !o && setEditBaby(null)}
+        />
       </div>
     </div>
   );

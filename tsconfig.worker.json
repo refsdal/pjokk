@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2023"],
+    "lib": [
+      "ES2023"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
@@ -12,10 +14,24 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["@cloudflare/vitest-pool-workers/types"],
+    "types": [
+      "@cloudflare/vitest-pool-workers/types"
+    ],
     "paths": {
-      "@shared/*": ["./src/shared/*"]
-    }
+      "@shared/*": [
+        "./src/shared/*"
+      ],
+      "@/*": [
+        "./src/web/*"
+      ]
+    },
+    "resolveJsonModule": true
   },
-  "include": ["src/worker", "src/shared", "test", "worker-configuration.d.ts", "vitest.config.ts"]
+  "include": [
+    "src/worker",
+    "src/shared",
+    "test",
+    "worker-configuration.d.ts",
+    "vitest.config.ts"
+  ]
 }

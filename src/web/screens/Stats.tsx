@@ -2,13 +2,25 @@ import { useState } from "react";
 import {
   Bar,
   BarChart,
+  ComposedChart,
+  Line,
   ResponsiveContainer,
+  Scatter,
   Tooltip,
   XAxis,
+  YAxis,
 } from "recharts";
 import { IconBabyBottle, IconMoon, IconRuler } from "@tabler/icons-react";
+import type { Baby } from "@shared/schemas";
 import { Card } from "@/components/ui/card";
-import { useBabies, useStats } from "@/lib/data";
+import { useBabies, useMeasurements, useStats } from "@/lib/data";
+import {
+  ageInMonths,
+  formatPercentile,
+  referenceCurves,
+  referenceWeight,
+  weightPercentile,
+} from "@/lib/growth";
 import { t } from "@/lib/i18n";
 import { formatRelative } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -49,6 +61,92 @@ function StatCard({
   );
 }
 
+// WHO growth chart: the baby's weights against the P3/P50/P97 reference
+// curves for their sex. Rendered only when sex is set and there's data.
+function GrowthChart({ baby }: { baby: Baby }) {
+  const measurements = useMeasurements(baby.id);
+  const sex = baby.sex;
+  if (!sex) return null;
+
+  const weights = (measurements.data ?? [])
+    .filter((m) => m.type === "weight")
+    .map((m) => ({
+      age: ageInMonths(new Date(baby.birthDate), new Date(m.time)),
+      kg: m.value,
+    }))
+    .filter((m) => m.age >= 0 && m.age <= 60)
+    .sort((a, b) => a.age - b.age);
+  if (weights.length === 0) return null;
+
+  const maxAge = Math.min(
+    60,
+    Math.max(12, Math.ceil(weights[weights.length - 1]!.age) + 2),
+  );
+  const chartData: Record<string, number | null>[] = [];
+  for (let m = 0; m <= maxAge; m++) {
+    const row: Record<string, number | null> = { age: m };
+    for (const curve of referenceCurves) {
+      row[curve.label] = referenceWeight(sex, m, curve.z);
+    }
+    chartData.push(row);
+  }
+  for (const w of weights) {
+    chartData.push({ age: w.age, baby: w.kg });
+  }
+  chartData.sort((a, b) => (a.age ?? 0) - (b.age ?? 0));
+
+  return (
+    <Card>
+      <p className="pb-3 text-xs font-semibold tracking-wide text-muted uppercase">
+        {t("Growth (WHO weight-for-age)")}
+      </p>
+      <div className="h-52">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart
+            data={chartData}
+            margin={{ top: 4, right: 4, left: -22, bottom: 0 }}
+          >
+            <XAxis
+              dataKey="age"
+              type="number"
+              domain={[0, maxAge]}
+              tickCount={Math.min(7, maxAge + 1)}
+              tickLine={false}
+              axisLine={false}
+              tick={{ fontSize: 11, fill: "var(--color-muted)" }}
+            />
+            <YAxis
+              domain={["auto", "auto"]}
+              tickLine={false}
+              axisLine={false}
+              tick={{ fontSize: 11, fill: "var(--color-muted)" }}
+            />
+            {referenceCurves.map((curve) => (
+              <Line
+                key={curve.label}
+                dataKey={curve.label}
+                stroke="var(--color-line)"
+                strokeWidth={curve.z === 0 ? 2 : 1}
+                dot={false}
+                connectNulls
+                isAnimationActive={false}
+              />
+            ))}
+            <Scatter
+              dataKey="baby"
+              fill="var(--color-growth)"
+              isAnimationActive={false}
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="pt-1 text-[11px] text-muted">
+        {t("Reference lines: WHO P3 / P50 / P97 · months on the x-axis")}
+      </p>
+    </Card>
+  );
+}
+
 export function StatsScreen() {
   const babies = useBabies();
   const baby = babies.data?.[0];
@@ -85,6 +183,15 @@ export function StatsScreen() {
   const weightDelta =
     s?.weight?.prevValue != null
       ? Math.round((s.weight.value - s.weight.prevValue) * 1000)
+      : null;
+
+  const percentile =
+    s?.weight && baby?.sex
+      ? weightPercentile(
+          baby.sex,
+          ageInMonths(new Date(baby.birthDate), new Date(s.weight.time)),
+          s.weight.value,
+        )
       : null;
 
   return (
@@ -176,8 +283,12 @@ export function StatsScreen() {
                   </span>
                 )}
                 <span className="block text-xs font-medium text-muted">
-                  {formatRelative(new Date(s.weight.time))} ·{" "}
-                  {t("percentile curves come later")}
+                  {formatRelative(new Date(s.weight.time))}
+                  {percentile != null
+                    ? ` · ${t("~")}${formatPercentile(percentile)}${t(". percentile (WHO)")}`
+                    : baby?.sex
+                      ? ""
+                      : ` · ${t("set sex in Settings for percentiles")}`}
                 </span>
               </p>
             ) : (
@@ -187,6 +298,8 @@ export function StatsScreen() {
             )}
           </div>
         </Card>
+
+        {baby && <GrowthChart baby={baby} />}
       </div>
     </div>
   );
