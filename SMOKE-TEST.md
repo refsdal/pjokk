@@ -1,6 +1,8 @@
 # Smoke test — Phase 1
 
-Live URL: **https://pjokk.refsdal-holding-as.workers.dev**
+Live URL: **https://app.pjokk.no**
+(fallback: https://pjokk.refsdal-holding-as.workers.dev — same Worker;
+pjokk.no apex is reserved for a separate landing page)
 
 ## 0. One-time setup (before Google sign-in works)
 
@@ -8,7 +10,7 @@ Google OAuth secrets are placeholders. In Google Cloud Console create an
 OAuth 2.0 Web client with redirect URI:
 
 ```
-https://pjokk.refsdal-holding-as.workers.dev/api/auth/callback/google
+https://app.pjokk.no/api/auth/callback/google
 ```
 
 Then:
@@ -18,13 +20,11 @@ wrangler secret put GOOGLE_CLIENT_ID
 wrangler secret put GOOGLE_CLIENT_SECRET
 ```
 
-(When pjokk.no activates: add the pjokk.no redirect URI too, flip `APP_URL`
-and enable the `routes` block in wrangler.jsonc, redeploy.)
-
 ## 1. Founder account (bootstrap)
 
 1. Set `OPEN_SIGNUP` to `"1"` in wrangler.jsonc → `pnpm deploy`.
-2. Open the live URL on your phone → Continue with Google (as yourself).
+2. Open https://app.pjokk.no on your phone → Continue with Google (as
+   yourself).
 3. You land on **Welcome**: create family "Refsdal", then add the baby
    (name + birth date) → you land on Home.
 4. Set `OPEN_SIGNUP` back to `"0"` → `pnpm deploy`. Signup is closed again.

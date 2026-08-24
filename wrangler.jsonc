@@ -41,12 +41,12 @@
   "vars": {
     // Overridden locally by .dev.vars; secrets (GOOGLE_CLIENT_SECRET,
     // BETTER_AUTH_SECRET) are set with `wrangler secret put`.
-    // Switch to https://pjokk.no once NORID activates the domain (and enable
-    // the routes block below).
-    "APP_URL": "https://pjokk.refsdal-holding-as.workers.dev",
+    "APP_URL": "https://app.pjokk.no",
     // Set to "1" only while creating the very first (founder) account.
     "OPEN_SIGNUP": "0"
-  }
-  // Custom domain — enable once NORID activates pjokk.no:
-  // "routes": [{ "pattern": "pjokk.no", "custom_domain": true }]
+  },
+  // The app lives on app.pjokk.no; the apex is a separate landing page that
+  // merely links here. workers.dev stays on as a fallback origin.
+  "workers_dev": true,
+  "routes": [{ "pattern": "app.pjokk.no", "custom_domain": true }]
 }

@@ -3,8 +3,8 @@
 Pjokk ("en liten pjokk" — a little tyke) is a self-hosted baby tracker for families,
 running entirely on Cloudflare Workers. It is a from-scratch replacement for
 sprout-track (https://github.com/Oak-and-Sprout/sprout-track), built mobile-first
-as a PWA. Domain: pjokk.no (pending NORID activation — use a workers.dev subdomain
-until it resolves).
+as a PWA. Domain: the app lives at **app.pjokk.no** (live); the pjokk.no apex
+is reserved for a separate landing page that only links to the app.
 
 ## Product principles (read before writing any UI)
 
@@ -62,7 +62,7 @@ until it resolves).
   grain for QR-at-Sunday-dinner). Table:
   `family_invite(code, familyId, role, expiresAt, maxUses, usedCount)`.
   Defaults: 72 h expiry, revocable, role baked into the code. Redeem endpoint is
-  rate-limited (codes are credentials). Flow: open `https://pjokk.no/join/CODE`
+  rate-limited (codes are credentials). Flow: open `https://app.pjokk.no/join/CODE`
   (also rendered as QR) → social sign-in → validate code → addMember → land on
   family home.
 - **Cloudflare Workers gotcha:** D1 bindings only exist inside the request
@@ -165,8 +165,9 @@ sheet pattern — build the pattern well once.
 
 ## Phased roadmap
 
-> **Status (2026-08-24): Phase 1 SHIPPED** to
-> https://pjokk.refsdal-holding-as.workers.dev (Refsdal Holding AS account).
+> **Status (2026-08-24): Phase 1 SHIPPED** to https://app.pjokk.no
+> (custom domain; workers.dev fallback stays enabled; Refsdal Holding AS
+> account).
 > Also already in place ahead of schedule: night mode (scheduled + manual),
 > minimal Settings (members, invite link w/ QR + revoke, night mode, sign
 > out), PWA update toast, offline persist + paused-mutation queue.
