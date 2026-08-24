@@ -5,6 +5,7 @@ import { Sheet } from "@/components/Sheet";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { api, unwrap } from "@/lib/api";
 import { authClient, useSession } from "@/lib/auth-client";
 import { toast } from "@/lib/toast";
 import { note, type AdminUser } from "./lib";
@@ -25,11 +26,12 @@ function UserSheet({
   const run = async (
     label: string,
     fn: () => Promise<unknown>,
-    auditAction: string,
+    // null = the server writes its own audit entry for this op.
+    auditAction: string | null,
   ) => {
     try {
       await fn();
-      note(auditAction, user!.id, user!.email);
+      if (auditAction) note(auditAction, user!.id, user!.email);
       toast(`${label} ✓`);
       refresh();
       onClose();
@@ -137,8 +139,15 @@ function UserSheet({
                 onDelete={() =>
                   void run(
                     "User deleted",
-                    () => authClient.admin.removeUser({ userId: user.id }),
-                    "user.delete",
+                    // Server-side safe delete: reassigns log attribution to
+                    // the tombstone first, audits, then removes the account.
+                    async () =>
+                      unwrap(
+                        await api.admin.users[":id"].delete.$post({
+                          param: { id: user.id },
+                        }),
+                      ),
+                    null,
                   )
                 }
               />

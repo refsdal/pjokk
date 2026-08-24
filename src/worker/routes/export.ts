@@ -7,8 +7,12 @@ import type { FamEnv } from "../context";
 
 const esc = (v: unknown): string => {
   if (v === null || v === undefined) return "";
-  const s = String(v);
-  return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+  let s = String(v);
+  // Formula-injection guard (sec review M1): a leading = + - @ tab or CR
+  // would execute as a formula in Excel/Sheets. Neutralize with a leading
+  // apostrophe (none of our numeric fields are negative).
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return /[",\n']/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
 };
 
 const HEADERS = [

@@ -169,6 +169,34 @@ choices, noted so they can be revisited deliberately.
   a Stop button; every use is audited.
 - API keys can never be system admins (rejected before the role check).
 
+## Security review (2026-08-24)
+
+High/medium findings were fixed the same day; low findings are tracked as
+GitHub issues #1–#7.
+
+- **H1**: KV rate limit (20/10 min/IP) fronts /api/auth/sign-in/email —
+  better-auth's built-in limiter is memory-backed and useless on Workers.
+- **H2**: family creation is sysadmin-only
+  (`allowUserToCreateOrganization`); everyone else joins via invite codes.
+  Accounts that bypass signup are inert and swept by a daily orphan purge
+  (7 days old, no membership, not admin; FK-protected users skipped). The
+  Welcome screen tells non-admins to use an invite link. New legitimate
+  families are created by the operator.
+- **M1**: CSV export neutralizes formula prefixes (=+-@, tab, CR) with a
+  leading apostrophe.
+- **M2**: push subscribe only accepts https endpoints on known push-service
+  hosts (FCM/APNs/Mozilla/WNS) — the worker never POSTs to arbitrary URLs.
+- **M3**: security headers everywhere — public/_headers for assets (CSP,
+  frame-ancestors none, HSTS, nosniff, referrer, permissions-policy) and a
+  worker middleware for /api/* (no CSP there; /api/docs loads Scalar's CDN
+  bundle).
+- **M4**: API keys support expiry (default UI choice 1 year; never possible)
+  and a read-only flag (GET/HEAD only). Enforced in apiKeyAuth.
+- **M5**: user deletion goes through POST /api/admin/users/:id/delete —
+  reassigns all non-cascading FKs (log attribution, invites, keys, audit) to
+  the banned "Deleted user" tombstone, audits, then deletes. Client no
+  longer calls better-auth removeUser (FKs would 500 it).
+
 ## Infra
 
 - **Deployed to the Refsdal Holding AS Cloudflare account**

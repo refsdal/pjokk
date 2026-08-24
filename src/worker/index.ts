@@ -10,6 +10,7 @@ import { diapersApp } from "./routes/diapers";
 import { feedsApp } from "./routes/feeds";
 import { invitesAdminApp, invitesPublicApp } from "./routes/invites";
 import { apiKeyAuth, rejectApiKey } from "./middleware/api-key";
+import { rateLimit } from "./middleware/rate-limit";
 import { requireSysadmin } from "./middleware/sysadmin";
 import { adminApp } from "./routes/admin";
 import { exportApp } from "./routes/export";
@@ -17,7 +18,7 @@ import { keysApp } from "./routes/keys";
 import { otherLogsApp } from "./routes/other-logs";
 import { pushApp } from "./routes/push";
 import { statsApp } from "./routes/stats";
-import { runBackup, runReminders } from "./scheduled";
+import { purgeOrphanUsers, runBackup, runReminders } from "./scheduled";
 import { sleepApp } from "./routes/sleep";
 import { timelineApp } from "./routes/timeline";
 
@@ -32,6 +33,26 @@ const inject = createMiddleware<AppEnv>(async (c, next) => {
 const app = createApp<AppEnv>();
 
 app.use("/api/*", inject);
+
+// Security headers on every API response (the SPA assets get theirs from
+// public/_headers). No CSP here — responses are JSON, and /api/docs loads
+// Scalar's bundle from a CDN.
+app.use("/api/*", async (c, next) => {
+  await next();
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("X-Frame-Options", "DENY");
+  c.header("Referrer-Policy", "same-origin");
+  c.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+});
+
+// Credential brute-force brake (sec review H1): better-auth's built-in
+// limiter is memory-backed and useless across Workers isolates, so the KV
+// limiter fronts the password endpoint. 20/10 min per IP is generous for
+// humans, hopeless for guessing.
+app.use(
+  "/api/auth/sign-in/email",
+  rateLimit({ name: "auth-signin", limit: 20, windowSeconds: 600 }),
+);
 
 // better-auth owns /api/auth/* (must be registered before the session
 // middleware so it terminates the chain itself).
@@ -100,6 +121,8 @@ export default {
     if (event.cron === "15 3 * * *") {
       const key = await runBackup(env);
       console.log(`cron: backup written to ${key}`);
+      const purged = await purgeOrphanUsers(env);
+      if (purged > 0) console.log(`cron: purged ${purged} orphan account(s)`);
     } else {
       const sent = await runReminders(env);
       if (sent > 0) console.log(`cron: ${sent} reminder(s) sent`);

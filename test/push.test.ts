@@ -12,7 +12,7 @@ const SUB_KEYS = {
   auth: "tBHItJI5svbpez7KI4CCXg",
 };
 
-const PUSH_ORIGIN = "https://push.example.com";
+const PUSH_ORIGIN = "https://fcm.googleapis.com";
 
 // The main worker runs in the same isolate as the tests (pool-workers), so
 // stubbing global fetch intercepts the worker's outbound push deliveries.
@@ -58,6 +58,22 @@ async function subscribe(cookie: string, endpoint: string) {
 }
 
 describe("web push", () => {
+  it("rejects endpoints that aren't a known push service (SSRF guard)", async () => {
+    const a = await rig();
+    for (const endpoint of [
+      "https://evil.example.com/exfil",
+      "http://fcm.googleapis.com/downgrade",
+      "https://fcm.googleapis.com.evil.com/x",
+    ]) {
+      const res = await api("/api/push/subscribe", {
+        method: "POST",
+        cookie: a.cookie,
+        body: { endpoint, ...SUB_KEYS },
+      });
+      expect(res.status).toBe(400);
+    }
+  });
+
   it("stores, re-binds and removes subscriptions", async () => {
     const a = await rig();
     const endpoint = `${PUSH_ORIGIN}/sub/one`;

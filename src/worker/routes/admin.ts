@@ -12,6 +12,25 @@ import { schema } from "../db";
 import { createApp, iso, isoOrNull, jsonContent } from "../lib";
 import { audit } from "../middleware/sysadmin";
 
+// Attribution survivor for deleted accounts: has no sign-in methods and is
+// banned; log rows point here after their author is removed.
+export const TOMBSTONE_ID = "user_tombstone";
+
+async function ensureTombstone(db: AppEnv["Variables"]["db"]) {
+  await db
+    .insert(schema.user)
+    .values({
+      id: TOMBSTONE_ID,
+      name: "Deleted user",
+      email: "deleted@pjokk.invalid",
+      emailVerified: false,
+      banned: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .onConflictDoNothing();
+}
+
 // System-admin endpoints (all behind requireSysadmin, wired in index.ts).
 // User-level support ops (ban, sessions, passwords, impersonation) come from
 // better-auth's admin plugin under /api/auth/admin/* — these cover what that
@@ -42,6 +61,20 @@ const deleteFamily = createRoute({
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: jsonContent(z.object({ ok: z.literal(true) }), "Deleted"),
+    404: jsonContent(ErrorSchema, "Not found"),
+  },
+});
+
+const deleteUser = createRoute({
+  method: "post",
+  path: "/api/admin/users/{id}/delete",
+  tags: ["admin"],
+  description:
+    "Deletes a user account safely: their historical log attributions are reassigned to a tombstone 'Deleted user' first (FKs would otherwise block), then the account and its sessions/memberships/subscriptions are removed. Audited.",
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: jsonContent(z.object({ ok: z.literal(true) }), "Deleted"),
+    400: jsonContent(ErrorSchema, "Refused (self or tombstone)"),
     404: jsonContent(ErrorSchema, "Not found"),
   },
 });
@@ -157,6 +190,60 @@ export const adminApp = createApp<AppEnv>()
     await db
       .delete(schema.organization)
       .where(eq(schema.organization.id, id));
+    return c.json({ ok: true as const }, 200);
+  })
+  .openapi(deleteUser, async (c) => {
+    const { id } = c.req.valid("param");
+    const db = c.var.db;
+    const self = c.var.sessionData!.user.id;
+    if (id === self || id === TOMBSTONE_ID) {
+      return c.json({ error: "Refused", code: "REFUSED" }, 400);
+    }
+    const target = await db
+      .select({ email: schema.user.email })
+      .from(schema.user)
+      .where(eq(schema.user.id, id));
+    if (!target[0]) {
+      return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+    }
+
+    await ensureTombstone(db);
+    // Reassign every non-cascading FK to the tombstone so history survives
+    // as "Deleted user" and the delete can't be blocked.
+    const caretakerTables = [
+      schema.feedLog,
+      schema.diaperLog,
+      schema.sleepLog,
+      schema.medicineLog,
+      schema.bathLog,
+      schema.noteLog,
+      schema.milestoneLog,
+      schema.measurementLog,
+      schema.pumpLog,
+    ] as const;
+    for (const table of caretakerTables) {
+      await db
+        .update(table)
+        .set({ caretakerId: TOMBSTONE_ID })
+        .where(eq(table.caretakerId, id));
+    }
+    await db
+      .update(schema.familyInvite)
+      .set({ createdBy: TOMBSTONE_ID })
+      .where(eq(schema.familyInvite.createdBy, id));
+    await db
+      .update(schema.apiKey)
+      .set({ createdBy: TOMBSTONE_ID, revokedAt: new Date() })
+      .where(eq(schema.apiKey.createdBy, id));
+    await db
+      .update(schema.adminAudit)
+      .set({ adminId: TOMBSTONE_ID })
+      .where(eq(schema.adminAudit.adminId, id));
+
+    await audit(db, self, "user.delete", id, target[0].email);
+    // Cascades take sessions, accounts, passkeys, memberships, push
+    // subscriptions/prefs and sent invitations.
+    await db.delete(schema.user).where(eq(schema.user.id, id));
     return c.json({ ok: true as const }, 200);
   })
   .openapi(auditList, async (c) => {

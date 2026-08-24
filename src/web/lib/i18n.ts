@@ -204,6 +204,13 @@ const nb: Record<string, string> = {
   "Key name (e.g. “Home Assistant”)": "Navn (f.eks. «Home Assistant»)",
   "Create": "Opprett",
   "never used": "aldri brukt",
+  "read-only": "kun lesing",
+  "expires": "utløper",
+  "Read + write": "Lese + skrive",
+  "Read-only": "Kun lesing",
+  "90 days": "90 dager",
+  "1 year": "1 år",
+  "Never expires": "Utløper aldri",
   "Data": "Data",
   "Everything ever logged, one row per entry — plain CSV.":
     "Alt som noen gang er logget, én rad per oppføring — ren CSV.",
@@ -236,6 +243,9 @@ const nb: Record<string, string> = {
   "Welcome to ": "Velkommen til ",
   "Join failed": "Kunne ikke bli med",
   "Set up your family": "Sett opp familien din",
+  "Almost there": "Nesten fremme",
+  "Pjokk is invite-only. Open the invite link (or scan the QR) from your family's admin to join.":
+    "Pjokk er kun på invitasjon. Åpne invitasjonslenken (eller skann QR-koden) fra familiens admin for å bli med.",
   "Who are we tracking?": "Hvem skal vi følge med på?",
   "Create family": "Opprett familie",
   "Family name (e.g. “The Olsens”)": "Familienavn (f.eks. «Olsen»)",

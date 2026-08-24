@@ -27,6 +27,26 @@ export function WelcomeScreen() {
     return <Navigate to="/login" />;
   }
 
+  // Family creation is a sysadmin action; everyone else arrives via an
+  // invite link and never sees this screen without a family.
+  const isSysadmin =
+    (session?.user as { role?: string | null } | undefined)?.role === "admin";
+  if (session && !hasFamily && !isSysadmin) {
+    return (
+      <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-6 text-center">
+        <img src="/icon.svg" alt="" className="mx-auto h-16 w-16" />
+        <h1 className="text-2xl font-extrabold text-ink">
+          {t("Almost there")}
+        </h1>
+        <p className="text-sm text-muted">
+          {t(
+            "Pjokk is invite-only. Open the invite link (or scan the QR) from your family's admin to join.",
+          )}
+        </p>
+      </div>
+    );
+  }
+
   const createFamily = async () => {
     setBusy(true);
     try {

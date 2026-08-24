@@ -626,7 +626,12 @@ export function familyScope(db: Db, familyId: string) {
     }),
 
     // --- API keys (admin-managed; the raw key exists only in the return) ---
-    async createApiKey(data: { name: string; createdBy: string }) {
+    async createApiKey(data: {
+      name: string;
+      createdBy: string;
+      expiresAt?: Date | null;
+      readOnly?: boolean;
+    }) {
       const raw = generateApiKey();
       const rows = await db
         .insert(apiKey)
@@ -636,6 +641,8 @@ export function familyScope(db: Db, familyId: string) {
           createdBy: data.createdBy,
           keyHash: await sha256Hex(raw),
           prefix: raw.slice(0, 12),
+          expiresAt: data.expiresAt ?? null,
+          readOnly: data.readOnly ?? false,
         })
         .returning();
       return { row: rows[0]!, key: raw };

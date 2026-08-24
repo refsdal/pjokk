@@ -16,6 +16,8 @@ export const apiKeyAuth = createMiddleware<AppEnv>(async (c, next) => {
         id: schema.apiKey.id,
         familyId: schema.apiKey.familyId,
         lastUsedAt: schema.apiKey.lastUsedAt,
+        expiresAt: schema.apiKey.expiresAt,
+        readOnly: schema.apiKey.readOnly,
         userId: schema.user.id,
         userName: schema.user.name,
         userEmail: schema.user.email,
@@ -28,6 +30,15 @@ export const apiKeyAuth = createMiddleware<AppEnv>(async (c, next) => {
     const row = rows[0];
     if (!row) {
       return c.json({ error: "Invalid API key", code: "INVALID_KEY" }, 401);
+    }
+    if (row.expiresAt && row.expiresAt.getTime() <= Date.now()) {
+      return c.json({ error: "API key expired", code: "KEY_EXPIRED" }, 401);
+    }
+    if (row.readOnly && !["GET", "HEAD"].includes(c.req.method)) {
+      return c.json(
+        { error: "This API key is read-only", code: "READ_ONLY_KEY" },
+        403,
+      );
     }
     // Synthetic session: just the fields the tenancy layer + handlers read.
     c.set("sessionData", {

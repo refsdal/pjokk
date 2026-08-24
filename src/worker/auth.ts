@@ -56,8 +56,14 @@ export function createAuth(env: Env) {
       },
     },
     plugins: [
-      // An organization IS a family. Parents are admins.
-      organization({ creatorRole: "admin" }),
+      // An organization IS a family. Parents are admins. Creating families
+      // is a sysadmin action (sec review H2): everyone else joins through an
+      // invite code, so a signup-bypass account can't do anything.
+      organization({
+        creatorRole: "admin",
+        allowUserToCreateOrganization: (user) =>
+          (user as { role?: string | null }).role === "admin",
+      }),
       passkey({
         rpID: url.hostname,
         rpName: "Pjokk",

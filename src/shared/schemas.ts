@@ -400,11 +400,18 @@ export const ApiKeySchema = z
     createdAt: isoTime(),
     lastUsedAt: isoTime().nullable(),
     revokedAt: isoTime().nullable(),
+    expiresAt: isoTime().nullable(),
+    readOnly: z.boolean(),
   })
   .openapi("ApiKey");
 
 export const CreateApiKeySchema = z
-  .object({ name: z.string().min(1).max(60) })
+  .object({
+    name: z.string().min(1).max(60),
+    // Omitted = never expires.
+    expiresInDays: z.number().int().min(1).max(3650).optional(),
+    readOnly: z.boolean().default(false),
+  })
   .openapi("CreateApiKey");
 
 // The full key appears here ONCE and is never retrievable again.

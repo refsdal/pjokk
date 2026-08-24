@@ -14,6 +14,28 @@ import { pushToUser } from "../push";
 
 const okSchema = z.object({ ok: z.literal(true) });
 
+// SSRF guard (sec review M2): the worker later POSTs to stored endpoints on
+// a schedule, so only real browser push services are accepted.
+const ALLOWED_PUSH_HOSTS = [
+  /(^|\.)fcm\.googleapis\.com$/, // Chrome/Chromium
+  /(^|\.)push\.apple\.com$/, // Safari / iOS
+  /(^|\.)push\.services\.mozilla\.com$/, // Firefox
+  /(^|\.)mozaws\.net$/, // Firefox (legacy autopush)
+  /(^|\.)notify\.windows\.com$/, // Edge (WNS)
+];
+
+export function isAllowedPushEndpoint(endpoint: string): boolean {
+  try {
+    const url = new URL(endpoint);
+    return (
+      url.protocol === "https:" &&
+      ALLOWED_PUSH_HOSTS.some((re) => re.test(url.hostname))
+    );
+  } catch {
+    return false;
+  }
+}
+
 const config = createRoute({
   method: "get",
   path: "/api/push/config",
@@ -34,6 +56,10 @@ const subscribe = createRoute({
   },
   responses: {
     200: jsonContent(okSchema, "Stored"),
+    400: jsonContent(
+      z.object({ error: z.string(), code: z.string().optional() }),
+      "Not a recognized push service endpoint",
+    ),
   },
 });
 
@@ -86,6 +112,12 @@ export const pushApp = createApp<FamEnv>()
   })
   .openapi(subscribe, async (c) => {
     const body = c.req.valid("json");
+    if (!isAllowedPushEndpoint(body.endpoint)) {
+      return c.json(
+        { error: "Unrecognized push service", code: "BAD_ENDPOINT" },
+        400,
+      );
+    }
     const userId = c.var.sessionData.user.id;
     await c.var.db
       .insert(schema.pushSubscription)

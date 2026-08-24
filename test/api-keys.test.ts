@@ -93,6 +93,48 @@ describe("api keys", () => {
     ).toBe(403);
   });
 
+  it("read-only keys can read but not write; expired keys are refused", async () => {
+    const a = await rig();
+    const ro = (await (
+      await api("/api/keys", {
+        method: "POST",
+        cookie: a.cookie,
+        body: { name: "Grafana", readOnly: true },
+      })
+    ).json()) as { key: string };
+    expect((await keyApi("/api/babies", ro.key)).status).toBe(200);
+    expect(
+      (
+        await keyApi("/api/feeds", ro.key, {
+          method: "POST",
+          body: {
+            babyId: a.baby.id,
+            time: new Date().toISOString(),
+            type: "bottle",
+          },
+        })
+      ).status,
+    ).toBe(403);
+
+    const shortLived = (await (
+      await api("/api/keys", {
+        method: "POST",
+        cookie: a.cookie,
+        body: { name: "Ephemeral", expiresInDays: 1 },
+      })
+    ).json()) as { id: string; key: string };
+    expect((await keyApi("/api/babies", shortLived.key)).status).toBe(200);
+    // Force-expire it.
+    const { schema } = await import("../src/worker/db");
+    const { eq } = await import("drizzle-orm");
+    const { db } = await import("./helpers");
+    await db()
+      .update(schema.apiKey)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(schema.apiKey.id, shortLived.id));
+    expect((await keyApi("/api/babies", shortLived.key)).status).toBe(401);
+  });
+
   it("revoked and bogus keys get 401", async () => {
     const a = await rig();
     const created = (await (

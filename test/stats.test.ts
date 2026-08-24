@@ -165,6 +165,20 @@ describe("csv export", () => {
     expect(lines[2]).toContain("D-vitamin");
     expect(csv).not.toContain("999");
 
+    // Formula injection is neutralized with a leading apostrophe.
+    await api("/api/notes", {
+      method: "POST",
+      cookie: a.cookie,
+      body: {
+        babyId: a.baby.id,
+        time: new Date().toISOString(),
+        content: '=HYPERLINK("http://evil.example","x")',
+      },
+    });
+    const csv2 = await (await api("/api/export.csv", { cookie: a.cookie })).text();
+    expect(csv2).toContain("'=HYPERLINK");
+    expect(csv2).not.toMatch(/(^|,)=HYPERLINK/m);
+
     // Unauthenticated: refused.
     expect((await api("/api/export.csv")).status).toBe(401);
   });

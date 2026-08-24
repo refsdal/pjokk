@@ -17,6 +17,8 @@ function serKey(row: typeof schema.apiKey.$inferSelect) {
     createdAt: iso(row.createdAt),
     lastUsedAt: isoOrNull(row.lastUsedAt),
     revokedAt: isoOrNull(row.revokedAt),
+    expiresAt: isoOrNull(row.expiresAt),
+    readOnly: row.readOnly,
   };
 }
 
@@ -60,6 +62,10 @@ export const keysApp = createApp<FamEnv>()
     const { row, key } = await c.var.fam.createApiKey({
       name: body.name,
       createdBy: c.var.sessionData.user.id,
+      expiresAt: body.expiresInDays
+        ? new Date(Date.now() + body.expiresInDays * 24 * 3600_000)
+        : null,
+      readOnly: body.readOnly,
     });
     return c.json({ ...serKey(row), key }, 201);
   })

@@ -126,6 +126,8 @@ function BabyEditSheet({
 function ApiKeysSection() {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
+  const [readOnly, setReadOnly] = useState(false);
+  const [expiry, setExpiry] = useState<"never" | "90" | "365">("365");
   const [freshKey, setFreshKey] = useState<ApiKeyCreated | null>(null);
 
   const keys = useQuery({
@@ -136,7 +138,15 @@ function ApiKeysSection() {
   const createKey = useMutation({
     mutationFn: async () =>
       unwrap<ApiKeyCreated>(
-        await api.keys.$post({ json: { name: name.trim() } }),
+        await api.keys.$post({
+          json: {
+            name: name.trim(),
+            readOnly,
+            ...(expiry === "never"
+              ? {}
+              : { expiresInDays: Number(expiry) }),
+          },
+        }),
       ),
     onSuccess: (created) => {
       setFreshKey(created);
@@ -186,12 +196,22 @@ function ApiKeysSection() {
       {activeKeys.map((k) => (
         <div key={k.id} className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-ink">{k.name}</p>
+            <p className="truncate text-sm font-semibold text-ink">
+              {k.name}
+              {k.readOnly && (
+                <span className="ml-2 rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-bold text-muted uppercase">
+                  {t("read-only")}
+                </span>
+              )}
+            </p>
             <p className="truncate font-mono text-xs text-muted">
               {k.prefix}…{" · "}
               {k.lastUsedAt
                 ? `${t("used")} ${formatRelative(new Date(k.lastUsedAt))}`
                 : t("never used")}
+              {k.expiresAt
+                ? ` · ${t("expires")} ${new Date(k.expiresAt).toLocaleDateString("nb-NO")}`
+                : ""}
             </p>
           </div>
           <Button
@@ -205,13 +225,31 @@ function ApiKeysSection() {
         </div>
       ))}
 
-      <div className="flex gap-2">
+      <div className="space-y-3">
         <Input
           placeholder={t("Key name (e.g. “Home Assistant”)")}
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
+        <ChipGroup
+          options={[
+            { value: "rw", label: t("Read + write") },
+            { value: "ro", label: t("Read-only") },
+          ]}
+          value={readOnly ? "ro" : "rw"}
+          onChange={(v) => setReadOnly(v === "ro")}
+        />
+        <ChipGroup
+          options={[
+            { value: "90", label: t("90 days") },
+            { value: "365", label: t("1 year") },
+            { value: "never", label: t("Never expires") },
+          ]}
+          value={expiry}
+          onChange={setExpiry}
+        />
         <Button
+          size="full"
           variant="secondary"
           disabled={createKey.isPending || name.trim().length === 0}
           onClick={() => createKey.mutate()}

@@ -1,6 +1,43 @@
-import { and, eq, gt, max } from "drizzle-orm";
+import { and, eq, gt, isNull, lt, max, ne, notExists } from "drizzle-orm";
 import { createDb, schema } from "./db";
 import { pushToUser } from "./push";
+import { TOMBSTONE_ID } from "./routes/admin";
+
+// Orphan hygiene (sec review H2): accounts created past the invite flow have
+// no membership and can't create one — sweep them after a week. Sysadmins
+// and anyone with a membership are never touched; FK-protected users (e.g.
+// with historical logs) are skipped.
+export async function purgeOrphanUsers(env: Env, now = Date.now()) {
+  const db = createDb(env.DB);
+  const cutoff = new Date(now - 7 * 24 * 3600_000);
+  const orphans = await db
+    .select({ id: schema.user.id, email: schema.user.email })
+    .from(schema.user)
+    .where(
+      and(
+        isNull(schema.user.role),
+        ne(schema.user.id, TOMBSTONE_ID),
+        lt(schema.user.createdAt, cutoff),
+        notExists(
+          db
+            .select({ id: schema.member.id })
+            .from(schema.member)
+            .where(eq(schema.member.userId, schema.user.id)),
+        ),
+      ),
+    );
+  let purged = 0;
+  for (const orphan of orphans) {
+    try {
+      await db.delete(schema.user).where(eq(schema.user.id, orphan.id));
+      purged++;
+      console.log(`purge: removed orphan account ${orphan.email}`);
+    } catch {
+      // FK references (historical data) — leave it alone.
+    }
+  }
+  return purged;
+}
 
 // Feed reminders: one nudge per gap. A caretaker with feedReminderHours=N
 // gets a push when the family hasn't logged a feed for N hours — once, until
