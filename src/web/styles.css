@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans:
+    ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+
+  /* Calm, warm neutrals. One accent + per-category tints (icons/badges ONLY,
+     never backgrounds). */
+  --color-bg: #faf9f7;
+  --color-surface: #ffffff;
+  --color-surface-2: #f3f1ed;
+  --color-ink: #29261f;
+  --color-ink-soft: #5c574d;
+  --color-muted: #938d80;
+  --color-line: #e9e6e0;
+  --color-accent: #d97757;
+  --color-accent-soft: #f7e9e2;
+  --color-danger: #c4534a;
+
+  /* Category tints (CLAUDE.md §7). */
+  --color-sleep: #8b7bd8;
+  --color-feed: #5b9bd8;
+  --color-diaper: #3fb8ab;
+  --color-growth: #e88d67;
+
+  --radius-xl2: 1.25rem;
+}
+
+/* Night mode: near-black warm background, single amber ramp, no blue light.
+   Toggled by putting .night on <html>. */
+.night {
+  --color-bg: #171310;
+  --color-surface: #201b16;
+  --color-surface-2: #2a231c;
+  --color-ink: #e8c99a;
+  --color-ink-soft: #c2a67e;
+  --color-muted: #8a7455;
+  --color-line: #322a21;
+  --color-accent: #d99a55;
+  --color-accent-soft: #33270f;
+  --color-danger: #d9825f;
+  --color-sleep: #c2a06a;
+  --color-feed: #c2a06a;
+  --color-diaper: #c2a06a;
+  --color-growth: #c2a06a;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+/* Safe areas (viewport-fit=cover). */
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pb-tabbar {
+  padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
+}
+
+/* Remove number input spinners; steppers own the interaction. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+.animate-pulse-soft {
+  animation: pulse-soft 2.4s ease-in-out infinite;
+}

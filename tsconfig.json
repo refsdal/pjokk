@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
@@ -13,11 +17,26 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["vite/client", "node", "vite-plugin-pwa/client"],
+    "types": [
+      "vite/client",
+      "node",
+      "vite-plugin-pwa/client"
+    ],
     "paths": {
-      "@/*": ["./src/web/*"],
-      "@shared/*": ["./src/shared/*"]
+      "@/*": [
+        "./src/web/*"
+      ],
+      "@shared/*": [
+        "./src/shared/*"
+      ]
     }
   },
-  "include": ["src/web", "src/shared", "vite.config.ts", "drizzle.config.ts"]
+  "include": [
+    "src/web",
+    "src/shared",
+    "src/worker",
+    "worker-configuration.d.ts",
+    "vite.config.ts",
+    "drizzle.config.ts"
+  ]
 }

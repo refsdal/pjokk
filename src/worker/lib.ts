@@ -51,6 +51,6 @@ export function serSleep<T extends { startTime: Date; endTime: Date | null }>(
   };
 }
 
-export function serBaby<T extends { birthDate: Date }>(row: T) {
-  return { ...row, birthDate: iso(row.birthDate) };
+export function serBaby(row: { id: string; name: string; birthDate: Date }) {
+  return { id: row.id, name: row.name, birthDate: iso(row.birthDate) };
 }

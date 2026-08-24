@@ -32,19 +32,22 @@ app.on(["GET", "POST"], "/api/auth/*", (c) =>
 app.use("/api/*", sessionMiddleware);
 
 // Everything below /api (except auth + public invite endpoints) requires an
-// authenticated session with an active family.
-const domainApp = createApp<FamEnv>()
-  .use("/api/*", requireFamily)
-  .use("/api/invites", requireAdmin)
-  .use("/api/invites/*", requireAdmin)
+// authenticated session with an active family. Middleware is registered in
+// statement form: .use() would collapse the accumulated route types that the
+// RPC client derives from the .route() chain.
+const domainBase = createApp<FamEnv>();
+domainBase.use("/api/*", requireFamily);
+domainBase.use("/api/invites", requireAdmin);
+domainBase.use("/api/invites/*", requireAdmin);
+const domainApp = domainBase
   .route("/", babiesApp)
   .route("/", feedsApp)
   .route("/", diapersApp)
   .route("/", sleepApp)
   .route("/", invitesAdminApp);
 
-const routes = app.route("/", invitesPublicApp).route("/", domainApp);
-
+// Docs are public: registered before the tenancy-gated domain mount so the
+// requireFamily middleware never sees these paths.
 app.doc("/api/openapi.json", {
   openapi: "3.1.0",
   info: {
@@ -54,6 +57,8 @@ app.doc("/api/openapi.json", {
   },
 });
 app.get("/api/docs", Scalar({ url: "/api/openapi.json" }));
+
+const routes = app.route("/", invitesPublicApp).route("/", domainApp);
 
 // The Hono RPC client derives its types from this.
 export type AppType = typeof routes;

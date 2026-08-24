@@ -11,7 +11,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply pjokk --local",
     "db:migrate:remote": "wrangler d1 migrations apply pjokk --remote",
-    "deploy": "pnpm build && wrangler deploy"
+    "deploy": "pnpm build && wrangler deploy",
+    "seed:local": "node scripts/seed.mjs && wrangler d1 execute pjokk --local --file .seed.sql",
+    "cf-typegen": "wrangler types"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.7.1",
@@ -29,11 +31,13 @@
     "hono": "^4.13.3",
     "idb-keyval": "^6.3.0",
     "lucide-react": "^1.33.0",
+    "qrcode": "^1.5.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-hook-form": "^7.86.0",
     "tailwind-merge": "^3.6.0",
     "vaul": "^1.1.2",
+    "workbox-window": "^7.4.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -43,6 +47,7 @@
     "@cloudflare/workers-types": "^5.20260823.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.2.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",

@@ -6,3 +6,4 @@ dist/
 .DS_Store
 coverage/
 dev.db*
+.seed.sql
