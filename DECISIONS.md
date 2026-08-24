@@ -82,6 +82,23 @@ choices, noted so they can be revisited deliberately.
 - Pump logs are tied to the baby (same scoping as everything else), even
   though pumping is about the parent.
 
+## Phase 4
+
+- **Stats day-bucketing happens server-side in the caretaker's timezone**:
+  the client sends `Date.getTimezoneOffset()` and `/api/stats` splits sleep
+  sessions across local midnights (active sessions count up to now). DST
+  transitions can shift a bucket edge by an hour — accepted.
+- **Averages divide by the full window** (7/30 days) including today's
+  partial day. Simple and predictable over clever.
+- **The weight row shows a trend (Δ vs previous weight), not a percentile.**
+  Percentiles need the baby's sex (no such column yet) + WHO LMS reference
+  data — both land with the Phase 6 growth curves.
+- **Recharts is lazy-loaded** with the Stats route (its ~350 kB chunk would
+  otherwise grow the main bundle by 70%).
+- **CSV export is one file for the whole family** (all babies, all kinds,
+  chronological, `kind` column + union of detail columns), served as a plain
+  non-OpenAPI route with content-disposition. Any member can export.
+
 ## Infra
 
 - **Deployed to the Refsdal Holding AS Cloudflare account**

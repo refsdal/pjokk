@@ -302,6 +302,36 @@ export const SummarySchema = z
   })
   .openapi("Summary");
 
+// --- Stats (Phase 4): deliberately minimal ---
+
+export const StatsDaySchema = z
+  .object({
+    date: z.string(), // YYYY-MM-DD in the requester's local time
+    sleepMin: z.number(),
+    intakeMl: z.number(),
+    feeds: z.number().int(),
+    diapers: z.number().int(),
+  })
+  .openapi("StatsDay");
+
+export const StatsSchema = z
+  .object({
+    days: z.array(StatsDaySchema),
+    avgSleepMin: z.number(),
+    avgIntakeMl: z.number(),
+    avgFeeds: z.number(),
+    avgDiapers: z.number(),
+    weight: z
+      .object({
+        value: z.number(),
+        time: isoTime(),
+        prevValue: z.number().nullable(),
+        prevTime: isoTime().nullable(),
+      })
+      .nullable(),
+  })
+  .openapi("Stats");
+
 // --- Family / members ---
 
 export const MemberSchema = z
@@ -400,3 +430,5 @@ export type MeasurementLog = z.infer<typeof MeasurementLogSchema>;
 export type PumpLog = z.infer<typeof PumpLogSchema>;
 export type MedicineUnit = (typeof medicineUnits)[number];
 export type MeasurementType = (typeof measurementTypes)[number];
+export type Stats = z.infer<typeof StatsSchema>;
+export type StatsDay = z.infer<typeof StatsDaySchema>;

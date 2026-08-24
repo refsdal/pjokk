@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, lt } from "drizzle-orm";
+import { and, desc, eq, gt, gte, isNull, lt, or } from "drizzle-orm";
 import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
 import type { Db } from "./index";
 import {
@@ -481,6 +481,55 @@ export function familyScope(db: Db, familyId: string) {
         .where(and(eq(sleepLog.id, id), eq(sleepLog.familyId, familyId)))
         .returning({ id: sleepLog.id });
       return rows.length > 0;
+    },
+
+    // --- range queries for stats (no caretaker join needed) ---
+    async feedsInRange(babyId: string, from: Date, to: Date) {
+      return db
+        .select({
+          time: feedLog.time,
+          type: feedLog.type,
+          amountMl: feedLog.amountMl,
+        })
+        .from(feedLog)
+        .where(
+          and(
+            eq(feedLog.familyId, familyId),
+            eq(feedLog.babyId, babyId),
+            gte(feedLog.time, from),
+            lt(feedLog.time, to),
+          ),
+        );
+    },
+
+    async diapersInRange(babyId: string, from: Date, to: Date) {
+      return db
+        .select({ time: diaperLog.time })
+        .from(diaperLog)
+        .where(
+          and(
+            eq(diaperLog.familyId, familyId),
+            eq(diaperLog.babyId, babyId),
+            gte(diaperLog.time, from),
+            lt(diaperLog.time, to),
+          ),
+        );
+    },
+
+    // Sessions OVERLAPPING the range (they can span midnight and the range
+    // edges); active sessions have endTime null.
+    async sleepsInRange(babyId: string, from: Date, to: Date) {
+      return db
+        .select({ startTime: sleepLog.startTime, endTime: sleepLog.endTime })
+        .from(sleepLog)
+        .where(
+          and(
+            eq(sleepLog.familyId, familyId),
+            eq(sleepLog.babyId, babyId),
+            lt(sleepLog.startTime, to),
+            or(isNull(sleepLog.endTime), gt(sleepLog.endTime, from)),
+          ),
+        );
     },
 
     // One query bundle for the home screen glance.

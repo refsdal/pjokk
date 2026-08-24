@@ -165,7 +165,7 @@ sheet pattern — build the pattern well once.
 
 ## Phased roadmap
 
-> **Status (2026-08-24): Phases 1–3 SHIPPED** to https://app.pjokk.no
+> **Status (2026-08-24): Phases 1–4 SHIPPED** to https://app.pjokk.no
 > (custom domain; workers.dev fallback stays enabled; Refsdal Holding AS
 > account). Phase 2 delivered the day-grouped timeline (merged
 > `/api/timeline` endpoint with before-cursor pagination), edit/delete
@@ -175,7 +175,11 @@ sheet pattern — build the pattern well once.
 > milestone, measurement, pump) as ONE generic CRUD + route factory
 > (`scoped.ts logCrud` / `routes/other-logs.ts makeLogRoutes`) and ONE
 > dispatcher sheet (`OtherLogSheet`), reachable from the More button and the
-> timeline's new Other filter.
+> timeline's new Other filter. Phase 4 delivered the Stats tab (avg
+> sleep/intake per day, sleep-per-day bar chart w/ week/month toggle —
+> recharts lazy-loaded — and a weight row with trend; percentile deferred to
+> Phase 6, needs a baby sex field + WHO LMS data) and CSV export under
+> Settings → Data (`GET /api/export.csv`).
 > Also already in place ahead of schedule: night mode (scheduled + manual),
 > minimal Settings (members, invite link w/ QR + revoke, night mode, sign
 > out), PWA update toast, offline persist + paused-mutation queue.

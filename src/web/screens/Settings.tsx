@@ -5,7 +5,7 @@ import type { Invite } from "@shared/schemas";
 import { ChipGroup } from "@/components/Chips";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { api, unwrap } from "@/lib/api";
+import { API_BASE, api, unwrap } from "@/lib/api";
 import { signOut, useSession } from "@/lib/auth-client";
 import { useBabies, useInvites, useMembers } from "@/lib/data";
 import { t } from "@/lib/i18n";
@@ -207,6 +207,20 @@ export function SettingsScreen() {
             value={mode}
             onChange={setMode}
           />
+        </Card>
+
+        <SectionTitle>{t("Data")}</SectionTitle>
+        <Card className="space-y-3">
+          <p className="text-sm text-muted">
+            {t("Everything ever logged, one row per entry — plain CSV.")}
+          </p>
+          <Button
+            size="full"
+            variant="outline"
+            onClick={() => window.location.assign(`${API_BASE}/api/export.csv`)}
+          >
+            {t("Export CSV")}
+          </Button>
         </Card>
 
         <SectionTitle>{t("Account")}</SectionTitle>

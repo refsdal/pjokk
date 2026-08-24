@@ -9,7 +9,9 @@ import { babiesApp } from "./routes/babies";
 import { diapersApp } from "./routes/diapers";
 import { feedsApp } from "./routes/feeds";
 import { invitesAdminApp, invitesPublicApp } from "./routes/invites";
+import { exportApp } from "./routes/export";
 import { otherLogsApp } from "./routes/other-logs";
+import { statsApp } from "./routes/stats";
 import { sleepApp } from "./routes/sleep";
 import { timelineApp } from "./routes/timeline";
 
@@ -48,6 +50,8 @@ const domainApp = domainBase
   .route("/", sleepApp)
   .route("/", otherLogsApp)
   .route("/", timelineApp)
+  .route("/", statsApp)
+  .route("/", exportApp)
   .route("/", invitesAdminApp);
 
 // Docs are public: registered before the tenancy-gated domain mount so the

@@ -2,6 +2,7 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  lazyRouteComponent,
   Outlet,
 } from "@tanstack/react-router";
 import { Toaster } from "@/components/Toaster";
@@ -12,7 +13,6 @@ import { JoinScreen } from "@/screens/Join";
 import { LoginScreen } from "@/screens/Login";
 import { SettingsScreen } from "@/screens/Settings";
 import { AppShell } from "@/screens/shell";
-import { StatsScreen } from "@/screens/stubs";
 import { TimelineScreen } from "@/screens/Timeline";
 import { WelcomeScreen } from "@/screens/Welcome";
 
@@ -45,10 +45,11 @@ const timelineRoute = createRoute({
   component: TimelineScreen,
 });
 
+// Lazy: recharts is heavy and only this tab needs it.
 const statsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/stats",
-  component: StatsScreen,
+  component: lazyRouteComponent(() => import("@/screens/Stats"), "StatsScreen"),
 });
 
 const settingsRoute = createRoute({

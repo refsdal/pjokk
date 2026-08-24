@@ -13,6 +13,7 @@ import type {
   MedicineUnit,
   Member,
   SleepLog,
+  Stats,
   Summary,
   Timeline,
   TimelineFilter,
@@ -118,6 +119,24 @@ export function useTimeline(
         }),
       ),
     getNextPageParam: (last) => last.nextCursor,
+  });
+}
+
+export function useStats(babyId: string | undefined, days: 7 | 30) {
+  return useQuery({
+    queryKey: ["stats", babyId, days],
+    enabled: !!babyId,
+    staleTime: 60_000,
+    queryFn: async () =>
+      unwrap<Stats>(
+        await api.stats.$get({
+          query: {
+            babyId: babyId!,
+            days: String(days),
+            tz: String(new Date().getTimezoneOffset()),
+          },
+        }),
+      ),
   });
 }
 
