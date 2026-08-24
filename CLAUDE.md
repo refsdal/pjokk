@@ -204,5 +204,8 @@ sheet pattern — build the pattern well once.
   active-session logic. Use @cloudflare/vitest-pool-workers so tests run in the
   real runtime — and ensure wrangler config itself has the right compat date
   (the vitest plugin injects nodejs_compat, which can mask a missing flag).
-- Commit style: small, phase-scoped. Reference the phase in commit messages.
+- Commit style: small, scoped commits following **Conventional Commits**
+  (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, …). Reference the
+  roadmap phase in the body when the work is phase-scoped, e.g.
+  `feat(timeline): day-grouped feed` with `Phase 2` noted in the body.
 
