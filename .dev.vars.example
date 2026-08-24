@@ -2,6 +2,11 @@
 #   wrangler secret put BETTER_AUTH_SECRET   (generate: openssl rand -base64 32)
 #   wrangler secret put GOOGLE_CLIENT_ID
 #   wrangler secret put GOOGLE_CLIENT_SECRET
+#   wrangler secret put VAPID_PUBLIC_KEY
+#   wrangler secret put VAPID_PRIVATE_KEY
+# (generate a VAPID pair with: node scripts/gen-vapid.mjs)
 BETTER_AUTH_SECRET=
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=

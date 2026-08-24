@@ -332,6 +332,38 @@ export const StatsSchema = z
   })
   .openapi("Stats");
 
+// --- Web push (Phase 5) ---
+
+export const feedReminderChoices = [0, 3, 4, 6] as const;
+
+export const PushConfigSchema = z
+  .object({ publicKey: z.string() })
+  .openapi("PushConfig");
+
+export const SubscribeSchema = z
+  .object({
+    endpoint: z.string().url().max(1000),
+    p256dh: z.string().min(1).max(300),
+    auth: z.string().min(1).max(100),
+  })
+  .openapi("Subscribe");
+
+export const UnsubscribeSchema = z
+  .object({ endpoint: z.string().max(1000) })
+  .openapi("Unsubscribe");
+
+export const PushPrefsSchema = z
+  .object({
+    feedReminderHours: z
+      .union([z.literal(0), z.literal(3), z.literal(4), z.literal(6)])
+      .default(0),
+  })
+  .openapi("PushPrefs");
+
+export const PushTestResultSchema = z
+  .object({ sent: z.number().int() })
+  .openapi("PushTestResult");
+
 // --- Family / members ---
 
 export const MemberSchema = z

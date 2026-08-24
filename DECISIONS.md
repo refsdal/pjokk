@@ -92,12 +92,34 @@ choices, noted so they can be revisited deliberately.
   partial day. Simple and predictable over clever.
 - **The weight row shows a trend (Δ vs previous weight), not a percentile.**
   Percentiles need the baby's sex (no such column yet) + WHO LMS reference
-  data — both land with the Phase 6 growth curves.
+  data — both land with the Phase 7 growth curves.
 - **Recharts is lazy-loaded** with the Stats route (its ~350 kB chunk would
   otherwise grow the main bundle by 70%).
 - **CSV export is one file for the whole family** (all babies, all kinds,
   chronological, `kind` column + union of detail columns), served as a plain
   non-OpenAPI route with content-disposition. Any member can export.
+
+## Phase 5
+
+- **web-push works under nodejs_compat** (verified per CLAUDE.md before
+  building): we use `generateRequestDetails` for the aes128gcm/VAPID crypto
+  but do the HTTP ourselves, so 404/410 responses prune dead subscriptions.
+- **VAPID subject falls back to https://app.pjokk.no** when APP_URL is http
+  (local dev) — the spec requires https: or mailto:.
+- **Reminders are one-nudge-per-gap**: `lastRemindedAt >= lastFeed` gates
+  re-sending; a new feed starts a new observation window, and changing the
+  pref resets it. Cron runs every 15 min, so delivery lags the threshold by
+  up to 15 min.
+- **Reminder scope is the family's most recent feed** (any baby) — right for
+  one-baby families; revisit per-baby when a family actually has two.
+- **Backups are JSON row dumps to R2** (`backups/YYYY-MM-DD.json`, all
+  tables incl. auth). D1 has no in-Worker dump API; restore is manual by
+  design. Old backups are kept (R2 lifecycle rule later if it ever matters).
+- **Push handlers ship via `workbox.importScripts`** (public/push-sw.js) —
+  no injectManifest migration needed.
+- **vitest-pool-workers 0.22 removed `fetchMock`**; outbound push HTTP is
+  tested by stubbing global fetch (tests share the worker isolate, so the
+  stub applies to worker code too).
 
 ## Infra
 

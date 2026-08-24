@@ -30,6 +30,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,woff2}"],
+        // Push + notification-click handlers live beside the generated SW.
+        importScripts: ["push-sw.js"],
         // The SPA shell must never swallow API/auth routes.
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [

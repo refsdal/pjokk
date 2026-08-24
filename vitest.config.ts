@@ -4,9 +4,11 @@ import {
   cloudflareTest,
   readD1Migrations,
 } from "@cloudflare/vitest-pool-workers";
+import webpush from "web-push";
 
 export default defineConfig(async () => {
   const migrations = await readD1Migrations(path.join(import.meta.dirname, "migrations"));
+  const vapid = webpush.generateVAPIDKeys();
   return {
     resolve: {
       alias: {
@@ -28,6 +30,8 @@ export default defineConfig(async () => {
             APP_URL: "http://localhost",
             GOOGLE_CLIENT_ID: "test",
             GOOGLE_CLIENT_SECRET: "test",
+            VAPID_PUBLIC_KEY: vapid.publicKey,
+            VAPID_PRIVATE_KEY: vapid.privateKey,
           },
         },
       }),

@@ -178,8 +178,13 @@ sheet pattern — build the pattern well once.
 > timeline's new Other filter. Phase 4 delivered the Stats tab (avg
 > sleep/intake per day, sleep-per-day bar chart w/ week/month toggle —
 > recharts lazy-loaded — and a weight row with trend; percentile deferred to
-> Phase 6, needs a baby sex field + WHO LMS data) and CSV export under
-> Settings → Data (`GET /api/export.csv`).
+> Phase 7, needs a baby sex field + WHO LMS data) and CSV export under
+> Settings → Data (`GET /api/export.csv`). Phase 5 delivered web push
+> (web-push pkg verified working under nodejs_compat; VAPID secrets;
+> subscription lifecycle w/ 410 pruning), per-caretaker feed reminders
+> (off/3/4/6 h, one nudge per gap, */15 cron), the nightly D1 → R2 JSON
+> backup (03:15 UTC cron), a configurable night-mode schedule, and the
+> Settings → Notifications section (enable/disable device, test push).
 > Also already in place ahead of schedule: night mode (scheduled + manual),
 > minimal Settings (members, invite link w/ QR + revoke, night mode, sign
 > out), PWA update toast, offline persist + paused-mutation queue.
@@ -200,7 +205,13 @@ sheet pattern — build the pattern well once.
 5. **Push + PWA polish:** web push (VAPID), subscription lifecycle (cleanup on
    410), per-caretaker notification prefs, Cron reminders, night mode schedule,
    update toast. iOS web push works for installed PWAs.
-6. **Nice-to-haves:** WHO growth curves, client-side PDF report (jsPDF — never
+6. **Tabler icons:** replace ALL icons so the app exclusively uses Tabler
+   icons (`@tabler/icons-react`), dropping lucide-react entirely. Tabler has
+   literal `diaper` and `baby-bottle` glyphs (lucide has neither); pairing:
+   Feed = `baby-bottle`, Pump = `milk`. Same 24×24 / 2px-stroke style, so it's
+   a mechanical swap in the icon maps (`otherKindMeta`, `kindStyle`, home grid)
+   plus any stray UI icons.
+7. **Nice-to-haves:** WHO growth curves, client-side PDF report (jsPDF — never
    server-side), API keys for Home Assistant/Grafana, kiosk/PIN mode for a
    shared nursery tablet, Norwegian translation, Capacitor shell if ever needed.
 

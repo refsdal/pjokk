@@ -10,6 +10,13 @@ import { signOut, useSession } from "@/lib/auth-client";
 import { useBabies, useInvites, useMembers } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { useAppearance } from "@/lib/appearance";
+import {
+  currentSubscription,
+  disablePush,
+  enablePush,
+  pushSupported,
+  sendTestPush,
+} from "@/lib/push";
 import { formatAge } from "@/lib/time";
 import { toast } from "@/lib/toast";
 
@@ -38,12 +45,119 @@ function InviteQR({ url }: { url: string }) {
   );
 }
 
+function NotificationsSection() {
+  const queryClient = useQueryClient();
+  const supported = pushSupported();
+  const [subscribed, setSubscribed] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!supported) return;
+    void currentSubscription().then((sub) => setSubscribed(!!sub));
+  }, [supported]);
+
+  const prefs = useQuery({
+    queryKey: ["pushPrefs"],
+    queryFn: async () =>
+      unwrap<{ feedReminderHours: 0 | 3 | 4 | 6 }>(
+        await api.push.prefs.$get(),
+      ),
+  });
+
+  const savePrefs = useMutation({
+    mutationFn: async (feedReminderHours: 0 | 3 | 4 | 6) =>
+      unwrap(await api.push.prefs.$put({ json: { feedReminderHours } })),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ["pushPrefs"] }),
+    onError: (err) => toast(err.message, "error"),
+  });
+
+  const togglePush = async () => {
+    setBusy(true);
+    try {
+      if (subscribed) {
+        await disablePush();
+        setSubscribed(false);
+      } else {
+        await enablePush();
+        setSubscribed(true);
+        toast(t("Notifications enabled on this device"));
+      }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t("Push failed"), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!supported) {
+    return (
+      <Card>
+        <p className="text-sm text-muted">
+          {t(
+            "Push is not available in this browser. On iPhone, add Pjokk to the Home Screen first.",
+          )}
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="space-y-4">
+      <Button
+        size="full"
+        variant={subscribed ? "outline" : "primary"}
+        disabled={busy || subscribed === null}
+        onClick={() => void togglePush()}
+      >
+        {subscribed
+          ? t("Disable on this device")
+          : t("Enable notifications")}
+      </Button>
+
+      <div>
+        <p className="pb-2 text-xs font-semibold tracking-wide text-muted uppercase">
+          {t("Remind me when no feed for")}
+        </p>
+        <ChipGroup
+          options={[
+            { value: "0", label: t("Off") },
+            { value: "3", label: "3 h" },
+            { value: "4", label: "4 h" },
+            { value: "6", label: "6 h" },
+          ]}
+          value={String(prefs.data?.feedReminderHours ?? 0) as "0"}
+          onChange={(v) => savePrefs.mutate(Number(v) as 0 | 3 | 4 | 6)}
+        />
+      </div>
+
+      {subscribed && (
+        <Button
+          size="full"
+          variant="ghost"
+          onClick={() =>
+            void sendTestPush().then((sent) =>
+              toast(
+                sent > 0
+                  ? t("Test sent — check your notifications")
+                  : t("No delivery — try re-enabling push"),
+              ),
+            )
+          }
+        >
+          {t("Send test notification")}
+        </Button>
+      )}
+    </Card>
+  );
+}
+
 export function SettingsScreen() {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
   const members = useMembers();
   const babies = useBabies();
-  const { mode, setMode, themeMode, setThemeMode } = useAppearance();
+  const { mode, setMode, schedule, setSchedule, themeMode, setThemeMode } =
+    useAppearance();
 
   const myRole = members.data?.find(
     (m) => m.userId === session?.user.id,
@@ -183,6 +297,9 @@ export function SettingsScreen() {
           ))}
         </Card>
 
+        <SectionTitle>{t("Notifications")}</SectionTitle>
+        <NotificationsSection />
+
         <SectionTitle>{t("Appearance")}</SectionTitle>
         <Card>
           <ChipGroup
@@ -197,16 +314,56 @@ export function SettingsScreen() {
         </Card>
 
         <SectionTitle>{t("Night mode")}</SectionTitle>
-        <Card>
+        <Card className="space-y-4">
           <ChipGroup
             options={[
-              { value: "auto", label: t("Auto (22–07)") },
+              {
+                value: "auto",
+                label: `${t("Auto")} (${schedule.startHour}–${String(schedule.endHour).padStart(2, "0")})`,
+              },
               { value: "on", label: t("On") },
               { value: "off", label: t("Off") },
             ]}
             value={mode}
             onChange={setMode}
           />
+          {mode === "auto" && (
+            <div className="space-y-3">
+              <div>
+                <p className="pb-2 text-xs font-semibold tracking-wide text-muted uppercase">
+                  {t("From")}
+                </p>
+                <ChipGroup
+                  options={[
+                    { value: "20", label: "20:00" },
+                    { value: "21", label: "21:00" },
+                    { value: "22", label: "22:00" },
+                    { value: "23", label: "23:00" },
+                  ]}
+                  value={String(schedule.startHour) as "22"}
+                  onChange={(v) =>
+                    setSchedule({ ...schedule, startHour: Number(v) })
+                  }
+                />
+              </div>
+              <div>
+                <p className="pb-2 text-xs font-semibold tracking-wide text-muted uppercase">
+                  {t("Until")}
+                </p>
+                <ChipGroup
+                  options={[
+                    { value: "6", label: "06:00" },
+                    { value: "7", label: "07:00" },
+                    { value: "8", label: "08:00" },
+                  ]}
+                  value={String(schedule.endHour) as "7"}
+                  onChange={(v) =>
+                    setSchedule({ ...schedule, endHour: Number(v) })
+                  }
+                />
+              </div>
+            </div>
+          )}
         </Card>
 
         <SectionTitle>{t("Data")}</SectionTitle>

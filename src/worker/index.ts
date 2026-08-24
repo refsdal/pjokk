@@ -11,7 +11,9 @@ import { feedsApp } from "./routes/feeds";
 import { invitesAdminApp, invitesPublicApp } from "./routes/invites";
 import { exportApp } from "./routes/export";
 import { otherLogsApp } from "./routes/other-logs";
+import { pushApp } from "./routes/push";
 import { statsApp } from "./routes/stats";
+import { runBackup, runReminders } from "./scheduled";
 import { sleepApp } from "./routes/sleep";
 import { timelineApp } from "./routes/timeline";
 
@@ -52,6 +54,7 @@ const domainApp = domainBase
   .route("/", timelineApp)
   .route("/", statsApp)
   .route("/", exportApp)
+  .route("/", pushApp)
   .route("/", invitesAdminApp);
 
 // Docs are public: registered before the tenancy-gated domain mount so the
@@ -73,8 +76,13 @@ export type AppType = typeof routes;
 
 export default {
   fetch: app.fetch,
-  // Nightly D1 export to R2 lands in Phase 5; the trigger is already wired.
-  async scheduled(_event: ScheduledController, _env: Env) {
-    console.log("cron: backup export not implemented yet (phase 5)");
+  async scheduled(event: ScheduledController, env: Env) {
+    if (event.cron === "15 3 * * *") {
+      const key = await runBackup(env);
+      console.log(`cron: backup written to ${key}`);
+    } else {
+      const sent = await runReminders(env);
+      if (sent > 0) console.log(`cron: ${sent} reminder(s) sent`);
+    }
   },
 } satisfies ExportedHandler<Env>;

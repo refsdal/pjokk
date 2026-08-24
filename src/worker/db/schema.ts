@@ -1,5 +1,12 @@
 import { sql } from "drizzle-orm";
-import { index, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+} from "drizzle-orm/sqlite-core";
 import { organization, user } from "./auth-schema";
 
 export * from "./auth-schema";
@@ -214,6 +221,41 @@ export const pumpLog = sqliteTable(
     createdAt: createdAt(),
   },
   (t) => [index("pump_family_time_idx").on(t.familyId, t.time)],
+);
+
+// --- Web push (Phase 5) ---
+
+// One row per browser/device push subscription. Endpoint is the identity;
+// rows are deleted when the push service answers 404/410.
+export const pushSubscription = sqliteTable(
+  "push_subscription",
+  {
+    id: id(),
+    familyId: familyId(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull().unique(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("push_sub_user_idx").on(t.userId)],
+);
+
+// Per-caretaker notification preferences (per family). feedReminderHours=0
+// means off; lastRemindedAt implements one-nudge-per-gap.
+export const pushPref = sqliteTable(
+  "push_pref",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    familyId: familyId(),
+    feedReminderHours: integer("feed_reminder_hours").default(0).notNull(),
+    lastRemindedAt: integer("last_reminded_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.familyId] })],
 );
 
 // Custom invite codes (QR-at-Sunday-dinner grain, not email-addressed).

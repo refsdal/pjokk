@@ -32,8 +32,8 @@
     }
   ],
   "triggers": {
-    // Nightly D1 export to R2 (03:15 UTC). Handler is a stub until Phase 5.
-    "crons": ["15 3 * * *"]
+    // 03:15 UTC: nightly D1 → R2 backup. Every 15 min: feed reminders.
+    "crons": ["15 3 * * *", "*/15 * * * *"]
   },
   "observability": {
     "enabled": true

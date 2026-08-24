@@ -58,6 +58,18 @@ wrangler secret put GOOGLE_CLIENT_SECRET
     each account and GET `/api/summary?babyId=…` — `caretakerName` matches
     whoever logged it. (Timeline UI renders this in Phase 2.)
 
+## 4b. Push notifications (phase 5)
+
+18. Settings → Notifications → **Enable notifications** (on iPhone: install
+    to Home Screen first, then enable from the installed app).
+19. **Send test notification** → a "Push works on this device ✅" banner
+    arrives, tapping it opens the app.
+20. Set "Remind me when no feed for" to 3 h. If the family's last feed is
+    older than 3 h, a reminder arrives within 15 min (cron). Logging a feed
+    resets the gap; you get at most one nudge per gap.
+21. Backups: after 03:15 UTC, `backups/YYYY-MM-DD.json` appears in the
+    pjokk-files R2 bucket.
+
 ## 5. PWA + polish
 
 14. Add to Home Screen on iOS/Android → standalone app with the Pjokk icon.
