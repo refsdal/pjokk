@@ -1,13 +1,18 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ChartColumn, House, List, Settings } from "lucide-react";
+import {
+  IconChartBar,
+  IconHome,
+  IconList,
+  IconSettings,
+} from "@tabler/icons-react";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const tabs = [
-  { to: "/", label: "Home", icon: House },
-  { to: "/timeline", label: "Timeline", icon: List },
-  { to: "/stats", label: "Stats", icon: ChartColumn },
-  { to: "/settings", label: "Settings", icon: Settings },
+  { to: "/", label: "Home", icon: IconHome },
+  { to: "/timeline", label: "Timeline", icon: IconList },
+  { to: "/stats", label: "Stats", icon: IconChartBar },
+  { to: "/settings", label: "Settings", icon: IconSettings },
 ] as const;
 
 export function TabBar() {
@@ -26,7 +31,7 @@ export function TabBar() {
                 active ? "text-accent" : "text-muted",
               )}
             >
-              <Icon className="h-6 w-6" strokeWidth={active ? 2.4 : 2} />
+              <Icon className="h-6 w-6" stroke={active ? 2.4 : 2} />
               {t(label)}
             </Link>
           );

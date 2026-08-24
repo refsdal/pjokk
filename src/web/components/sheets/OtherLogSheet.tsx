@@ -1,11 +1,12 @@
 import {
-  Bath,
-  FlaskConical,
-  Pill,
-  Ruler,
-  Sparkles,
-  StickyNote,
-} from "lucide-react";
+  IconBath,
+  IconMilk,
+  IconNote,
+  IconPill,
+  IconRuler,
+  IconSparkles,
+  type Icon as TablerIcon,
+} from "@tabler/icons-react";
 import { useState } from "react";
 import type {
   MeasurementType,
@@ -35,14 +36,14 @@ export type OtherEntry = Extract<TimelineEntry, { kind: OtherKind }>;
 
 export const otherKindMeta: Record<
   OtherKind,
-  { label: string; icon: typeof Pill; tint: string }
+  { label: string; icon: TablerIcon; tint: string }
 > = {
-  medicine: { label: "Medicine", icon: Pill, tint: "text-growth" },
-  bath: { label: "Bath", icon: Bath, tint: "text-diaper" },
-  note: { label: "Note", icon: StickyNote, tint: "text-muted" },
-  milestone: { label: "Milestone", icon: Sparkles, tint: "text-accent" },
-  measurement: { label: "Measurement", icon: Ruler, tint: "text-growth" },
-  pump: { label: "Pump", icon: FlaskConical, tint: "text-feed" },
+  medicine: { label: "Medicine", icon: IconPill, tint: "text-growth" },
+  bath: { label: "Bath", icon: IconBath, tint: "text-diaper" },
+  note: { label: "Note", icon: IconNote, tint: "text-muted" },
+  milestone: { label: "Milestone", icon: IconSparkles, tint: "text-accent" },
+  measurement: { label: "Measurement", icon: IconRuler, tint: "text-growth" },
+  pump: { label: "Pump", icon: IconMilk, tint: "text-feed" },
 };
 
 const measurementConfig: Record<

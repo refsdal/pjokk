@@ -6,7 +6,7 @@ import {
   Tooltip,
   XAxis,
 } from "recharts";
-import { Moon, Milk, Ruler } from "lucide-react";
+import { IconBabyBottle, IconMoon, IconRuler } from "@tabler/icons-react";
 import { Card } from "@/components/ui/card";
 import { useBabies, useStats } from "@/lib/data";
 import { t } from "@/lib/i18n";
@@ -29,7 +29,7 @@ function StatCard({
   value,
   sub,
 }: {
-  icon: typeof Moon;
+  icon: typeof IconMoon;
   tint: string;
   label: string;
   value: string;
@@ -100,13 +100,13 @@ export function StatsScreen() {
       <div className="space-y-3 pb-tabbar">
         <div className="flex gap-3">
           <StatCard
-            icon={Moon}
+            icon={IconMoon}
             tint="text-sleep"
             label={t("Sleep / day")}
             value={s ? sleepFmt(s.avgSleepMin) : "—"}
           />
           <StatCard
-            icon={Milk}
+            icon={IconBabyBottle}
             tint="text-feed"
             label={t("Intake / day")}
             value={s ? `${s.avgIntakeMl} ml` : "—"}
@@ -160,7 +160,7 @@ export function StatsScreen() {
 
         <Card className="flex items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-2 text-growth">
-            <Ruler className="h-5 w-5" />
+            <IconRuler className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold tracking-wide text-muted uppercase">

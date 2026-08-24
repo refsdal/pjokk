@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import type { Icon as TablerIcon } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { formatRelative } from "@/lib/time";
@@ -14,7 +14,7 @@ export function StatusCard({
   tintClass,
   onClick,
 }: {
-  icon: LucideIcon;
+  icon: TablerIcon;
   label: string;
   time: Date | null;
   detail?: string;

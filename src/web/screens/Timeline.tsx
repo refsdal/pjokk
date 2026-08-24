@@ -1,4 +1,10 @@
-import { Droplets, Milk, Moon, NotebookPen } from "lucide-react";
+import {
+  IconBabyBottle,
+  IconDiaper,
+  IconMoon,
+  IconNote,
+  type Icon as TablerIcon,
+} from "@tabler/icons-react";
 import { useState } from "react";
 import type { TimelineEntry, TimelineFilter } from "@shared/schemas";
 import { DiaperSheet } from "@/components/sheets/DiaperSheet";
@@ -118,11 +124,11 @@ function entryMain(e: TimelineEntry): { title: string; detail: string | null } {
 
 const kindStyle: Record<
   TimelineEntry["kind"],
-  { icon: typeof Milk; tint: string }
+  { icon: TablerIcon; tint: string }
 > = {
-  feed: { icon: Milk, tint: "text-feed" },
-  diaper: { icon: Droplets, tint: "text-diaper" },
-  sleep: { icon: Moon, tint: "text-sleep" },
+  feed: { icon: IconBabyBottle, tint: "text-feed" },
+  diaper: { icon: IconDiaper, tint: "text-diaper" },
+  sleep: { icon: IconMoon, tint: "text-sleep" },
   medicine: otherKindMeta.medicine,
   bath: otherKindMeta.bath,
   note: otherKindMeta.note,
@@ -159,7 +165,7 @@ function Row({
         <span className="font-semibold">{title}</span>
         {detail && <span className="text-ink-soft"> · {detail}</span>}
         {entry.notes && (
-          <NotebookPen className="ml-1.5 inline h-3.5 w-3.5 text-muted" />
+          <IconNote className="ml-1.5 inline h-3.5 w-3.5 text-muted" />
         )}
         {active && (
           <span className="ml-1.5 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-bold text-accent uppercase">

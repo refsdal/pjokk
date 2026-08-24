@@ -121,6 +121,18 @@ choices, noted so they can be revisited deliberately.
   tested by stubbing global fetch (tests share the worker isolate, so the
   stub applies to worker code too).
 
+## Phase 6
+
+- **Icons are exclusively @tabler/icons-react** (lucide-react removed).
+  Pairings from the icon review: Feed=IconBabyBottle, Diaper=IconDiaper,
+  Pump=IconMilk, Sleep=IconMoon, Medicine=IconPill, Bath=IconBath,
+  Milestone=IconSparkles, Measurement=IconRuler, Note=IconNote.
+- **The "has a note" row indicator and the Note activity share IconNote** —
+  both mean "there's note text here"; one glyph, one meaning.
+- Tabler's stroke-width prop is `stroke` (not `strokeWidth`); components
+  type icons as `Icon` from the package (function components, not
+  ForwardRef like lucide).
+
 ## Infra
 
 - **Deployed to the Refsdal Holding AS Cloudflare account**

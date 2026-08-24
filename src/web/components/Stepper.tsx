@@ -1,4 +1,4 @@
-import { Minus, Plus } from "lucide-react";
+import { IconMinus, IconPlus } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 
 // Number stepper: amounts change by taps, never by the OS keyboard.
@@ -42,7 +42,7 @@ export function Stepper({
         onClick={() => adjust(-step)}
         className="flex h-12 w-14 items-center justify-center rounded-xl bg-surface-2 text-ink active:scale-95"
       >
-        <Minus className="h-5 w-5" />
+        <IconMinus className="h-5 w-5" />
       </button>
       <div className="text-center tabular-nums">
         <span className="text-2xl font-bold">
@@ -56,7 +56,7 @@ export function Stepper({
         onClick={() => adjust(step)}
         className="flex h-12 w-14 items-center justify-center rounded-xl bg-surface-2 text-ink active:scale-95"
       >
-        <Plus className="h-5 w-5" />
+        <IconPlus className="h-5 w-5" />
       </button>
     </div>
   );

@@ -1,4 +1,4 @@
-import { Moon } from "lucide-react";
+import { IconMoon } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import type { SleepLog } from "@shared/schemas";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ export function ActiveSleepBanner({ session }: { session: SleepLog }) {
   return (
     <div className="flex items-center gap-3 rounded-xl2 border border-line bg-surface p-4">
       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-2 text-sleep">
-        <Moon className="h-5 w-5 animate-pulse-soft" />
+        <IconMoon className="h-5 w-5 animate-pulse-soft" />
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-xs font-semibold tracking-wide text-muted uppercase">

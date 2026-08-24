@@ -185,6 +185,10 @@ sheet pattern — build the pattern well once.
 > (off/3/4/6 h, one nudge per gap, */15 cron), the nightly D1 → R2 JSON
 > backup (03:15 UTC cron), a configurable night-mode schedule, and the
 > Settings → Notifications section (enable/disable device, test push).
+> Phase 6 delivered the full Tabler icon swap: lucide-react is gone, all
+> icons are @tabler/icons-react (Feed=baby-bottle, Diaper=diaper,
+> Pump=milk; the attached-note indicator and the Note activity now share
+> IconNote deliberately).
 > Also already in place ahead of schedule: night mode (scheduled + manual),
 > minimal Settings (members, invite link w/ QR + revoke, night mode, sign
 > out), PWA update toast, offline persist + paused-mutation queue.

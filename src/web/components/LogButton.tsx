@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import type { Icon as TablerIcon } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 
 // The 2×2 grid of big log buttons: the whole point of the home screen.
@@ -9,7 +9,7 @@ export function LogButton({
   onClick,
   disabled,
 }: {
-  icon: LucideIcon;
+  icon: TablerIcon;
   label: string;
   tintClass: string;
   onClick: () => void;

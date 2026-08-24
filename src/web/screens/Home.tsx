@@ -1,4 +1,10 @@
-import { Baby as BabyIcon, Droplets, Milk, Moon, Plus } from "lucide-react";
+import {
+  IconBabyBottle,
+  IconBabyCarriage,
+  IconDiaper,
+  IconMoon,
+  IconPlus,
+} from "@tabler/icons-react";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { ActiveSleepBanner } from "@/components/ActiveSleepBanner";
@@ -110,7 +116,7 @@ export function HomeScreen() {
         {/* Status before action: last feed / last diaper at a glance */}
         <div className="grid grid-cols-1 gap-3">
           <StatusCard
-            icon={Milk}
+            icon={IconBabyBottle}
             label={t("Last feed")}
             time={s?.lastFeed ? new Date(s.lastFeed.time) : null}
             detail={s?.lastFeed ? feedDetail(s.lastFeed) : undefined}
@@ -118,7 +124,7 @@ export function HomeScreen() {
             onClick={() => setSheet("feed")}
           />
           <StatusCard
-            icon={Droplets}
+            icon={IconDiaper}
             label={t("Last diaper")}
             time={s?.lastDiaper ? new Date(s.lastDiaper.time) : null}
             detail={s?.lastDiaper ? t(s.lastDiaper.type) : undefined}
@@ -127,7 +133,7 @@ export function HomeScreen() {
           />
           {!active && s?.lastSleep?.endTime && (
             <StatusCard
-              icon={Moon}
+              icon={IconMoon}
               label={t("Last sleep")}
               time={new Date(s.lastSleep.endTime)}
               tintClass="text-sleep"
@@ -139,26 +145,26 @@ export function HomeScreen() {
         {/* 2×2 log grid */}
         <div className="grid grid-cols-2 gap-3 pt-1">
           <LogButton
-            icon={Milk}
+            icon={IconBabyBottle}
             label={t("Feed")}
             tintClass="text-feed"
             onClick={() => setSheet("feed")}
           />
           <LogButton
-            icon={Droplets}
+            icon={IconDiaper}
             label={t("Diaper")}
             tintClass="text-diaper"
             onClick={() => setSheet("diaper")}
           />
           <LogButton
-            icon={Moon}
+            icon={IconMoon}
             label={active ? t("Sleeping…") : t("Sleep")}
             tintClass="text-sleep"
             onClick={() => setSheet("sleep")}
             disabled={!!active}
           />
           <LogButton
-            icon={Plus}
+            icon={IconPlus}
             label={t("More")}
             tintClass="text-growth"
             onClick={() => setSheet("more")}
@@ -222,7 +228,7 @@ function NightHome({
   const wakeSleep = useWakeSleep();
   const nightAction = (
     label: string,
-    icon: typeof Moon,
+    icon: typeof IconMoon,
     onClick: () => void,
   ) => {
     const Icon = icon;
@@ -241,14 +247,14 @@ function NightHome({
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-end px-4 pb-tabbar">
       <div className="space-y-3 pb-4">
-        <BabyIcon className="mx-auto h-6 w-6 text-muted" />
+        <IconBabyCarriage className="mx-auto h-6 w-6 text-muted" />
         {activeSleepId
-          ? nightAction(t("Wake"), Moon, () =>
+          ? nightAction(t("Wake"), IconMoon, () =>
               wakeSleep.mutate({ id: activeSleepId }),
             )
-          : nightAction(t("Sleep"), Moon, () => setSheet("sleep"))}
-        {nightAction(t("Feed"), Milk, () => setSheet("feed"))}
-        {nightAction(t("Diaper"), Droplets, () => setSheet("diaper"))}
+          : nightAction(t("Sleep"), IconMoon, () => setSheet("sleep"))}
+        {nightAction(t("Feed"), IconBabyBottle, () => setSheet("feed"))}
+        {nightAction(t("Diaper"), IconDiaper, () => setSheet("diaper"))}
       </div>
 
       <FeedSheet
