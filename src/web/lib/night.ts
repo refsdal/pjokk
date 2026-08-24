@@ -40,10 +40,10 @@ export function useNight() {
     return () => clearInterval(timer);
   }, [mode]);
 
+  // (The theme-color meta is owned by AppearanceProvider, which also knows
+  // about dark mode.)
   useEffect(() => {
     document.documentElement.classList.toggle("night", night);
-    const meta = document.querySelector('meta[name="theme-color"]');
-    meta?.setAttribute("content", night ? "#171310" : "#faf9f7");
   }, [night]);
 
   const setMode = useCallback((m: NightMode) => {

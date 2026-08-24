@@ -44,6 +44,24 @@ choices, noted so they can be revisited deliberately.
   phone legitimately differ); org-level schedule config comes later.
 - Invite defaults: role member, 72 h, max 5 uses.
 
+## Phase 2
+
+- **Timeline is a server-merged endpoint** (`GET /api/timeline`): three
+  scoped queries (each over-fetching one page) merged and cut in the Worker,
+  with an ISO `before` cursor. Day grouping happens client-side. hasMore is
+  true when the merge exceeds a page OR any source filled its own quota.
+- **Sleep entries sort by startTime** in the timeline.
+- **Update payloads use null-to-clear semantics** (omitted = untouched,
+  null = cleared) so type switches can drop stale fields.
+- **Editing an active sleep session never touches its endTime** — ending a
+  session is exclusively the Wake action.
+- **Dark mode is device-local** (system/light/dark in Settings) and layered
+  under night mode: `.night` is declared after `.dark` in CSS, so night wins
+  while both classes are set.
+- **Local D1 state is keyed by `database_id`** — changing the id in
+  wrangler.jsonc silently starts an empty local DB. Re-run
+  `pnpm db:migrate:local && pnpm seed:local` after any id change.
+
 ## Infra
 
 - **Deployed to the Refsdal Holding AS Cloudflare account**

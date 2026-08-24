@@ -165,9 +165,12 @@ sheet pattern — build the pattern well once.
 
 ## Phased roadmap
 
-> **Status (2026-08-24): Phase 1 SHIPPED** to https://app.pjokk.no
+> **Status (2026-08-24): Phases 1 and 2 SHIPPED** to https://app.pjokk.no
 > (custom domain; workers.dev fallback stays enabled; Refsdal Holding AS
-> account).
+> account). Phase 2 delivered the day-grouped timeline (merged
+> `/api/timeline` endpoint with before-cursor pagination), edit/delete
+> through the same log sheets (incl. the notes field), filter chips, day
+> summaries, and dark mode (system/light/dark — night mode still overrides).
 > Also already in place ahead of schedule: night mode (scheduled + manual),
 > minimal Settings (members, invite link w/ QR + revoke, night mode, sign
 > out), PWA update toast, offline persist + paused-mutation queue.

@@ -1,4 +1,4 @@
-import { ChartColumn, List } from "lucide-react";
+import { ChartColumn } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { t } from "@/lib/i18n";
 
@@ -17,16 +17,6 @@ function Stub({
       <h1 className="text-xl font-extrabold text-ink">{title}</h1>
       <p className="text-sm text-muted">{note}</p>
     </div>
-  );
-}
-
-export function TimelineScreen() {
-  return (
-    <Stub
-      icon={List}
-      title={t("Timeline")}
-      note={t("The day-grouped feed lands in phase 2.")}
-    />
   );
 }
 

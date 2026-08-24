@@ -27,8 +27,28 @@
   --radius-xl2: 1.25rem;
 }
 
+/* Dark mode: the same calm warm palette, inverted. Toggled by .dark on
+   <html> (system preference or explicit choice). */
+.dark {
+  --color-bg: #171512;
+  --color-surface: #1f1d19;
+  --color-surface-2: #2a2723;
+  --color-ink: #ece8e1;
+  --color-ink-soft: #b6afa3;
+  --color-muted: #8b8578;
+  --color-line: #2e2b26;
+  --color-accent: #e08a68;
+  --color-accent-soft: #3a2a21;
+  --color-danger: #d9736a;
+  --color-sleep: #a294e6;
+  --color-feed: #7fb3e8;
+  --color-diaper: #56c6b9;
+  --color-growth: #efa07e;
+}
+
 /* Night mode: near-black warm background, single amber ramp, no blue light.
-   Toggled by putting .night on <html>. */
+   Toggled by putting .night on <html>. Declared after .dark so it wins when
+   both classes are present. */
 .night {
   --color-bg: #171310;
   --color-surface: #201b16;

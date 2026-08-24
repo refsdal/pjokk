@@ -11,7 +11,7 @@ import { SleepSheet } from "@/components/sheets/SleepSheet";
 import { useSession } from "@/lib/auth-client";
 import { useBabies, useFeeds, useSummary, useWakeSleep } from "@/lib/data";
 import { t } from "@/lib/i18n";
-import { useNightContext } from "@/screens/shell";
+import { useAppearance } from "@/lib/appearance";
 import { formatAge } from "@/lib/time";
 import { toast } from "@/lib/toast";
 
@@ -38,7 +38,7 @@ export function HomeScreen() {
   const summary = useSummary(baby?.id);
   const feeds = useFeeds(baby?.id);
   const [sheet, setSheet] = useState<OpenSheet>(null);
-  const { night } = useNightContext();
+  const { night } = useAppearance();
   const navigate = useNavigate();
 
   if (babies.isSuccess && babies.data.length === 0) {

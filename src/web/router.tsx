@@ -6,21 +6,23 @@ import {
 } from "@tanstack/react-router";
 import { Toaster } from "@/components/Toaster";
 import { UpdateBanner } from "@/components/UpdateBanner";
+import { AppearanceProvider } from "@/lib/appearance";
 import { HomeScreen } from "@/screens/Home";
 import { JoinScreen } from "@/screens/Join";
 import { LoginScreen } from "@/screens/Login";
 import { SettingsScreen } from "@/screens/Settings";
 import { AppShell } from "@/screens/shell";
-import { StatsScreen, TimelineScreen } from "@/screens/stubs";
+import { StatsScreen } from "@/screens/stubs";
+import { TimelineScreen } from "@/screens/Timeline";
 import { WelcomeScreen } from "@/screens/Welcome";
 
 const rootRoute = createRootRoute({
   component: () => (
-    <>
+    <AppearanceProvider>
       <Outlet />
       <Toaster />
       <UpdateBanner />
-    </>
+    </AppearanceProvider>
   ),
 });
 

@@ -1,4 +1,5 @@
 import {
+  useInfiniteQuery,
   useMutation,
   useQuery,
   type QueryClient,
@@ -11,6 +12,8 @@ import type {
   Member,
   SleepLog,
   Summary,
+  Timeline,
+  TimelineFilter,
 } from "@shared/schemas";
 import { api, unwrap } from "./api";
 
@@ -60,6 +63,29 @@ export function useDiapers(babyId: string | undefined, limit = 25) {
   });
 }
 
+export function useTimeline(
+  babyId: string | undefined,
+  filter: TimelineFilter | null,
+) {
+  return useInfiniteQuery({
+    queryKey: ["timeline", babyId, filter ?? "all"],
+    enabled: !!babyId,
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) =>
+      unwrap<Timeline>(
+        await api.timeline.$get({
+          query: {
+            babyId: babyId!,
+            limit: "50",
+            ...(pageParam ? { before: pageParam } : {}),
+            ...(filter ? { filter } : {}),
+          },
+        }),
+      ),
+    getNextPageParam: (last) => last.nextCursor,
+  });
+}
+
 export function useMembers() {
   return useQuery({
     queryKey: ["members"],
@@ -105,11 +131,48 @@ export interface WakeSleepVars {
   endTime?: string;
 }
 
+// Patch payloads: omitted = untouched, null = cleared.
+export interface UpdateFeedVars {
+  id: string;
+  patch: {
+    time?: string;
+    type?: "bottle" | "breast" | "solids";
+    amountMl?: number | null;
+    side?: "left" | "right" | "both" | null;
+    durationMin?: number | null;
+    notes?: string | null;
+  };
+}
+
+export interface UpdateDiaperVars {
+  id: string;
+  patch: {
+    time?: string;
+    type?: "wet" | "dirty" | "both";
+    notes?: string | null;
+  };
+}
+
+export interface UpdateSleepVars {
+  id: string;
+  patch: {
+    startTime?: string;
+    endTime?: string | null;
+    location?: string | null;
+    notes?: string | null;
+  };
+}
+
+export interface DeleteVars {
+  id: string;
+}
+
 const invalidateLogs = (qc: QueryClient) => {
   void qc.invalidateQueries({ queryKey: ["summary"] });
   void qc.invalidateQueries({ queryKey: ["feeds"] });
   void qc.invalidateQueries({ queryKey: ["diapers"] });
   void qc.invalidateQueries({ queryKey: ["sleep"] });
+  void qc.invalidateQueries({ queryKey: ["timeline"] });
 };
 
 export function registerMutationDefaults(qc: QueryClient) {
@@ -134,6 +197,78 @@ export function registerMutationDefaults(qc: QueryClient) {
         await api.sleep[":id"].wake.$post({ param: { id }, json: body }),
       ),
     onSettled: () => invalidateLogs(qc),
+  });
+  qc.setMutationDefaults(["updateFeed"], {
+    mutationFn: async ({ id, patch }: UpdateFeedVars) =>
+      unwrap<FeedLog>(
+        await api.feeds[":id"].$patch({ param: { id }, json: patch }),
+      ),
+    onSettled: () => invalidateLogs(qc),
+  });
+  qc.setMutationDefaults(["updateDiaper"], {
+    mutationFn: async ({ id, patch }: UpdateDiaperVars) =>
+      unwrap<DiaperLog>(
+        await api.diapers[":id"].$patch({ param: { id }, json: patch }),
+      ),
+    onSettled: () => invalidateLogs(qc),
+  });
+  qc.setMutationDefaults(["updateSleep"], {
+    mutationFn: async ({ id, patch }: UpdateSleepVars) =>
+      unwrap<SleepLog>(
+        await api.sleep[":id"].$patch({ param: { id }, json: patch }),
+      ),
+    onSettled: () => invalidateLogs(qc),
+  });
+  qc.setMutationDefaults(["deleteFeed"], {
+    mutationFn: async ({ id }: DeleteVars) =>
+      unwrap(await api.feeds[":id"].$delete({ param: { id } })),
+    onSettled: () => invalidateLogs(qc),
+  });
+  qc.setMutationDefaults(["deleteDiaper"], {
+    mutationFn: async ({ id }: DeleteVars) =>
+      unwrap(await api.diapers[":id"].$delete({ param: { id } })),
+    onSettled: () => invalidateLogs(qc),
+  });
+  qc.setMutationDefaults(["deleteSleep"], {
+    mutationFn: async ({ id }: DeleteVars) =>
+      unwrap(await api.sleep[":id"].$delete({ param: { id } })),
+    onSettled: () => invalidateLogs(qc),
+  });
+}
+
+export function useUpdateFeed() {
+  return useMutation<FeedLog, Error, UpdateFeedVars>({
+    mutationKey: ["updateFeed"],
+  });
+}
+
+export function useUpdateDiaper() {
+  return useMutation<DiaperLog, Error, UpdateDiaperVars>({
+    mutationKey: ["updateDiaper"],
+  });
+}
+
+export function useUpdateSleep() {
+  return useMutation<SleepLog, Error, UpdateSleepVars>({
+    mutationKey: ["updateSleep"],
+  });
+}
+
+export function useDeleteFeed() {
+  return useMutation<unknown, Error, DeleteVars>({
+    mutationKey: ["deleteFeed"],
+  });
+}
+
+export function useDeleteDiaper() {
+  return useMutation<unknown, Error, DeleteVars>({
+    mutationKey: ["deleteDiaper"],
+  });
+}
+
+export function useDeleteSleep() {
+  return useMutation<unknown, Error, DeleteVars>({
+    mutationKey: ["deleteSleep"],
   });
 }
 

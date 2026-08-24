@@ -60,8 +60,17 @@ export const CreateFeedSchema = z
   })
   .openapi("CreateFeed");
 
-export const UpdateFeedSchema = CreateFeedSchema.omit({ babyId: true })
-  .partial()
+// Update schemas allow null to CLEAR a field (e.g. switching a feed from
+// bottle to breast nulls amountMl); omitted fields stay untouched.
+export const UpdateFeedSchema = z
+  .object({
+    time: isoTime().optional(),
+    type: z.enum(feedTypes).optional(),
+    amountMl: z.number().int().min(0).max(1000).nullable().optional(),
+    side: z.enum(feedSides).nullable().optional(),
+    durationMin: z.number().int().min(0).max(600).nullable().optional(),
+    notes: z.string().max(1000).nullable().optional(),
+  })
   .openapi("UpdateFeed");
 
 export const DiaperLogSchema = z
@@ -81,8 +90,12 @@ export const CreateDiaperSchema = z
   })
   .openapi("CreateDiaper");
 
-export const UpdateDiaperSchema = CreateDiaperSchema.omit({ babyId: true })
-  .partial()
+export const UpdateDiaperSchema = z
+  .object({
+    time: isoTime().optional(),
+    type: z.enum(diaperTypes).optional(),
+    notes: z.string().max(1000).nullable().optional(),
+  })
   .openapi("UpdateDiaper");
 
 export const SleepLogSchema = z
@@ -120,6 +133,26 @@ export const WakeSchema = z
     endTime: isoTime().optional(),
   })
   .openapi("Wake");
+
+// --- Timeline: the merged, day-groupable feed of everything ---
+
+export const timelineFilters = ["feeds", "diapers", "sleep"] as const;
+
+export const TimelineEntrySchema = z
+  .discriminatedUnion("kind", [
+    FeedLogSchema.extend({ kind: z.literal("feed") }),
+    DiaperLogSchema.extend({ kind: z.literal("diaper") }),
+    SleepLogSchema.extend({ kind: z.literal("sleep") }),
+  ])
+  .openapi("TimelineEntry");
+
+export const TimelineSchema = z
+  .object({
+    entries: z.array(TimelineEntrySchema),
+    // Pass back as ?before= to fetch the next (older) page.
+    nextCursor: isoTime().nullable(),
+  })
+  .openapi("Timeline");
 
 // --- Home screen summary: one query answers "when did she last …" ---
 
@@ -219,3 +252,6 @@ export type Member = z.infer<typeof MemberSchema>;
 export type Invite = z.infer<typeof InviteSchema>;
 export type FeedType = (typeof feedTypes)[number];
 export type DiaperType = (typeof diaperTypes)[number];
+export type TimelineEntry = z.infer<typeof TimelineEntrySchema>;
+export type Timeline = z.infer<typeof TimelineSchema>;
+export type TimelineFilter = (typeof timelineFilters)[number];

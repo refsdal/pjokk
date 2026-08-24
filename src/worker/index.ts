@@ -10,6 +10,7 @@ import { diapersApp } from "./routes/diapers";
 import { feedsApp } from "./routes/feeds";
 import { invitesAdminApp, invitesPublicApp } from "./routes/invites";
 import { sleepApp } from "./routes/sleep";
+import { timelineApp } from "./routes/timeline";
 
 // Auth + db are request-scoped on Workers (D1 bindings only exist inside the
 // handler), hence the per-request factory here.
@@ -44,6 +45,7 @@ const domainApp = domainBase
   .route("/", feedsApp)
   .route("/", diapersApp)
   .route("/", sleepApp)
+  .route("/", timelineApp)
   .route("/", invitesAdminApp);
 
 // Docs are public: registered before the tenancy-gated domain mount so the

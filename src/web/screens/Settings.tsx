@@ -9,7 +9,7 @@ import { api, unwrap } from "@/lib/api";
 import { signOut, useSession } from "@/lib/auth-client";
 import { useBabies, useInvites, useMembers } from "@/lib/data";
 import { t } from "@/lib/i18n";
-import { useNightContext } from "@/screens/shell";
+import { useAppearance } from "@/lib/appearance";
 import { formatAge } from "@/lib/time";
 import { toast } from "@/lib/toast";
 
@@ -43,7 +43,7 @@ export function SettingsScreen() {
   const queryClient = useQueryClient();
   const members = useMembers();
   const babies = useBabies();
-  const { mode, setMode } = useNightContext();
+  const { mode, setMode, themeMode, setThemeMode } = useAppearance();
 
   const myRole = members.data?.find(
     (m) => m.userId === session?.user.id,
@@ -181,6 +181,19 @@ export function SettingsScreen() {
               </p>
             </div>
           ))}
+        </Card>
+
+        <SectionTitle>{t("Appearance")}</SectionTitle>
+        <Card>
+          <ChipGroup
+            options={[
+              { value: "system", label: t("System") },
+              { value: "light", label: t("Light") },
+              { value: "dark", label: t("Dark") },
+            ]}
+            value={themeMode}
+            onChange={setThemeMode}
+          />
         </Card>
 
         <SectionTitle>{t("Night mode")}</SectionTitle>

@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, lt } from "drizzle-orm";
 import type { Db } from "./index";
 import {
   baby,
@@ -122,12 +122,19 @@ export function familyScope(db: Db, familyId: string) {
     },
 
     // --- feeds ---
-    async listFeeds(opts: { babyId?: string; limit?: number } = {}) {
+    async listFeeds(
+      opts: { babyId?: string; limit?: number; before?: Date } = {},
+    ) {
       return db
         .select(feedCols)
         .from(feedLog)
         .innerJoin(user, eq(feedLog.caretakerId, user.id))
-        .where(feedScope(opts.babyId))
+        .where(
+          and(
+            feedScope(opts.babyId),
+            opts.before ? lt(feedLog.time, opts.before) : undefined,
+          ),
+        )
         .orderBy(desc(feedLog.time))
         .limit(opts.limit ?? 50);
     },
@@ -186,12 +193,19 @@ export function familyScope(db: Db, familyId: string) {
     },
 
     // --- diapers ---
-    async listDiapers(opts: { babyId?: string; limit?: number } = {}) {
+    async listDiapers(
+      opts: { babyId?: string; limit?: number; before?: Date } = {},
+    ) {
       return db
         .select(diaperCols)
         .from(diaperLog)
         .innerJoin(user, eq(diaperLog.caretakerId, user.id))
-        .where(diaperScope(opts.babyId))
+        .where(
+          and(
+            diaperScope(opts.babyId),
+            opts.before ? lt(diaperLog.time, opts.before) : undefined,
+          ),
+        )
         .orderBy(desc(diaperLog.time))
         .limit(opts.limit ?? 50);
     },
@@ -244,12 +258,19 @@ export function familyScope(db: Db, familyId: string) {
     },
 
     // --- sleep ---
-    async listSleeps(opts: { babyId?: string; limit?: number } = {}) {
+    async listSleeps(
+      opts: { babyId?: string; limit?: number; before?: Date } = {},
+    ) {
       return db
         .select(sleepCols)
         .from(sleepLog)
         .innerJoin(user, eq(sleepLog.caretakerId, user.id))
-        .where(sleepScope(opts.babyId))
+        .where(
+          and(
+            sleepScope(opts.babyId),
+            opts.before ? lt(sleepLog.startTime, opts.before) : undefined,
+          ),
+        )
         .orderBy(desc(sleepLog.startTime))
         .limit(opts.limit ?? 50);
     },
