@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "pjokk",
+  "account_id": "ec92f89b6cf6daf1d0f5c59bc2a975db", // Refsdal Holding AS
   "main": "src/worker/index.ts",
   "compatibility_date": "2026-08-04",
   "compatibility_flags": ["nodejs_compat"],
@@ -14,8 +15,7 @@
     {
       "binding": "DB",
       "database_name": "pjokk",
-      // Placeholder until `wrangler d1 create pjokk` at first deploy.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "e9d50b4e-2680-4819-ad7e-ef8a20553568",
       "migrations_dir": "migrations"
     }
   ],
@@ -28,8 +28,7 @@
   "kv_namespaces": [
     {
       "binding": "KV",
-      // Placeholder until `wrangler kv namespace create KV` at first deploy.
-      "id": "00000000000000000000000000000000"
+      "id": "321697d9378d4a36aa052d53d1f93f45"
     }
   ],
   "triggers": {
@@ -40,9 +39,13 @@
     "enabled": true
   },
   "vars": {
-    // Overridden per environment; secrets (GOOGLE_CLIENT_SECRET,
+    // Overridden locally by .dev.vars; secrets (GOOGLE_CLIENT_SECRET,
     // BETTER_AUTH_SECRET) are set with `wrangler secret put`.
-    "APP_URL": "http://localhost:5173"
+    // Switch to https://pjokk.no once NORID activates the domain (and enable
+    // the routes block below).
+    "APP_URL": "https://pjokk.refsdal-holding-as.workers.dev",
+    // Set to "1" only while creating the very first (founder) account.
+    "OPEN_SIGNUP": "0"
   }
   // Custom domain — enable once NORID activates pjokk.no:
   // "routes": [{ "pattern": "pjokk.no", "custom_domain": true }]

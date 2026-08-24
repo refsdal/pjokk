@@ -1,0 +1,78 @@
+# Smoke test — Phase 1
+
+Live URL: **https://pjokk.refsdal-holding-as.workers.dev**
+
+## 0. One-time setup (before Google sign-in works)
+
+Google OAuth secrets are placeholders. In Google Cloud Console create an
+OAuth 2.0 Web client with redirect URI:
+
+```
+https://pjokk.refsdal-holding-as.workers.dev/api/auth/callback/google
+```
+
+Then:
+
+```sh
+wrangler secret put GOOGLE_CLIENT_ID
+wrangler secret put GOOGLE_CLIENT_SECRET
+```
+
+(When pjokk.no activates: add the pjokk.no redirect URI too, flip `APP_URL`
+and enable the `routes` block in wrangler.jsonc, redeploy.)
+
+## 1. Founder account (bootstrap)
+
+1. Set `OPEN_SIGNUP` to `"1"` in wrangler.jsonc → `pnpm deploy`.
+2. Open the live URL on your phone → Continue with Google (as yourself).
+3. You land on **Welcome**: create family "Refsdal", then add the baby
+   (name + birth date) → you land on Home.
+4. Set `OPEN_SIGNUP` back to `"0"` → `pnpm deploy`. Signup is closed again.
+
+## 2. Invite → second caretaker joins
+
+5. Settings → **New invite link** → QR + code appear.
+6. On a second device/browser (or incognito): scan the QR (or open the
+   link). The join page shows "Join Refsdal as member".
+7. Continue with Google (second account, e.g. Kristine's) → **Join family**
+   → lands on Home showing the same baby. (This works with signup closed —
+   the invite flow is the only signup door.)
+8. Back on device 1: Settings shows both caretakers; the invite's used
+   count ticked up. Revoke the invite; opening the link now says not valid.
+
+## 3. Logging (both accounts)
+
+9. Device 1: tap **Feed** → sheet opens prefilled → Save (two taps).
+   Home's "Last feed" flips to "just now" with the amount.
+10. Device 2: tap **Diaper** → pick type → Save. Device 1's home updates on
+    next refetch (≤60 s or pull to refresh by reopening).
+11. Tap **Sleep** → Start sleep. The purple banner appears with a live
+    counter and Wake. Tap **Wake** — banner clears, "Last sleep" shows.
+12. Retroactive path: Feed → "15 m ago" chip → Save; check the timestamp.
+
+## 4. Attribution
+
+13. In dev (`pnpm dev` + `pnpm seed:local`, sign in as
+    anders@pjokk.local / pjokk-dev): `/api/feeds` rows carry
+    `caretakerName` alternating Anders/Kristine. Live: log one entry from
+    each account and GET `/api/summary?babyId=…` — `caretakerName` matches
+    whoever logged it. (Timeline UI renders this in Phase 2.)
+
+## 5. PWA + polish
+
+14. Add to Home Screen on iOS/Android → standalone app with the Pjokk icon.
+15. Airplane mode → app still renders last-known home state; log a feed →
+    "Saved offline — will sync" → disable airplane mode → it syncs.
+16. Settings → Night mode → On: near-black warm screen, three big actions
+    in the bottom half.
+17. `/api/docs` serves the Scalar API reference.
+
+## Verified automatically (already done)
+
+- 16 workers-runtime tests: tenancy isolation (cross-family reads/writes
+  impossible, stale session claims re-verified), invite lifecycle (atomic
+  batch redeem, expiry/revoke/exhaustion, rate limiting), active-sleep
+  state machine (single active session, idempotent wake), summary shape.
+- Live checks: SPA 200, /api/docs 200, manifest + service worker 200, SPA
+  fallback on /join/CODE, auth gates on domain routes and redeem, public
+  invite-info endpoint.

@@ -165,6 +165,17 @@ sheet pattern — build the pattern well once.
 
 ## Phased roadmap
 
+> **Status (2026-08-24): Phase 1 SHIPPED** to
+> https://pjokk.refsdal-holding-as.workers.dev (Refsdal Holding AS account).
+> Also already in place ahead of schedule: night mode (scheduled + manual),
+> minimal Settings (members, invite link w/ QR + revoke, night mode, sign
+> out), PWA update toast, offline persist + paused-mutation queue.
+> Deviations & boring choices are logged in DECISIONS.md — notably:
+> passkey plugin is server-side only (no UI yet), email/password sign-IN is
+> enabled as the dev/demo path (signup stays closed), log sheets omit the
+> notes field until the edit sheet lands in Phase 2, and Google OAuth
+> credentials are still placeholders (see SMOKE-TEST.md for go-live steps).
+
 1. **Core loop:** schema, auth (social + orgs + invite codes), tenancy
    middleware, home screen with status cards + Feed/Diaper/Sleep sheets,
    active sleep session. This alone replaces 80 % of daily usage.

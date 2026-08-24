@@ -28,7 +28,9 @@ export function createAuth(env: Env) {
       google: {
         clientId: env.GOOGLE_CLIENT_ID,
         clientSecret: env.GOOGLE_CLIENT_SECRET,
-        disableImplicitSignUp: true,
+        // OPEN_SIGNUP=1 is the founder-bootstrap escape hatch: flip it on for
+        // the very first account (no invite exists yet), then back off.
+        disableImplicitSignUp: String(env.OPEN_SIGNUP) !== "1",
       },
     },
     databaseHooks: {
