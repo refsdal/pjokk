@@ -145,7 +145,7 @@ export function FeedSheet({
     setNow(Date.now());
     if (edit) {
       setType(edit.type);
-      setAmountMl(edit.amountMl ?? 120);
+      setAmountMl(edit.amountMl ?? (edit.type === "solids" ? 40 : 120));
       const sides = sidesFromFeed(edit) ?? { left: 10, right: 0 };
       setLeftMin(sides.left);
       setRightMin(sides.right);
@@ -241,7 +241,10 @@ export function FeedSheet({
         ...(trimmedNotes ? { notes: trimmedNotes } : {}),
       });
     }
-    if (type === "breast") {
+    // Only the create path's steppers are seeded from the live nursing
+    // timer — editing a past entry must never clear a timer that's still
+    // running for the CURRENT feed.
+    if (type === "breast" && !edit) {
       clearNursing();
       setTimer(emptyTimer);
     }

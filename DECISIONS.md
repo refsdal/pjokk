@@ -408,3 +408,8 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   `feed_log` (left/right minutes), additive to the existing
   `durationMin`, which stays the total and is what CSV export reports —
   CSV does not break out per-side minutes.
+- **Home's sleep sub-line renders the app-wide `formatDuration` "h:mm
+  today" format** (e.g. "2:10 today"), a deliberate deviation from the
+  spec's "2 h 10 m" wording — consistency with every other duration on
+  the app (active sleep banner, timeline spans) won out over matching the
+  spec's prose exactly.

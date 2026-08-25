@@ -121,6 +121,7 @@ const BACKUP_TABLES = [
   "measurement_log",
   "pump_log",
   "family_invite",
+  "sleep_location",
   "push_subscription",
   "push_pref",
   "api_key",

@@ -16,6 +16,11 @@ describe("nightly backup", () => {
         amountMl: 130,
       },
     });
+    await api("/api/sleep-locations", {
+      method: "POST",
+      cookie: a.cookie,
+      body: { name: "Hammock" },
+    });
 
     const key = await runBackup(env, new Date("2026-08-24T03:15:00Z"));
     expect(key).toBe("backups/2026-08-24.json");
@@ -29,5 +34,9 @@ describe("nightly backup", () => {
     expect(snapshot.tables.user!.length).toBeGreaterThan(0);
     expect(snapshot.tables.feed_log).toHaveLength(1);
     expect(Object.keys(snapshot.tables)).toContain("push_subscription");
+    expect(snapshot.tables.sleep_location).toHaveLength(1);
+    expect(
+      (snapshot.tables.sleep_location as { name: string }[])[0]!.name,
+    ).toBe("Hammock");
   });
 });
