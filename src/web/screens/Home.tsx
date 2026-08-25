@@ -8,6 +8,7 @@ import {
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { ActiveSleepBanner } from "@/components/ActiveSleepBanner";
+import { BabySwitcher } from "@/components/BabySwitcher";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { LogButton } from "@/components/LogButton";
 import { StatusCard } from "@/components/StatusCard";
@@ -20,15 +21,14 @@ import { useSession } from "@/lib/auth-client";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   prefetchOtherLists,
-  useBabies,
   useFeeds,
   useSummary,
   useWakeSleep,
   type OtherKind,
 } from "@/lib/data";
 import { t } from "@/lib/i18n";
+import { useSelectedBaby } from "@/lib/selected-baby";
 import { useAppearance } from "@/lib/appearance";
-import { formatAge } from "@/lib/time";
 import { toast } from "@/lib/toast";
 
 type OpenSheet = "feed" | "diaper" | "sleep" | "more" | "other" | null;
@@ -49,8 +49,7 @@ function feedDetail(feed: {
 
 export function HomeScreen() {
   const { data: session } = useSession();
-  const babies = useBabies();
-  const baby = babies.data?.[0];
+  const { babies, baby } = useSelectedBaby();
   const summary = useSummary(baby?.id);
   const feeds = useFeeds(baby?.id);
   const [sheet, setSheet] = useState<OpenSheet>(null);
@@ -117,12 +116,7 @@ export function HomeScreen() {
     <div className="mx-auto max-w-md px-4 pt-safe">
       {/* Baby header */}
       <header className="flex items-center justify-between py-4">
-        <div>
-          <h1 className="text-2xl font-extrabold text-ink">{baby.name}</h1>
-          <p className="text-sm font-medium text-muted">
-            {formatAge(new Date(baby.birthDate))}
-          </p>
-        </div>
+        <BabySwitcher />
         <div
           className="flex h-11 w-11 items-center justify-center rounded-full bg-accent-soft text-base font-bold text-accent"
           title={session?.user.name}

@@ -15,7 +15,9 @@ import type { Baby } from "@shared/schemas";
 import { ErrorState } from "@/components/QueryStates";
 import { ChipGroup } from "@/components/Chips";
 import { Card } from "@/components/ui/card";
-import { useBabies, useMeasurements, useStats } from "@/lib/data";
+import { BabySwitcher } from "@/components/BabySwitcher";
+import { useMeasurements, useStats } from "@/lib/data";
+import { useSelectedBaby } from "@/lib/selected-baby";
 import {
   ageInMonths,
   formatPercentile,
@@ -155,8 +157,7 @@ function GrowthChart({ baby }: { baby: Baby }) {
 }
 
 export function StatsScreen() {
-  const babies = useBabies();
-  const baby = babies.data?.[0];
+  const { baby } = useSelectedBaby();
   const [days, setDays] = useState<7 | 30>(7);
   const stats = useStats(baby?.id, days);
   const s = stats.data;
@@ -188,8 +189,9 @@ export function StatsScreen() {
 
   return (
     <div className="mx-auto max-w-md px-4 pt-safe">
-      <div className="flex items-center justify-between py-4">
+      <div className="flex items-center justify-between gap-2 py-4">
         <h1 className="text-2xl font-extrabold text-ink">{t("Stats")}</h1>
+        <BabySwitcher compact />
         <ChipGroup
           options={[
             { value: "7", label: t("Week") },

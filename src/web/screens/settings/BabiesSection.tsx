@@ -1,97 +1,17 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { IconPlus } from "@tabler/icons-react";
 import { useState } from "react";
 import type { Baby } from "@shared/schemas";
-import { ChipGroup } from "@/components/Chips";
-import { Sheet } from "@/components/Sheet";
-import { Button } from "@/components/ui/button";
+import { BabySheet } from "@/components/sheets/BabySheet";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { api, unwrap } from "@/lib/api";
 import { useBabies } from "@/lib/data";
 import { t } from "@/lib/i18n";
-import { formatAge, toLocalDateInput } from "@/lib/time";
-import { toast } from "@/lib/toast";
+import { formatAge } from "@/lib/time";
 import { SectionTitle } from "./lib";
 
-function BabyEditSheet({
-  baby,
-  onOpenChange,
-}: {
-  baby: Baby | null;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const queryClient = useQueryClient();
-  const [name, setName] = useState("");
-  const [birthDate, setBirthDate] = useState("");
-  const [sex, setSex] = useState<"girl" | "boy" | null>(null);
-  const [wasOpen, setWasOpen] = useState(false);
-
-  if (baby && !wasOpen) {
-    setWasOpen(true);
-    setName(baby.name);
-    setBirthDate(toLocalDateInput(new Date(baby.birthDate)));
-    setSex(baby.sex);
-  }
-  if (!baby && wasOpen) setWasOpen(false);
-
-  const save = useMutation({
-    mutationFn: async () =>
-      unwrap(
-        await api.babies[":id"].$patch({
-          param: { id: baby!.id },
-          json: {
-            name: name.trim(),
-            birthDate: new Date(birthDate).toISOString(),
-            sex,
-          },
-        }),
-      ),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["babies"] });
-      onOpenChange(false);
-    },
-    onError: (err) => toast(err.message, "error"),
-  });
-
-  return (
-    <Sheet open={!!baby} onOpenChange={onOpenChange} title={t("Edit baby")}>
-      <div className="space-y-5 pb-4">
-        <Input value={name} onChange={(e) => setName(e.target.value)} />
-        <ChipGroup
-          options={[
-            { value: "girl", label: t("Girl") },
-            { value: "boy", label: t("Boy") },
-          ]}
-          value={sex}
-          onChange={setSex}
-        />
-        <input
-          type="date"
-          value={birthDate}
-          max={toLocalDateInput()}
-          onChange={(e) => setBirthDate(e.target.value)}
-          className="h-12 w-full rounded-xl2 border border-line bg-surface px-4 text-base text-ink"
-        />
-        <Button
-          size="full"
-          onClick={() => save.mutate()}
-          disabled={save.isPending || name.trim().length === 0 || !birthDate}
-        >
-          {t("Save")}
-        </Button>
-        {!sex && (
-          <p className="text-xs text-muted">
-            {t("Sex is only used for WHO growth percentiles.")}
-          </p>
-        )}
-      </div>
-    </Sheet>
-  );
-}
-
-export function BabiesSection() {
+export function BabiesSection({ isAdmin }: { isAdmin: boolean }) {
   const babies = useBabies();
   const [editBaby, setEditBaby] = useState<Baby | null>(null);
+  const [adding, setAdding] = useState(false);
 
   return (
     <>
@@ -111,11 +31,22 @@ export function BabiesSection() {
             </p>
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="flex w-full items-center gap-2 px-4 py-3 text-left font-semibold text-ink-soft active:bg-surface-2"
+        >
+          <IconPlus className="h-5 w-5" />
+          {t("Add baby")}
+        </button>
       </Card>
-      <BabyEditSheet
-        baby={editBaby}
+      <BabySheet
+        open={!!editBaby}
         onOpenChange={(o) => !o && setEditBaby(null)}
+        baby={editBaby}
+        canDelete={isAdmin}
       />
+      <BabySheet open={adding} onOpenChange={setAdding} />
     </>
   );
 }

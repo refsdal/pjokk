@@ -233,6 +233,26 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   sheets, family switcher / multi-baby picker, install-to-home-screen hint,
   pre-paint theme script, sentence-splice translation keys.
 
+## Multi-baby & member management (2026-08-25)
+
+- **Baby selection is a device-local external store** (localStorage +
+  useSyncExternalStore) so Home/Timeline/Stats share one selection without a
+  provider; falls back to the first baby, self-heals if the selected baby is
+  gone. The baby's name IS the switcher (chevron appears with >1 baby);
+  Timeline/Stats carry a compact corner chip.
+- **One BabySheet for add + edit + delete** (delete is family-admin only,
+  cascades every log, warned + two-tap).
+- **Member management rides on better-auth's org API** (updateMemberRole /
+  removeMember — server-enforced permissions); the client additionally
+  refuses to demote/remove the LAST admin, and admins can't manage
+  themselves from the sheet. Removed members keep their attribution on old
+  entries; their stale session dies at requireFamily (tested).
+- MemberSchema now exposes the member-row id better-auth addresses.
+- Low-severity security issues #1–#7 all fixed and closed (global invite
+  rate backstop, session-gated docs, seed prod interlock, redacted +
+  30-day-expiring backups, no XFF fallback, server-side admin-op audit,
+  impersonated-write audit).
+
 ## Infra
 
 - **Deployed to the Refsdal Holding AS Cloudflare account**

@@ -45,6 +45,20 @@ const updateBaby = createRoute({
   },
 });
 
+const deleteBaby = createRoute({
+  method: "delete",
+  path: "/api/babies/{id}",
+  tags: ["babies"],
+  description:
+    "Family-admin only. Deletes the baby and EVERY log for them (cascade).",
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: jsonContent(z.object({ ok: z.literal(true) }), "Deleted"),
+    403: jsonContent(ErrorSchema, "Family admin only"),
+    404: jsonContent(ErrorSchema, "Not found"),
+  },
+});
+
 const listMembers = createRoute({
   method: "get",
   path: "/api/family/members",
@@ -89,6 +103,18 @@ export const babiesApp = createApp<FamEnv>()
       return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
     }
     return c.json(serBaby(updated), 200);
+  })
+  .openapi(deleteBaby, async (c) => {
+    const role = c.var.memberRole;
+    if (role !== "admin" && role !== "owner") {
+      return c.json({ error: "Admin only", code: "FORBIDDEN" }, 403);
+    }
+    const { id } = c.req.valid("param");
+    const ok = await c.var.fam.deleteBaby(id);
+    if (!ok) {
+      return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+    }
+    return c.json({ ok: true as const }, 200);
   })
   .openapi(listMembers, async (c) => {
     return c.json(await c.var.fam.members(), 200);

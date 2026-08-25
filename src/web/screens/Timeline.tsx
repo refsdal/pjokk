@@ -18,7 +18,9 @@ import { SleepSheet } from "@/components/sheets/SleepSheet";
 import { ChipGroup } from "@/components/Chips";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { Button } from "@/components/ui/button";
-import { useBabies, useFeeds, useTimeline } from "@/lib/data";
+import { BabySwitcher } from "@/components/BabySwitcher";
+import { useFeeds, useTimeline } from "@/lib/data";
+import { useSelectedBaby } from "@/lib/selected-baby";
 import { t } from "@/lib/i18n";
 import { formatClock, formatDay, formatDuration } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -188,8 +190,7 @@ function Row({
 }
 
 export function TimelineScreen() {
-  const babies = useBabies();
-  const baby = babies.data?.[0];
+  const { baby } = useSelectedBaby();
   const [filter, setFilter] = useState<TimelineFilter | null>(null);
   const timeline = useTimeline(baby?.id, filter);
   const feeds = useFeeds(baby?.id);
@@ -209,7 +210,10 @@ export function TimelineScreen() {
 
   return (
     <div className="mx-auto max-w-md px-4 pt-safe">
-      <h1 className="py-4 text-2xl font-extrabold text-ink">{t("Timeline")}</h1>
+      <div className="flex items-center justify-between py-4">
+        <h1 className="text-2xl font-extrabold text-ink">{t("Timeline")}</h1>
+        <BabySwitcher compact />
+      </div>
 
       <ChipGroup
         className="flex-nowrap overflow-x-auto pb-3"

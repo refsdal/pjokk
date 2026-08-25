@@ -178,6 +178,19 @@ const nb: Record<string, string> = {
   Boy: "Gutt",
   "Birth date": "Fødselsdato",
   "sex not set": "kjønn ikke angitt",
+  "Baby removed": "Baby fjernet",
+  "Removing a baby permanently deletes every log for them.":
+    "Å fjerne en baby sletter alle loggene deres for alltid.",
+  "Switch baby": "Bytt baby",
+  "Make admin": "Gjør til admin",
+  "Make member": "Gjør til medlem",
+  "Role updated": "Rolle oppdatert",
+  "Removed from the family": "Fjernet fra familien",
+  "Remove from family": "Fjern fra familien",
+  "The family needs at least one admin.": "Familien trenger minst én admin.",
+  "Removing someone keeps their past entries, attributed as before.":
+    "Å fjerne noen beholder tidligere oppføringer med samme navn.",
+  "Tap again to confirm": "Trykk igjen for å bekrefte",
   "Sex is only used for WHO growth percentiles.":
     "Kjønn brukes kun til WHO-vekstpersentiler.",
   Notifications: "Varsler",

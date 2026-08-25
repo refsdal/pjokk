@@ -243,6 +243,7 @@ export function familyScope(db: Db, familyId: string) {
     async members() {
       return db
         .select({
+          memberId: member.id,
           userId: member.userId,
           name: user.name,
           email: user.email,
@@ -269,6 +270,15 @@ export function familyScope(db: Db, familyId: string) {
         .from(baby)
         .where(and(eq(baby.id, id), eq(baby.familyId, familyId)));
       return rows[0] ?? null;
+    },
+
+    async deleteBaby(id: string) {
+      // FKs cascade: every log for the baby goes with it.
+      const rows = await db
+        .delete(baby)
+        .where(and(eq(baby.id, id), eq(baby.familyId, familyId)))
+        .returning({ id: baby.id });
+      return rows.length > 0;
     },
 
     async createBaby(data: {

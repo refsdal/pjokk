@@ -3,7 +3,13 @@ import { Button } from "@/components/ui/button";
 import { t } from "@/lib/i18n";
 
 // Two-tap delete: no modal, no accidental loss.
-export function DeleteButton({ onDelete }: { onDelete: () => void }) {
+export function DeleteButton({
+  onDelete,
+  label,
+}: {
+  onDelete: () => void;
+  label?: string;
+}) {
   const [armed, setArmed] = useState(false);
 
   useEffect(() => {
@@ -22,7 +28,7 @@ export function DeleteButton({ onDelete }: { onDelete: () => void }) {
         else setArmed(true);
       }}
     >
-      {armed ? t("Tap again to delete") : t("Delete")}
+      {armed ? t("Tap again to confirm") : (label ?? t("Delete"))}
     </Button>
   );
 }

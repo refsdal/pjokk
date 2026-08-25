@@ -21,6 +21,7 @@ const FAM = "fam_pjokk_test";
 const ANDERS = "user_anders";
 const KRISTINE = "user_kristine";
 const NORA = "baby_nora";
+const EMIL = "baby_emil";
 const hash = await hashPassword(PASSWORD);
 
 const rows = [
@@ -76,10 +77,14 @@ rows.push(
   `INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (${esc(id("mem"))}, ${esc(FAM)}, ${esc(KRISTINE)}, 'member', ${now});`,
 );
 
-// Nora, born ~10 months ago.
+// Nora (~10 months) and big brother Emil (~2.5 years).
 const birth = now - Math.round(10 * 30.4 * 24) * H;
+const emilBirth = now - Math.round(30 * 30.4 * 24) * H;
 rows.push(
   `INSERT INTO baby (id, family_id, name, birth_date, sex, created_at) VALUES (${esc(NORA)}, ${esc(FAM)}, 'Nora', ${birth}, 'girl', ${now});`,
+  `INSERT INTO baby (id, family_id, name, birth_date, sex, created_at) VALUES (${esc(EMIL)}, ${esc(FAM)}, 'Emil', ${emilBirth}, 'boy', ${now + 1});`,
+  `INSERT INTO feed_log (id, family_id, baby_id, caretaker_id, time, type, amount_ml, created_at) VALUES (${esc(id("feed"))}, ${esc(FAM)}, ${esc(EMIL)}, ${esc(KRISTINE)}, ${ms(3)}, 'solids', 250, ${now});`,
+  `INSERT INTO sleep_log (id, family_id, baby_id, caretaker_id, start_time, end_time, location, created_at) VALUES (${esc(id("slp"))}, ${esc(FAM)}, ${esc(EMIL)}, ${esc(ANDERS)}, ${ms(6)}, ${ms(4.5)}, 'crib', ${now});`,
 );
 
 const feed = (hoursAgo, by, type, extra) =>

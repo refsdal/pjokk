@@ -24,7 +24,7 @@ export function SettingsScreen() {
       <h1 className="py-4 text-2xl font-extrabold text-ink">{t("Settings")}</h1>
       <div className="pb-tabbar">
         <FamilySection isAdmin={isAdmin} />
-        <BabiesSection />
+        <BabiesSection isAdmin={isAdmin} />
 
         <SectionTitle>{t("Notifications")}</SectionTitle>
         <NotificationsSection />

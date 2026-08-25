@@ -456,6 +456,8 @@ export const PushTestResultSchema = z
 
 export const MemberSchema = z
   .object({
+    // The member-row id better-auth's remove/update-role APIs address.
+    memberId: z.string(),
     userId: z.string(),
     name: z.string(),
     email: z.string(),
