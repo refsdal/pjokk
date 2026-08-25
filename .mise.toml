@@ -2,5 +2,5 @@
 # same node + pnpm without corepack (whose shim breaks on some setups).
 # CI pins its own versions in .github/workflows/ci.yml — keep them in sync.
 [tools]
-node = "22"
+node = "24"
 pnpm = "11"
