@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { api, rig } from "./helpers";
+import { setPlan } from "./billing.test";
 import { SELF } from "cloudflare:test";
 
 const keyApi = (
@@ -19,6 +20,7 @@ const keyApi = (
 describe("api keys", () => {
   it("admin creates a key; the raw key appears exactly once", async () => {
     const a = await rig();
+    await setPlan(a.family.id, "premium");
     const res = await api("/api/keys", {
       method: "POST",
       cookie: a.cookie,
@@ -39,6 +41,7 @@ describe("api keys", () => {
 
   it("keys read and write logs, attributed to the creator", async () => {
     const a = await rig();
+    await setPlan(a.family.id, "premium");
     const { key } = (await (
       await api("/api/keys", {
         method: "POST",
@@ -71,6 +74,7 @@ describe("api keys", () => {
 
   it("keys are refused by admin and device-bound endpoints", async () => {
     const a = await rig();
+    await setPlan(a.family.id, "premium");
     const { key } = (await (
       await api("/api/keys", {
         method: "POST",
@@ -94,6 +98,7 @@ describe("api keys", () => {
 
   it("read-only keys can read but not write; expired keys are refused", async () => {
     const a = await rig();
+    await setPlan(a.family.id, "premium");
     const ro = (await (
       await api("/api/keys", {
         method: "POST",
@@ -136,6 +141,7 @@ describe("api keys", () => {
 
   it("revoked and bogus keys get 401", async () => {
     const a = await rig();
+    await setPlan(a.family.id, "premium");
     const created = (await (
       await api("/api/keys", {
         method: "POST",

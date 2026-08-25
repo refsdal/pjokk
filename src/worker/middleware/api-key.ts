@@ -3,6 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import type { AppEnv, SessionData } from "../context";
 import { schema } from "../db";
 import { sha256Hex } from "../db/scoped";
+import { canUse } from "../entitlements";
 
 // Bearer API keys (pjk_…) authenticate as the caretaker who created the key
 // (their attribution on logs), scoped to the key's family. Admin and
@@ -21,9 +22,14 @@ export const apiKeyAuth = createMiddleware<AppEnv>(async (c, next) => {
         userId: schema.user.id,
         userName: schema.user.name,
         userEmail: schema.user.email,
+        plan: schema.organization.plan,
       })
       .from(schema.apiKey)
       .innerJoin(schema.user, eq(schema.apiKey.createdBy, schema.user.id))
+      .innerJoin(
+        schema.organization,
+        eq(schema.apiKey.familyId, schema.organization.id),
+      )
       .where(
         and(eq(schema.apiKey.keyHash, hash), isNull(schema.apiKey.revokedAt)),
       );
@@ -33,6 +39,11 @@ export const apiKeyAuth = createMiddleware<AppEnv>(async (c, next) => {
     }
     if (row.expiresAt && row.expiresAt.getTime() <= Date.now()) {
       return c.json({ error: "API key expired", code: "KEY_EXPIRED" }, 401);
+    }
+    // Soft lock: API keys are a Premium feature. Keys survive a downgrade in
+    // the DB but stop authenticating until the family pays again.
+    if (!canUse({ plan: row.plan }, "apiKeys")) {
+      return c.json({ error: "Premium required", code: "PLAN_REQUIRED" }, 402);
     }
     if (row.readOnly && !["GET", "HEAD"].includes(c.req.method)) {
       return c.json(

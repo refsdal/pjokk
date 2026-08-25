@@ -31,8 +31,12 @@ export const requireFamily = createMiddleware<FamEnv>(async (c, next) => {
     return c.json({ error: "No active family", code: "NO_FAMILY" }, 403);
   }
   const membership = await c.var.db
-    .select({ role: schema.member.role })
+    .select({ role: schema.member.role, plan: schema.organization.plan })
     .from(schema.member)
+    .innerJoin(
+      schema.organization,
+      eq(schema.member.organizationId, schema.organization.id),
+    )
     .where(
       and(
         eq(schema.member.organizationId, familyId),
@@ -48,6 +52,7 @@ export const requireFamily = createMiddleware<FamEnv>(async (c, next) => {
   }
   c.set("familyId", familyId);
   c.set("memberRole", membership[0].role);
+  c.set("plan", membership[0].plan);
   c.set("fam", familyScope(c.var.db, familyId));
 
   // Issue #7: domain WRITES made while impersonating leave a trace with

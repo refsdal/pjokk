@@ -3,7 +3,7 @@ import { SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { canUse } from "../src/worker/entitlements";
 import { applySubscriptionStatus, grantLifetime } from "../src/worker/billing";
-import { db, createFamily } from "./helpers";
+import { api, db, createFamily, rig } from "./helpers";
 import { schema } from "../src/worker/db";
 
 // biome-ignore lint/suspicious/noExportsInTest: Shared test helpers for billing tasks
@@ -81,5 +81,72 @@ describe("stripe webhook plumbing", () => {
     });
     // 400/401 = signature verification ran (plugin mounted). 404 = not wired.
     expect([400, 401]).toContain(res.status);
+  });
+});
+
+describe("premium gates", () => {
+  it("POST /api/keys is 402 on free, 201 on premium", async () => {
+    const { family, cookie } = await rig();
+    const denied = await api("/api/keys", {
+      method: "POST",
+      cookie,
+      body: { name: "ha", readOnly: true },
+    });
+    expect(denied.status).toBe(402);
+    expect(((await denied.json()) as { code: string }).code).toBe(
+      "PLAN_REQUIRED",
+    );
+
+    await setPlan(family.id, "premium");
+    const ok = await api("/api/keys", {
+      method: "POST",
+      cookie,
+      body: { name: "ha", readOnly: true },
+    });
+    expect(ok.status).toBe(201);
+  });
+
+  it("GET /api/export.csv is 402 on free, 200 on comp", async () => {
+    const { family, cookie } = await rig();
+    expect((await api("/api/export.csv", { cookie })).status).toBe(402);
+    await setPlan(family.id, "comp");
+    expect((await api("/api/export.csv", { cookie })).status).toBe(200);
+  });
+
+  it("stats month view is 402 on free, week stays free", async () => {
+    const { family, baby, cookie } = await rig();
+    const week = await api(`/api/stats?babyId=${baby.id}&days=7`, { cookie });
+    expect(week.status).toBe(200);
+    const month = await api(`/api/stats?babyId=${baby.id}&days=30`, { cookie });
+    expect(month.status).toBe(402);
+    await setPlan(family.id, "lifetime");
+    const paid = await api(`/api/stats?babyId=${baby.id}&days=30`, { cookie });
+    expect(paid.status).toBe(200);
+  });
+
+  it("existing API keys stop authenticating on free (soft lock)", async () => {
+    const { family, cookie } = await rig();
+    await setPlan(family.id, "premium");
+    const created = await api("/api/keys", {
+      method: "POST",
+      cookie,
+      body: { name: "ha", readOnly: true },
+    });
+    const { key } = (await created.json()) as { key: string };
+
+    const useKey = (k: string) =>
+      SELF.fetch("http://localhost/api/babies", {
+        headers: { authorization: `Bearer ${k}`, origin: "http://localhost" },
+      });
+
+    expect((await useKey(key)).status).toBe(200);
+    await setPlan(family.id, "free");
+    const locked = await useKey(key);
+    expect(locked.status).toBe(402);
+    expect(((await locked.json()) as { code: string }).code).toBe(
+      "PLAN_REQUIRED",
+    );
+    await setPlan(family.id, "premium");
+    expect((await useKey(key)).status).toBe(200);
   });
 });

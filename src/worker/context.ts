@@ -24,6 +24,7 @@ export type FamEnv = {
     sessionData: SessionData;
     familyId: string;
     memberRole: string;
+    plan: string;
     fam: FamilyScope;
   };
 };

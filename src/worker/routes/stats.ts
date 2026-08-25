@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { ErrorSchema, StatsSchema } from "@shared/schemas";
 import type { FamEnv } from "../context";
+import { canUse } from "../entitlements";
 import { createApp, iso, isoOrNull, jsonContent } from "../lib";
 
 const DAY = 86_400_000;
@@ -23,12 +24,16 @@ const stats = createRoute({
   request: { query: statsQuery },
   responses: {
     200: jsonContent(StatsSchema, "Stats for the window"),
+    402: jsonContent(ErrorSchema, "Premium required"),
     404: jsonContent(ErrorSchema, "Unknown baby"),
   },
 });
 
 export const statsApp = createApp<FamEnv>().openapi(stats, async (c) => {
   const q = c.req.valid("query");
+  if (q.days > 7 && !canUse({ plan: c.var.plan }, "statsMonth")) {
+    return c.json({ error: "Premium required", code: "PLAN_REQUIRED" }, 402);
+  }
   if (!(await c.var.fam.getBaby(q.babyId))) {
     return c.json({ error: "Unknown baby", code: "NOT_FOUND" }, 404);
   }

@@ -7,6 +7,7 @@ import {
 } from "@shared/schemas";
 import type { FamEnv } from "../context";
 import type { schema } from "../db";
+import { canUse } from "../entitlements";
 import { createApp, iso, isoOrNull, jsonContent } from "../lib";
 
 function serKey(row: typeof schema.apiKey.$inferSelect) {
@@ -33,6 +34,7 @@ const createKey = createRoute({
   },
   responses: {
     201: jsonContent(ApiKeyCreatedSchema, "Created — copy the key now"),
+    402: jsonContent(ErrorSchema, "Premium required"),
   },
 });
 
@@ -58,6 +60,9 @@ const revokeKey = createRoute({
 
 export const keysApp = createApp<FamEnv>()
   .openapi(createKey, async (c) => {
+    if (!canUse({ plan: c.var.plan }, "apiKeys")) {
+      return c.json({ error: "Premium required", code: "PLAN_REQUIRED" }, 402);
+    }
     const body = c.req.valid("json");
     const { row, key } = await c.var.fam.createApiKey({
       name: body.name,

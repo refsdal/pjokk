@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { api, rig } from "./helpers";
+import { setPlan } from "./billing.test";
 import type { Stats } from "../src/shared/schemas";
 
 const H = 3600_000;
@@ -118,6 +119,7 @@ describe("csv export", () => {
   it("exports every kind chronologically, family-scoped", async () => {
     const a = await rig("Family A");
     const b = await rig("Family B");
+    await setPlan(a.family.id, "premium");
     const now = Date.now();
 
     await api("/api/feeds", {
