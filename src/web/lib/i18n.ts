@@ -262,6 +262,32 @@ const nb: Record<string, string> = {
   "Something went wrong": "Noe gikk galt",
   "API keys are a Premium feature.": "API-nøkler er en Premium-funksjon.",
 
+  // Welcome plan step
+  "Choose your plan": "Velg abonnement",
+  "You can change this anytime in Settings.":
+    "Du kan endre dette når som helst i innstillingene.",
+  "Premium monthly": "Premium månedlig",
+  "Premium yearly": "Premium årlig",
+  "Premium lifetime": "Premium livstid",
+  "2 months free": "2 måneder gratis",
+  "0 kr": "0 kr",
+  "20 kr/mo": "20 kr/mnd",
+  "200 kr/yr": "200 kr/år",
+  "400 kr": "400 kr",
+  "Included with Free": "Inkludert i Gratis",
+  "Included with Premium": "Inkludert i Premium",
+  "Feeds, sleep & diapers": "Måltider, søvn og bleier",
+  "Timeline & full history": "Tidslinje og full historikk",
+  "Week stats": "Ukestatistikk",
+  "Reminders & night mode": "Påminnelser og nattmodus",
+  "Growth charts (WHO)": "Vekstkurver (WHO)",
+  "Month stats": "Månedsstatistikk",
+  "CSV export": "CSV-eksport",
+  "Start tracking": "Kom i gang",
+  "Continue to checkout": "Fortsett til betaling",
+  "Paid plans continue to secure checkout with Stripe.":
+    "Betalte planer fortsetter til sikker betaling hos Stripe.",
+
   Data: "Data",
   "Everything ever logged, one row per entry — plain CSV.":
     "Alt som noen gang er logget, én rad per oppføring — ren CSV.",

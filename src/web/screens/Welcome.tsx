@@ -9,6 +9,7 @@ import { authClient, isSysadmin, useSession } from "@/lib/auth-client";
 import { t } from "@/lib/i18n";
 import { toLocalDateInput } from "@/lib/time";
 import { toast } from "@/lib/toast";
+import { PlanStep } from "./WelcomePlan";
 
 // Family founders land here once (everyone else arrives via /join/CODE).
 // Two steps on one screen: name the family, then add the baby.
@@ -22,6 +23,7 @@ export function WelcomeScreen() {
   const [babyName, setBabyName] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [sex, setSex] = useState<"girl" | "boy" | null>(null);
+  const [showPlan, setShowPlan] = useState(false);
   const [busy, setBusy] = useState(false);
 
   if (!isPending && !session) {
@@ -94,7 +96,7 @@ export function WelcomeScreen() {
         }),
       );
       await queryClient.invalidateQueries();
-      void navigate({ to: "/" });
+      setShowPlan(true);
     } catch (err) {
       toast(err instanceof Error ? err.message : t("Failed"), "error");
     } finally {
@@ -107,11 +109,20 @@ export function WelcomeScreen() {
       <div className="text-center">
         <img src="/icon.svg" alt="" className="mx-auto h-16 w-16" />
         <h1 className="mt-2 text-2xl font-extrabold text-ink">
-          {hasFamily ? t("Who are we tracking?") : t("Set up your family")}
+          {!hasFamily
+            ? t("Set up your family")
+            : showPlan
+              ? t("Choose your plan")
+              : t("Who are we tracking?")}
         </h1>
       </div>
 
-      {!hasFamily ? (
+      {hasFamily && showPlan ? (
+        <PlanStep
+          familyId={session?.session.activeOrganizationId ?? ""}
+          onFree={() => void navigate({ to: "/" })}
+        />
+      ) : !hasFamily ? (
         <form
           className="space-y-3"
           onSubmit={(e) => {
