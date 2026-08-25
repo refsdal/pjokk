@@ -198,9 +198,20 @@ sheet pattern — build the pattern well once.
 > plugin; user.role === "admin" ≠ family roles): platform stats, family
 > overview + cascade delete, user support (sessions/password/ban/delete),
 > impersonation with an in-app banner, and an append-only admin_audit
-> trail. Billing tools + coupons join it after Phase 9 (Stripe: freemium —
-> free core loop; Plus at 20 kr/mo · 200 kr/yr · 400 kr lifetime gating
-> growth charts, API keys, CSV export, stats month view).
+> trail. Phase 9 delivered Stripe billing via @better-auth/stripe, org-level
+> subscriptions AND org-level Stripe customers (users pay, families are
+> Premium; any family admin manages billing). `organization.plan` is one of
+> free/premium/lifetime/comp: webhooks flip free↔premium, a one-time
+> checkout grants lifetime, comp is an audited sysadmin override
+> (free/comp only — Stripe-derived values are webhook-only). Soft-lock
+> gates (402 PLAN_REQUIRED) sit on API key creation + consumption, CSV
+> export, and stats beyond a 7-day window; the growth chart is client-gated.
+> Settings → Billing offers monthly/yearly subscribe (plugin checkout),
+> lifetime (custom mode:payment route), and the Stripe Customer Portal for
+> self-service management. Admin gained an audited comp override and
+> cancels a family's subscription on cascade delete. Admin billing tools
+> (revenue/subscription visibility) and coupons remain the post-Phase-9
+> backlog.
 > Also already in place ahead of schedule: night mode (scheduled + manual),
 > minimal Settings (members, invite link w/ QR + revoke, night mode, sign
 > out), PWA update toast, offline persist + paused-mutation queue.

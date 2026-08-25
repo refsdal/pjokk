@@ -253,6 +253,75 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   30-day-expiring backups, no XFF fallback, server-side admin-op audit,
   impersonated-write audit).
 
+## Phase 9 (Stripe billing)
+
+- **@better-auth/stripe with org-level subscriptions AND org-level customers**
+  (`organization: { enabled: true }`, `subscription.enabled: true` scoped by
+  `referenceId` = family id): the family owns both entitlement and the Stripe
+  customer, so any family admin (or org owner) can manage billing —
+  `authorizeReference` checks the caller's member role is admin/owner before
+  letting them buy/cancel/restore/list.
+- **`organization.plan` values `free|premium|lifetime|comp`.** Webhooks only
+  ever move free↔premium (`onSubscriptionComplete/Update/Cancel/Deleted` →
+  `applySubscriptionStatus`); lifetime is granted exclusively by `onEvent`
+  reacting to a `checkout.session.completed` with `mode: "payment"` and
+  `metadata.kind === "lifetime"`; comp is an audited sysadmin override whose
+  zod schema accepts only `free | comp` by hand — Stripe-derived values
+  (premium/lifetime) can never be hand-set, only written by webhooks.
+- **Soft-lock downgrade**: API keys persist across a downgrade but stop
+  authenticating (402 `PLAN_REQUIRED`) rather than being revoked — the
+  soft-lock is symmetric with the growth-chart/CSV/stats gates and reversible
+  the instant the family re-subscribes.
+- Price IDs (`STRIPE_PRICE_PREMIUM_MONTHLY/YEARLY`, `STRIPE_PRICE_LIFETIME`)
+  are env secrets, NOK-only, tax handled by Stripe Tax with inclusive prices
+  (`automatic_tax: { enabled: true }` in `getCheckoutSessionParams`);
+  displayed prices (20 kr/mo · 200 kr/yr · 400 kr lifetime) are hardcoded
+  i18n strings, not read back from Stripe.
+- No trial — everyone, including existing alpha families, starts `free`.
+  `onSubscriptionComplete` hardcodes `"active"` rather than reading
+  `subscription.status`; harmless while no `freeTrial` config exists on the
+  plan, but would need revisiting if a trial is ever added (a trialing sub
+  would be misreported as active).
+- **Webhook signature verification confirmed working under nodejs_compat** —
+  the plugin's async WebCrypto path (`constructEventAsync`) returns 400 for
+  unsigned/forged payloads out of the box; no WebCrypto fallback was needed
+  (contrast Phase 5's web-push, which did need one). Installed `stripe@22.5.0`
+  + `@better-auth/stripe@1.7.1`; Stripe API version pinned to
+  `2026-07-29.dahlia` — the design spec said `2026-06-24`, but the installed
+  SDK's types forced the newer pin.
+- All plugin option/hook names matched the upstream docs as designed —
+  `onSubscriptionComplete/Update/Cancel/Deleted`, `annualDiscountPriceId`,
+  `authorizeReference`, `onEvent`, `getCheckoutSessionParams`,
+  `organization.enabled` — no naming surprises during implementation.
+- **Lifetime checkout uses `customer: <org stripeCustomerId>`** when the
+  family already has a Stripe customer (created by an earlier subscription
+  checkout), falling back to `customer_email` otherwise — so a lifetime buy
+  reuses the existing customer instead of creating a duplicate. Implemented
+  as a narrow `fam.stripeCustomerId()` scoped-query helper
+  (`src/worker/db/scoped.ts`), NOT by widening the existing `fam.family()`
+  helper: that was tried first and reverted because it leaked
+  `stripeCustomerId` through `GET /api/family` to every member; a regression
+  test now pins the field's absence from that response.
+- **Stats month gate runs before the unknown-baby 404 check** (`GET
+  /api/stats`): a free family probing `days=30` with a foreign `babyId` gets
+  402 `PLAN_REQUIRED`, not a distinguishing 404 — avoids letting an
+  unauthenticated-for-that-baby caller learn baby-existence via gate-order
+  side channel.
+- **`requireFamily` now inner-joins `organization`** to load `plan` in the
+  same read as the membership check (previously a separate query per
+  request). Side effect: a member row belonging to a hard-deleted
+  organization (orphaned FK) now fails the join and 403s instead of
+  authenticating with an undefined plan — an existing edge case made stricter
+  as a byproduct, not a regression.
+- **Admin plan override** (`POST /api/admin/families/:id/plan`) accepts only
+  `free | comp` (zod enum, mirrors the webhook-only rule above); the
+  Settings/admin UI additionally hides the override control once a family is
+  already on a paying plan, but the endpoint itself still permits overriding
+  a premium/lifetime family — a deliberate support escape hatch (e.g. comp'ing
+  a family mid-dispute), audited as `billing.plan.set`.
+- Admin billing tools (revenue/subscription visibility beyond plan override)
+  and coupon support remain a post-Phase-9 backlog item.
+
 ## Infra
 
 - **Deployed to the Refsdal Holding AS Cloudflare account**

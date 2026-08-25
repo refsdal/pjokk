@@ -79,6 +79,26 @@ wrangler secret put GOOGLE_CLIENT_SECRET
     in the bottom half.
 17. `/api/docs` serves the Scalar API reference.
 
+## 6. Go-live checklist — Stripe billing (Phase 9)
+
+22. `wrangler secret put` all five `STRIPE_*` values (live mode): secret key,
+    webhook secret, and the three price ids (premium monthly, premium
+    yearly, lifetime).
+23. In the Stripe dashboard: add a webhook endpoint
+    `https://app.pjokk.no/api/auth/stripe/webhook` subscribed to
+    `checkout.session.completed`, `customer.subscription.created`,
+    `customer.subscription.updated`, `customer.subscription.deleted`; copy
+    the signing secret into `STRIPE_WEBHOOK_SECRET`.
+24. Verify all three prices are NOK and tax behavior is **inclusive**;
+    confirm Stripe Tax is enabled on the account.
+25. Test-mode end-to-end pass first (before flipping to live keys):
+    - Subscribe monthly with card `4242 4242 4242 4242` → plan flips to
+      `premium`; open the Customer Portal from Settings → Billing → cancel →
+      verify the downgrade lands at period end (not immediately).
+    - Buy lifetime → plan flips to `lifetime`.
+    - In `/admin`, comp a family (plan → `comp`) then revoke it (plan →
+      `free`) → verify the audit trail records `billing.plan.set` both ways.
+
 ## Verified automatically (already done)
 
 - 16 workers-runtime tests: tenancy isolation (cross-family reads/writes
