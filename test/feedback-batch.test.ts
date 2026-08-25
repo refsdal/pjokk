@@ -120,7 +120,7 @@ describe("custom sleep locations", () => {
     expect(otherList).toHaveLength(0);
   });
 
-  it("rejects duplicates (defaults included) and enforces the cap", async () => {
+  it("rejects duplicate names (defaults included)", async () => {
     const { cookie } = await rig();
     expect(
       (
@@ -131,5 +131,70 @@ describe("custom sleep locations", () => {
         })
       ).status,
     ).toBe(409);
+  });
+
+  it("enforces the cap at 20 custom locations", async () => {
+    const { cookie } = await rig();
+    for (let i = 0; i < 20; i++) {
+      const res = await api("/api/sleep-locations", {
+        method: "POST",
+        cookie,
+        body: { name: `Spot ${i}` },
+      });
+      expect(res.status).toBe(201);
+    }
+    const overCap = await api("/api/sleep-locations", {
+      method: "POST",
+      cookie,
+      body: { name: "One too many" },
+    });
+    expect(overCap.status).toBe(409);
+    expect(((await overCap.json()) as { code: string }).code).toBe(
+      "LIMIT_REACHED",
+    );
+  });
+
+  it("member DELETE is forbidden; admin DELETE removes it; unknown id 404s", async () => {
+    const a = await rig();
+    const created = (await (
+      await api("/api/sleep-locations", {
+        method: "POST",
+        cookie: a.cookie,
+        body: { name: "Hammock" },
+      })
+    ).json()) as { id: string };
+
+    const member = await createUser("Reader");
+    await addMember(member.id, a.family.id, "member");
+    const memberCookie = await signIn(member.email);
+    expect(
+      (
+        await api(`/api/sleep-locations/${created.id}`, {
+          method: "DELETE",
+          cookie: memberCookie,
+        })
+      ).status,
+    ).toBe(403);
+
+    const del = await api(`/api/sleep-locations/${created.id}`, {
+      method: "DELETE",
+      cookie: a.cookie,
+    });
+    expect(del.status).toBe(200);
+    expect(await del.json()).toEqual({ ok: true });
+
+    const list = (await (
+      await api("/api/sleep-locations", { cookie: a.cookie })
+    ).json()) as { id: string }[];
+    expect(list.map((l) => l.id)).not.toContain(created.id);
+
+    expect(
+      (
+        await api(`/api/sleep-locations/${created.id}`, {
+          method: "DELETE",
+          cookie: a.cookie,
+        })
+      ).status,
+    ).toBe(404);
   });
 });

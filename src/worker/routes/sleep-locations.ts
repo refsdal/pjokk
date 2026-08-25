@@ -62,6 +62,12 @@ export const sleepLocationsApp = createApp<FamEnv>()
     return c.json(locations, 200);
   })
   .openapi(createLocation, async (c) => {
+    if (c.get("apiKeyAuth")) {
+      return c.json(
+        { error: "Not available to API keys", code: "FORBIDDEN" },
+        403,
+      );
+    }
     const role = c.var.memberRole;
     if (role !== "admin" && role !== "owner") return forbid(c);
 
@@ -82,6 +88,12 @@ export const sleepLocationsApp = createApp<FamEnv>()
     return c.json(created, 201);
   })
   .openapi(deleteLocation, async (c) => {
+    if (c.get("apiKeyAuth")) {
+      return c.json(
+        { error: "Not available to API keys", code: "FORBIDDEN" },
+        403,
+      );
+    }
     const role = c.var.memberRole;
     if (role !== "admin" && role !== "owner") return forbid(c);
 
