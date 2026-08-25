@@ -1,10 +1,25 @@
-import { and, desc, eq, gt, gte, isNull, lt, or } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  or,
+} from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
 import type { Db } from "./index";
 import {
   apiKey,
   baby,
   bathLog,
+  calendarAssignee,
+  calendarEvent,
+  calendarEventBaby,
   diaperLog,
   familyInvite,
   feedLog,
@@ -208,6 +223,83 @@ export type PumpRow = BathRow & {
   amountMl: number | null;
   durationMin: number | null;
 };
+
+export type CalendarCategory =
+  | "doctor"
+  | "vaccination"
+  | "babysitting"
+  | "family"
+  | "other";
+
+export type CalendarEventRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  category: CalendarCategory;
+  startTime: Date;
+  allDay: boolean;
+  durationMin: number | null;
+  remindMinutesBefore: number | null;
+  createdBy: string;
+  createdByName: string;
+  babies: { id: string; name: string }[];
+  assignees: { userId: string; name: string }[];
+};
+
+const calendarCols = {
+  id: calendarEvent.id,
+  title: calendarEvent.title,
+  description: calendarEvent.description,
+  location: calendarEvent.location,
+  category: calendarEvent.category,
+  startTime: calendarEvent.startTime,
+  allDay: calendarEvent.allDay,
+  durationMin: calendarEvent.durationMin,
+  remindMinutesBefore: calendarEvent.remindMinutesBefore,
+  createdBy: calendarEvent.createdBy,
+  createdByName: user.name,
+};
+
+type CalendarBaseRow = Omit<CalendarEventRow, "babies" | "assignees">;
+
+// Two IN-queries + client-side grouping beats N+1 per event at family scale.
+async function hydrateCalendarEvents(
+  db: Db,
+  rows: CalendarBaseRow[],
+): Promise<CalendarEventRow[]> {
+  if (rows.length === 0) return [];
+  const ids = rows.map((r) => r.id);
+  const [babyRows, assigneeRows] = await Promise.all([
+    db
+      .select({
+        eventId: calendarEventBaby.eventId,
+        id: baby.id,
+        name: baby.name,
+      })
+      .from(calendarEventBaby)
+      .innerJoin(baby, eq(calendarEventBaby.babyId, baby.id))
+      .where(inArray(calendarEventBaby.eventId, ids)),
+    db
+      .select({
+        eventId: calendarAssignee.eventId,
+        userId: user.id,
+        name: user.name,
+      })
+      .from(calendarAssignee)
+      .innerJoin(user, eq(calendarAssignee.userId, user.id))
+      .where(inArray(calendarAssignee.eventId, ids)),
+  ]);
+  return rows.map((r) => ({
+    ...r,
+    babies: babyRows
+      .filter((b) => b.eventId === r.id)
+      .map(({ id, name }) => ({ id, name })),
+    assignees: assigneeRows
+      .filter((a) => a.eventId === r.id)
+      .map(({ userId, name }) => ({ userId, name })),
+  }));
+}
 
 export function familyScope(db: Db, familyId: string) {
   const feedScope = (babyId?: string) =>
@@ -789,6 +881,168 @@ export function familyScope(db: Db, familyId: string) {
           and(eq(sleepLocation.id, id), eq(sleepLocation.familyId, familyId)),
         )
         .returning({ id: sleepLocation.id });
+      return rows.length > 0;
+    },
+
+    // --- calendar (premium): family-wide events, hydrated with link rows ---
+    async listCalendarEvents(from: Date, to: Date) {
+      const rows = await db
+        .select(calendarCols)
+        .from(calendarEvent)
+        .innerJoin(user, eq(calendarEvent.createdBy, user.id))
+        .where(
+          and(
+            eq(calendarEvent.familyId, familyId),
+            gte(calendarEvent.startTime, from),
+            lt(calendarEvent.startTime, to),
+          ),
+        )
+        .orderBy(asc(calendarEvent.startTime), asc(calendarEvent.id));
+      return hydrateCalendarEvents(db, rows);
+    },
+
+    async getCalendarEvent(id: string) {
+      const rows = await db
+        .select(calendarCols)
+        .from(calendarEvent)
+        .innerJoin(user, eq(calendarEvent.createdBy, user.id))
+        .where(
+          and(eq(calendarEvent.id, id), eq(calendarEvent.familyId, familyId)),
+        );
+      if (!rows[0]) return null;
+      const hydrated = await hydrateCalendarEvents(db, rows);
+      return hydrated[0] ?? null;
+    },
+
+    async createCalendarEvent(data: {
+      createdBy: string;
+      title: string;
+      description?: string | null;
+      location?: string | null;
+      category: CalendarCategory;
+      startTime: Date;
+      allDay: boolean;
+      durationMin?: number | null;
+      remindMinutesBefore?: number | null;
+      babyIds: string[];
+      assigneeUserIds: string[];
+    }) {
+      const id = crypto.randomUUID();
+      // Event row first, link rows after: a partial batch failure leaves a
+      // valid (if link-less) event, never dangling links (D1 has no
+      // transactions; batch() is atomic anyway, this is belt-and-braces).
+      const statements: BatchItem<"sqlite">[] = [
+        db.insert(calendarEvent).values({
+          id,
+          familyId,
+          createdBy: data.createdBy,
+          title: data.title,
+          description: data.description ?? null,
+          location: data.location ?? null,
+          category: data.category,
+          startTime: data.startTime,
+          allDay: data.allDay,
+          durationMin: data.allDay ? null : (data.durationMin ?? null),
+          remindMinutesBefore: data.remindMinutesBefore ?? null,
+        }),
+      ];
+      if (data.babyIds.length > 0) {
+        statements.push(
+          db
+            .insert(calendarEventBaby)
+            .values(data.babyIds.map((babyId) => ({ eventId: id, babyId }))),
+        );
+      }
+      if (data.assigneeUserIds.length > 0) {
+        statements.push(
+          db
+            .insert(calendarAssignee)
+            .values(
+              data.assigneeUserIds.map((userId) => ({ eventId: id, userId })),
+            ),
+        );
+      }
+      await db.batch(statements as never);
+      return this.getCalendarEvent(id);
+    },
+
+    async updateCalendarEvent(
+      id: string,
+      patch: Partial<{
+        title: string;
+        description: string | null;
+        location: string | null;
+        category: CalendarCategory;
+        startTime: Date;
+        allDay: boolean;
+        durationMin: number | null;
+        remindMinutesBefore: number | null;
+        remindedAt: Date | null;
+      }>,
+      links: { babyIds?: string[]; assigneeUserIds?: string[] },
+    ) {
+      const set = compactPatch(patch);
+      if (Object.keys(set).length > 0) {
+        const rows = await db
+          .update(calendarEvent)
+          .set(set)
+          .where(
+            and(eq(calendarEvent.id, id), eq(calendarEvent.familyId, familyId)),
+          )
+          .returning({ id: calendarEvent.id });
+        if (!rows[0]) return null;
+      } else {
+        // Ownership check even for a link-only update.
+        const rows = await db
+          .select({ id: calendarEvent.id })
+          .from(calendarEvent)
+          .where(
+            and(eq(calendarEvent.id, id), eq(calendarEvent.familyId, familyId)),
+          );
+        if (!rows[0]) return null;
+      }
+      const statements: BatchItem<"sqlite">[] = [];
+      if (links.babyIds !== undefined) {
+        statements.push(
+          db.delete(calendarEventBaby).where(eq(calendarEventBaby.eventId, id)),
+        );
+        if (links.babyIds.length > 0) {
+          statements.push(
+            db
+              .insert(calendarEventBaby)
+              .values(links.babyIds.map((babyId) => ({ eventId: id, babyId }))),
+          );
+        }
+      }
+      if (links.assigneeUserIds !== undefined) {
+        statements.push(
+          db.delete(calendarAssignee).where(eq(calendarAssignee.eventId, id)),
+        );
+        if (links.assigneeUserIds.length > 0) {
+          statements.push(
+            db.insert(calendarAssignee).values(
+              links.assigneeUserIds.map((userId) => ({
+                eventId: id,
+                userId,
+              })),
+            ),
+          );
+        }
+      }
+      if (statements.length > 0) {
+        await db.batch(statements as never);
+      }
+      return this.getCalendarEvent(id);
+    },
+
+    async deleteCalendarEvent(id: string) {
+      // Link rows go with it via ON DELETE cascade.
+      const rows = await db
+        .delete(calendarEvent)
+        .where(
+          and(eq(calendarEvent.id, id), eq(calendarEvent.familyId, familyId)),
+        )
+        .returning({ id: calendarEvent.id });
       return rows.length > 0;
     },
   };
