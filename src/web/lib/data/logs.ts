@@ -162,6 +162,8 @@ export function registerLogMutationDefaults(qc: QueryClient) {
                 amountMl: vars.amountMl ?? null,
                 side: vars.side ?? null,
                 durationMin: vars.durationMin ?? null,
+                leftMin: null,
+                rightMin: null,
                 notes: null,
               },
             }

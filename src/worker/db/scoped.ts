@@ -15,6 +15,7 @@ import {
   noteLog,
   organization,
   pumpLog,
+  sleepLocation,
   sleepLog,
   user,
 } from "./schema";
@@ -32,6 +33,8 @@ const feedCols = {
   amountMl: feedLog.amountMl,
   side: feedLog.side,
   durationMin: feedLog.durationMin,
+  leftMin: feedLog.leftMin,
+  rightMin: feedLog.rightMin,
   notes: feedLog.notes,
 };
 
@@ -355,6 +358,8 @@ export function familyScope(db: Db, familyId: string) {
       amountMl?: number | null;
       side?: "left" | "right" | "both" | null;
       durationMin?: number | null;
+      leftMin?: number | null;
+      rightMin?: number | null;
       notes?: string | null;
     }) {
       const rows = await db
@@ -372,6 +377,8 @@ export function familyScope(db: Db, familyId: string) {
         amountMl: number | null;
         side: "left" | "right" | "both" | null;
         durationMin: number | null;
+        leftMin: number | null;
+        rightMin: number | null;
         notes: string | null;
       }>,
     ) {
@@ -755,6 +762,33 @@ export function familyScope(db: Db, familyId: string) {
           ),
         )
         .returning({ code: familyInvite.code });
+      return rows.length > 0;
+    },
+
+    // --- sleep locations (custom chips, e.g. "Crib", "Grandma's") ---
+    async listSleepLocations() {
+      return db
+        .select({ id: sleepLocation.id, name: sleepLocation.name })
+        .from(sleepLocation)
+        .where(eq(sleepLocation.familyId, familyId))
+        .orderBy(sleepLocation.createdAt);
+    },
+
+    async createSleepLocation(name: string) {
+      const rows = await db
+        .insert(sleepLocation)
+        .values({ familyId, name })
+        .returning();
+      return rows[0]!;
+    },
+
+    async deleteSleepLocation(id: string) {
+      const rows = await db
+        .delete(sleepLocation)
+        .where(
+          and(eq(sleepLocation.id, id), eq(sleepLocation.familyId, familyId)),
+        )
+        .returning({ id: sleepLocation.id });
       return rows.length > 0;
     },
   };

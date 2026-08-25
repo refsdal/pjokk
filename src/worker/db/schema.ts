@@ -118,6 +118,8 @@ export const feedLog = sqliteTable(
     amountMl: integer("amount_ml"),
     side: text("side", { enum: ["left", "right", "both"] }),
     durationMin: integer("duration_min"),
+    leftMin: integer("left_min"),
+    rightMin: integer("right_min"),
     notes: text("notes"),
     createdAt: createdAt(),
   },
@@ -331,4 +333,17 @@ export const familyInvite = sqliteTable(
     createdAt: createdAt(),
   },
   (t) => [index("invite_family_idx").on(t.familyId)],
+);
+
+// Custom sleep locations (e.g. "Crib", "Grandma's"), per family — offered as
+// chips alongside the free-text sleep_log.location field.
+export const sleepLocation = sqliteTable(
+  "sleep_location",
+  {
+    id: id(),
+    familyId: familyId(),
+    name: text("name").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("sleep_location_family_idx").on(t.familyId)],
 );

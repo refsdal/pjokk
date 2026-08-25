@@ -57,6 +57,8 @@ export const FeedLogSchema = z
     amountMl: z.number().int().nullable(),
     side: z.enum(feedSides).nullable(),
     durationMin: z.number().int().nullable(),
+    leftMin: z.number().int().nullable(),
+    rightMin: z.number().int().nullable(),
   })
   .openapi("FeedLog");
 
@@ -68,6 +70,8 @@ export const CreateFeedSchema = z
     amountMl: z.number().int().min(0).max(1000).optional(),
     side: z.enum(feedSides).optional(),
     durationMin: z.number().int().min(0).max(600).optional(),
+    leftMin: z.number().int().min(0).max(600).nullable().optional(),
+    rightMin: z.number().int().min(0).max(600).nullable().optional(),
     notes: z.string().max(1000).optional(),
   })
   .openapi("CreateFeed");
@@ -81,6 +85,8 @@ export const UpdateFeedSchema = z
     amountMl: z.number().int().min(0).max(1000).nullable().optional(),
     side: z.enum(feedSides).nullable().optional(),
     durationMin: z.number().int().min(0).max(600).nullable().optional(),
+    leftMin: z.number().int().min(0).max(600).nullable().optional(),
+    rightMin: z.number().int().min(0).max(600).nullable().optional(),
     notes: z.string().max(1000).nullable().optional(),
   })
   .openapi("UpdateFeed");
@@ -145,6 +151,11 @@ export const WakeSchema = z
     endTime: isoTime().optional(),
   })
   .openapi("Wake");
+
+// Custom, per-family sleep-location chips (e.g. "Crib", "Grandma's").
+export const SleepLocationSchema = z
+  .object({ id: z.string(), name: z.string() })
+  .openapi("SleepLocation");
 
 // --- Phase 3 activity types: same structural pattern as the core three ---
 
@@ -544,6 +555,7 @@ export type Baby = z.infer<typeof BabySchema>;
 export type FeedLog = z.infer<typeof FeedLogSchema>;
 export type DiaperLog = z.infer<typeof DiaperLogSchema>;
 export type SleepLog = z.infer<typeof SleepLogSchema>;
+export type SleepLocation = z.infer<typeof SleepLocationSchema>;
 export type Summary = z.infer<typeof SummarySchema>;
 export type Member = z.infer<typeof MemberSchema>;
 export type Invite = z.infer<typeof InviteSchema>;
