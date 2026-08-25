@@ -119,6 +119,7 @@ recorded in DECISIONS.md.
   extra D1 read.
 
 **Server gates** (defense in depth; 402 + `{ code: "PLAN_REQUIRED" }` body):
+*Note: This spec was superseded 2026-08-25 — see docs/superpowers/specs/2026-08-25-entitlement-rework-design.md for the free-tier re-split (medicine free, multiple babies + other activities premium).*
 
 | surface | gate |
 |---|---|

@@ -336,6 +336,31 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   audited override rather than adding contention-handling for a case this
   rare.
 
+## Entitlement rework (2026-08-25)
+
+- **Free-tier re-split** (Phase 9 superseded): 1 baby max, feed/diaper/sleep +
+  **medicine** logging, timeline, day + week stats, reminders, night mode, PWA.
+  Premium: additional babies (`multipleBabies` feature), five other activity
+  types (`otherActivities`: bath/note/milestone/measurement/pump), growth
+  charts, month stats, CSV export, API keys.
+- **Medicine stays free** — safety-adjacent (dose tracking across tired
+  caregivers); the one gate that would feel hostile; `canUse` never gates it.
+- **Soft-lock, keep data** (consistent with Phase 9): existing entries of
+  gated types (other activities, additional babies' data) remain visible in
+  timeline and can be edited/deleted; only CREATION is premium. Baby limit
+  gates adding a baby (`POST /api/babies` returns 402 on `≥1 existing + free`),
+  never deleting or editing existing babies — a free family with 2 babies
+  before this ships keeps both forever.
+- **Grayed, not hidden**: the More sheet shows all six activity tiles; locked
+  ones render muted with a lock badge and tapping opens the upgrade prompt
+  (Settings → Billing). "Add baby" row in Settings gets the same treatment
+  (lock badge, disabled state, link to Billing). Server gates (402
+  `PLAN_REQUIRED`) back every client gate.
+- **Feature type expanded** (`src/worker/entitlements.ts`): `type Feature =
+  "otherActivities" | "multipleBabies" | "growthCharts" | "apiKeys" |
+  "csvExport" | "statsMonth"`. All plan reads go through `canUse(family,
+  feature)`, unchanged API.
+
 ## Infra
 
 - **Deployed to the Refsdal Holding AS Cloudflare account**
