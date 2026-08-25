@@ -27,12 +27,16 @@ const PLANS: {
 ];
 
 const FREE_FEATURES = [
+  "1 baby",
   "Feeds, sleep & diapers",
+  "Medicine log",
   "Timeline & full history",
   "Week stats",
   "Reminders & night mode",
 ];
 const PREMIUM_FEATURES = [
+  "More babies",
+  "Bath, notes, milestones & pump",
   "Growth charts (WHO)",
   "Month stats",
   "CSV export",

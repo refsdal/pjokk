@@ -101,7 +101,7 @@ export function BillingSection({ isAdmin }: { isAdmin: boolean }) {
           <>
             <p className="text-sm text-muted">
               {t(
-                "Premium unlocks growth charts, month stats, CSV export and API keys.",
+                "Premium unlocks more babies, all activity types, growth charts, month stats, CSV export and API keys.",
               )}
             </p>
             {isAdmin ? (
