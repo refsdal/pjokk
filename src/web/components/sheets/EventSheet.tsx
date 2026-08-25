@@ -118,6 +118,12 @@ export function EventSheet({
       : duration === "custom"
         ? customMin
         : Number(duration);
+    // Guard against the open-time prefill losing the race with useBabies():
+    // for a single-baby family, always attach that baby on create, even if
+    // the babies query hadn't resolved yet when the sheet opened.
+    const soleBaby =
+      (babies.data ?? []).length === 1 ? [babies.data![0]!.id] : null;
+    const effectiveBabyIds = !edit && soleBaby ? soleBaby : babyIds;
     const payload = {
       title: title.trim(),
       description: description.trim() || undefined,
@@ -127,7 +133,7 @@ export function EventSheet({
       allDay,
       durationMin,
       remindMinutesBefore: reminder === "off" ? undefined : Number(reminder),
-      babyIds,
+      babyIds: effectiveBabyIds,
       assigneeUserIds: assignees,
     };
     if (edit) {
@@ -288,7 +294,11 @@ export function EventSheet({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
-        <Button size="full" onClick={save} disabled={title.trim().length === 0}>
+        <Button
+          size="full"
+          onClick={save}
+          disabled={title.trim().length === 0 || (!edit && babies.isLoading)}
+        >
           {t("Save")}
         </Button>
         {edit && <DeleteButton onDelete={remove} />}
