@@ -9,10 +9,13 @@ Freemium billing for Pjokk. The free tier keeps the entire core loop
 (logging, timeline, week stats, push, night mode). **Premium** — 20 kr/mo ·
 200 kr/yr · 400 kr lifetime — unlocks growth charts, API keys, CSV export,
 and the stats month view. Integration is the official `@better-auth/stripe`
-plugin with **organization-level subscriptions**: the family owns the
-entitlement, the purchasing user owns the payment relationship.
+plugin with **organization-level subscriptions AND organization-level Stripe
+customers** (`organization: { enabled: true }`, `customerType:
+"organization"`): the family owns both the entitlement and the Stripe
+customer. The purchasing admin enters the card at checkout, but any family
+admin can manage the subscription afterwards.
 
-Mental model: **users pay, families are Premium.**
+Mental model: **admins pay, families are Premium.**
 
 ## Decisions (settled with the user)
 
@@ -115,7 +118,7 @@ recorded in DECISIONS.md.
 - `requireFamily` middleware loads `plan` into context once, so gates cost no
   extra D1 read.
 
-**Server gates** (defense in depth; 402 + `{ code: "plan_required" }` body):
+**Server gates** (defense in depth; 402 + `{ code: "PLAN_REQUIRED" }` body):
 
 | surface | gate |
 |---|---|
@@ -159,17 +162,23 @@ admin-only (existing `isAdmin` flag).
 
 ## Ownership edge cases (accepted, recorded)
 
+Because the Stripe customer is organization-level, the family — not the
+purchaser — owns the payment relationship. The card entered at checkout is
+saved on the family's customer object.
+
 1. **Second admin subscribes while already Premium:** UI hides upgrade when
-   `plan !== "free"`; plugin also rejects a duplicate active subscription for
-   the same `referenceId`. No double billing.
-2. **Purchaser leaves/is removed from the family:** their subscription keeps
-   paying and only they can manage it. Accepted at this scale — they cancel
-   via their own portal, family drops to free on the webhook; the admin
-   override is the support escape hatch. No code to block removal.
-3. **Purchaser's account is deleted:** the admin user-delete flow cancels any
-   active Stripe subscription for that customer before deletion (in scope for
-   Phase 9, since the flow already exists).
-4. **Lifetime purchaser leaves:** family keeps `lifetime` — deliberate; it
+   `plan !== "free"`; the plugin also allows only one active subscription per
+   `referenceId`. No double billing.
+2. **Purchaser leaves/is removed from the family:** billing continues on the
+   family's Stripe customer, and any remaining family admin can manage or
+   cancel via the billing portal. No orphaned subscriptions.
+3. **Purchaser's account is deleted:** no billing impact — the subscription
+   belongs to the family's customer, so the family keeps what it paid for.
+   No cancel step needed in the user-delete flow.
+4. **Family is deleted (admin cascade delete):** any active Stripe
+   subscription for that family is canceled (best-effort) before the cascade
+   delete, so billing can't outlive the data.
+5. **Lifetime purchaser leaves:** family keeps `lifetime` — deliberate; it
    matches what "lifetime" means to a buyer sharing the app with a partner.
 
 ## Admin override
@@ -184,7 +193,7 @@ admin-only (existing `isAdmin` flag).
 
 - `canUse` feature map + plan-transition invariants (webhook sets `premium`;
   cancel downgrades only from `premium`; `lifetime`/`comp` immune).
-- Each server gate: 402 with `{ code: "plan_required" }` on free, passes on
+- Each server gate: 402 with `{ code: "PLAN_REQUIRED" }` on free, passes on
   premium (keys create, CSV export, `stats?days=30`).
 - API-key consumption middleware: valid key rejected on free family, accepted
   again on premium (soft-lock round trip).
