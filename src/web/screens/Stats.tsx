@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -10,14 +10,21 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { IconBabyBottle, IconMoon, IconRuler } from "@tabler/icons-react";
+import {
+  IconBabyBottle,
+  IconLock,
+  IconMoon,
+  IconRuler,
+} from "@tabler/icons-react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import type { Baby } from "@shared/schemas";
 import { ErrorState } from "@/components/QueryStates";
 import { ChipGroup } from "@/components/Chips";
 import { Card } from "@/components/ui/card";
 import { BabySwitcher } from "@/components/BabySwitcher";
-import { useMeasurements, useStats } from "@/lib/data";
+import { useFamily, useMeasurements, useStats } from "@/lib/data";
 import { useSelectedBaby } from "@/lib/selected-baby";
+import { toast } from "@/lib/toast";
 import {
   ageInMonths,
   formatPercentile,
@@ -158,9 +165,17 @@ function GrowthChart({ baby }: { baby: Baby }) {
 
 export function StatsScreen() {
   const { baby } = useSelectedBaby();
+  const family = useFamily();
+  const navigate = useNavigate();
   const [days, setDays] = useState<7 | 30>(7);
   const stats = useStats(baby?.id, days);
   const s = stats.data;
+
+  const premium = (family.data?.plan ?? "free") !== "free";
+
+  useEffect(() => {
+    if (days === 30 && family.isSuccess && !premium) setDays(7);
+  }, [days, premium, family.isSuccess]);
 
   const chartData = (s?.days ?? []).map((d) => {
     const date = new Date(`${d.date}T00:00:00`);
@@ -198,7 +213,14 @@ export function StatsScreen() {
             { value: "30", label: t("Month") },
           ]}
           value={String(days)}
-          onChange={(v) => setDays(Number(v) as 7 | 30)}
+          onChange={(v) => {
+            if (v === "30" && !premium) {
+              toast(t("Month view is a Premium feature"));
+              void navigate({ to: "/settings" });
+              return;
+            }
+            setDays(Number(v) as 7 | 30);
+          }}
         />
       </div>
 
@@ -301,7 +323,27 @@ export function StatsScreen() {
           </div>
         </Card>
 
-        {baby && <GrowthChart baby={baby} />}
+        {baby &&
+          (premium ? (
+            <GrowthChart baby={baby} />
+          ) : (
+            <Card className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted">
+                <IconLock className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-ink">
+                  {t("Growth chart")}
+                </p>
+                <p className="text-xs text-muted">
+                  {t("WHO percentile curves are a Premium feature.")}{" "}
+                  <Link to="/settings" className="underline">
+                    {t("Upgrade")}
+                  </Link>
+                </p>
+              </div>
+            </Card>
+          ))}
       </div>
     </div>
   );

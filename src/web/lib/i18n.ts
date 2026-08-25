@@ -157,6 +157,11 @@ const nb: Record<string, string> = {
   "set sex in Settings for percentiles":
     "angi kjønn i Innstillinger for persentiler",
   "Log a weight under More → Measurement": "Logg en vekt under Mer → Måling",
+  "Month view is a Premium feature": "Månedsvisning er en Premium-funksjon",
+  "Growth chart": "Vekstkurve",
+  "WHO percentile curves are a Premium feature.":
+    "WHO-percentilkurver er en Premium-funksjon.",
+  Upgrade: "Oppgrader",
 
   // Settings
   Family: "Familie",
