@@ -5,12 +5,13 @@ import {
   IconLock,
   IconPlus,
 } from "@tabler/icons-react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import type { CalendarEvent } from "@shared/schemas";
 import { ChipGroup } from "@/components/Chips";
 import { ErrorState } from "@/components/QueryStates";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EventSheet } from "@/components/sheets/EventSheet";
 import { useCalendarEvents, usePremium } from "@/lib/data";
 import {
   calendarCategoryMeta,
@@ -20,6 +21,7 @@ import {
 } from "@/lib/calendar-ui";
 import { t } from "@/lib/i18n";
 import { formatClock, formatDay } from "@/lib/time";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 const monthFmt = new Intl.DateTimeFormat("nb-NO", {
@@ -88,12 +90,10 @@ function EventRow({
 
 export function CalendarScreen() {
   const premium = usePremium();
+  const navigate = useNavigate();
   const [view, setView] = useState<"month" | "week">("month");
   const [anchor, setAnchor] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  // Sheet state is owned here already so Task 7's EventSheet wiring is a
-  // tiny diff — EventSheet itself doesn't exist until Task 7.
-  // biome-ignore lint/correctness/noUnusedVariables: wired up in Task 7
   const [sheet, setSheet] = useState<{
     open: boolean;
     edit: CalendarEvent | null;
@@ -153,9 +153,14 @@ export function CalendarScreen() {
     setSelectedDay(null);
   };
 
-  // Task 7 restores the real premium-gate navigation + sheet open; for this
-  // commit EventSheet doesn't exist yet, so this is a no-op.
-  const addEvent = () => {};
+  const addEvent = () => {
+    if (!premium) {
+      toast(t("Premium feature — upgrade in Settings"));
+      void navigate({ to: "/settings" });
+      return;
+    }
+    setSheet({ open: true, edit: null });
+  };
 
   // List content: the selected day's events, else the upcoming feed.
   const listEvents = selectedDay
@@ -175,7 +180,6 @@ export function CalendarScreen() {
     return groups;
   }, [listEvents]);
 
-  const days = view === "month" ? gridDays! : monthGridDays(anchor).slice(0, 0);
   const weekDays = useMemo(
     () =>
       Array.from({ length: 7 }, (_, i) => {
@@ -185,7 +189,7 @@ export function CalendarScreen() {
       }),
     [gridFrom],
   );
-  const cells = view === "month" ? days : weekDays;
+  const cells = view === "month" ? gridDays! : weekDays;
   const todayKey = dayKey(new Date());
 
   return (
@@ -330,11 +334,21 @@ export function CalendarScreen() {
               </p>
             )}
             {group.events.map((event) => (
-              <EventRow key={event.id} event={event} onTap={() => {}} />
+              <EventRow
+                key={event.id}
+                event={event}
+                onTap={(e) => setSheet({ open: true, edit: e })}
+              />
             ))}
           </div>
         ))}
       </div>
+
+      <EventSheet
+        open={sheet.open}
+        onOpenChange={(open) => setSheet((s) => ({ ...s, open }))}
+        edit={sheet.edit}
+      />
     </div>
   );
 }
