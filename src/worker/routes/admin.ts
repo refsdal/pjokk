@@ -2,6 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { count, desc, eq, gt, max, sql } from "drizzle-orm";
 import {
   AdminFamilySchema,
+  AdminSetPlanSchema,
   AdminStatsSchema,
   AuditEntrySchema,
   AuditNoteSchema,
@@ -12,6 +13,7 @@ import { schema } from "../db";
 import { createApp, iso, isoOrNull, jsonContent } from "../lib";
 import { ensureTombstone, TOMBSTONE_ID } from "../db/tombstone";
 import { audit } from "../middleware/sysadmin";
+import { createStripe } from "../stripe";
 
 // System-admin endpoints (all behind requireSysadmin, wired in index.ts).
 // User-level support ops (ban, sessions, passwords, impersonation) come from
@@ -43,6 +45,22 @@ const deleteFamily = createRoute({
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: jsonContent(z.object({ ok: z.literal(true) }), "Deleted"),
+    404: jsonContent(ErrorSchema, "Not found"),
+  },
+});
+
+const setFamilyPlan = createRoute({
+  method: "post",
+  path: "/api/admin/families/{id}/plan",
+  tags: ["admin"],
+  description:
+    "Support override for a family's plan. Only 'free' and 'comp' — Stripe-derived values (premium/lifetime) are written exclusively by webhooks. Audited.",
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { "application/json": { schema: AdminSetPlanSchema } } },
+  },
+  responses: {
+    200: jsonContent(z.object({ ok: z.literal(true) }), "Plan set"),
     404: jsonContent(ErrorSchema, "Not found"),
   },
 });
@@ -168,8 +186,52 @@ export const adminApp = createApp<AppEnv>()
       id,
       org[0].name,
     );
+    // Billing can't outlive the data: cancel any live Stripe subscription
+    // before the cascade delete. Best-effort — a Stripe hiccup shouldn't
+    // block the delete (the sub would be orphaned either way).
+    const subs = await db
+      .select({
+        stripeSubscriptionId: schema.subscription.stripeSubscriptionId,
+      })
+      .from(schema.subscription)
+      .where(eq(schema.subscription.referenceId, id));
+    const stripeClient = createStripe(c.env);
+    for (const s of subs) {
+      if (s.stripeSubscriptionId) {
+        await stripeClient.subscriptions
+          .cancel(s.stripeSubscriptionId)
+          .catch(() => {});
+      }
+    }
+    await db
+      .delete(schema.subscription)
+      .where(eq(schema.subscription.referenceId, id));
     // FKs cascade: members, invites, babies, and all logs go with the org.
     await db.delete(schema.organization).where(eq(schema.organization.id, id));
+    return c.json({ ok: true as const }, 200);
+  })
+  .openapi(setFamilyPlan, async (c) => {
+    const { id } = c.req.valid("param");
+    const { plan } = c.req.valid("json");
+    const db = c.var.db;
+    const org = await db
+      .select({ plan: schema.organization.plan })
+      .from(schema.organization)
+      .where(eq(schema.organization.id, id));
+    if (!org[0]) {
+      return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+    }
+    await audit(
+      db,
+      c.var.sessionData!.user.id,
+      "billing.plan.set",
+      id,
+      `${org[0].plan} -> ${plan}`,
+    );
+    await db
+      .update(schema.organization)
+      .set({ plan })
+      .where(eq(schema.organization.id, id));
     return c.json({ ok: true as const }, 200);
   })
   .openapi(deleteUser, async (c) => {

@@ -187,3 +187,59 @@ describe("lifetime checkout", () => {
     expect(body).not.toHaveProperty("stripeCustomerId");
   });
 });
+
+describe("admin plan override", () => {
+  async function sysadmin() {
+    const u = await createUser("Sys");
+    await db()
+      .update(schema.user)
+      .set({ role: "admin" })
+      .where(eq(schema.user.id, u.id));
+    return signIn(u.email);
+  }
+
+  it("sets comp and back to free, audited; rejects premium/lifetime values", async () => {
+    const cookie = await sysadmin();
+    const fam = await createFamily("Comp family");
+
+    const comp = await api(`/api/admin/families/${fam.id}/plan`, {
+      method: "POST",
+      cookie,
+      body: { plan: "comp" },
+    });
+    expect(comp.status).toBe(200);
+    expect(await planOf(fam.id)).toBe("comp");
+
+    const bad = await api(`/api/admin/families/${fam.id}/plan`, {
+      method: "POST",
+      cookie,
+      body: { plan: "premium" },
+    });
+    expect(bad.status).toBe(400);
+
+    const back = await api(`/api/admin/families/${fam.id}/plan`, {
+      method: "POST",
+      cookie,
+      body: { plan: "free" },
+    });
+    expect(back.status).toBe(200);
+    expect(await planOf(fam.id)).toBe("free");
+
+    const trail = await db()
+      .select()
+      .from(schema.adminAudit)
+      .where(eq(schema.adminAudit.action, "billing.plan.set"));
+    expect(trail.length).toBe(2);
+  });
+
+  it("is sysadmin-only", async () => {
+    const { cookie } = await rig(); // family admin, NOT sysadmin
+    const fam = await createFamily("Other family");
+    const res = await api(`/api/admin/families/${fam.id}/plan`, {
+      method: "POST",
+      cookie,
+      body: { plan: "comp" },
+    });
+    expect([401, 403]).toContain(res.status);
+  });
+});

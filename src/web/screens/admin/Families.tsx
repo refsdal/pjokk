@@ -26,6 +26,21 @@ export function AdminFamilies() {
     onError: (err) => toast(err.message, "error"),
   });
 
+  const setPlan = useMutation({
+    mutationFn: async (vars: { id: string; plan: "free" | "comp" }) =>
+      unwrap(
+        await api.admin.families[":id"].plan.$post({
+          param: { id: vars.id },
+          json: { plan: vars.plan },
+        }),
+      ),
+    onSuccess: () => {
+      toast("Plan updated");
+      void queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+    onError: (err) => toast(err.message, "error"),
+  });
+
   return (
     <Card className="divide-y divide-line p-0">
       {(families.data ?? []).map((f) => (
@@ -44,6 +59,23 @@ export function AdminFamilies() {
                 : "no feeds"}
             </p>
           </div>
+          {f.plan === "comp" ? (
+            <button
+              type="button"
+              className="text-xs font-semibold text-muted underline"
+              onClick={() => setPlan.mutate({ id: f.id, plan: "free" })}
+            >
+              Revoke comp
+            </button>
+          ) : f.plan === "free" ? (
+            <button
+              type="button"
+              className="text-xs font-semibold text-muted underline"
+              onClick={() => setPlan.mutate({ id: f.id, plan: "comp" })}
+            >
+              Comp
+            </button>
+          ) : null}
           <div className="w-28 shrink-0">
             <DeleteButton onDelete={() => deleteFamily.mutate(f.id)} />
           </div>

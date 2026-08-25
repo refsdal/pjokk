@@ -371,6 +371,10 @@ export const AdminFamilySchema = z
   })
   .openapi("AdminFamily");
 
+export const AdminSetPlanSchema = z
+  .object({ plan: z.enum(["free", "comp"]) })
+  .openapi("AdminSetPlan");
+
 export const AuditEntrySchema = z
   .object({
     id: z.string(),
