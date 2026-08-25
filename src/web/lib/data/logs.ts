@@ -83,6 +83,8 @@ export interface LogFeedVars {
   amountMl?: number;
   side?: "left" | "right" | "both";
   durationMin?: number;
+  leftMin?: number;
+  rightMin?: number;
   notes?: string;
 }
 
@@ -113,6 +115,8 @@ export interface UpdateFeedVars {
     amountMl?: number | null;
     side?: "left" | "right" | "both" | null;
     durationMin?: number | null;
+    leftMin?: number | null;
+    rightMin?: number | null;
     notes?: string | null;
   };
 }
@@ -162,8 +166,8 @@ export function registerLogMutationDefaults(qc: QueryClient) {
                 amountMl: vars.amountMl ?? null,
                 side: vars.side ?? null,
                 durationMin: vars.durationMin ?? null,
-                leftMin: null,
-                rightMin: null,
+                leftMin: vars.leftMin ?? null,
+                rightMin: vars.rightMin ?? null,
                 notes: null,
               },
             }
