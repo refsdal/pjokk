@@ -138,6 +138,10 @@ export const calendarApp = createApp<FamEnv>()
   .openapi(updateEvent, async (c) => {
     const { id } = c.req.valid("param");
     const body = c.req.valid("json");
+    const existing = await c.var.fam.getCalendarEvent(id);
+    if (!existing) {
+      return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+    }
     if (!(await refsValid(c, body.babyIds, body.assigneeUserIds))) {
       return c.json(
         { error: "Unknown baby or member", code: "INVALID_REFERENCE" },
@@ -146,6 +150,11 @@ export const calendarApp = createApp<FamEnv>()
     }
     const rearm =
       body.startTime !== undefined || body.remindMinutesBefore !== undefined;
+    // The invariant (allDay => durationMin null) must hold against the
+    // RESULTING state, not just an incoming allDay:true — an event already
+    // all-day must reject/clear a duration even when this PATCH never
+    // mentions allDay.
+    const effectiveAllDay = body.allDay ?? existing.allDay;
     const updated = await c.var.fam.updateCalendarEvent(
       id,
       {
@@ -155,8 +164,8 @@ export const calendarApp = createApp<FamEnv>()
         category: body.category,
         startTime: body.startTime ? new Date(body.startTime) : undefined,
         allDay: body.allDay,
-        // Switching to all-day clears the duration.
-        durationMin: body.allDay === true ? null : body.durationMin,
+        // Switching to (or already being) all-day clears the duration.
+        durationMin: effectiveAllDay ? null : body.durationMin,
         remindMinutesBefore: body.remindMinutesBefore,
         // Moving the event (or its reminder) re-arms the sweep latch.
         remindedAt: rearm ? null : undefined,

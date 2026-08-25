@@ -1,4 +1,6 @@
+import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
+import { schema } from "../src/worker/db";
 import { familyScope } from "../src/worker/db/scoped";
 import {
   addMember,
@@ -291,5 +293,94 @@ describe("calendar API", () => {
     });
     expect(patched.status).toBe(200);
     // remindedAt reset is internal — verified end-to-end in the reminder tests.
+  });
+
+  it("PATCH allDay:true clears an existing duration; PATCH durationMin on an already-all-day event stays null", async () => {
+    const a = await rig();
+    await setPlan(a.family.id, "premium");
+
+    // (a) timed event with a duration -> PATCH allDay:true clears it.
+    const timed = await api("/api/calendar/events", {
+      method: "POST",
+      cookie: a.cookie,
+      body: {
+        title: "Timed",
+        startTime: futureIso(24),
+        allDay: false,
+        durationMin: 45,
+      },
+    });
+    expect(timed.status).toBe(201);
+    const timedEvent = (await timed.json()) as { id: string };
+
+    const toAllDay = await api(`/api/calendar/events/${timedEvent.id}`, {
+      method: "PATCH",
+      cookie: a.cookie,
+      body: { allDay: true },
+    });
+    expect(toAllDay.status).toBe(200);
+    expect(
+      ((await toAllDay.json()) as { durationMin: number | null }).durationMin,
+    ).toBeNull();
+
+    // (b) already-all-day event -> PATCH durationMin alone must not stick
+    // (regression test for the allDay-vs-existing-state invariant).
+    const allDay = await api("/api/calendar/events", {
+      method: "POST",
+      cookie: a.cookie,
+      body: {
+        title: "Already all-day",
+        startTime: futureIso(24),
+        allDay: true,
+      },
+    });
+    expect(allDay.status).toBe(201);
+    const allDayEvent = (await allDay.json()) as { id: string };
+
+    const durationOnly = await api(`/api/calendar/events/${allDayEvent.id}`, {
+      method: "PATCH",
+      cookie: a.cookie,
+      body: { durationMin: 45 },
+    });
+    expect(durationOnly.status).toBe(200);
+    expect(
+      ((await durationOnly.json()) as { durationMin: number | null })
+        .durationMin,
+    ).toBeNull();
+  });
+
+  it("PATCH startTime re-arms the reminder latch (clears remindedAt)", async () => {
+    const a = await rig();
+    await setPlan(a.family.id, "premium");
+    const created = await api("/api/calendar/events", {
+      method: "POST",
+      cookie: a.cookie,
+      body: {
+        title: "Reminder test",
+        startTime: futureIso(24),
+        remindMinutesBefore: 60,
+      },
+    });
+    expect(created.status).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+
+    // Simulate the reminder sweep having already fired.
+    await db()
+      .update(schema.calendarEvent)
+      .set({ remindedAt: new Date() })
+      .where(eq(schema.calendarEvent.id, id));
+
+    const patched = await api(`/api/calendar/events/${id}`, {
+      method: "PATCH",
+      cookie: a.cookie,
+      body: { startTime: futureIso(48) },
+    });
+    expect(patched.status).toBe(200);
+
+    const rows = await db()
+      .select({ remindedAt: schema.calendarEvent.remindedAt })
+      .from(schema.calendarEvent)
+      .where(eq(schema.calendarEvent.id, id));
+    expect(rows[0]!.remindedAt).toBeNull();
   });
 });
