@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { canUse } from "../src/worker/entitlements";
 import { applySubscriptionStatus, grantLifetime } from "../src/worker/billing";
@@ -68,5 +69,17 @@ describe("plan transitions", () => {
     expect(await planOf(fam.id)).toBe("lifetime");
     await grantLifetime(db(), fam.id);
     expect(await planOf(fam.id)).toBe("lifetime");
+  });
+});
+
+describe("stripe webhook plumbing", () => {
+  it("webhook endpoint exists and rejects an unsigned payload", async () => {
+    const res = await SELF.fetch("http://localhost/api/auth/stripe/webhook", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ type: "checkout.session.completed" }),
+    });
+    // 400/401 = signature verification ran (plugin mounted). 404 = not wired.
+    expect([400, 401]).toContain(res.status);
   });
 });

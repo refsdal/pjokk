@@ -2,8 +2,12 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, bearer, organization } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
-import { eq } from "drizzle-orm";
+import { stripe } from "@better-auth/stripe";
+import type Stripe from "stripe";
+import { and, eq } from "drizzle-orm";
 import { createDb, schema } from "./db";
+import { createStripe } from "./stripe";
+import { applySubscriptionStatus, grantLifetime } from "./billing";
 
 // D1 bindings only exist inside the request handler, so the better-auth
 // instance is created per-request (stashed on Hono context in middleware).
@@ -11,6 +15,7 @@ import { createDb, schema } from "./db";
 export function createAuth(env: Env) {
   const db = createDb(env.DB);
   const url = new URL(env.APP_URL);
+  const stripeClient = createStripe(env);
 
   return betterAuth({
     baseURL: env.APP_URL,
@@ -77,6 +82,88 @@ export function createAuth(env: Env) {
       // System-admin tooling (user.role === "admin"): list/ban users, revoke
       // sessions, set passwords, impersonate. Family roles are unrelated.
       admin(),
+      // Billing (Phase 9): org-level subscriptions AND org-level Stripe
+      // customers — the family owns both the entitlement and the customer.
+      // organization.plan is the denormalized gate the app reads; these
+      // hooks are the only writers besides the lifetime webhook + sysadmin
+      // override.
+      stripe({
+        stripeClient,
+        stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET,
+        organization: { enabled: true },
+        subscription: {
+          enabled: true,
+          plans: [
+            {
+              name: "premium",
+              priceId: env.STRIPE_PRICE_PREMIUM_MONTHLY,
+              annualDiscountPriceId: env.STRIPE_PRICE_PREMIUM_YEARLY,
+            },
+          ],
+          // Only family admins may buy/cancel/restore/list for a family.
+          authorizeReference: async ({ user, referenceId }) => {
+            const rows = await db
+              .select({ role: schema.member.role })
+              .from(schema.member)
+              .where(
+                and(
+                  eq(schema.member.organizationId, referenceId),
+                  eq(schema.member.userId, user.id),
+                ),
+              )
+              .limit(1);
+            const role = rows[0]?.role;
+            return role === "admin" || role === "owner";
+          },
+          onSubscriptionComplete: async ({ subscription }) => {
+            await applySubscriptionStatus(
+              db,
+              subscription.referenceId,
+              "active",
+            );
+          },
+          onSubscriptionUpdate: async ({ subscription }) => {
+            await applySubscriptionStatus(
+              db,
+              subscription.referenceId,
+              subscription.status,
+            );
+          },
+          onSubscriptionCancel: async ({ subscription }) => {
+            // Fires when cancellation is SCHEDULED (cancel_at_period_end) as
+            // well as when it lands; applySubscriptionStatus keys off
+            // status, so a still-active-until-period-end sub stays premium.
+            await applySubscriptionStatus(
+              db,
+              subscription.referenceId,
+              subscription.status,
+            );
+          },
+          onSubscriptionDeleted: async ({ subscription }) => {
+            await applySubscriptionStatus(
+              db,
+              subscription.referenceId,
+              "canceled",
+            );
+          },
+          getCheckoutSessionParams: async () => ({
+            params: { automatic_tax: { enabled: true } },
+          }),
+        },
+        // Lifetime (one-time payment) rides the same webhook.
+        onEvent: async (event) => {
+          if (event.type !== "checkout.session.completed") return;
+          const session = event.data.object as Stripe.Checkout.Session;
+          if (
+            session.mode === "payment" &&
+            session.payment_status === "paid" &&
+            session.metadata?.kind === "lifetime" &&
+            session.metadata.familyId
+          ) {
+            await grantLifetime(db, session.metadata.familyId);
+          }
+        },
+      }),
     ],
   });
 }
