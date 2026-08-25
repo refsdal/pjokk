@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { api, rig } from "./helpers";
+import { addMember, api, createUser, rig, signIn } from "./helpers";
 
 describe("per-side nursing minutes", () => {
   it("stores and returns leftMin/rightMin on breast feeds", async () => {
@@ -82,5 +82,54 @@ describe("summary today block", () => {
     expect(s.today.wet).toBe(1);
     expect(s.today.dirty).toBe(0);
     expect(s.today.both).toBe(1);
+  });
+});
+
+describe("custom sleep locations", () => {
+  it("member reads, only admin writes, family-scoped", async () => {
+    const a = await rig();
+    const created = await api("/api/sleep-locations", {
+      method: "POST",
+      cookie: a.cookie,
+      body: { name: "Hammock" },
+    });
+    expect(created.status).toBe(201);
+
+    const member = await createUser("Reader");
+    await addMember(member.id, a.family.id, "member");
+    const memberCookie = await signIn(member.email);
+    const list = await api("/api/sleep-locations", { cookie: memberCookie });
+    expect(list.status).toBe(200);
+    expect(
+      ((await list.json()) as { name: string }[]).map((l) => l.name),
+    ).toContain("Hammock");
+    expect(
+      (
+        await api("/api/sleep-locations", {
+          method: "POST",
+          cookie: memberCookie,
+          body: { name: "Nope" },
+        })
+      ).status,
+    ).toBe(403);
+
+    const b = await rig("Other family");
+    const otherList = (await (
+      await api("/api/sleep-locations", { cookie: b.cookie })
+    ).json()) as unknown[];
+    expect(otherList).toHaveLength(0);
+  });
+
+  it("rejects duplicates (defaults included) and enforces the cap", async () => {
+    const { cookie } = await rig();
+    expect(
+      (
+        await api("/api/sleep-locations", {
+          method: "POST",
+          cookie,
+          body: { name: "crib" },
+        })
+      ).status,
+    ).toBe(409);
   });
 });

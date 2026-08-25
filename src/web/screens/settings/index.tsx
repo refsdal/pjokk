@@ -12,6 +12,7 @@ import { BillingSection } from "./BillingSection";
 import { FamilySection } from "./FamilySection";
 import { SectionTitle } from "./lib";
 import { NotificationsSection } from "./NotificationsSection";
+import { SleepLocationsSection } from "./SleepLocationsSection";
 
 export function SettingsScreen() {
   const { data: session } = useSession();
@@ -27,6 +28,13 @@ export function SettingsScreen() {
       <div className="pb-tabbar">
         <FamilySection isAdmin={isAdmin} />
         <BabiesSection isAdmin={isAdmin} />
+
+        {isAdmin && (
+          <>
+            <SectionTitle>{t("Sleep locations")}</SectionTitle>
+            <SleepLocationsSection />
+          </>
+        )}
 
         <SectionTitle>{t("Notifications")}</SectionTitle>
         <NotificationsSection />

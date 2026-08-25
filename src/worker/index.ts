@@ -22,6 +22,7 @@ import { exportApp } from "./routes/export";
 import { keysApp } from "./routes/keys";
 import { otherLogsApp } from "./routes/other-logs";
 import { pushApp } from "./routes/push";
+import { sleepLocationsApp } from "./routes/sleep-locations";
 import { statsApp } from "./routes/stats";
 import {
   purgeOrphanUsers,
@@ -117,6 +118,7 @@ const domainApp = domainBase
   .route("/", feedsApp)
   .route("/", diapersApp)
   .route("/", sleepApp)
+  .route("/", sleepLocationsApp)
   .route("/", otherLogsApp)
   .route("/", timelineApp)
   .route("/", statsApp)

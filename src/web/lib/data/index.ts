@@ -8,6 +8,7 @@ export * from "./insights";
 export * from "./keys";
 export * from "./logs";
 export * from "./other";
+export * from "./sleep-locations";
 
 export function registerMutationDefaults(qc: QueryClient) {
   registerLogMutationDefaults(qc);

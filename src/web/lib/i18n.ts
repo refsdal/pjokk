@@ -203,6 +203,14 @@ const nb: Record<string, string> = {
   "Tap again to confirm": "Trykk igjen for å bekrefte",
   "Sex is only used for WHO growth percentiles.":
     "Kjønn brukes kun til WHO-vekstpersentiler.",
+
+  // Sleep locations (Settings)
+  "Sleep locations": "Sovesteder",
+  "Add location": "Legg til sted",
+  "Extra sleep-location chips for this family, alongside Crib, Stroller & Contact nap.":
+    "Ekstra valg for sovested for denne familien, i tillegg til Seng, Vogn og Kontaktlur.",
+  "Location (e.g. “Hammock”)": "Sted (f.eks. «Hengekøye»)",
+
   Notifications: "Varsler",
   "Enable notifications": "Slå på varsler",
   "Disable on this device": "Slå av på denne enheten",
