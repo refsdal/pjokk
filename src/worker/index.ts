@@ -23,7 +23,12 @@ import { keysApp } from "./routes/keys";
 import { otherLogsApp } from "./routes/other-logs";
 import { pushApp } from "./routes/push";
 import { statsApp } from "./routes/stats";
-import { purgeOrphanUsers, runBackup, runReminders } from "./scheduled";
+import {
+  purgeOrphanUsers,
+  reconcilePlans,
+  runBackup,
+  runReminders,
+} from "./scheduled";
 import { sleepApp } from "./routes/sleep";
 import { timelineApp } from "./routes/timeline";
 
@@ -103,8 +108,10 @@ domainBase.use("/api/invites/*", requireAdmin);
 domainBase.use("/api/keys", requireAdmin);
 domainBase.use("/api/keys/*", requireAdmin);
 domainBase.use("/api/billing/*", requireAdmin);
-// Push subscriptions are device-bound; keys have no business there.
+// Push subscriptions and billing are device/session-bound; keys have no
+// business there.
 domainBase.use("/api/push/*", rejectApiKey);
+domainBase.use("/api/billing/*", rejectApiKey);
 const domainApp = domainBase
   .route("/", babiesApp)
   .route("/", feedsApp)
@@ -160,6 +167,10 @@ export default {
       console.log(`cron: backup written to ${key}`);
       const purged = await purgeOrphanUsers(env);
       if (purged > 0) console.log(`cron: purged ${purged} orphan account(s)`);
+      const reconciled = await reconcilePlans(env);
+      if (reconciled > 0) {
+        console.log(`cron: reconciled ${reconciled} family plan(s) to premium`);
+      }
     } else {
       const sent = await runReminders(env);
       if (sent > 0) console.log(`cron: ${sent} reminder(s) sent`);

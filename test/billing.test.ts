@@ -1,34 +1,21 @@
 import { eq } from "drizzle-orm";
-import { SELF } from "cloudflare:test";
+import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { canUse } from "../src/worker/entitlements";
 import { applySubscriptionStatus, grantLifetime } from "../src/worker/billing";
+import { reconcilePlans } from "../src/worker/scheduled";
 import {
   addMember,
   api,
   createUser,
   db,
   createFamily,
+  planOf,
   rig,
+  setPlan,
   signIn,
 } from "./helpers";
 import { schema } from "../src/worker/db";
-
-// biome-ignore lint/suspicious/noExportsInTest: Shared test helpers for billing tasks
-export const planOf = async (id: string) =>
-  (
-    await db()
-      .select({ plan: schema.organization.plan })
-      .from(schema.organization)
-      .where(eq(schema.organization.id, id))
-  )[0]!.plan;
-
-// biome-ignore lint/suspicious/noExportsInTest: Shared test helpers for billing tasks
-export const setPlan = (id: string, plan: string) =>
-  db()
-    .update(schema.organization)
-    .set({ plan })
-    .where(eq(schema.organization.id, id));
 
 describe("canUse", () => {
   it("denies premium features on free, allows on every paid plan", () => {
@@ -77,6 +64,80 @@ describe("plan transitions", () => {
     expect(await planOf(fam.id)).toBe("lifetime");
     await grantLifetime(db(), fam.id);
     expect(await planOf(fam.id)).toBe("lifetime");
+  });
+});
+
+describe("nightly plan reconciliation", () => {
+  it("flips a free family with a stray active subscription row to premium", async () => {
+    const fam = await createFamily("Reconcile me");
+    await db()
+      .insert(schema.subscription)
+      .values({
+        id: `sub_${fam.id}`,
+        plan: "premium",
+        referenceId: fam.id,
+        status: "active",
+      });
+    expect(await planOf(fam.id)).toBe("free");
+
+    const flipped = await reconcilePlans(env);
+    expect(flipped).toBeGreaterThan(0);
+    expect(await planOf(fam.id)).toBe("premium");
+  });
+
+  it("never touches a lifetime family, even with a stray active sub row", async () => {
+    const fam = await createFamily("Lifetime with stray sub");
+    await setPlan(fam.id, "lifetime");
+    await db()
+      .insert(schema.subscription)
+      .values({
+        id: `sub_${fam.id}`,
+        plan: "premium",
+        referenceId: fam.id,
+        status: "active",
+      });
+
+    await reconcilePlans(env);
+    expect(await planOf(fam.id)).toBe("lifetime");
+  });
+});
+
+describe("subscribe-while-lifetime/comp guard", () => {
+  const upgradeBody = {
+    plan: "premium",
+    customerType: "organization",
+    successUrl: "/settings",
+    cancelUrl: "/settings",
+  };
+
+  it("refuses a lifetime family admin trying to start a paid subscription", async () => {
+    const { family, cookie } = await rig();
+    await setPlan(family.id, "lifetime");
+    const res = await api("/api/auth/subscription/upgrade", {
+      method: "POST",
+      cookie,
+      body: { ...upgradeBody, referenceId: family.id },
+    });
+    // The plugin surfaces an authorizeReference refusal as UNAUTHORIZED.
+    expect(res.status).toBeGreaterThanOrEqual(401);
+    expect(res.status).toBeLessThan(404);
+  });
+
+  it("authorizes a free family admin (fails later at the Stripe network call, not at the auth gate)", async () => {
+    const { family, cookie } = await rig();
+    const res = await api("/api/auth/subscription/upgrade", {
+      method: "POST",
+      cookie,
+      body: { ...upgradeBody, referenceId: family.id },
+    });
+    // authorizeReference passes for "free", so this never hits the
+    // UNAUTHORIZED branch; with the fake test Stripe key ("sk_test_fake")
+    // the plugin then fails trying to create a Stripe customer — verified
+    // to come back as 400 { code: "UNABLE_TO_CREATE_CUSTOMER" }. The exact
+    // Stripe-layer error code isn't the point of this test, so only the
+    // "didn't get stuck at the auth gate" part is pinned.
+    expect(res.status).toBe(400);
+    expect([401, 403]).not.toContain(res.status);
   });
 });
 

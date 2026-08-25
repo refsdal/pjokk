@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 // Chip groups replace dropdowns everywhere (CLAUDE.md §5): one tap, no
@@ -8,7 +9,7 @@ export function ChipGroup<T extends string>({
   onChange,
   className,
 }: {
-  options: { value: T; label: string }[];
+  options: { value: T; label: ReactNode }[];
   value: T | null;
   onChange: (v: T) => void;
   className?: string;

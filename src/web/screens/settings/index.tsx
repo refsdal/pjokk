@@ -45,10 +45,21 @@ export function SettingsScreen() {
         {isAdmin && !premium && (
           <>
             <SectionTitle>{t("API keys")}</SectionTitle>
-            <Card>
+            <Card className="space-y-3">
               <p className="text-sm text-muted">
                 {t("API keys are a Premium feature.")}
               </p>
+              <Button
+                size="full"
+                variant="outline"
+                onClick={() =>
+                  document
+                    .getElementById("billing")
+                    ?.scrollIntoView({ behavior: "smooth" })
+                }
+              >
+                {t("Upgrade")} · {t("Premium")}
+              </Button>
             </Card>
           </>
         )}

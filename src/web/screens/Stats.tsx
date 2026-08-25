@@ -210,7 +210,17 @@ export function StatsScreen() {
         <ChipGroup
           options={[
             { value: "7", label: t("Week") },
-            { value: "30", label: t("Month") },
+            {
+              value: "30",
+              label: premium ? (
+                t("Month")
+              ) : (
+                <span className="inline-flex items-center gap-1">
+                  {t("Month")}
+                  <IconLock className="h-3.5 w-3.5" />
+                </span>
+              ),
+            },
           ]}
           value={String(days)}
           onChange={(v) => {

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { api, rig } from "./helpers";
-import { setPlan } from "./billing.test";
+import { api, rig, setPlan } from "./helpers";
 import type { Stats } from "../src/shared/schemas";
 
 const H = 3600_000;

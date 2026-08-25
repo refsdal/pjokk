@@ -1,8 +1,23 @@
 import { env, SELF } from "cloudflare:test";
 import { hashPassword } from "better-auth/crypto";
+import { eq } from "drizzle-orm";
 import { createDb, schema } from "../src/worker/db";
 
 export const db = () => createDb(env.DB);
+
+export const planOf = async (id: string) =>
+  (
+    await db()
+      .select({ plan: schema.organization.plan })
+      .from(schema.organization)
+      .where(eq(schema.organization.id, id))
+  )[0]!.plan;
+
+export const setPlan = (id: string, plan: string) =>
+  db()
+    .update(schema.organization)
+    .set({ plan })
+    .where(eq(schema.organization.id, id));
 
 const PASSWORD = "test-password-123";
 

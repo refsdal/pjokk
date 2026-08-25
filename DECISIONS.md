@@ -272,7 +272,7 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   authenticating (402 `PLAN_REQUIRED`) rather than being revoked — the
   soft-lock is symmetric with the growth-chart/CSV/stats gates and reversible
   the instant the family re-subscribes.
-- Price IDs (`STRIPE_PRICE_PREMIUM_MONTHLY/YEARLY`, `STRIPE_PRICE_LIFETIME`)
+- Price IDs (`STRIPE_PRICE_PREMIUM_MONTHLY/YEARLY`, `STRIPE_PRICE_PREMIUM_LIFETIME`)
   are env secrets, NOK-only, tax handled by Stripe Tax with inclusive prices
   (`automatic_tax: { enabled: true }` in `getCheckoutSessionParams`);
   displayed prices (20 kr/mo · 200 kr/yr · 400 kr lifetime) are hardcoded
@@ -321,6 +321,20 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   a family mid-dispute), audited as `billing.plan.set`.
 - Admin billing tools (revenue/subscription visibility beyond plan override)
   and coupon support remain a post-Phase-9 backlog item.
+- **`past_due` downgrades immediately** (excluded from `PREMIUM_STATUSES`):
+  deliberate — matches the spec's chosen "soft lock, keep data" option over a
+  grace period; recovery events (`active`/`trialing` again) restore premium
+  automatically. The plugin's webhook hooks also swallow errors internally
+  (Stripe always gets a 200, regardless of whether `applySubscriptionStatus`'s
+  D1 write succeeded), which is why the nightly `reconcilePlans` cron step
+  exists — a paying family stuck on `free` by a failed write self-heals by
+  03:15 UTC the next day rather than staying stuck until the next webhook.
+- **Edge race accepted**: a lifetime payment completing after a sysadmin comp
+  is dropped by `grantLifetime`'s guard (only `free`/`premium` are
+  upgradeable to lifetime) — vanishingly unlikely (comp and a concurrent
+  Stripe checkout on the same family), and support resolves it via the
+  audited override rather than adding contention-handling for a case this
+  rare.
 
 ## Infra
 

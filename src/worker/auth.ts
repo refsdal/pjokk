@@ -101,7 +101,7 @@ export function createAuth(env: Env) {
             },
           ],
           // Only family admins may buy/cancel/restore/list for a family.
-          authorizeReference: async ({ user, referenceId }) => {
+          authorizeReference: async ({ user, referenceId, action }) => {
             const rows = await db
               .select({ role: schema.member.role })
               .from(schema.member)
@@ -113,7 +113,24 @@ export function createAuth(env: Env) {
               )
               .limit(1);
             const role = rows[0]?.role;
-            return role === "admin" || role === "owner";
+            if (role !== "admin" && role !== "owner") return false;
+            // Lifetime/comp families already have Premium through a path the
+            // subscription plugin knows nothing about — its own table would
+            // happily start a paid subscription on top that grants nothing
+            // extra (and would double-charge). Block it here rather than
+            // relying on the plugin to notice. "premium" stays allowed: it's
+            // how the plugin switches monthly<->yearly (upgrade-subscription
+            // with an existing subscriptionId).
+            if (action === "upgrade-subscription") {
+              const orgRows = await db
+                .select({ plan: schema.organization.plan })
+                .from(schema.organization)
+                .where(eq(schema.organization.id, referenceId))
+                .limit(1);
+              const plan = orgRows[0]?.plan;
+              return plan === "free" || plan === "premium";
+            }
+            return true;
           },
           onSubscriptionComplete: async ({ subscription }) => {
             await applySubscriptionStatus(

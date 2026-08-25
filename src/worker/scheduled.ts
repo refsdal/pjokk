@@ -1,7 +1,19 @@
-import { and, eq, gt, isNull, lt, max, ne, notExists, or } from "drizzle-orm";
+import {
+  and,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  lt,
+  max,
+  ne,
+  notExists,
+  or,
+} from "drizzle-orm";
 import { createDb, schema } from "./db";
 import { pushToUser } from "./push";
 import { TOMBSTONE_ID } from "./db/tombstone";
+import { PREMIUM_STATUSES, applySubscriptionStatus } from "./billing";
 
 // Orphan hygiene (sec review H2): accounts created past the invite flow have
 // no membership and can't create one — sweep them after a week. Sysadmins
@@ -114,6 +126,43 @@ const BACKUP_TABLES = [
   "api_key",
   "admin_audit",
 ];
+
+// Compensating control for the plugin's fire-and-forget webhook hooks (see
+// DECISIONS.md Phase 9): onSubscriptionComplete/Update/Cancel/Deleted swallow
+// errors internally so Stripe always sees a 200, which means a failed
+// applySubscriptionStatus D1 write is never retried by Stripe. A paying
+// family could sit on plan "free" indefinitely. This nightly sweep finds
+// that mismatch and repairs it — one-directional only (free -> premium),
+// never a downgrade, so it can never race a subscription webhook the wrong
+// way: at worst it repeats work applySubscriptionStatus already did.
+export async function reconcilePlans(env: Env) {
+  const db = createDb(env.DB);
+  const stuck = await db
+    .select({
+      id: schema.organization.id,
+      status: schema.subscription.status,
+    })
+    .from(schema.organization)
+    .innerJoin(
+      schema.subscription,
+      eq(schema.subscription.referenceId, schema.organization.id),
+    )
+    .where(
+      and(
+        eq(schema.organization.plan, "free"),
+        inArray(schema.subscription.status, [...PREMIUM_STATUSES]),
+      ),
+    );
+  const seen = new Set<string>();
+  let flipped = 0;
+  for (const fam of stuck) {
+    if (seen.has(fam.id)) continue;
+    seen.add(fam.id);
+    await applySubscriptionStatus(db, fam.id, fam.status);
+    flipped++;
+  }
+  return flipped;
+}
 
 export async function runBackup(env: Env, now = new Date()) {
   const dump: Record<string, unknown[]> = {};

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { api, rig } from "./helpers";
-import { setPlan } from "./billing.test";
+import { api, rig, setPlan } from "./helpers";
 import { SELF } from "cloudflare:test";
 
 const keyApi = (
