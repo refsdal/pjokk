@@ -15,6 +15,7 @@ import {
   type OtherEntry,
 } from "@/components/sheets/OtherLogSheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
+import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { Button } from "@/components/ui/button";
 import { useBabies, useFeeds, useTimeline } from "@/lib/data";
 import { t } from "@/lib/i18n";
@@ -213,7 +214,7 @@ export function TimelineScreen() {
       className={cn(
         "h-9 rounded-full border px-3.5 text-sm font-semibold transition-colors select-none",
         filter === value
-          ? "border-accent bg-accent text-white"
+          ? "border-accent bg-accent text-on-accent"
           : "border-line bg-surface text-ink-soft",
       )}
     >
@@ -234,6 +235,10 @@ export function TimelineScreen() {
       </div>
 
       <div className="pb-tabbar">
+        {timeline.isPending && <LoadingState />}
+        {timeline.isError && (
+          <ErrorState onRetry={() => void timeline.refetch()} />
+        )}
         {timeline.isSuccess && entries.length === 0 && (
           <p className="py-16 text-center text-sm text-muted">
             {t("Nothing here yet — log something from Home.")}

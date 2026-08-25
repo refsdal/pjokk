@@ -40,7 +40,7 @@ export function TimeField({
       className={cn(
         "h-11 rounded-full border px-4 text-sm font-semibold transition-colors select-none",
         preset === p
-          ? "border-accent bg-accent text-white"
+          ? "border-accent bg-accent text-on-accent"
           : "border-line bg-surface text-ink-soft",
       )}
     >

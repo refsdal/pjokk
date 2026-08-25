@@ -56,29 +56,17 @@ export function DiaperSheet({
     const when = (time ?? new Date()).toISOString();
     const trimmedNotes = notes.trim();
     if (edit) {
-      updateDiaper.mutate(
-        {
-          id: edit.id,
-          patch: { time: when, type, notes: trimmedNotes || null },
-        },
-        {
-          onError: (err) =>
-            toast(t("Could not update diaper: ") + err.message, "error"),
-        },
-      );
+      updateDiaper.mutate({
+        id: edit.id,
+        patch: { time: when, type, notes: trimmedNotes || null },
+      });
     } else {
-      logDiaper.mutate(
-        {
-          babyId,
-          time: when,
-          type,
-          ...(trimmedNotes ? { notes: trimmedNotes } : {}),
-        },
-        {
-          onError: (err) =>
-            toast(t("Could not save diaper: ") + err.message, "error"),
-        },
-      );
+      logDiaper.mutate({
+        babyId,
+        time: when,
+        type,
+        ...(trimmedNotes ? { notes: trimmedNotes } : {}),
+      });
     }
     if (!navigator.onLine) toast(t("Saved offline — will sync"));
     onOpenChange(false);
@@ -86,12 +74,7 @@ export function DiaperSheet({
 
   const remove = () => {
     if (!edit) return;
-    deleteDiaper.mutate(
-      { id: edit.id },
-      {
-        onError: (err) => toast(t("Could not delete: ") + err.message, "error"),
-      },
-    );
+    deleteDiaper.mutate({ id: edit.id });
     onOpenChange(false);
   };
 

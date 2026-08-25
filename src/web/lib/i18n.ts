@@ -42,6 +42,9 @@ const nb: Record<string, string> = {
   "15 m ago": "15 min siden",
   "Pick time": "Velg tid",
   "Saved offline — will sync": "Lagret uten nett — synkroniseres",
+  "Could not save": "Kunne ikke lagre",
+  "Couldn't load": "Kunne ikke laste inn",
+  "Try again": "Prøv igjen",
 
   // Feed sheet
   Bottle: "Flaske",

@@ -16,6 +16,9 @@
   --color-line: #e9e6e0;
   --color-accent: #d97757;
   --color-accent-soft: #f7e9e2;
+  /* Text/icon color ON accent- and danger-colored surfaces. Near-black warm
+     in night mode so selected chips and primary buttons emit no white light. */
+  --color-on-accent: #ffffff;
   --color-danger: #c4534a;
 
   /* Category tints (CLAUDE.md §7). */
@@ -59,6 +62,7 @@
   --color-line: #322a21;
   --color-accent: #d99a55;
   --color-accent-soft: #33270f;
+  --color-on-accent: #1d1610;
   --color-danger: #d9825f;
   --color-sleep: #c2a06a;
   --color-feed: #c2a06a;

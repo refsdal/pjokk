@@ -250,30 +250,19 @@ export function OtherLogSheet({
                 : {};
 
     if (edit) {
-      updateOther.mutate(
-        {
-          kind,
-          id: edit.id,
-          patch: { ...fields, time: when, notes: trimmedNotes || null },
-        },
-        {
-          onError: (err) =>
-            toast(t("Could not update: ") + err.message, "error"),
-        },
-      );
+      updateOther.mutate({
+        kind,
+        id: edit.id,
+        patch: { ...fields, time: when, notes: trimmedNotes || null },
+      });
     } else {
-      createOther.mutate(
-        {
-          kind,
-          babyId,
-          time: when,
-          ...fields,
-          ...(trimmedNotes ? { notes: trimmedNotes } : {}),
-        } as CreateOtherVars,
-        {
-          onError: (err) => toast(t("Could not save: ") + err.message, "error"),
-        },
-      );
+      createOther.mutate({
+        kind,
+        babyId,
+        time: when,
+        ...fields,
+        ...(trimmedNotes ? { notes: trimmedNotes } : {}),
+      } as CreateOtherVars);
     }
     if (!navigator.onLine) toast(t("Saved offline — will sync"));
     onOpenChange(false);
@@ -281,12 +270,7 @@ export function OtherLogSheet({
 
   const remove = () => {
     if (!edit) return;
-    deleteOther.mutate(
-      { kind, id: edit.id },
-      {
-        onError: (err) => toast(t("Could not delete: ") + err.message, "error"),
-      },
-    );
+    deleteOther.mutate({ kind, id: edit.id });
     onOpenChange(false);
   };
 

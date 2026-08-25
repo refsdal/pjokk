@@ -64,36 +64,24 @@ export function SleepSheet({
   const save = () => {
     const trimmedNotes = notes.trim();
     if (edit) {
-      updateSleep.mutate(
-        {
-          id: edit.id,
-          patch: {
-            startTime: (time ?? new Date()).toISOString(),
-            // Never touch the end time of a running session from here.
-            ...(isActiveEdit
-              ? {}
-              : { endTime: (endTime ?? new Date()).toISOString() }),
-            location,
-            notes: trimmedNotes || null,
-          },
-        },
-        {
-          onError: (err) =>
-            toast(t("Could not update sleep: ") + err.message, "error"),
-        },
-      );
-    } else {
-      startSleep.mutate(
-        {
-          babyId,
+      updateSleep.mutate({
+        id: edit.id,
+        patch: {
           startTime: (time ?? new Date()).toISOString(),
-          ...(location ? { location } : {}),
+          // Never touch the end time of a running session from here.
+          ...(isActiveEdit
+            ? {}
+            : { endTime: (endTime ?? new Date()).toISOString() }),
+          location,
+          notes: trimmedNotes || null,
         },
-        {
-          onError: (err) =>
-            toast(t("Could not start sleep: ") + err.message, "error"),
-        },
-      );
+      });
+    } else {
+      startSleep.mutate({
+        babyId,
+        startTime: (time ?? new Date()).toISOString(),
+        ...(location ? { location } : {}),
+      });
     }
     if (!navigator.onLine) toast(t("Saved offline — will sync"));
     onOpenChange(false);
@@ -101,12 +89,7 @@ export function SleepSheet({
 
   const remove = () => {
     if (!edit) return;
-    deleteSleep.mutate(
-      { id: edit.id },
-      {
-        onError: (err) => toast(t("Could not delete: ") + err.message, "error"),
-      },
-    );
+    deleteSleep.mutate({ id: edit.id });
     onOpenChange(false);
   };
 

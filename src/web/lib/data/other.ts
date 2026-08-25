@@ -1,6 +1,8 @@
 import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
 import type { MeasurementType, MedicineUnit } from "@shared/schemas";
 import { api, unwrap } from "../api";
+import { t } from "../i18n";
+import { toast } from "../toast";
 import { invalidateLogs } from "./keys";
 
 // The six Phase 3 activity types: one generic client path for all of them.
@@ -127,6 +129,8 @@ export function registerOtherMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["createOther"], {
     mutationFn: async ({ kind, ...body }: CreateOtherVars) =>
       unwrap(await otherApi[kind].$post({ json: body })),
+    onError: (err: Error) =>
+      toast(t("Could not save: ") + err.message, "error"),
     onSettled: () => invalidateLogs(qc),
   });
   qc.setMutationDefaults(["updateOther"], {
@@ -134,11 +138,15 @@ export function registerOtherMutationDefaults(qc: QueryClient) {
       unwrap(
         await otherApi[kind][":id"].$patch({ param: { id }, json: patch }),
       ),
+    onError: (err: Error) =>
+      toast(t("Could not update: ") + err.message, "error"),
     onSettled: () => invalidateLogs(qc),
   });
   qc.setMutationDefaults(["deleteOther"], {
     mutationFn: async ({ kind, id }: DeleteOtherVars) =>
       unwrap(await otherApi[kind][":id"].$delete({ param: { id } })),
+    onError: (err: Error) =>
+      toast(t("Could not delete: ") + err.message, "error"),
     onSettled: () => invalidateLogs(qc),
   });
 }

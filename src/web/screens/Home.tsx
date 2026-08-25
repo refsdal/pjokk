@@ -8,6 +8,7 @@ import {
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { ActiveSleepBanner } from "@/components/ActiveSleepBanner";
+import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { LogButton } from "@/components/LogButton";
 import { StatusCard } from "@/components/StatusCard";
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,14 @@ export function HomeScreen() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  if (babies.isError) {
+    return (
+      <div className="flex min-h-dvh flex-col justify-center">
+        <ErrorState onRetry={() => void babies.refetch()} />
+      </div>
+    );
+  }
+
   if (babies.isSuccess && babies.data.length === 0) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-4 px-8 text-center">
@@ -73,7 +82,11 @@ export function HomeScreen() {
   }
 
   if (!baby) {
-    return <div className="min-h-dvh" />;
+    return (
+      <div className="flex min-h-dvh flex-col justify-center">
+        <LoadingState />
+      </div>
+    );
   }
 
   const s = summary.data;

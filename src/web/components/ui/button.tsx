@@ -8,11 +8,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "bg-accent text-white",
+        primary: "bg-accent text-on-accent",
         secondary: "bg-surface-2 text-ink",
         outline: "border border-line bg-surface text-ink",
         ghost: "text-ink-soft",
-        danger: "bg-danger text-white",
+        danger: "bg-danger text-on-accent",
       },
       size: {
         default: "h-12 px-5 text-base",

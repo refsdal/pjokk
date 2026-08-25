@@ -42,6 +42,16 @@ export function WelcomeScreen() {
             "Pjokk is invite-only. Open the invite link (or scan the QR) from your family's admin to join.",
           )}
         </p>
+        <Button
+          variant="outline"
+          onClick={() =>
+            void authClient
+              .signOut()
+              .then(() => window.location.assign("/login"))
+          }
+        >
+          {t("Sign out")}
+        </Button>
       </div>
     );
   }

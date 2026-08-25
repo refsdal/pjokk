@@ -1,6 +1,7 @@
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { ErrorState } from "@/components/QueryStates";
 import { Button } from "@/components/ui/button";
 import { api, unwrap } from "@/lib/api";
 import { authClient, signIn, useSession } from "@/lib/auth-client";
@@ -68,6 +69,8 @@ export function JoinScreen() {
       <img src="/icon.svg" alt="" className="mx-auto h-16 w-16" />
 
       {info.isLoading && <p className="text-muted">{t("Checking invite…")}</p>}
+
+      {info.isError && <ErrorState onRetry={() => void info.refetch()} />}
 
       {info.data && !info.data.valid && (
         <>

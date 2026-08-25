@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { IconBabyBottle, IconMoon, IconRuler } from "@tabler/icons-react";
 import type { Baby } from "@shared/schemas";
+import { ErrorState } from "@/components/QueryStates";
 import { Card } from "@/components/ui/card";
 import { useBabies, useMeasurements, useStats } from "@/lib/data";
 import {
@@ -177,7 +178,7 @@ export function StatsScreen() {
       className={cn(
         "h-9 rounded-full border px-4 text-sm font-semibold transition-colors select-none",
         days === value
-          ? "border-accent bg-accent text-white"
+          ? "border-accent bg-accent text-on-accent"
           : "border-line bg-surface text-ink-soft",
       )}
     >
@@ -210,6 +211,7 @@ export function StatsScreen() {
       </div>
 
       <div className="space-y-3 pb-tabbar">
+        {stats.isError && <ErrorState onRetry={() => void stats.refetch()} />}
         <div className="flex gap-3">
           <StatCard
             icon={IconMoon}

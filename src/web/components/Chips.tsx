@@ -24,7 +24,7 @@ export function ChipGroup<T extends string>({
           className={cn(
             "h-11 min-w-16 rounded-full border px-4 text-sm font-semibold transition-colors select-none active:scale-[0.97]",
             value === opt.value
-              ? "border-accent bg-accent text-white"
+              ? "border-accent bg-accent text-on-accent"
               : "border-line bg-surface text-ink-soft",
           )}
         >

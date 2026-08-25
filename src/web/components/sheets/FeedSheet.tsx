@@ -95,37 +95,25 @@ export function FeedSheet({
     const when = (time ?? new Date()).toISOString();
     const trimmedNotes = notes.trim();
     if (edit) {
-      updateFeed.mutate(
-        {
-          id: edit.id,
-          patch: {
-            time: when,
-            type,
-            amountMl: type === "breast" ? null : amountMl,
-            side: type === "breast" ? side : null,
-            durationMin: type === "breast" ? durationMin : null,
-            notes: trimmedNotes || null,
-          },
-        },
-        {
-          onError: (err) =>
-            toast(t("Could not update feed: ") + err.message, "error"),
-        },
-      );
-    } else {
-      logFeed.mutate(
-        {
-          babyId,
+      updateFeed.mutate({
+        id: edit.id,
+        patch: {
           time: when,
           type,
-          ...(type === "breast" ? { side, durationMin } : { amountMl }),
-          ...(trimmedNotes ? { notes: trimmedNotes } : {}),
+          amountMl: type === "breast" ? null : amountMl,
+          side: type === "breast" ? side : null,
+          durationMin: type === "breast" ? durationMin : null,
+          notes: trimmedNotes || null,
         },
-        {
-          onError: (err) =>
-            toast(t("Could not save feed: ") + err.message, "error"),
-        },
-      );
+      });
+    } else {
+      logFeed.mutate({
+        babyId,
+        time: when,
+        type,
+        ...(type === "breast" ? { side, durationMin } : { amountMl }),
+        ...(trimmedNotes ? { notes: trimmedNotes } : {}),
+      });
     }
     if (!navigator.onLine) toast(t("Saved offline — will sync"));
     onOpenChange(false);
@@ -133,12 +121,7 @@ export function FeedSheet({
 
   const remove = () => {
     if (!edit) return;
-    deleteFeed.mutate(
-      { id: edit.id },
-      {
-        onError: (err) => toast(t("Could not delete: ") + err.message, "error"),
-      },
-    );
+    deleteFeed.mutate({ id: edit.id });
     onOpenChange(false);
   };
 

@@ -37,16 +37,8 @@ export function ActiveSleepBanner({ session }: { session: SleepLog }) {
       </div>
       <Button
         variant="secondary"
-        onClick={() =>
-          wakeSleep.mutate(
-            { id: session.id },
-            {
-              onError: (err) =>
-                toast(t("Could not wake: ") + err.message, "error"),
-            },
-          )
-        }
-        disabled={wakeSleep.isPending}
+        onClick={() => wakeSleep.mutate({ id: session.id })}
+        disabled={wakeSleep.isPending || session.id === "optimistic"}
       >
         {t("Wake")}
       </Button>

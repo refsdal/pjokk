@@ -20,10 +20,15 @@ export function LoginScreen({ redirectTo = "/" }: { redirectTo?: string }) {
   }
 
   const google = async () => {
-    await signIn.social({
-      provider: "google",
-      callbackURL: redirectTo,
-    });
+    try {
+      const { error } = await signIn.social({
+        provider: "google",
+        callbackURL: redirectTo,
+      });
+      if (error) throw new Error(error.message ?? t("Sign-in failed"));
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t("Sign-in failed"), "error");
+    }
   };
 
   const emailSignIn = async () => {
