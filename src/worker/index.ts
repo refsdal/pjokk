@@ -29,6 +29,7 @@ import {
   purgeOrphanUsers,
   reconcilePlans,
   runBackup,
+  runCalendarReminders,
   runReminders,
 } from "./scheduled";
 import { sleepApp } from "./routes/sleep";
@@ -178,6 +179,10 @@ export default {
     } else {
       const sent = await runReminders(env);
       if (sent > 0) console.log(`cron: ${sent} reminder(s) sent`);
+      const calendarSent = await runCalendarReminders(env);
+      if (calendarSent > 0) {
+        console.log(`cron: ${calendarSent} calendar reminder(s) sent`);
+      }
     }
   },
 } satisfies ExportedHandler<Env>;
