@@ -3,6 +3,7 @@ import { registerLogMutationDefaults } from "./logs";
 import { registerOtherMutationDefaults } from "./other";
 
 // One import site for the data layer; modules are split by domain.
+export * from "./calendar";
 export * from "./family";
 export * from "./insights";
 export * from "./keys";
