@@ -1,5 +1,6 @@
 import {
   IconBath,
+  IconLock,
   IconMilk,
   IconNote,
   IconPill,
@@ -7,6 +8,7 @@ import {
   IconSparkles,
   type Icon as TablerIcon,
 } from "@tabler/icons-react";
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import type {
   MeasurementType,
@@ -23,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import {
   useCreateOther,
   useDeleteOther,
+  useFamily,
   useOtherList,
   useUpdateOther,
   type CreateOtherVars,
@@ -31,6 +34,16 @@ import {
 import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+
+// Kinds gated behind Premium on the free plan (Task 1's server-side 402s).
+// Medicine stays free.
+const GATED_KINDS: ReadonlySet<OtherKind> = new Set([
+  "bath",
+  "note",
+  "milestone",
+  "measurement",
+  "pump",
+]);
 
 export type OtherEntry = Extract<TimelineEntry, { kind: OtherKind }>;
 
@@ -93,25 +106,43 @@ export function MoreSheet({
   onOpenChange: (open: boolean) => void;
   onPick: (kind: OtherKind) => void;
 }) {
+  const navigate = useNavigate();
+  const premium = (useFamily().data?.plan ?? "free") !== "free";
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange} title={t("Log something")}>
       <div className="grid grid-cols-3 gap-3 pt-1 pb-6">
         {(Object.keys(otherKindMeta) as OtherKind[]).map((kind) => {
           const { label, icon: Icon, tint } = otherKindMeta[kind];
+          const locked = !premium && GATED_KINDS.has(kind);
           return (
             <button
               key={kind}
               type="button"
-              onClick={() => onPick(kind)}
-              className="flex h-24 flex-col items-center justify-center gap-2 rounded-xl2 border border-line bg-surface select-none active:scale-[0.97] active:bg-surface-2"
+              onClick={
+                locked
+                  ? () => {
+                      toast(t("Premium feature — upgrade in Settings"));
+                      onOpenChange(false);
+                      void navigate({ to: "/settings" });
+                    }
+                  : () => onPick(kind)
+              }
+              className={cn(
+                "flex h-24 flex-col items-center justify-center gap-2 rounded-xl2 border border-line bg-surface select-none active:scale-[0.97] active:bg-surface-2",
+                locked && "opacity-60",
+              )}
             >
               <span
                 className={cn(
-                  "flex h-10 w-10 items-center justify-center rounded-full bg-surface-2",
-                  tint,
+                  "relative flex h-10 w-10 items-center justify-center rounded-full bg-surface-2",
+                  locked ? "text-muted" : tint,
                 )}
               >
                 <Icon className="h-5 w-5" />
+                {locked && (
+                  <IconLock className="absolute -right-1 -bottom-1 h-4 w-4 rounded-full bg-surface p-0.5 text-muted" />
+                )}
               </span>
               <span className="text-sm font-bold text-ink">{t(label)}</span>
             </button>

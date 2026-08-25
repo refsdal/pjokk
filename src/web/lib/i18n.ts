@@ -170,6 +170,8 @@ const nb: Record<string, string> = {
   "WHO percentile curves are a Premium feature.":
     "WHO-percentilkurver er en Premium-funksjon.",
   Upgrade: "Oppgrader",
+  "Premium feature — upgrade in Settings":
+    "Premium-funksjon — oppgrader i innstillingene",
 
   // Settings
   Family: "Familie",
