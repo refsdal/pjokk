@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
-    "check": "biome check . && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.worker.json --noEmit",
+    "check": "biome check . && node scripts/check-i18n.mjs && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.worker.json --noEmit",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply pjokk --local",

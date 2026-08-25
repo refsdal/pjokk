@@ -197,6 +197,42 @@ GitHub issues #1–#7.
   the banned "Deleted user" tombstone, audits, then deletes. Client no
   longer calls better-auth removeUser (FKs would 500 it).
 
+## Quality reviews (2026-08-25)
+
+Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
+
+- **Defects fixed** (batch 1): orphan purge role filter (better-auth stamps
+  role="user" — test helpers now mirror that), empty-PATCH 500s, DB-enforced
+  single active sleep (partial unique index + 409 on the UNIQUE cause
+  chain), lossless timeline keyset cursor ("ms|id", global time-DESC/id-DESC
+  order), backup covers api_key/admin_audit, case-insensitive invite codes,
+  formatRelative across midnight, measurement type-switch reseeds value,
+  local-time date inputs, night-flip never unmounts an open sheet, More
+  picker prefetches prefill lists.
+- **Guardrails** (batch 2): GitHub Actions CI (lint+types+tests+build),
+  Biome as linter/formatter (pnpm check runs it), Settings + data-layer god
+  files split by domain (public import surfaces unchanged), isSysadmin()
+  as the single session-role cast.
+- **Failure paths** (batch 3): optimistic summary updates (offline glance
+  correct immediately; rollback + toast on error), ALL mutation error
+  toasts live in the mutation defaults (covers offline-resumed mutations),
+  shared Loading/ErrorState on Home/Timeline/Stats/Join, Welcome trap has
+  Sign out, --color-on-accent kills white light in night mode.
+- **a11y + i18n** (batch 4): pinch-zoom restored, aria-live toasts, one
+  ChipGroup (aria-pressed, 44px) for every chip row, real buttons,
+  aria-current tabs, live stepper values, reduced-motion support;
+  time.ts relative/age strings localized.
+- **i18n guard** (batch 5): scripts/check-i18n.mjs fails CI when a t()
+  literal lacks a dictionary entry (caught "Admin console" on first run).
+  Tombstone moved to the db layer; test scrypt hash memoized.
+- **Deliberate non-goals:** no monorepo, no repository-pattern over
+  drizzle, no DI, code-based routing stays, blunt cache invalidation stays.
+- **Still on the backlog** (tracked, not urgent): migrate feeds/diapers
+  routes onto makeLogRoutes, scoped.ts directory split, core-three
+  categoryMeta dedup, sheet-lifecycle hook extraction, back-gesture closes
+  sheets, family switcher / multi-baby picker, install-to-home-screen hint,
+  pre-paint theme script, sentence-splice translation keys.
+
 ## Infra
 
 - **Deployed to the Refsdal Holding AS Cloudflare account**

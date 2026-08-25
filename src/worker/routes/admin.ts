@@ -10,26 +10,8 @@ import {
 import type { AppEnv } from "../context";
 import { schema } from "../db";
 import { createApp, iso, isoOrNull, jsonContent } from "../lib";
+import { ensureTombstone, TOMBSTONE_ID } from "../db/tombstone";
 import { audit } from "../middleware/sysadmin";
-
-// Attribution survivor for deleted accounts: has no sign-in methods and is
-// banned; log rows point here after their author is removed.
-export const TOMBSTONE_ID = "user_tombstone";
-
-async function ensureTombstone(db: AppEnv["Variables"]["db"]) {
-  await db
-    .insert(schema.user)
-    .values({
-      id: TOMBSTONE_ID,
-      name: "Deleted user",
-      email: "deleted@pjokk.invalid",
-      emailVerified: false,
-      banned: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .onConflictDoNothing();
-}
 
 // System-admin endpoints (all behind requireSysadmin, wired in index.ts).
 // User-level support ops (ban, sessions, passwords, impersonation) come from

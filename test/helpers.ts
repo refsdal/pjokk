@@ -5,6 +5,13 @@ import { createDb, schema } from "../src/worker/db";
 export const db = () => createDb(env.DB);
 
 const PASSWORD = "test-password-123";
+
+// scrypt is ~100ms per call and the password never varies — hash once.
+let cachedHash: Promise<string> | undefined;
+const passwordHash = () => {
+  cachedHash ??= hashPassword(PASSWORD);
+  return cachedHash;
+};
 const BASE = "http://localhost";
 
 let counter = 0;
@@ -33,7 +40,7 @@ export async function createUser(name: string) {
       accountId: id,
       providerId: "credential",
       userId: id,
-      password: await hashPassword(PASSWORD),
+      password: await passwordHash(),
       createdAt: now,
       updatedAt: now,
     });

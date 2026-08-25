@@ -230,6 +230,7 @@ const nb: Record<string, string> = {
   Account: "Konto",
   "Sign out": "Logg ut",
   "API docs": "API-dokumentasjon",
+  "Admin console": "Adminkonsoll",
 
   // Login / join / welcome
   "Family baby tracker": "Babylogg for familien",

@@ -1,7 +1,7 @@
 import { and, eq, gt, isNull, lt, max, ne, notExists, or } from "drizzle-orm";
 import { createDb, schema } from "./db";
 import { pushToUser } from "./push";
-import { TOMBSTONE_ID } from "./routes/admin";
+import { TOMBSTONE_ID } from "./db/tombstone";
 
 // Orphan hygiene (sec review H2): accounts created past the invite flow have
 // no membership and can't create one — sweep them after a week. Sysadmins
