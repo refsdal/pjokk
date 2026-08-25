@@ -30,14 +30,14 @@ export const billingApp = createApp<FamEnv>().openapi(
       );
     }
     const stripe = createStripe(c.env);
-    const family = await c.var.fam.family();
+    const stripeCustomerId = await c.var.fam.stripeCustomerId();
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: [{ price: c.env.STRIPE_PRICE_PREMIUM_LIFETIME, quantity: 1 }],
       client_reference_id: c.var.familyId,
       metadata: { kind: "lifetime", familyId: c.var.familyId },
-      ...(family?.stripeCustomerId
-        ? { customer: family.stripeCustomerId }
+      ...(stripeCustomerId
+        ? { customer: stripeCustomerId }
         : { customer_email: c.var.sessionData.user.email }),
       automatic_tax: { enabled: true },
       success_url: `${c.env.APP_URL}/settings?billing=success`,

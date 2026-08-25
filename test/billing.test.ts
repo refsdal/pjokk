@@ -175,4 +175,15 @@ describe("lifetime checkout", () => {
     const res = await api("/api/billing/lifetime", { method: "POST", cookie });
     expect(res.status).toBe(409);
   });
+
+  it("GET /api/family never leaks stripeCustomerId to members", async () => {
+    const { family } = await rig();
+    const member = await createUser("Member");
+    await addMember(member.id, family.id, "member");
+    const memberCookie = await signIn(member.email);
+    const res = await api("/api/family", { cookie: memberCookie });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).not.toHaveProperty("stripeCustomerId");
+  });
 });

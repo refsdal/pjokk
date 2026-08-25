@@ -234,11 +234,21 @@ export function familyScope(db: Db, familyId: string) {
           name: organization.name,
           slug: organization.slug,
           plan: organization.plan,
-          stripeCustomerId: organization.stripeCustomerId,
         })
         .from(organization)
         .where(eq(organization.id, familyId));
       return rows[0] ?? null;
+    },
+
+    // Narrow, billing-only lookup — deliberately NOT folded into family()
+    // above, whose result is returned verbatim by GET /api/family to every
+    // member (not just admins); stripeCustomerId must never ride along.
+    async stripeCustomerId() {
+      const rows = await db
+        .select({ stripeCustomerId: organization.stripeCustomerId })
+        .from(organization)
+        .where(eq(organization.id, familyId));
+      return rows[0]?.stripeCustomerId ?? null;
     },
 
     async members() {
