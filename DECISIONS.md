@@ -350,3 +350,27 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
 - vitest-pool-workers 0.22 dropped `defineWorkersConfig`; tests use the
   `cloudflareTest()` Vite plugin API with explicit miniflare bindings (no
   wrangler-config read, so the missing dist/ dir can't break tests).
+- **Test environment = a Wrangler environment, not a separate repo/config**
+  (`env.test` in wrangler.jsonc → worker `pjokk-test` at app-test.pjokk.no).
+  An environment IS a standalone worker at runtime — own D1 (`pjokk-test`),
+  KV, R2 (`pjokk-test-files`), secrets, crons, custom domain — but managed
+  from the one config file so code and infra can't drift. Rejected: a
+  duplicated wrangler config (drift risk) and git-integration preview URLs
+  (no clean stateful isolation; auth redirect URIs and Stripe webhooks need
+  a stable origin). The Vite plugin selects the env via `CLOUDFLARE_ENV=test`
+  at build time; the emitted dist config is already fully resolved, so the
+  deploy command takes NO `--env` flag (passing it double-suffixes the name
+  to `pjokk-test-test` — learned the hard way, worker deleted).
+  `--env test` IS still used for wrangler commands that read the source
+  config: `secret put`, `d1 migrations apply`, `d1 execute`.
+- **Test env is the permanent home of Stripe test mode**: sk_test key,
+  test-mode price ids and a test-mode webhook endpoint point at
+  app-test.pjokk.no; production only ever holds live keys. Google/Stripe
+  test-env secrets are placeholders ("unset") until filled per
+  SMOKE-TEST.md §7.
+- **CI deploys test on every green push to main** (deploy-test job in
+  ci.yml, gated on the `CLOUDFLARE_API_TOKEN` repo secret — skips
+  gracefully while unset). Production deploys stay manual (`pnpm deploy`).
+  No Cloudflare Access in front of app-test: closed signup is the gate,
+  same security model as production. `workers_dev` is off for the test env
+  (that origin isn't in better-auth's trusted origins).

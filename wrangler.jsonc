@@ -48,5 +48,36 @@
   // The app lives on app.pjokk.no; the apex is a separate landing page that
   // merely links here. workers.dev stays on as a fallback origin.
   "workers_dev": true,
-  "routes": [{ "pattern": "app.pjokk.no", "custom_domain": true }]
+  "routes": [{ "pattern": "app.pjokk.no", "custom_domain": true }],
+  "env": {
+    // Test environment: deploys as the `pjokk-test` worker with fully
+    // isolated data (own D1/KV/R2) at app-test.pjokk.no. CI deploys it on
+    // every push to main; production stays a manual `pnpm deploy`.
+    // Stripe TEST-MODE keys live here — the billing smoke pass runs against
+    // this env, never against production with test keys.
+    // Bindings are NOT inherited by environments, hence the repetition.
+    "test": {
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "pjokk-test",
+          "database_id": "15666cdc-4db9-4c2b-9583-8f1725f0ab42",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [{ "binding": "FILES", "bucket_name": "pjokk-test-files" }],
+      "kv_namespaces": [
+        { "binding": "KV", "id": "8f32ad05796a4c7f86ab9e1f81f1640c" }
+      ],
+      "triggers": { "crons": ["15 3 * * *", "*/15 * * * *"] },
+      "vars": {
+        "APP_URL": "https://app-test.pjokk.no",
+        "OPEN_SIGNUP": "0"
+      },
+      // No workers.dev fallback here: that origin isn't in better-auth's
+      // trusted origins, so exposing it would only serve a broken login.
+      "workers_dev": false,
+      "routes": [{ "pattern": "app-test.pjokk.no", "custom_domain": true }]
+    }
+  }
 }

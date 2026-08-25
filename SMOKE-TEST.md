@@ -81,23 +81,62 @@ wrangler secret put GOOGLE_CLIENT_SECRET
 
 ## 6. Go-live checklist — Stripe billing (Phase 9)
 
-22. `wrangler secret put` all five `STRIPE_*` values (live mode): secret key,
-    webhook secret, and the three price ids (premium monthly, premium
-    yearly, lifetime).
-23. In the Stripe dashboard: add a webhook endpoint
+The test-mode pass (item 25) runs on the **test environment**
+(`app-test.pjokk.no`, worker `pjokk-test`, isolated D1/KV/R2) — see
+section 7. Production only ever holds live keys.
+
+22. `wrangler secret put` all five `STRIPE_*` values (live mode, NO
+    `--env` flag → production): secret key, webhook secret, and the three
+    price ids (`STRIPE_PRICE_PREMIUM_MONTHLY` / `_YEARLY` / `_LIFETIME`).
+23. In the Stripe dashboard (live mode): add a webhook endpoint
     `https://app.pjokk.no/api/auth/stripe/webhook` subscribed to
     `checkout.session.completed`, `customer.subscription.created`,
     `customer.subscription.updated`, `customer.subscription.deleted`; copy
     the signing secret into `STRIPE_WEBHOOK_SECRET`.
 24. Verify all three prices are NOK and tax behavior is **inclusive**;
     confirm Stripe Tax is enabled on the account.
-25. Test-mode end-to-end pass first (before flipping to live keys):
+25. Test-mode end-to-end pass on `app-test.pjokk.no` first (before flipping
+    live keys into production):
     - Subscribe monthly with card `4242 4242 4242 4242` → plan flips to
       `premium`; open the Customer Portal from Settings → Billing → cancel →
       verify the downgrade lands at period end (not immediately).
     - Buy lifetime → plan flips to `lifetime`.
     - In `/admin`, comp a family (plan → `comp`) then revoke it (plan →
       `free`) → verify the audit trail records `billing.plan.set` both ways.
+
+## 7. Test environment (app-test.pjokk.no) — one-time setup
+
+Infrastructure already provisioned (D1 `pjokk-test`, KV, R2
+`pjokk-test-files`, custom domain, crons, `BETTER_AUTH_SECRET` + fresh
+VAPID pair). CI auto-deploys it on every green push to main once the
+GitHub secret exists. Remaining manual steps:
+
+26. GitHub repo → Settings → Secrets and variables → Actions: add
+    `CLOUDFLARE_API_TOKEN` (Cloudflare dashboard → My Profile → API Tokens
+    → Create Token → "Edit Cloudflare Workers" template, plus D1:Edit;
+    scope to the Refsdal Holding AS account). Until it exists the
+    `deploy-test` CI job skips gracefully.
+27. Google Cloud Console → the Pjokk OAuth client → add authorized
+    redirect URI `https://app-test.pjokk.no/api/auth/callback/google`,
+    then replace the placeholder test-env secrets:
+    `wrangler secret put GOOGLE_CLIENT_ID --env test` (and
+    `GOOGLE_CLIENT_SECRET`).
+28. Stripe dashboard → **test mode**: create/copy the three Premium prices
+    (NOK, inclusive tax), add a webhook endpoint
+    `https://app-test.pjokk.no/api/auth/stripe/webhook` (same four events
+    as item 23), then replace the placeholders:
+    `wrangler secret put STRIPE_SECRET_KEY --env test` (`sk_test_…`),
+    `STRIPE_WEBHOOK_SECRET`, and the three `STRIPE_PRICE_PREMIUM_*` ids.
+29. Bootstrap the founder account: temporarily set `OPEN_SIGNUP` to "1"
+    for the test env (Cloudflare dashboard → pjokk-test → Settings →
+    Variables, or edit wrangler.jsonc env.test and redeploy), sign in with
+    Google at `https://app-test.pjokk.no`, then set it back to "0".
+    Promote yourself to sysadmin by setting `role = 'admin'` on your user
+    row: `wrangler d1 execute pjokk-test --env test --remote --command
+    "UPDATE user SET role='admin' WHERE email='<you>'"` — then create a
+    family from `/admin`.
+30. Manual deploys remain available: `pnpm deploy:test` (test) and
+    `pnpm deploy` (production). Migrations: `pnpm db:migrate:test`.
 
 ## Verified automatically (already done)
 
