@@ -65,7 +65,9 @@ export const apiKey = sqliteTable(
     revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
     // NULL = never expires.
     expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
-    readOnly: integer("read_only", { mode: "boolean" }).default(false).notNull(),
+    readOnly: integer("read_only", { mode: "boolean" })
+      .default(false)
+      .notNull(),
     createdAt: createdAt(),
   },
   (t) => [index("api_key_family_idx").on(t.familyId)],

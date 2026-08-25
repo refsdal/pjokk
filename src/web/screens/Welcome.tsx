@@ -5,7 +5,7 @@ import { ChipGroup } from "@/components/Chips";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, unwrap } from "@/lib/api";
-import { authClient, useSession } from "@/lib/auth-client";
+import { authClient, isSysadmin, useSession } from "@/lib/auth-client";
 import { t } from "@/lib/i18n";
 import { toLocalDateInput } from "@/lib/time";
 import { toast } from "@/lib/toast";
@@ -30,9 +30,7 @@ export function WelcomeScreen() {
 
   // Family creation is a sysadmin action; everyone else arrives via an
   // invite link and never sees this screen without a family.
-  const isSysadmin =
-    (session?.user as { role?: string | null } | undefined)?.role === "admin";
-  if (session && !hasFamily && !isSysadmin) {
+  if (session && !hasFamily && !isSysadmin(session)) {
     return (
       <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-6 text-center">
         <img src="/icon.svg" alt="" className="mx-auto h-16 w-16" />
@@ -51,7 +49,12 @@ export function WelcomeScreen() {
   const createFamily = async () => {
     setBusy(true);
     try {
-      const slug = `${familyName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "family"}-${Math.random().toString(36).slice(2, 7)}`;
+      const slug = `${
+        familyName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "") || "family"
+      }-${Math.random().toString(36).slice(2, 7)}`;
       const { data, error } = await authClient.organization.create({
         name: familyName.trim(),
         slug,

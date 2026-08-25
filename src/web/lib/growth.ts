@@ -33,8 +33,7 @@ function normalCdf(z: number): number {
   const t = 1 / (1 + 0.3275911 * x);
   const erf =
     1 -
-    (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t -
-      0.284496736) *
+    ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) *
       t +
       0.254829592) *
       t *
@@ -52,7 +51,7 @@ export function weightPercentile(
   if (!lms || weightKg <= 0) return null;
   const [l, m, s] = lms;
   const z =
-    l !== 0 ? (Math.pow(weightKg / m, l) - 1) / (l * s) : Math.log(weightKg / m) / s;
+    l !== 0 ? ((weightKg / m) ** l - 1) / (l * s) : Math.log(weightKg / m) / s;
   return normalCdf(z) * 100;
 }
 
@@ -65,7 +64,7 @@ export function referenceWeight(
   const lms = lmsAt(sex, ageMonths);
   if (!lms) return null;
   const [l, m, s] = lms;
-  return l !== 0 ? m * Math.pow(1 + l * s * z, 1 / l) : m * Math.exp(s * z);
+  return l !== 0 ? m * (1 + l * s * z) ** (1 / l) : m * Math.exp(s * z);
 }
 
 /** z-scores for the P3 / P50 / P97 reference lines. */

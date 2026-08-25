@@ -31,9 +31,7 @@ export function jsonContent<T extends z.ZodType>(
 export const iso = (d: Date) => d.toISOString();
 export const isoOrNull = (d: Date | null) => (d ? d.toISOString() : null);
 
-export function serFeed<
-  T extends { time: Date },
->(row: T) {
+export function serFeed<T extends { time: Date }>(row: T) {
   return { ...row, time: iso(row.time) };
 }
 

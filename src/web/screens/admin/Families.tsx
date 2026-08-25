@@ -13,8 +13,7 @@ export function AdminFamilies() {
   const queryClient = useQueryClient();
   const families = useQuery({
     queryKey: ["admin", "families"],
-    queryFn: async () =>
-      unwrap<AdminFamily[]>(await api.admin.families.$get()),
+    queryFn: async () => unwrap<AdminFamily[]>(await api.admin.families.$get()),
   });
 
   const deleteFamily = useMutation({

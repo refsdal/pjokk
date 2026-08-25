@@ -99,13 +99,15 @@ describe("safe user deletion (M5)", () => {
 
     // A second caretaker with history.
     const victim = await createUser("Leaving caretaker");
-    await db().insert(schema.member).values({
-      id: `mem_${Date.now()}`,
-      organizationId: a.family.id,
-      userId: victim.id,
-      role: "member",
-      createdAt: new Date(),
-    });
+    await db()
+      .insert(schema.member)
+      .values({
+        id: `mem_${Date.now()}`,
+        organizationId: a.family.id,
+        userId: victim.id,
+        role: "member",
+        createdAt: new Date(),
+      });
     const victimCookie = await signIn(victim.email);
     await api("/api/feeds", {
       method: "POST",

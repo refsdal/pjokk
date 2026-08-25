@@ -6,14 +6,16 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
-    "check": "tsc -b --noEmit && tsc -p tsconfig.worker.json --noEmit",
+    "check": "biome check . && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.worker.json --noEmit",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply pjokk --local",
     "db:migrate:remote": "wrangler d1 migrations apply pjokk --remote",
     "deploy": "vite build && wrangler deploy -c dist/pjokk/wrangler.json",
     "seed:local": "node scripts/seed.mjs && wrangler d1 execute pjokk --local --file .seed.sql",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
   },
   "dependencies": {
     "@better-auth/passkey": "^1.7.1",
@@ -44,6 +46,7 @@
   },
   "devDependencies": {
     "@better-auth/cli": "^1.4.21",
+    "@biomejs/biome": "^2.5.10",
     "@cloudflare/vite-plugin": "^1.53.1",
     "@cloudflare/vitest-pool-workers": "^0.22.0",
     "@cloudflare/workers-types": "^5.20260823.1",

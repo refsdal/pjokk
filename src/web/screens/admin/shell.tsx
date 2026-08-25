@@ -8,7 +8,7 @@ import {
   IconUsersGroup,
 } from "@tabler/icons-react";
 import { TabBar, type TabItem } from "@/components/TabBar";
-import { useSession } from "@/lib/auth-client";
+import { isSysadmin, useSession } from "@/lib/auth-client";
 
 // Operator console shell: role guard + its own bottom tab bar (same
 // component as the app's), so each concern gets a page that can grow.
@@ -24,8 +24,7 @@ export function AdminShell() {
   const { data: session, isPending } = useSession();
   if (isPending) return <div className="min-h-dvh" />;
   if (!session) return <Navigate to="/login" />;
-  const role = (session.user as { role?: string | null }).role;
-  if (role !== "admin") return <Navigate to="/" />;
+  if (!isSysadmin(session)) return <Navigate to="/" />;
 
   return (
     <div className="min-h-dvh">

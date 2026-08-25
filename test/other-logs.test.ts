@@ -104,7 +104,8 @@ describe("phase 3 activity types", () => {
   it("all six types create and land on the timeline (other filter)", async () => {
     const a = await rig();
     const now = Date.now();
-    const at = (minAgo: number) => new Date(now - minAgo * 60_000).toISOString();
+    const at = (minAgo: number) =>
+      new Date(now - minAgo * 60_000).toISOString();
     const post = async (path: string, body: Record<string, unknown>) => {
       const res = await api(path, { method: "POST", cookie: a.cookie, body });
       expect(res.status).toBe(201);

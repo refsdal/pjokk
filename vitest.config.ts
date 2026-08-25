@@ -7,7 +7,9 @@ import {
 import webpush from "web-push";
 
 export default defineConfig(async () => {
-  const migrations = await readD1Migrations(path.join(import.meta.dirname, "migrations"));
+  const migrations = await readD1Migrations(
+    path.join(import.meta.dirname, "migrations"),
+  );
   const vapid = webpush.generateVAPIDKeys();
   return {
     resolve: {

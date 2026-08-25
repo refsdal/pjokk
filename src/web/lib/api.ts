@@ -3,7 +3,8 @@ import type { AppType } from "../../worker/index";
 
 // '' = same origin (the Worker serves both SPA and API). A future native
 // shell points this at the deployed origin instead.
-export const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
+export const API_BASE =
+  (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
 
 export const client = hc<AppType>(API_BASE, {
   init: { credentials: "include" },

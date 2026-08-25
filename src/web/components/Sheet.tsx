@@ -15,7 +15,11 @@ export function Sheet({
   children: ReactNode;
 }) {
   return (
-    <Drawer.Root open={open} onOpenChange={onOpenChange} repositionInputs={false}>
+    <Drawer.Root
+      open={open}
+      onOpenChange={onOpenChange}
+      repositionInputs={false}
+    >
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40" />
         <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col rounded-t-3xl bg-bg outline-none">

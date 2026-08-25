@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  referenceWeight,
-  weightPercentile,
-} from "../src/web/lib/growth";
+import { referenceWeight, weightPercentile } from "../src/web/lib/growth";
 
 // Anchors from the WHO weight-for-age tables (canonical published medians).
 describe("WHO weight-for-age percentiles", () => {

@@ -37,6 +37,10 @@ for (const table of [
   "measurement_log",
   "pump_log",
   "family_invite",
+  "api_key",
+  "admin_audit",
+  "push_subscription",
+  "push_pref",
   "baby",
   "invitation",
   "member",
@@ -105,7 +109,7 @@ feed(0.8, KRISTINE, "breast", { side: "right", durationMin: 15 });
 const simple = (table, hoursAgo, by, cols) => {
   const keys = Object.keys(cols);
   rows.push(
-    `INSERT INTO ${table} (id, family_id, baby_id, caretaker_id, time${keys.length ? ", " + keys.map((k) => cols[k].col).join(", ") : ""}, created_at) VALUES (${esc(id("oth"))}, ${esc(FAM)}, ${esc(NORA)}, ${esc(by)}, ${ms(hoursAgo)}${keys.length ? ", " + keys.map((k) => cols[k].val).join(", ") : ""}, ${now});`,
+    `INSERT INTO ${table} (id, family_id, baby_id, caretaker_id, time${keys.length ? `, ${keys.map((k) => cols[k].col).join(", ")}` : ""}, created_at) VALUES (${esc(id("oth"))}, ${esc(FAM)}, ${esc(NORA)}, ${esc(by)}, ${ms(hoursAgo)}${keys.length ? `, ${keys.map((k) => cols[k].val).join(", ")}` : ""}, ${now});`,
   );
 };
 simple("medicine_log", 12.8, ANDERS, {
@@ -134,5 +138,5 @@ simple("pump_log", 9, KRISTINE, {
   durationMin: { col: "duration_min", val: 15 },
 });
 
-writeFileSync(".seed.sql", rows.join("\n") + "\n");
+writeFileSync(".seed.sql", `${rows.join("\n")}\n`);
 console.log(`wrote .seed.sql (${rows.length} statements)`);

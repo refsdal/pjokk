@@ -56,13 +56,15 @@ export async function addMember(
   familyId: string,
   role: "admin" | "member" = "member",
 ) {
-  await db().insert(schema.member).values({
-    id: `mem_${uid()}`,
-    organizationId: familyId,
-    userId,
-    role,
-    createdAt: new Date(),
-  });
+  await db()
+    .insert(schema.member)
+    .values({
+      id: `mem_${uid()}`,
+      organizationId: familyId,
+      userId,
+      role,
+      createdAt: new Date(),
+    });
 }
 
 export async function createBaby(familyId: string, name = "Baby") {

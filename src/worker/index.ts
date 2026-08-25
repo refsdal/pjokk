@@ -4,7 +4,11 @@ import { createAuth } from "./auth";
 import type { AppEnv, FamEnv } from "./context";
 import { createDb } from "./db";
 import { createApp } from "./lib";
-import { requireAdmin, requireFamily, sessionMiddleware } from "./middleware/tenancy";
+import {
+  requireAdmin,
+  requireFamily,
+  sessionMiddleware,
+} from "./middleware/tenancy";
 import { babiesApp } from "./routes/babies";
 import { diapersApp } from "./routes/diapers";
 import { feedsApp } from "./routes/feeds";

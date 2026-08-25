@@ -14,13 +14,12 @@ export function ChipGroup<T extends string>({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-wrap gap-2", className)} role="radiogroup">
+    <div className={cn("flex flex-wrap gap-2", className)}>
       {options.map((opt) => (
         <button
           key={opt.value}
           type="button"
-          role="radio"
-          aria-checked={value === opt.value}
+          aria-pressed={value === opt.value}
           onClick={() => onChange(opt.value)}
           className={cn(
             "h-11 min-w-16 rounded-full border px-4 text-sm font-semibold transition-colors select-none active:scale-[0.97]",

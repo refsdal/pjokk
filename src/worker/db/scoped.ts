@@ -302,9 +302,7 @@ export function familyScope(db: Db, familyId: string) {
     },
 
     // --- feeds ---
-    async listFeeds(
-      opts: ListOpts = {},
-    ) {
+    async listFeeds(opts: ListOpts = {}) {
       return db
         .select(feedCols)
         .from(feedLog)
@@ -375,9 +373,7 @@ export function familyScope(db: Db, familyId: string) {
     },
 
     // --- diapers ---
-    async listDiapers(
-      opts: ListOpts = {},
-    ) {
+    async listDiapers(opts: ListOpts = {}) {
       return db
         .select(diaperCols)
         .from(diaperLog)
@@ -442,9 +438,7 @@ export function familyScope(db: Db, familyId: string) {
     },
 
     // --- sleep ---
-    async listSleeps(
-      opts: ListOpts = {},
-    ) {
+    async listSleeps(opts: ListOpts = {}) {
       return db
         .select(sleepCols)
         .from(sleepLog)

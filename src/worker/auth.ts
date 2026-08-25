@@ -17,7 +17,10 @@ export function createAuth(env: Env) {
     secret: env.BETTER_AUTH_SECRET,
     // workers.dev stays trusted so the app keeps working there during the
     // transition to app.pjokk.no (and as a fallback URL).
-    trustedOrigins: [env.APP_URL, "https://pjokk.refsdal-holding-as.workers.dev"],
+    trustedOrigins: [
+      env.APP_URL,
+      "https://pjokk.refsdal-holding-as.workers.dev",
+    ],
     database: drizzleAdapter(db, { provider: "sqlite", schema }),
     // Open signup is DISABLED (closed alpha). Accounts are only created via
     // the invite redeem flow: /join/CODE calls social sign-in with

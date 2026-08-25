@@ -13,10 +13,7 @@ import { StatusCard } from "@/components/StatusCard";
 import { Button } from "@/components/ui/button";
 import { DiaperSheet } from "@/components/sheets/DiaperSheet";
 import { FeedSheet } from "@/components/sheets/FeedSheet";
-import {
-  MoreSheet,
-  OtherLogSheet,
-} from "@/components/sheets/OtherLogSheet";
+import { MoreSheet, OtherLogSheet } from "@/components/sheets/OtherLogSheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
 import { useSession } from "@/lib/auth-client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -84,7 +81,13 @@ export function HomeScreen() {
 
   // Never switch layouts while a sheet is open: the 22:00 auto-flip would
   // unmount an open More/Other sheet and discard whatever was typed.
-  if (night && (sheet === null || sheet === "feed" || sheet === "diaper" || sheet === "sleep")) {
+  if (
+    night &&
+    (sheet === null ||
+      sheet === "feed" ||
+      sheet === "diaper" ||
+      sheet === "sleep")
+  ) {
     return (
       <NightHome
         babyId={baby.id}

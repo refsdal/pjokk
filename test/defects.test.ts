@@ -30,7 +30,11 @@ describe("empty PATCH bodies are no-ops, not 500s", () => {
     ).json()) as { id: string };
 
     for (const path of [`/api/feeds/${feed.id}`, `/api/baths/${bath.id}`]) {
-      const res = await api(path, { method: "PATCH", cookie: a.cookie, body: {} });
+      const res = await api(path, {
+        method: "PATCH",
+        cookie: a.cookie,
+        body: {},
+      });
       expect(res.status).toBe(200);
     }
     const babyPatch = await api(`/api/babies/${a.baby.id}`, {
@@ -132,7 +136,11 @@ describe("one active sleep session per baby (DB-enforced)", () => {
     // A COMPLETED session alongside an active one is fine.
     await db()
       .insert(schema.sleepLog)
-      .values({ ...base, startTime: new Date(Date.now() - 3600_000), endTime: new Date() });
+      .values({
+        ...base,
+        startTime: new Date(Date.now() - 3600_000),
+        endTime: new Date(),
+      });
   });
 });
 

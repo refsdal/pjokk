@@ -187,9 +187,7 @@ export const adminApp = createApp<AppEnv>()
       org[0].name,
     );
     // FKs cascade: members, invites, babies, and all logs go with the org.
-    await db
-      .delete(schema.organization)
-      .where(eq(schema.organization.id, id));
+    await db.delete(schema.organization).where(eq(schema.organization.id, id));
     return c.json({ ok: true as const }, 200);
   })
   .openapi(deleteUser, async (c) => {

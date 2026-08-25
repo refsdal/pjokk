@@ -18,9 +18,8 @@ export function AppShell() {
     return <Navigate to="/welcome" />;
   }
 
-  const impersonatedBy = (
-    session.session as { impersonatedBy?: string | null }
-  ).impersonatedBy;
+  const impersonatedBy = (session.session as { impersonatedBy?: string | null })
+    .impersonatedBy;
 
   return (
     <div className="min-h-dvh">

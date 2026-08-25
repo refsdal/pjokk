@@ -11,7 +11,7 @@ import { AppearanceProvider } from "@/lib/appearance";
 import { HomeScreen } from "@/screens/Home";
 import { JoinScreen } from "@/screens/Join";
 import { LoginScreen } from "@/screens/Login";
-import { SettingsScreen } from "@/screens/Settings";
+import { SettingsScreen } from "@/screens/settings";
 import { AppShell } from "@/screens/shell";
 import { TimelineScreen } from "@/screens/Timeline";
 import { WelcomeScreen } from "@/screens/Welcome";

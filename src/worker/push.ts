@@ -73,12 +73,13 @@ export async function pushToUser(
     .where(eq(schema.pushSubscription.userId, userId));
 
   const results = await Promise.all(
-    subs.map(async (sub) => ({ sub, outcome: await sendOne(env, sub, payload) })),
+    subs.map(async (sub) => ({
+      sub,
+      outcome: await sendOne(env, sub, payload),
+    })),
   );
 
-  const gone = results
-    .filter((r) => r.outcome === "gone")
-    .map((r) => r.sub.id);
+  const gone = results.filter((r) => r.outcome === "gone").map((r) => r.sub.id);
   if (gone.length > 0) {
     await db
       .delete(schema.pushSubscription)

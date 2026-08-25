@@ -184,7 +184,10 @@ export const pushApp = createApp<FamEnv>()
       })
       .onConflictDoUpdate({
         target: [schema.pushPref.userId, schema.pushPref.familyId],
-        set: { feedReminderHours: body.feedReminderHours, lastRemindedAt: null },
+        set: {
+          feedReminderHours: body.feedReminderHours,
+          lastRemindedAt: null,
+        },
       });
     return c.json({ feedReminderHours: body.feedReminderHours }, 200);
   })

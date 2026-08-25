@@ -49,7 +49,12 @@ function StatCard({
 }) {
   return (
     <Card className="flex-1">
-      <div className={cn("mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-surface-2", tint)}>
+      <div
+        className={cn(
+          "mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-surface-2",
+          tint,
+        )}
+      >
         <Icon className="h-4.5 w-4.5" />
       </div>
       <p className="text-xs font-semibold tracking-wide text-muted uppercase">
@@ -231,7 +236,10 @@ export function StatsScreen() {
           </p>
           <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+              <BarChart
+                data={chartData}
+                margin={{ top: 4, right: 0, left: 0, bottom: 0 }}
+              >
                 <XAxis
                   dataKey="label"
                   tickLine={false}

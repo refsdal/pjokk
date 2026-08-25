@@ -87,9 +87,8 @@ describe("api keys", () => {
       (await keyApi("/api/invites", key, { method: "POST", body: {} })).status,
     ).toBe(403);
     expect(
-      (
-        await keyApi("/api/push/test", key, { method: "POST", body: {} })
-      ).status,
+      (await keyApi("/api/push/test", key, { method: "POST", body: {} }))
+        .status,
     ).toBe(403);
   });
 
@@ -146,7 +145,10 @@ describe("api keys", () => {
     ).json()) as { id: string; key: string };
 
     expect((await keyApi("/api/babies", created.key)).status).toBe(200);
-    await api(`/api/keys/${created.id}`, { method: "DELETE", cookie: a.cookie });
+    await api(`/api/keys/${created.id}`, {
+      method: "DELETE",
+      cookie: a.cookie,
+    });
     expect((await keyApi("/api/babies", created.key)).status).toBe(401);
     expect((await keyApi("/api/babies", "pjk_bogus")).status).toBe(401);
   });

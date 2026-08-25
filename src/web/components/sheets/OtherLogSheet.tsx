@@ -48,11 +48,39 @@ export const otherKindMeta: Record<
 
 const measurementConfig: Record<
   MeasurementType,
-  { label: string; unit: string; step: number; min: number; max: number; fallback: number }
+  {
+    label: string;
+    unit: string;
+    step: number;
+    min: number;
+    max: number;
+    fallback: number;
+  }
 > = {
-  weight: { label: "Weight", unit: "kg", step: 0.1, min: 0.5, max: 40, fallback: 5 },
-  length: { label: "Length", unit: "cm", step: 0.5, min: 30, max: 130, fallback: 60 },
-  head: { label: "Head", unit: "cm", step: 0.5, min: 25, max: 60, fallback: 40 },
+  weight: {
+    label: "Weight",
+    unit: "kg",
+    step: 0.1,
+    min: 0.5,
+    max: 40,
+    fallback: 5,
+  },
+  length: {
+    label: "Length",
+    unit: "cm",
+    step: 0.5,
+    min: 30,
+    max: 130,
+    fallback: 60,
+  },
+  head: {
+    label: "Head",
+    unit: "cm",
+    step: 0.5,
+    min: 25,
+    max: 60,
+    fallback: 40,
+  },
 };
 
 // The "More" picker: six activity types, one tap each.
@@ -174,7 +202,9 @@ export function OtherLogSheet({
       if (kind === "milestone") setTitle("");
       if (kind === "measurement") {
         setMtype("weight");
-        setValue(lastMeasurement("weight") ?? measurementConfig.weight.fallback);
+        setValue(
+          lastMeasurement("weight") ?? measurementConfig.weight.fallback,
+        );
       }
       if (kind === "pump") {
         setSide(

@@ -8,13 +8,7 @@ import {
   WakeSchema,
 } from "@shared/schemas";
 import type { FamEnv } from "../context";
-import {
-  createApp,
-  jsonContent,
-  serDiaper,
-  serFeed,
-  serSleep,
-} from "../lib";
+import { createApp, jsonContent, serDiaper, serFeed, serSleep } from "../lib";
 
 const listQuery = z.object({
   babyId: z.string().optional(),
@@ -137,7 +131,7 @@ export const sleepApp = createApp<FamEnv>()
         );
       }
     }
-    let created;
+    let created: Awaited<ReturnType<typeof c.var.fam.createSleep>>;
     try {
       created = await c.var.fam.createSleep({
         babyId: body.babyId,

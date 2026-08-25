@@ -23,7 +23,9 @@ export async function currentSubscription(): Promise<PushSubscription | null> {
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-  const raw = atob((base64 + padding).replaceAll("-", "+").replaceAll("_", "/"));
+  const raw = atob(
+    (base64 + padding).replaceAll("-", "+").replaceAll("_", "/"),
+  );
   return Uint8Array.from(raw, (c) => c.charCodeAt(0));
 }
 
@@ -65,8 +67,6 @@ export async function disablePush(): Promise<void> {
 }
 
 export async function sendTestPush(): Promise<number> {
-  const { sent } = await unwrap<{ sent: number }>(
-    await api.push.test.$post(),
-  );
+  const { sent } = await unwrap<{ sent: number }>(await api.push.test.$post());
   return sent;
 }

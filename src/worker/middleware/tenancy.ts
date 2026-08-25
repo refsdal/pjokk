@@ -40,7 +40,10 @@ export const requireFamily = createMiddleware<FamEnv>(async (c, next) => {
     )
     .limit(1);
   if (!membership[0]) {
-    return c.json({ error: "Not a member of this family", code: "NOT_MEMBER" }, 403);
+    return c.json(
+      { error: "Not a member of this family", code: "NOT_MEMBER" },
+      403,
+    );
   }
   c.set("familyId", familyId);
   c.set("memberRole", membership[0].role);

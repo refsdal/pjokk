@@ -120,8 +120,10 @@ function makeLogRoutes<
   };
 
   const createHandler = async (c: LooseCtx) => {
-    const body = c.req.valid("json") as { babyId: string; time: string } &
-      Insert;
+    const body = c.req.valid("json") as {
+      babyId: string;
+      time: string;
+    } & Insert;
     if (!(await c.var.fam.getBaby(body.babyId))) {
       return c.json({ error: "Unknown baby", code: "NOT_FOUND" }, 404);
     }

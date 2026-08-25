@@ -1,14 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "../src/worker/db";
-import {
-  addMember,
-  api,
-  createUser,
-  db,
-  rig,
-  signIn,
-} from "./helpers";
+import { addMember, api, createUser, db, rig, signIn } from "./helpers";
 
 async function inviteRow(code: string) {
   const rows = await db()
@@ -106,7 +99,11 @@ describe("invite codes", () => {
         await api("/api/invites", { method: "POST", cookie: a.cookie, body })
       ).json()) as { code: string };
 
-    const expired = await make({ role: "member", expiresInHours: 1, maxUses: 5 });
+    const expired = await make({
+      role: "member",
+      expiresInHours: 1,
+      maxUses: 5,
+    });
     await db()
       .update(schema.familyInvite)
       .set({ expiresAt: new Date(Date.now() - 1000) })

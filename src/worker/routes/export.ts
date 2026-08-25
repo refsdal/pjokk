@@ -36,15 +36,26 @@ type Row = Partial<Record<(typeof HEADERS)[number], unknown>> & {
   sortMs: number;
 };
 
-export const exportApp = new Hono<FamEnv>().get("/api/export.csv", async (c) => {
-  const fam = c.var.fam;
-  const babies = await fam.listBabies();
-  const babyName = new Map(babies.map((b) => [b.id, b.name]));
-  const MAX = 100_000;
-  const opts = { limit: MAX };
+export const exportApp = new Hono<FamEnv>().get(
+  "/api/export.csv",
+  async (c) => {
+    const fam = c.var.fam;
+    const babies = await fam.listBabies();
+    const babyName = new Map(babies.map((b) => [b.id, b.name]));
+    const MAX = 100_000;
+    const opts = { limit: MAX };
 
-  const [feeds, diapers, sleeps, meds, baths, notes, milestones, meas, pumps] =
-    await Promise.all([
+    const [
+      feeds,
+      diapers,
+      sleeps,
+      meds,
+      baths,
+      notes,
+      milestones,
+      meas,
+      pumps,
+    ] = await Promise.all([
       fam.listFeeds(opts),
       fam.listDiapers(opts),
       fam.listSleeps(opts),
@@ -56,109 +67,110 @@ export const exportApp = new Hono<FamEnv>().get("/api/export.csv", async (c) => 
       fam.pump.list(opts),
     ]);
 
-  const rows: Row[] = [
-    ...feeds.map((r) => ({
-      sortMs: r.time.getTime(),
-      kind: "feed",
-      baby: babyName.get(r.babyId),
-      time: r.time.toISOString(),
-      type: r.type,
-      amount: r.amountMl,
-      unit: r.amountMl != null ? "ml" : null,
-      side: r.side,
-      duration_min: r.durationMin,
-      caretaker: r.caretakerName,
-      notes: r.notes,
-    })),
-    ...diapers.map((r) => ({
-      sortMs: r.time.getTime(),
-      kind: "diaper",
-      baby: babyName.get(r.babyId),
-      time: r.time.toISOString(),
-      type: r.type,
-      caretaker: r.caretakerName,
-      notes: r.notes,
-    })),
-    ...sleeps.map((r) => ({
-      sortMs: r.startTime.getTime(),
-      kind: "sleep",
-      baby: babyName.get(r.babyId),
-      time: r.startTime.toISOString(),
-      end_time: r.endTime?.toISOString() ?? null,
-      location: r.location,
-      caretaker: r.caretakerName,
-      notes: r.notes,
-    })),
-    ...meds.map((r) => ({
-      sortMs: r.time.getTime(),
-      kind: "medicine",
-      baby: babyName.get(r.babyId),
-      time: r.time.toISOString(),
-      detail: r.name,
-      amount: r.amount,
-      unit: r.unit,
-      caretaker: r.caretakerName,
-      notes: r.notes,
-    })),
-    ...baths.map((r) => ({
-      sortMs: r.time.getTime(),
-      kind: "bath",
-      baby: babyName.get(r.babyId),
-      time: r.time.toISOString(),
-      caretaker: r.caretakerName,
-      notes: r.notes,
-    })),
-    ...notes.map((r) => ({
-      sortMs: r.time.getTime(),
-      kind: "note",
-      baby: babyName.get(r.babyId),
-      time: r.time.toISOString(),
-      detail: r.content,
-      caretaker: r.caretakerName,
-      notes: r.notes,
-    })),
-    ...milestones.map((r) => ({
-      sortMs: r.time.getTime(),
-      kind: "milestone",
-      baby: babyName.get(r.babyId),
-      time: r.time.toISOString(),
-      detail: r.title,
-      caretaker: r.caretakerName,
-      notes: r.notes,
-    })),
-    ...meas.map((r) => ({
-      sortMs: r.time.getTime(),
-      kind: "measurement",
-      baby: babyName.get(r.babyId),
-      time: r.time.toISOString(),
-      type: r.type,
-      value: r.value,
-      unit: r.type === "weight" ? "kg" : "cm",
-      caretaker: r.caretakerName,
-      notes: r.notes,
-    })),
-    ...pumps.map((r) => ({
-      sortMs: r.time.getTime(),
-      kind: "pump",
-      baby: babyName.get(r.babyId),
-      time: r.time.toISOString(),
-      amount: r.amountMl,
-      unit: r.amountMl != null ? "ml" : null,
-      side: r.side,
-      duration_min: r.durationMin,
-      caretaker: r.caretakerName,
-      notes: r.notes,
-    })),
-  ].sort((a, b) => a.sortMs - b.sortMs);
+    const rows: Row[] = [
+      ...feeds.map((r) => ({
+        sortMs: r.time.getTime(),
+        kind: "feed",
+        baby: babyName.get(r.babyId),
+        time: r.time.toISOString(),
+        type: r.type,
+        amount: r.amountMl,
+        unit: r.amountMl != null ? "ml" : null,
+        side: r.side,
+        duration_min: r.durationMin,
+        caretaker: r.caretakerName,
+        notes: r.notes,
+      })),
+      ...diapers.map((r) => ({
+        sortMs: r.time.getTime(),
+        kind: "diaper",
+        baby: babyName.get(r.babyId),
+        time: r.time.toISOString(),
+        type: r.type,
+        caretaker: r.caretakerName,
+        notes: r.notes,
+      })),
+      ...sleeps.map((r) => ({
+        sortMs: r.startTime.getTime(),
+        kind: "sleep",
+        baby: babyName.get(r.babyId),
+        time: r.startTime.toISOString(),
+        end_time: r.endTime?.toISOString() ?? null,
+        location: r.location,
+        caretaker: r.caretakerName,
+        notes: r.notes,
+      })),
+      ...meds.map((r) => ({
+        sortMs: r.time.getTime(),
+        kind: "medicine",
+        baby: babyName.get(r.babyId),
+        time: r.time.toISOString(),
+        detail: r.name,
+        amount: r.amount,
+        unit: r.unit,
+        caretaker: r.caretakerName,
+        notes: r.notes,
+      })),
+      ...baths.map((r) => ({
+        sortMs: r.time.getTime(),
+        kind: "bath",
+        baby: babyName.get(r.babyId),
+        time: r.time.toISOString(),
+        caretaker: r.caretakerName,
+        notes: r.notes,
+      })),
+      ...notes.map((r) => ({
+        sortMs: r.time.getTime(),
+        kind: "note",
+        baby: babyName.get(r.babyId),
+        time: r.time.toISOString(),
+        detail: r.content,
+        caretaker: r.caretakerName,
+        notes: r.notes,
+      })),
+      ...milestones.map((r) => ({
+        sortMs: r.time.getTime(),
+        kind: "milestone",
+        baby: babyName.get(r.babyId),
+        time: r.time.toISOString(),
+        detail: r.title,
+        caretaker: r.caretakerName,
+        notes: r.notes,
+      })),
+      ...meas.map((r) => ({
+        sortMs: r.time.getTime(),
+        kind: "measurement",
+        baby: babyName.get(r.babyId),
+        time: r.time.toISOString(),
+        type: r.type,
+        value: r.value,
+        unit: r.type === "weight" ? "kg" : "cm",
+        caretaker: r.caretakerName,
+        notes: r.notes,
+      })),
+      ...pumps.map((r) => ({
+        sortMs: r.time.getTime(),
+        kind: "pump",
+        baby: babyName.get(r.babyId),
+        time: r.time.toISOString(),
+        amount: r.amountMl,
+        unit: r.amountMl != null ? "ml" : null,
+        side: r.side,
+        duration_min: r.durationMin,
+        caretaker: r.caretakerName,
+        notes: r.notes,
+      })),
+    ].sort((a, b) => a.sortMs - b.sortMs);
 
-  const csv = [
-    HEADERS.join(","),
-    ...rows.map((r) => HEADERS.map((h) => esc(r[h])).join(",")),
-  ].join("\n");
+    const csv = [
+      HEADERS.join(","),
+      ...rows.map((r) => HEADERS.map((h) => esc(r[h])).join(",")),
+    ].join("\n");
 
-  const stamp = new Date().toISOString().slice(0, 10);
-  return c.body(csv, 200, {
-    "content-type": "text/csv; charset=utf-8",
-    "content-disposition": `attachment; filename="pjokk-export-${stamp}.csv"`,
-  });
-});
+    const stamp = new Date().toISOString().slice(0, 10);
+    return c.body(csv, 200, {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": `attachment; filename="pjokk-export-${stamp}.csv"`,
+    });
+  },
+);

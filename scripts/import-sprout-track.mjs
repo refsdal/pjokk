@@ -23,7 +23,9 @@ import { DatabaseSync } from "node:sqlite";
 const args = process.argv.slice(2);
 const dbPath = args.find((a) => !a.startsWith("--"));
 if (!dbPath) {
-  console.error("usage: node scripts/import-sprout-track.mjs <sprout.db> [--inspect|--family ... --baby a=b --caretaker name=id]");
+  console.error(
+    "usage: node scripts/import-sprout-track.mjs <sprout.db> [--inspect|--family ... --baby a=b --caretaker name=id]",
+  );
   process.exit(1);
 }
 const flag = (name) => {
@@ -49,17 +51,35 @@ const ms = (v) => {
   return Number.isNaN(t) ? null : t;
 };
 const esc = (s) => `'${String(s).replaceAll("'", "''")}'`;
-const escOrNull = (s) => (s === null || s === undefined || s === "" ? "NULL" : esc(s));
+const escOrNull = (s) =>
+  s === null || s === undefined || s === "" ? "NULL" : esc(s);
 
 if (args.includes("--inspect")) {
   console.log("== Babies ==");
-  for (const b of rows(`SELECT id, firstName, lastName, birthDate, gender FROM Baby WHERE deletedAt IS NULL`))
-    console.log(`  ${b.id}  ${b.firstName} ${b.lastName}  born ${b.birthDate}  ${b.gender ?? ""}`);
+  for (const b of rows(
+    `SELECT id, firstName, lastName, birthDate, gender FROM Baby WHERE deletedAt IS NULL`,
+  ))
+    console.log(
+      `  ${b.id}  ${b.firstName} ${b.lastName}  born ${b.birthDate}  ${b.gender ?? ""}`,
+    );
   console.log("== Caretakers ==");
-  for (const c of rows(`SELECT id, name, type FROM Caretaker WHERE deletedAt IS NULL`))
+  for (const c of rows(
+    `SELECT id, name, type FROM Caretaker WHERE deletedAt IS NULL`,
+  ))
     console.log(`  ${c.id}  "${c.name}"  ${c.type ?? ""}`);
-  const count = (t) => rows(`SELECT count(*) AS n FROM ${t} WHERE deletedAt IS NULL`)[0].n;
-  for (const t of ["FeedLog", "DiaperLog", "SleepLog", "Note", "Milestone", "PumpLog", "BathLog", "Measurement", "MedicineLog"])
+  const count = (t) =>
+    rows(`SELECT count(*) AS n FROM ${t} WHERE deletedAt IS NULL`)[0].n;
+  for (const t of [
+    "FeedLog",
+    "DiaperLog",
+    "SleepLog",
+    "Note",
+    "Milestone",
+    "PumpLog",
+    "BathLog",
+    "Measurement",
+    "MedicineLog",
+  ])
     console.log(`${t}: ${count(t)} rows`);
   process.exit(0);
 }
@@ -68,12 +88,16 @@ const familyId = flag("family");
 const babyMap = new Map(flagAll("baby").map((p) => p.split("=")));
 const defaultCaretaker = flag("default-caretaker");
 // --caretaker accepts sprout caretaker NAME or ID on the left.
-const caretakerByKey = new Map(flagAll("caretaker").map((p) => {
-  const i = p.lastIndexOf("=");
-  return [p.slice(0, i), p.slice(i + 1)];
-}));
+const caretakerByKey = new Map(
+  flagAll("caretaker").map((p) => {
+    const i = p.lastIndexOf("=");
+    return [p.slice(0, i), p.slice(i + 1)];
+  }),
+);
 if (!familyId || babyMap.size === 0) {
-  console.error("--family and at least one --baby mapping are required (run --inspect first)");
+  console.error(
+    "--family and at least one --baby mapping are required (run --inspect first)",
+  );
   process.exit(1);
 }
 
@@ -120,16 +144,26 @@ const base = (r, timeMs) => {
   const babyId = babyMap.get(r.babyId);
   const caretakerId = resolveCaretaker(r.caretakerId);
   if (!babyId) return skip("unmapped baby"), null;
-  if (!caretakerId) return skip("unmapped caretaker (set --default-caretaker)"), null;
+  if (!caretakerId)
+    return skip("unmapped caretaker (set --default-caretaker)"), null;
   if (timeMs === null) return skip("unparseable time"), null;
-  return [esc(`st-${r.id}`), esc(familyId), esc(babyId), esc(caretakerId), timeMs];
+  return [
+    esc(`st-${r.id}`),
+    esc(familyId),
+    esc(babyId),
+    esc(caretakerId),
+    timeMs,
+  ];
 };
 
 for (const r of rows(`SELECT * FROM FeedLog WHERE deletedAt IS NULL`)) {
   const b = base(r, ms(r.time));
   if (!b) continue;
   const type = { BREAST: "breast", BOTTLE: "bottle", SOLIDS: "solids" }[r.type];
-  if (!type) { skip(`feed type ${r.type}`); continue; }
+  if (!type) {
+    skip(`feed type ${r.type}`);
+    continue;
+  }
   const durationMin =
     r.feedDuration != null
       ? Math.round(r.feedDuration / 60)
@@ -139,12 +173,28 @@ for (const r of rows(`SELECT * FROM FeedLog WHERE deletedAt IS NULL`)) {
   const notes = [r.food, r.notes].filter(Boolean).join(" · ") || null;
   insert(
     "feed_log",
-    ["id", "family_id", "baby_id", "caretaker_id", "time", "type", "amount_ml", "side", "duration_min", "notes", "created_at"],
-    [...b, esc(type),
+    [
+      "id",
+      "family_id",
+      "baby_id",
+      "caretaker_id",
+      "time",
+      "type",
+      "amount_ml",
+      "side",
+      "duration_min",
+      "notes",
+      "created_at",
+    ],
+    [
+      ...b,
+      esc(type),
       type === "breast" ? "NULL" : (toMl(r.amount, r.unitAbbr) ?? "NULL"),
       r.side ? esc(r.side.toLowerCase()) : "NULL",
       type === "breast" ? (durationMin ?? "NULL") : "NULL",
-      escOrNull(notes), now],
+      escOrNull(notes),
+      now,
+    ],
   );
 }
 
@@ -152,10 +202,22 @@ for (const r of rows(`SELECT * FROM DiaperLog WHERE deletedAt IS NULL`)) {
   const b = base(r, ms(r.time));
   if (!b) continue;
   const type = { WET: "wet", DIRTY: "dirty", BOTH: "both" }[r.type];
-  if (!type) { skip(`diaper type ${r.type} (DRY has no Pjokk equivalent)`); continue; }
+  if (!type) {
+    skip(`diaper type ${r.type} (DRY has no Pjokk equivalent)`);
+    continue;
+  }
   insert(
     "diaper_log",
-    ["id", "family_id", "baby_id", "caretaker_id", "time", "type", "notes", "created_at"],
+    [
+      "id",
+      "family_id",
+      "baby_id",
+      "caretaker_id",
+      "time",
+      "type",
+      "notes",
+      "created_at",
+    ],
     [...b, esc(type), escOrNull(r.notes), now],
   );
 }
@@ -166,9 +228,28 @@ for (const r of rows(`SELECT * FROM SleepLog WHERE deletedAt IS NULL`)) {
   const [id, fam, babyId, caretakerId, startMs] = b;
   insert(
     "sleep_log",
-    ["id", "family_id", "baby_id", "caretaker_id", "start_time", "end_time", "location", "notes", "created_at"],
-    [id, fam, babyId, caretakerId, startMs, ms(r.endTime) ?? "NULL",
-      escOrNull(r.location?.toLowerCase()), escOrNull(r.notes), now],
+    [
+      "id",
+      "family_id",
+      "baby_id",
+      "caretaker_id",
+      "start_time",
+      "end_time",
+      "location",
+      "notes",
+      "created_at",
+    ],
+    [
+      id,
+      fam,
+      babyId,
+      caretakerId,
+      startMs,
+      ms(r.endTime) ?? "NULL",
+      escOrNull(r.location?.toLowerCase()),
+      escOrNull(r.notes),
+      now,
+    ],
   );
 }
 
@@ -177,7 +258,16 @@ for (const r of rows(`SELECT * FROM Note WHERE deletedAt IS NULL`)) {
   if (!b) continue;
   insert(
     "note_log",
-    ["id", "family_id", "baby_id", "caretaker_id", "time", "content", "notes", "created_at"],
+    [
+      "id",
+      "family_id",
+      "baby_id",
+      "caretaker_id",
+      "time",
+      "content",
+      "notes",
+      "created_at",
+    ],
     [...b, esc(r.content ?? ""), escOrNull(r.category), now],
   );
 }
@@ -187,7 +277,16 @@ for (const r of rows(`SELECT * FROM Milestone WHERE deletedAt IS NULL`)) {
   if (!b) continue;
   insert(
     "milestone_log",
-    ["id", "family_id", "baby_id", "caretaker_id", "time", "title", "notes", "created_at"],
+    [
+      "id",
+      "family_id",
+      "baby_id",
+      "caretaker_id",
+      "time",
+      "title",
+      "notes",
+      "created_at",
+    ],
     [...b, esc(r.title ?? ""), escOrNull(r.description), now],
   );
 }
@@ -195,13 +294,38 @@ for (const r of rows(`SELECT * FROM Milestone WHERE deletedAt IS NULL`)) {
 for (const r of rows(`SELECT * FROM PumpLog WHERE deletedAt IS NULL`)) {
   const b = base(r, ms(r.startTime));
   if (!b) continue;
-  const total = r.totalAmount ?? ((r.leftAmount ?? 0) + (r.rightAmount ?? 0) || null);
-  const side = r.leftAmount && r.rightAmount ? "both" : r.leftAmount ? "left" : r.rightAmount ? "right" : null;
+  const total =
+    r.totalAmount ?? ((r.leftAmount ?? 0) + (r.rightAmount ?? 0) || null);
+  const side =
+    r.leftAmount && r.rightAmount
+      ? "both"
+      : r.leftAmount
+        ? "left"
+        : r.rightAmount
+          ? "right"
+          : null;
   insert(
     "pump_log",
-    ["id", "family_id", "baby_id", "caretaker_id", "time", "side", "amount_ml", "duration_min", "notes", "created_at"],
-    [...b, side ? esc(side) : "NULL", total != null ? toMl(total, r.unitAbbr) : "NULL",
-      r.duration ?? "NULL", escOrNull(r.notes), now],
+    [
+      "id",
+      "family_id",
+      "baby_id",
+      "caretaker_id",
+      "time",
+      "side",
+      "amount_ml",
+      "duration_min",
+      "notes",
+      "created_at",
+    ],
+    [
+      ...b,
+      side ? esc(side) : "NULL",
+      total != null ? toMl(total, r.unitAbbr) : "NULL",
+      r.duration ?? "NULL",
+      escOrNull(r.notes),
+      now,
+    ],
   );
 }
 
@@ -211,7 +335,15 @@ for (const r of rows(`SELECT * FROM BathLog WHERE deletedAt IS NULL`)) {
   const notes = [r.bathType, r.notes].filter(Boolean).join(" · ") || null;
   insert(
     "bath_log",
-    ["id", "family_id", "baby_id", "caretaker_id", "time", "notes", "created_at"],
+    [
+      "id",
+      "family_id",
+      "baby_id",
+      "caretaker_id",
+      "time",
+      "notes",
+      "created_at",
+    ],
     [...b, escOrNull(notes), now],
   );
 }
@@ -219,18 +351,38 @@ for (const r of rows(`SELECT * FROM BathLog WHERE deletedAt IS NULL`)) {
 for (const r of rows(`SELECT * FROM Measurement WHERE deletedAt IS NULL`)) {
   const b = base(r, ms(r.date));
   if (!b) continue;
-  const map = { WEIGHT: "weight", HEIGHT: "length", HEAD_CIRCUMFERENCE: "head" };
+  const map = {
+    WEIGHT: "weight",
+    HEIGHT: "length",
+    HEAD_CIRCUMFERENCE: "head",
+  };
   const type = map[r.type];
-  if (!type) { skip(`measurement type ${r.type}`); continue; }
-  const value = type === "weight" ? toKg(r.value, r.unit) : toCm(r.value, r.unit);
+  if (!type) {
+    skip(`measurement type ${r.type}`);
+    continue;
+  }
+  const value =
+    type === "weight" ? toKg(r.value, r.unit) : toCm(r.value, r.unit);
   insert(
     "measurement_log",
-    ["id", "family_id", "baby_id", "caretaker_id", "time", "type", "value", "notes", "created_at"],
+    [
+      "id",
+      "family_id",
+      "baby_id",
+      "caretaker_id",
+      "time",
+      "type",
+      "value",
+      "notes",
+      "created_at",
+    ],
     [...b, esc(type), Math.round(value * 100) / 100, escOrNull(r.notes), now],
   );
 }
 
-const medicineNames = new Map(rows(`SELECT id, name FROM Medicine`).map((m) => [m.id, m.name]));
+const medicineNames = new Map(
+  rows(`SELECT id, name FROM Medicine`).map((m) => [m.id, m.name]),
+);
 const PJOKK_UNITS = new Set(["ml", "mg", "drops", "dose"]);
 for (const r of rows(`SELECT * FROM MedicineLog WHERE deletedAt IS NULL`)) {
   const b = base(r, ms(r.time));
@@ -238,9 +390,26 @@ for (const r of rows(`SELECT * FROM MedicineLog WHERE deletedAt IS NULL`)) {
   const unit = String(r.unitAbbr ?? "").toLowerCase();
   insert(
     "medicine_log",
-    ["id", "family_id", "baby_id", "caretaker_id", "time", "name", "amount", "unit", "notes", "created_at"],
-    [...b, esc(medicineNames.get(r.medicineId) ?? "Medicine"), r.doseAmount ?? "NULL",
-      PJOKK_UNITS.has(unit) ? esc(unit) : "NULL", escOrNull(r.notes), now],
+    [
+      "id",
+      "family_id",
+      "baby_id",
+      "caretaker_id",
+      "time",
+      "name",
+      "amount",
+      "unit",
+      "notes",
+      "created_at",
+    ],
+    [
+      ...b,
+      esc(medicineNames.get(r.medicineId) ?? "Medicine"),
+      r.doseAmount ?? "NULL",
+      PJOKK_UNITS.has(unit) ? esc(unit) : "NULL",
+      escOrNull(r.notes),
+      now,
+    ],
   );
 }
 
@@ -248,5 +417,6 @@ writeFileSync(".import.sql", out.join("\n") + "\n");
 console.log(`wrote .import.sql (${out.length} inserts)`);
 if (Object.keys(skipped).length) {
   console.log("skipped:");
-  for (const [why, n] of Object.entries(skipped)) console.log(`  ${n} × ${why}`);
+  for (const [why, n] of Object.entries(skipped))
+    console.log(`  ${n} × ${why}`);
 }

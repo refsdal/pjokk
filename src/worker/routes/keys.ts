@@ -6,7 +6,7 @@ import {
   ErrorSchema,
 } from "@shared/schemas";
 import type { FamEnv } from "../context";
-import { schema } from "../db";
+import type { schema } from "../db";
 import { createApp, iso, isoOrNull, jsonContent } from "../lib";
 
 function serKey(row: typeof schema.apiKey.$inferSelect) {

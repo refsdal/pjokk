@@ -62,19 +62,14 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  const dark =
-    themeMode === "dark" || (themeMode === "system" && systemDark);
+  const dark = themeMode === "dark" || (themeMode === "system" && systemDark);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
 
   useEffect(() => {
-    const color = nightValue.night
-      ? "#171310"
-      : dark
-        ? "#171512"
-        : "#faf9f7";
+    const color = nightValue.night ? "#171310" : dark ? "#171512" : "#faf9f7";
     document
       .querySelector('meta[name="theme-color"]')
       ?.setAttribute("content", color);

@@ -31,7 +31,11 @@ describe("stats", () => {
       api("/api/feeds", {
         method: "POST",
         cookie: a.cookie,
-        body: { babyId: a.baby.id, time: new Date(time).toISOString(), ...body },
+        body: {
+          babyId: a.baby.id,
+          time: new Date(time).toISOString(),
+          ...body,
+        },
       });
     await feed(todayMidnight - 5 * H, { type: "bottle", amountMl: 200 });
     await feed(todayMidnight + 1 * H, { type: "bottle", amountMl: 120 });
@@ -175,7 +179,9 @@ describe("csv export", () => {
         content: '=HYPERLINK("http://evil.example","x")',
       },
     });
-    const csv2 = await (await api("/api/export.csv", { cookie: a.cookie })).text();
+    const csv2 = await (
+      await api("/api/export.csv", { cookie: a.cookie })
+    ).text();
     expect(csv2).toContain("'=HYPERLINK");
     expect(csv2).not.toMatch(/(^|,)=HYPERLINK/m);
 
