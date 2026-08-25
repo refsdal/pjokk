@@ -41,9 +41,9 @@ export function Stepper({
     setDraft(null);
   }, [value]);
   const commit = () => {
-    if (draft !== null) {
+    if (draft !== null && draft.trim() !== "") {
       const parsed = Number(draft.replace(",", "."));
-      if (!Number.isNaN(parsed)) onChange(clamp(parsed));
+      if (Number.isFinite(parsed)) onChange(clamp(parsed));
     }
     setDraft(null);
   };
