@@ -104,7 +104,7 @@ export function SleepSheet({
           options={[
             { value: "crib", label: t("Crib") },
             { value: "stroller", label: t("Stroller") },
-            { value: "arms", label: t("Arms") },
+            { value: "arms", label: t("Contact nap") },
           ]}
           value={location}
           onChange={setLocation}

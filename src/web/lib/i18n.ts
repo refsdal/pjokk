@@ -83,7 +83,7 @@ const nb: Record<string, string> = {
   // Sleep sheet
   Crib: "Seng",
   Stroller: "Vogn",
-  Arms: "Armkroken",
+  "Contact nap": "Kontaktlur",
   "Start sleep": "Start søvn",
   "Edit sleep": "Rediger søvn",
   "Fell asleep": "Sovnet",
