@@ -236,6 +236,27 @@ const nb: Record<string, string> = {
   "90 days": "90 dager",
   "1 year": "1 år",
   "Never expires": "Utløper aldri",
+
+  // Billing
+  Plan: "Abonnement",
+  "Current plan": "Gjeldende plan",
+  Free: "Gratis",
+  Premium: "Premium",
+  "Premium · lifetime": "Premium · livstid",
+  "Premium · complimentary": "Premium · sponset",
+  "Premium unlocks growth charts, month stats, CSV export and API keys.":
+    "Premium låser opp vekstkurver, månedsstatistikk, CSV-eksport og API-nøkler.",
+  "Premium monthly — 20 kr/mo": "Premium månedlig — 20 kr/mnd",
+  "Premium yearly — 200 kr/yr": "Premium årlig — 200 kr/år",
+  "Lifetime — 400 kr once": "Livstid — 400 kr én gang",
+  "Ask a family admin to upgrade.":
+    "Be en familieadministrator om å oppgradere.",
+  "Manage subscription": "Administrer abonnement",
+  "Payment received — welcome to Premium!":
+    "Betaling mottatt — velkommen til Premium!",
+  "Something went wrong": "Noe gikk galt",
+  "API keys are a Premium feature.": "API-nøkler er en Premium-funksjon.",
+
   Data: "Data",
   "Everything ever logged, one row per entry — plain CSV.":
     "Alt som noen gang er logget, én rad per oppføring — ren CSV.",

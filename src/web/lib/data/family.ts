@@ -1,6 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import type { Baby, Invite, Member } from "@shared/schemas";
+import type { Baby, Family, Invite, Member } from "@shared/schemas";
 import { api, unwrap } from "../api";
+
+export function useFamily() {
+  return useQuery({
+    queryKey: ["family"],
+    queryFn: async () => unwrap<Family>(await api.family.$get()),
+  });
+}
 
 export function useBabies() {
   return useQuery({

@@ -1,10 +1,15 @@
 import { createAuthClient } from "better-auth/react";
 import { adminClient, organizationClient } from "better-auth/client/plugins";
+import { stripeClient } from "@better-auth/stripe/client";
 import { API_BASE } from "./api";
 
 export const authClient = createAuthClient({
   ...(API_BASE ? { baseURL: API_BASE } : {}),
-  plugins: [organizationClient(), adminClient()],
+  plugins: [
+    organizationClient(),
+    adminClient(),
+    stripeClient({ subscription: true }),
+  ],
 });
 
 export const { useSession, signIn, signOut } = authClient;

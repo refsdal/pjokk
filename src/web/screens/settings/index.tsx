@@ -3,11 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { API_BASE } from "@/lib/api";
 import { isSysadmin, signOut, useSession } from "@/lib/auth-client";
-import { useMembers } from "@/lib/data";
+import { useFamily, useMembers } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { ApiKeysSection } from "./ApiKeysSection";
 import { AppearanceSection } from "./AppearanceSection";
 import { BabiesSection } from "./BabiesSection";
+import { BillingSection } from "./BillingSection";
 import { FamilySection } from "./FamilySection";
 import { SectionTitle } from "./lib";
 import { NotificationsSection } from "./NotificationsSection";
@@ -15,6 +16,7 @@ import { NotificationsSection } from "./NotificationsSection";
 export function SettingsScreen() {
   const { data: session } = useSession();
   const members = useMembers();
+  const premium = (useFamily().data?.plan ?? "free") !== "free";
 
   const myRole = members.data?.find((m) => m.userId === session?.user.id)?.role;
   const isAdmin = myRole === "admin" || myRole === "owner";
@@ -31,10 +33,23 @@ export function SettingsScreen() {
 
         <AppearanceSection />
 
-        {isAdmin && (
+        <BillingSection isAdmin={isAdmin} />
+
+        {isAdmin && premium && (
           <>
             <SectionTitle>{t("API keys")}</SectionTitle>
             <ApiKeysSection />
+          </>
+        )}
+
+        {isAdmin && !premium && (
+          <>
+            <SectionTitle>{t("API keys")}</SectionTitle>
+            <Card>
+              <p className="text-sm text-muted">
+                {t("API keys are a Premium feature.")}
+              </p>
+            </Card>
           </>
         )}
 
@@ -46,9 +61,21 @@ export function SettingsScreen() {
           <Button
             size="full"
             variant="outline"
-            onClick={() => window.location.assign(`${API_BASE}/api/export.csv`)}
+            onClick={() =>
+              premium
+                ? window.location.assign(`${API_BASE}/api/export.csv`)
+                : document
+                    .getElementById("billing")
+                    ?.scrollIntoView({ behavior: "smooth" })
+            }
           >
-            {t("Export CSV")}
+            {premium ? (
+              t("Export CSV")
+            ) : (
+              <>
+                {t("Export CSV")} · {t("Premium")}
+              </>
+            )}
           </Button>
         </Card>
 

@@ -547,6 +547,7 @@ export type SleepLog = z.infer<typeof SleepLogSchema>;
 export type Summary = z.infer<typeof SummarySchema>;
 export type Member = z.infer<typeof MemberSchema>;
 export type Invite = z.infer<typeof InviteSchema>;
+export type Family = z.infer<typeof FamilySchema>;
 export type FeedType = (typeof feedTypes)[number];
 export type DiaperType = (typeof diaperTypes)[number];
 export type TimelineEntry = z.infer<typeof TimelineEntrySchema>;
