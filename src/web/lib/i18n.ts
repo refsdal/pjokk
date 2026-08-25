@@ -317,6 +317,19 @@ const nb: Record<string, string> = {
   "Paid plans continue to secure checkout with Stripe.":
     "Betalte planer fortsetter til sikker betaling hos Stripe.",
 
+  // Calendar
+  Calendar: "Kalender",
+  Upcoming: "Kommende",
+  Tomorrow: "I morgen",
+  "All day": "Hele dagen",
+  "Add event": "Legg til hendelse",
+  "No upcoming events": "Ingen kommende hendelser",
+  "Calendar is a Premium feature": "Kalenderen er en Premium-funksjon",
+  "Plan appointments and family events together.":
+    "Planlegg avtaler og familiehendelser sammen.",
+  Previous: "Forrige",
+  Next: "Neste",
+
   Data: "Data",
   "Everything ever logged, one row per entry — plain CSV.":
     "Alt som noen gang er logget, én rad per oppføring — ren CSV.",

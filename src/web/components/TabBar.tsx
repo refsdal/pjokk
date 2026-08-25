@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+  IconCalendar,
   IconChartBar,
   IconHome,
   IconList,
@@ -21,6 +22,7 @@ export interface TabItem {
 const mainTabs: TabItem[] = [
   { to: "/", label: "Home", icon: IconHome, exact: true },
   { to: "/timeline", label: "Timeline", icon: IconList },
+  { to: "/calendar", label: "Calendar", icon: IconCalendar },
   { to: "/stats", label: "Stats", icon: IconChartBar },
   { to: "/settings", label: "Settings", icon: IconSettings },
 ];
