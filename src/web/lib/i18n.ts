@@ -41,6 +41,7 @@ const nb: Record<string, string> = {
   Now: "Nå",
   "15 m ago": "15 min siden",
   "Pick time": "Velg tid",
+  "Other day": "Annen dag",
   "Saved offline — will sync": "Lagret uten nett — synkroniseres",
   "Could not save": "Kunne ikke lagre",
   "just now": "akkurat nå",

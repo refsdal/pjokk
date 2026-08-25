@@ -388,7 +388,9 @@ export function OtherLogSheet({
           </>
         )}
 
-        <TimeField key={instance} value={time} onChange={setTime} />
+        {kind !== "measurement" && (
+          <TimeField key={instance} value={time} onChange={setTime} />
+        )}
 
         {kind !== "note" && (
           <Input
