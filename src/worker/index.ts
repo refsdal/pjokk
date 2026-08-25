@@ -17,6 +17,7 @@ import { apiKeyAuth, rejectApiKey } from "./middleware/api-key";
 import { rateLimit } from "./middleware/rate-limit";
 import { audit, requireSysadmin } from "./middleware/sysadmin";
 import { adminApp } from "./routes/admin";
+import { billingApp } from "./routes/billing";
 import { exportApp } from "./routes/export";
 import { keysApp } from "./routes/keys";
 import { otherLogsApp } from "./routes/other-logs";
@@ -101,6 +102,7 @@ domainBase.use("/api/invites", requireAdmin);
 domainBase.use("/api/invites/*", requireAdmin);
 domainBase.use("/api/keys", requireAdmin);
 domainBase.use("/api/keys/*", requireAdmin);
+domainBase.use("/api/billing/*", requireAdmin);
 // Push subscriptions are device-bound; keys have no business there.
 domainBase.use("/api/push/*", rejectApiKey);
 const domainApp = domainBase
@@ -114,6 +116,7 @@ const domainApp = domainBase
   .route("/", exportApp)
   .route("/", pushApp)
   .route("/", keysApp)
+  .route("/", billingApp)
   .route("/", invitesAdminApp);
 
 // API docs require a signed-in session (issue #2): registered before the

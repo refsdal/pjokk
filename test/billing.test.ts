@@ -3,7 +3,15 @@ import { SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { canUse } from "../src/worker/entitlements";
 import { applySubscriptionStatus, grantLifetime } from "../src/worker/billing";
-import { api, db, createFamily, rig } from "./helpers";
+import {
+  addMember,
+  api,
+  createUser,
+  db,
+  createFamily,
+  rig,
+  signIn,
+} from "./helpers";
 import { schema } from "../src/worker/db";
 
 // biome-ignore lint/suspicious/noExportsInTest: Shared test helpers for billing tasks
@@ -148,5 +156,23 @@ describe("premium gates", () => {
     );
     await setPlan(family.id, "premium");
     expect((await useKey(key)).status).toBe(200);
+  });
+});
+
+describe("lifetime checkout", () => {
+  it("rejects members (admin-only)", async () => {
+    const { family } = await rig();
+    const member = await createUser("Member");
+    await addMember(member.id, family.id, "member");
+    const cookie = await signIn(member.email);
+    const res = await api("/api/billing/lifetime", { method: "POST", cookie });
+    expect(res.status).toBe(403);
+  });
+
+  it("rejects an already-paying family", async () => {
+    const { family, cookie } = await rig();
+    await setPlan(family.id, "premium");
+    const res = await api("/api/billing/lifetime", { method: "POST", cookie });
+    expect(res.status).toBe(409);
   });
 });

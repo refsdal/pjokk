@@ -234,6 +234,7 @@ export function familyScope(db: Db, familyId: string) {
           name: organization.name,
           slug: organization.slug,
           plan: organization.plan,
+          stripeCustomerId: organization.stripeCustomerId,
         })
         .from(organization)
         .where(eq(organization.id, familyId));

@@ -475,6 +475,10 @@ export const FamilySchema = z
   })
   .openapi("Family");
 
+export const CheckoutUrlSchema = z
+  .object({ url: z.string() })
+  .openapi("CheckoutUrl");
+
 // --- Invites ---
 
 export const InviteSchema = z
