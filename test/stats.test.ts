@@ -63,11 +63,12 @@ describe("stats", () => {
     expect(yesterday.sleepMin).toBe(120);
     expect(today.sleepMin).toBe(360);
     expect(yesterday.intakeMl).toBe(200);
-    expect(today.intakeMl).toBe(180);
+    // Intake sums bottle ml only — the solids feed's 60 (grams) don't count.
+    expect(today.intakeMl).toBe(120);
     expect(today.feeds).toBe(3);
     expect(today.diapers).toBe(1);
     expect(stats.avgSleepMin).toBe(Math.round((120 + 360) / 7));
-    expect(stats.avgIntakeMl).toBe(Math.round(380 / 7));
+    expect(stats.avgIntakeMl).toBe(Math.round(320 / 7));
   });
 
   it("returns latest weight with its predecessor", async () => {
@@ -111,6 +112,29 @@ describe("stats", () => {
       cookie: b.cookie,
     });
     expect(res.status).toBe(404);
+  });
+
+  it("intake sums bottle ml only — solids grams don't pollute it", async () => {
+    const { family, baby, cookie } = await rig();
+    await setPlan(family.id, "premium");
+    const now = new Date().toISOString();
+    await api("/api/feeds", {
+      method: "POST",
+      cookie,
+      body: { babyId: baby.id, time: now, type: "bottle", amountMl: 120 },
+    });
+    await api("/api/feeds", {
+      method: "POST",
+      cookie,
+      body: { babyId: baby.id, time: now, type: "solids", amountMl: 80 },
+    });
+    const res = await api(`/api/stats?babyId=${baby.id}&days=7`, { cookie });
+    const s = (await res.json()) as {
+      days: { intakeMl: number; feeds: number }[];
+    };
+    const today = s.days[s.days.length - 1]!;
+    expect(today.feeds).toBe(2);
+    expect(today.intakeMl).toBe(120);
   });
 });
 

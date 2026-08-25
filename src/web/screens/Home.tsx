@@ -44,7 +44,7 @@ function feedDetail(feed: {
     return [feed.side, feed.durationMin ? `${feed.durationMin} min` : null]
       .filter(Boolean)
       .join(" · ");
-  return t("solids");
+  return feed.amountMl != null ? `${feed.amountMl} g` : t("solids");
 }
 
 export function HomeScreen() {

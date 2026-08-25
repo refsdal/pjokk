@@ -65,7 +65,7 @@ export const statsApp = createApp<FamEnv>().openapi(stats, async (c) => {
     const b = buckets.get(dayIndex(f.time.getTime()));
     if (b) {
       b.feeds += 1;
-      b.intakeMl += f.amountMl ?? 0;
+      if (f.type === "bottle") b.intakeMl += f.amountMl ?? 0;
     }
   }
   for (const d of diapers) {

@@ -79,7 +79,7 @@ export const exportApp = new Hono<FamEnv>().get(
         time: r.time.toISOString(),
         type: r.type,
         amount: r.amountMl,
-        unit: r.amountMl != null ? "ml" : null,
+        unit: r.amountMl != null ? (r.type === "solids" ? "g" : "ml") : null,
         side: r.side,
         duration_min: r.durationMin,
         caretaker: r.caretakerName,

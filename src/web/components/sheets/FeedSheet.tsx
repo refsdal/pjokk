@@ -50,9 +50,8 @@ export function FeedSheet({
 
   const applyPrefill = (feedType: FeedType) => {
     const last = lastByType.get(feedType);
-    if (feedType === "bottle" || feedType === "solids") {
-      setAmountMl(last?.amountMl ?? 120);
-    }
+    if (feedType === "bottle") setAmountMl(last?.amountMl ?? 120);
+    if (feedType === "solids") setAmountMl(last?.amountMl ?? 40);
     if (feedType === "breast") {
       setSide(last?.side ?? "left");
       setDurationMin(last?.durationMin ?? 15);
@@ -146,10 +145,14 @@ export function FeedSheet({
           <Stepper
             value={amountMl}
             onChange={setAmountMl}
-            step={10}
-            min={10}
+            step={
+              type === "bottle"
+                ? (v, dir) => ((dir > 0 ? v < 50 : v <= 50) ? 5 : 10)
+                : 5
+            }
+            min={5}
             max={500}
-            unit="ml"
+            unit={type === "solids" ? "g" : "ml"}
           />
         )}
 

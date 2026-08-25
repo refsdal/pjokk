@@ -71,7 +71,7 @@ function entryMain(e: TimelineEntry): { title: string; detail: string | null } {
       };
     return {
       title: t("Solids"),
-      detail: e.amountMl ? `${e.amountMl} ml` : null,
+      detail: e.amountMl ? `${e.amountMl} g` : null,
     };
   }
   if (e.kind === "diaper") {
