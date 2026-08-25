@@ -1,4 +1,5 @@
 import { IconMinus, IconPlus } from "@tabler/icons-react";
+import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 // Number stepper: amounts change by taps, never by the OS keyboard.
@@ -38,13 +39,13 @@ export function Stepper({
     >
       <button
         type="button"
-        aria-label={`decrease by ${step}`}
+        aria-label={`${t("decrease")} ${unit}`}
         onClick={() => adjust(-step)}
         className="flex h-12 w-14 items-center justify-center rounded-xl bg-surface-2 text-ink active:scale-95"
       >
         <IconMinus className="h-5 w-5" />
       </button>
-      <div className="text-center tabular-nums">
+      <div className="text-center tabular-nums" aria-live="polite">
         <span className="text-2xl font-bold">
           {decimals > 0 ? value.toFixed(decimals) : value}
         </span>
@@ -52,7 +53,7 @@ export function Stepper({
       </div>
       <button
         type="button"
-        aria-label={`increase by ${step}`}
+        aria-label={`${t("increase")} ${unit}`}
         onClick={() => adjust(step)}
         className="flex h-12 w-14 items-center justify-center rounded-xl bg-surface-2 text-ink active:scale-95"
       >

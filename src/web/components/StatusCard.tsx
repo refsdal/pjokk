@@ -1,6 +1,5 @@
 import type { Icon as TablerIcon } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
-import { Card } from "@/components/ui/card";
 import { formatRelative } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
@@ -29,10 +28,10 @@ export function StatusCard({
   }, []);
 
   return (
-    <Card
-      className="flex items-center gap-3 active:bg-surface-2"
+    <button
+      type="button"
       onClick={onClick}
-      role={onClick ? "button" : undefined}
+      className="flex w-full items-center gap-3 rounded-xl2 border border-line bg-surface p-4 text-left active:bg-surface-2"
     >
       <div
         className={cn(
@@ -53,6 +52,6 @@ export function StatusCard({
           ) : null}
         </p>
       </div>
-    </Card>
+    </button>
   );
 }

@@ -15,6 +15,7 @@ import {
   type OtherEntry,
 } from "@/components/sheets/OtherLogSheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
+import { ChipGroup } from "@/components/Chips";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { Button } from "@/components/ui/button";
 import { useBabies, useFeeds, useTimeline } from "@/lib/data";
@@ -206,33 +207,22 @@ export function TimelineScreen() {
     else groups.push({ key, date: d, entries: [entry] });
   }
 
-  const filterChip = (value: TimelineFilter | null, label: string) => (
-    <button
-      key={label}
-      type="button"
-      onClick={() => setFilter(value)}
-      className={cn(
-        "h-9 rounded-full border px-3.5 text-sm font-semibold transition-colors select-none",
-        filter === value
-          ? "border-accent bg-accent text-on-accent"
-          : "border-line bg-surface text-ink-soft",
-      )}
-    >
-      {label}
-    </button>
-  );
-
   return (
     <div className="mx-auto max-w-md px-4 pt-safe">
       <h1 className="py-4 text-2xl font-extrabold text-ink">{t("Timeline")}</h1>
 
-      <div className="flex gap-2 overflow-x-auto pb-3">
-        {filterChip(null, t("All"))}
-        {filterChip("feeds", t("Feeds"))}
-        {filterChip("sleep", t("Sleep"))}
-        {filterChip("diapers", t("Diapers"))}
-        {filterChip("other", t("Other"))}
-      </div>
+      <ChipGroup
+        className="flex-nowrap overflow-x-auto pb-3"
+        options={[
+          { value: "all", label: t("All") },
+          { value: "feeds", label: t("Feeds") },
+          { value: "sleep", label: t("Sleep") },
+          { value: "diapers", label: t("Diapers") },
+          { value: "other", label: t("Other") },
+        ]}
+        value={filter ?? "all"}
+        onChange={(v) => setFilter(v === "all" ? null : (v as TimelineFilter))}
+      />
 
       <div className="pb-tabbar">
         {timeline.isPending && <LoadingState />}

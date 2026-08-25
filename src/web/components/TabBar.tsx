@@ -38,6 +38,7 @@ export function TabBar({ tabs = mainTabs }: { tabs?: TabItem[] }) {
             <Link
               key={to}
               to={to}
+              aria-current={active ? "page" : undefined}
               className={cn(
                 "flex h-16 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-semibold",
                 active ? "text-accent" : "text-muted",

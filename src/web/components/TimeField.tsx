@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { ChipGroup } from "@/components/Chips";
 import { t } from "@/lib/i18n";
 import { formatClock } from "@/lib/time";
+import { cn } from "@/lib/utils";
 
 // Retroactive logging is the norm (CLAUDE.md §4): every time field offers
 // Now / 15 m ago / Pick time. Value is a Date; "Now" means save-time now
@@ -33,28 +34,17 @@ export function TimeField({
     if (p === "pick") onChange(value ?? new Date());
   };
 
-  const chip = (p: Preset, label: string) => (
-    <button
-      type="button"
-      onClick={() => choose(p)}
-      className={cn(
-        "h-11 rounded-full border px-4 text-sm font-semibold transition-colors select-none",
-        preset === p
-          ? "border-accent bg-accent text-on-accent"
-          : "border-line bg-surface text-ink-soft",
-      )}
-    >
-      {label}
-    </button>
-  );
-
   return (
     <div className={cn("space-y-2", className)}>
-      <div className="flex gap-2">
-        {chip("now", t("Now"))}
-        {chip("15m", t("15 m ago"))}
-        {chip("pick", t("Pick time"))}
-      </div>
+      <ChipGroup
+        options={[
+          { value: "now", label: t("Now") },
+          { value: "15m", label: t("15 m ago") },
+          { value: "pick", label: t("Pick time") },
+        ]}
+        value={preset}
+        onChange={choose}
+      />
       {preset === "15m" && value && (
         <p className="px-1 text-sm text-muted">{formatClock(value)}</p>
       )}

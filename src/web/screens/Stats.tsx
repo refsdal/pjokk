@@ -13,6 +13,7 @@ import {
 import { IconBabyBottle, IconMoon, IconRuler } from "@tabler/icons-react";
 import type { Baby } from "@shared/schemas";
 import { ErrorState } from "@/components/QueryStates";
+import { ChipGroup } from "@/components/Chips";
 import { Card } from "@/components/ui/card";
 import { useBabies, useMeasurements, useStats } from "@/lib/data";
 import {
@@ -171,21 +172,6 @@ export function StatsScreen() {
     };
   });
 
-  const rangeChip = (value: 7 | 30, label: string) => (
-    <button
-      type="button"
-      onClick={() => setDays(value)}
-      className={cn(
-        "h-9 rounded-full border px-4 text-sm font-semibold transition-colors select-none",
-        days === value
-          ? "border-accent bg-accent text-on-accent"
-          : "border-line bg-surface text-ink-soft",
-      )}
-    >
-      {label}
-    </button>
-  );
-
   const weightDelta =
     s?.weight?.prevValue != null
       ? Math.round((s.weight.value - s.weight.prevValue) * 1000)
@@ -204,10 +190,14 @@ export function StatsScreen() {
     <div className="mx-auto max-w-md px-4 pt-safe">
       <div className="flex items-center justify-between py-4">
         <h1 className="text-2xl font-extrabold text-ink">{t("Stats")}</h1>
-        <div className="flex gap-2">
-          {rangeChip(7, t("Week"))}
-          {rangeChip(30, t("Month"))}
-        </div>
+        <ChipGroup
+          options={[
+            { value: "7", label: t("Week") },
+            { value: "30", label: t("Month") },
+          ]}
+          value={String(days)}
+          onChange={(v) => setDays(Number(v) as 7 | 30)}
+        />
       </div>
 
       <div className="space-y-3 pb-tabbar">
