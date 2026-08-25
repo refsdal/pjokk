@@ -6,7 +6,8 @@ export type Feature =
   | "csvExport"
   | "statsMonth"
   | "otherActivities"
-  | "multipleBabies";
+  | "multipleBabies"
+  | "calendar";
 
 const requiresPremium: Record<Feature, boolean> = {
   growthCharts: true,
@@ -15,6 +16,7 @@ const requiresPremium: Record<Feature, boolean> = {
   statsMonth: true,
   otherActivities: true,
   multipleBabies: true,
+  calendar: true,
 };
 
 export function canUse(family: { plan: string }, feature: Feature): boolean {

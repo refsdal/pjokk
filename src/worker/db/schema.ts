@@ -347,3 +347,60 @@ export const sleepLocation = sqliteTable(
   },
   (t) => [index("sleep_location_family_idx").on(t.familyId)],
 );
+
+// --- Calendar (premium): family-wide planned events. Babies and responsible
+// members attach via join tables; zero baby rows = family-wide event.
+
+export const calendarEvent = sqliteTable(
+  "calendar_event",
+  {
+    id: id(),
+    familyId: familyId(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
+    title: text("title").notNull(),
+    description: text("description"),
+    location: text("location"),
+    category: text("category", {
+      enum: ["doctor", "vaccination", "babysitting", "family", "other"],
+    })
+      .default("other")
+      .notNull(),
+    startTime: integer("start_time", { mode: "timestamp_ms" }).notNull(),
+    // All-day events are single-day; durationMin is NULL when set.
+    allDay: integer("all_day", { mode: "boolean" }).default(false).notNull(),
+    durationMin: integer("duration_min"),
+    // NULL = no reminder. remindedAt is the sweep's idempotency latch.
+    remindMinutesBefore: integer("remind_minutes_before"),
+    remindedAt: integer("reminded_at", { mode: "timestamp_ms" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("calendar_family_start_idx").on(t.familyId, t.startTime)],
+);
+
+export const calendarEventBaby = sqliteTable(
+  "calendar_event_baby",
+  {
+    eventId: text("event_id")
+      .notNull()
+      .references(() => calendarEvent.id, { onDelete: "cascade" }),
+    babyId: text("baby_id")
+      .notNull()
+      .references(() => baby.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.babyId] })],
+);
+
+export const calendarAssignee = sqliteTable(
+  "calendar_assignee",
+  {
+    eventId: text("event_id")
+      .notNull()
+      .references(() => calendarEvent.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id),
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.userId] })],
+);
