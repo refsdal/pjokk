@@ -321,9 +321,9 @@ const nb: Record<string, string> = {
   "Welcome to ": "Velkommen til ",
   "Join failed": "Kunne ikke bli med",
   "Set up your family": "Sett opp familien din",
-  "Almost there": "Nesten fremme",
-  "Pjokk is invite-only. Open the invite link (or scan the QR) from your family's admin to join.":
-    "Pjokk er kun på invitasjon. Åpne invitasjonslenken (eller skann QR-koden) fra familiens admin for å bli med.",
+  "Invited to a family?": "Invitert til en familie?",
+  "Open the invite link (or scan the QR) from your family's admin to join them instead.":
+    "Åpne invitasjonslenken (eller skann QR-koden) fra familiens admin for å bli med hos dem i stedet.",
   "Who are we tracking?": "Hvem skal vi følge med på?",
   "Create family": "Opprett familie",
   "Family name (e.g. “The Olsens”)": "Familienavn (f.eks. «Olsen»)",

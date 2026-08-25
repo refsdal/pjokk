@@ -5,7 +5,7 @@ import { ChipGroup } from "@/components/Chips";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, unwrap } from "@/lib/api";
-import { authClient, isSysadmin, useSession } from "@/lib/auth-client";
+import { authClient, useSession } from "@/lib/auth-client";
 import { t } from "@/lib/i18n";
 import { toLocalDateInput } from "@/lib/time";
 import { toast } from "@/lib/toast";
@@ -28,34 +28,6 @@ export function WelcomeScreen() {
 
   if (!isPending && !session) {
     return <Navigate to="/login" />;
-  }
-
-  // Family creation is a sysadmin action; everyone else arrives via an
-  // invite link and never sees this screen without a family.
-  if (session && !hasFamily && !isSysadmin(session)) {
-    return (
-      <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-6 text-center">
-        <img src="/icon.svg" alt="" className="mx-auto h-16 w-16" />
-        <h1 className="text-2xl font-extrabold text-ink">
-          {t("Almost there")}
-        </h1>
-        <p className="text-sm text-muted">
-          {t(
-            "Pjokk is invite-only. Open the invite link (or scan the QR) from your family's admin to join.",
-          )}
-        </p>
-        <Button
-          variant="outline"
-          onClick={() =>
-            void authClient
-              .signOut()
-              .then(() => window.location.assign("/login"))
-          }
-        >
-          {t("Sign out")}
-        </Button>
-      </div>
-    );
   }
 
   const createFamily = async () => {
@@ -142,6 +114,28 @@ export function WelcomeScreen() {
           >
             {t("Create family")}
           </Button>
+
+          <div className="space-y-2 pt-6 text-center">
+            <p className="text-sm font-semibold text-ink-soft">
+              {t("Invited to a family?")}
+            </p>
+            <p className="text-sm text-muted">
+              {t(
+                "Open the invite link (or scan the QR) from your family's admin to join them instead.",
+              )}
+            </p>
+            <button
+              type="button"
+              className="text-sm text-muted underline"
+              onClick={() =>
+                void authClient
+                  .signOut()
+                  .then(() => window.location.assign("/login"))
+              }
+            >
+              {t("Sign out")}
+            </button>
+          </div>
         </form>
       ) : (
         <form

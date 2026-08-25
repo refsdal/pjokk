@@ -170,3 +170,28 @@ describe("household member management (better-auth org)", () => {
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
 });
+
+describe("self-serve family creation", () => {
+  const create = (cookie: string, name: string) =>
+    api("/api/auth/organization/create", {
+      method: "POST",
+      cookie,
+      body: { name, slug: `${name.toLowerCase()}-${Date.now().toString(36)}` },
+    });
+
+  it("a user without a family can create one", async () => {
+    const founder = await createUser("Fresh founder");
+    const cookie = await signIn(founder.email);
+    const res = await create(cookie, "Selfserve");
+    expect(res.status).toBe(200);
+  });
+
+  it("a user already in a family cannot create another", async () => {
+    const a = await rig();
+    const other = await createUser("Second family wisher");
+    await addMember(other.id, a.family.id, "member");
+    const cookie = await signIn(other.email);
+    const res = await create(cookie, "Sneaky");
+    expect(res.status).toBeGreaterThanOrEqual(400);
+  });
+});

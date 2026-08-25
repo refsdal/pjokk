@@ -64,13 +64,22 @@ export function createAuth(env: Env) {
       },
     },
     plugins: [
-      // An organization IS a family. Parents are admins. Creating families
-      // is a sysadmin action (sec review H2): everyone else joins through an
-      // invite code, so a signup-bypass account can't do anything.
+      // An organization IS a family. Parents are admins. Anyone WITHOUT a
+      // family may found one (self-serve onboarding through the Welcome
+      // flow); existing members go through invites, and sysadmins may always
+      // create. Accounts themselves remain invite-gated (OPEN_SIGNUP /
+      // invite links), so this stays closed to strangers.
       organization({
         creatorRole: "admin",
-        allowUserToCreateOrganization: (user) =>
-          (user as { role?: string | null }).role === "admin",
+        allowUserToCreateOrganization: async (user) => {
+          if ((user as { role?: string | null }).role === "admin") return true;
+          const membership = await db
+            .select({ id: schema.member.id })
+            .from(schema.member)
+            .where(eq(schema.member.userId, user.id))
+            .limit(1);
+          return membership.length === 0;
+        },
       }),
       passkey({
         rpID: url.hostname,

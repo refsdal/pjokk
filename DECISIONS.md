@@ -374,3 +374,11 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   No Cloudflare Access in front of app-test: closed signup is the gate,
   same security model as production. `workers_dev` is off for the test env
   (that origin isn't in better-auth's trusted origins).
+- **Self-serve family creation** (post-Phase 9): any signed-in account with
+  NO existing membership may create a family (sysadmins always can); members
+  of a family cannot create a second one. This deliberately retires the
+  sec-review-H2 posture that "a signup-bypass account can't do anything" —
+  the gate moves entirely to ACCOUNT creation (OPEN_SIGNUP / invite links).
+  The Welcome invite-only wall is gone; family-less users get the create
+  flow (family → baby → plan) with an "Invited to a family?" pointer and
+  sign-out escape below the form.
