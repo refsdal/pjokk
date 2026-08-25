@@ -323,6 +323,16 @@ export const SummarySchema = z
     lastDiaper: DiaperLogSchema.nullable(),
     activeSleep: SleepLogSchema.nullable(),
     lastSleep: SleepLogSchema.nullable(),
+    // Local-day totals for the requester's timezone (see the `tz` query param).
+    today: z.object({
+      feeds: z.number().int(),
+      intakeMl: z.number().int(),
+      solidsG: z.number().int(),
+      wet: z.number().int(),
+      dirty: z.number().int(),
+      both: z.number().int(),
+      sleepMin: z.number().int(),
+    }),
   })
   .openapi("Summary");
 

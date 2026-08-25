@@ -130,6 +130,7 @@ const nb: Record<string, string> = {
   Diapers: "Bleier",
   Other: "Annet",
   Today: "I dag",
+  today: "i dag",
   Yesterday: "I går",
   feed: "måltid",
   feeds: "måltider",

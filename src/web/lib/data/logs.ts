@@ -46,7 +46,14 @@ export function useSummary(babyId: string | undefined) {
     // The home screen is a glance: keep it current while open.
     refetchInterval: 60_000,
     queryFn: async () =>
-      unwrap<Summary>(await api.summary.$get({ query: { babyId: babyId! } })),
+      unwrap<Summary>(
+        await api.summary.$get({
+          query: {
+            babyId: babyId!,
+            tz: String(new Date().getTimezoneOffset()),
+          },
+        }),
+      ),
   });
 }
 

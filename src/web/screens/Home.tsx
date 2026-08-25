@@ -28,6 +28,7 @@ import {
 } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { useSelectedBaby } from "@/lib/selected-baby";
+import { formatDuration } from "@/lib/time";
 import { useAppearance } from "@/lib/appearance";
 import { toast } from "@/lib/toast";
 
@@ -135,6 +136,13 @@ export function HomeScreen() {
             label={t("Last feed")}
             time={s?.lastFeed ? new Date(s.lastFeed.time) : null}
             detail={s?.lastFeed ? feedDetail(s.lastFeed) : undefined}
+            sub={
+              s
+                ? `${s.today.feeds} ${t("feeds")} · ${s.today.intakeMl} ml${
+                    s.today.solidsG > 0 ? ` · ${s.today.solidsG} g` : ""
+                  } ${t("today")}`
+                : undefined
+            }
             tintClass="text-feed"
             onClick={() => setSheet("feed")}
           />
@@ -143,6 +151,11 @@ export function HomeScreen() {
             label={t("Last diaper")}
             time={s?.lastDiaper ? new Date(s.lastDiaper.time) : null}
             detail={s?.lastDiaper ? t(s.lastDiaper.type) : undefined}
+            sub={
+              s
+                ? `${s.today.wet} ${t("wet")} · ${s.today.dirty} ${t("dirty")} · ${s.today.both} ${t("both")}`
+                : undefined
+            }
             tintClass="text-diaper"
             onClick={() => setSheet("diaper")}
           />
@@ -151,6 +164,7 @@ export function HomeScreen() {
               icon={IconMoon}
               label={t("Last sleep")}
               time={new Date(s.lastSleep.endTime)}
+              sub={`${formatDuration(s.today.sleepMin * 60_000)} ${t("today")}`}
               tintClass="text-sleep"
               onClick={() => setSheet("sleep")}
             />

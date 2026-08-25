@@ -98,13 +98,22 @@ const remove = createRoute({
   },
 });
 
+const DAY = 86_400_000;
+
 const summary = createRoute({
   method: "get",
   path: "/api/summary",
   tags: ["summary"],
   description:
-    "Everything the home screen needs in one call: last feed, last diaper, active + last sleep.",
-  request: { query: z.object({ babyId: z.string() }) },
+    "Everything the home screen needs in one call: last feed, last diaper, active + last sleep, and today's local-day totals.",
+  request: {
+    query: z.object({
+      babyId: z.string(),
+      // The requester's Date.getTimezoneOffset() (minutes, UTC−local). The
+      // `today` block follows the caretaker's clock, not the server's.
+      tz: z.coerce.number().int().min(-840).max(840).default(0),
+    }),
+  },
   responses: {
     200: jsonContent(SummarySchema, "Status summary for a baby"),
     404: jsonContent(ErrorSchema, "Unknown baby"),
@@ -207,17 +216,57 @@ export const sleepApp = createApp<FamEnv>()
     return c.json({ ok: true as const }, 200);
   })
   .openapi(summary, async (c) => {
-    const { babyId } = c.req.valid("query");
+    const { babyId, tz } = c.req.valid("query");
     if (!(await c.var.fam.getBaby(babyId))) {
       return c.json({ error: "Unknown baby", code: "NOT_FOUND" }, 404);
     }
     const s = await c.var.fam.summary(babyId);
+
+    const tzMs = tz * 60_000;
+    const now = Date.now();
+    const dayIdx = Math.floor((now - tzMs) / DAY);
+    const rangeFrom = dayIdx * DAY + tzMs;
+    const rangeTo = (dayIdx + 1) * DAY + tzMs;
+
+    const [feeds, diapers, sleeps] = await Promise.all([
+      c.var.fam.feedsInRange(babyId, new Date(rangeFrom), new Date(rangeTo)),
+      c.var.fam.diapersInRange(babyId, new Date(rangeFrom), new Date(rangeTo)),
+      c.var.fam.sleepsInRange(babyId, new Date(rangeFrom), new Date(rangeTo)),
+    ]);
+
+    const today = {
+      feeds: 0,
+      intakeMl: 0,
+      solidsG: 0,
+      wet: 0,
+      dirty: 0,
+      both: 0,
+      sleepMin: 0,
+    };
+    for (const f of feeds) {
+      today.feeds += 1;
+      if (f.type === "bottle") today.intakeMl += f.amountMl ?? 0;
+      if (f.type === "solids") today.solidsG += f.amountMl ?? 0;
+    }
+    for (const d of diapers) {
+      if (d.type === "wet") today.wet += 1;
+      else if (d.type === "dirty") today.dirty += 1;
+      else today.both += 1;
+    }
+    // Sleep minutes inside today's window; active sessions count up to now.
+    for (const sl of sleeps) {
+      const from = Math.max(sl.startTime.getTime(), rangeFrom);
+      const to = Math.min(sl.endTime?.getTime() ?? now, rangeTo, now);
+      if (to > from) today.sleepMin += Math.round((to - from) / 60_000);
+    }
+
     return c.json(
       {
         lastFeed: s.lastFeed ? serFeed(s.lastFeed) : null,
         lastDiaper: s.lastDiaper ? serDiaper(s.lastDiaper) : null,
         activeSleep: s.activeSleep ? serSleep(s.activeSleep) : null,
         lastSleep: s.lastSleep ? serSleep(s.lastSleep) : null,
+        today,
       },
       200,
     );

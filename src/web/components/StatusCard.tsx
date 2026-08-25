@@ -10,6 +10,7 @@ export function StatusCard({
   label,
   time,
   detail,
+  sub,
   tintClass,
   onClick,
 }: {
@@ -17,6 +18,7 @@ export function StatusCard({
   label: string;
   time: Date | null;
   detail?: string;
+  sub?: string;
   tintClass: string;
   onClick?: () => void;
 }) {
@@ -51,6 +53,7 @@ export function StatusCard({
             <span className="ml-1.5 font-medium text-ink-soft">{detail}</span>
           ) : null}
         </p>
+        {sub ? <p className="truncate text-xs text-muted">{sub}</p> : null}
       </div>
     </button>
   );

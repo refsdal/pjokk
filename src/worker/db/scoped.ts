@@ -581,7 +581,7 @@ export function familyScope(db: Db, familyId: string) {
 
     async diapersInRange(babyId: string, from: Date, to: Date) {
       return db
-        .select({ time: diaperLog.time })
+        .select({ time: diaperLog.time, type: diaperLog.type })
         .from(diaperLog)
         .where(
           and(
