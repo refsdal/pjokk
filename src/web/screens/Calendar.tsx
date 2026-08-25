@@ -22,7 +22,6 @@ import { t } from "@/lib/i18n";
 import { formatClock, formatDay } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
-const DAY_MS = 24 * 3600_000;
 const monthFmt = new Intl.DateTimeFormat("nb-NO", {
   month: "long",
   year: "numeric",
@@ -110,7 +109,12 @@ export function CalendarScreen() {
     [view, gridDays, anchor],
   );
   const gridTo = useMemo(
-    () => new Date(gridFrom.getTime() + (view === "month" ? 42 : 7) * DAY_MS),
+    () =>
+      new Date(
+        gridFrom.getFullYear(),
+        gridFrom.getMonth(),
+        gridFrom.getDate() + (view === "month" ? 42 : 7),
+      ),
     [gridFrom, view],
   );
   const grid = useCalendarEvents(gridFrom, gridTo);
@@ -122,7 +126,12 @@ export function CalendarScreen() {
     return d;
   }, []);
   const upcomingTo = useMemo(
-    () => new Date(upcomingFrom.getTime() + 90 * DAY_MS),
+    () =>
+      new Date(
+        upcomingFrom.getFullYear(),
+        upcomingFrom.getMonth(),
+        upcomingFrom.getDate() + 90,
+      ),
     [upcomingFrom],
   );
   const upcoming = useCalendarEvents(upcomingFrom, upcomingTo);
@@ -152,6 +161,9 @@ export function CalendarScreen() {
   const listEvents = selectedDay
     ? (byDay.get(selectedDay) ?? [])
     : (upcoming.data ?? []);
+  // The selected-day list is fed by the grid query, not upcoming — gate the
+  // empty state on whichever query actually feeds the visible list.
+  const listLoading = selectedDay ? grid.isLoading : upcoming.isLoading;
   const listGroups = useMemo(() => {
     const groups: { day: Date; events: CalendarEvent[] }[] = [];
     for (const e of listEvents) {
@@ -287,7 +299,7 @@ export function CalendarScreen() {
           {selectedDay ? dayLabel(new Date(selectedDay)) : t("Upcoming")}
         </p>
         {listGroups.length === 0 &&
-          !upcoming.isLoading &&
+          !listLoading &&
           (premium ? (
             <p className="py-6 text-center text-sm text-muted">
               {t("No upcoming events")}
