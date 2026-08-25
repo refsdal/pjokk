@@ -27,7 +27,7 @@ export function useTimeline(
   });
 }
 
-export function useStats(babyId: string | undefined, days: 7 | 30) {
+export function useStats(babyId: string | undefined, days: 1 | 7 | 30) {
   return useQuery({
     queryKey: ["stats", babyId, days],
     enabled: !!babyId,

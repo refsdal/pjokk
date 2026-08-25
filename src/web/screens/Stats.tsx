@@ -21,6 +21,7 @@ import type { Baby } from "@shared/schemas";
 import { ErrorState } from "@/components/QueryStates";
 import { ChipGroup } from "@/components/Chips";
 import { Card } from "@/components/ui/card";
+import { OtherLogSheet } from "@/components/sheets/OtherLogSheet";
 import { BabySwitcher } from "@/components/BabySwitcher";
 import { useFamily, useMeasurements, useStats } from "@/lib/data";
 import { useSelectedBaby } from "@/lib/selected-baby";
@@ -167,7 +168,8 @@ export function StatsScreen() {
   const { baby } = useSelectedBaby();
   const family = useFamily();
   const navigate = useNavigate();
-  const [days, setDays] = useState<7 | 30>(7);
+  const [days, setDays] = useState<1 | 7 | 30>(7);
+  const [measureOpen, setMeasureOpen] = useState(false);
   const stats = useStats(baby?.id, days);
   const s = stats.data;
 
@@ -181,9 +183,9 @@ export function StatsScreen() {
     const date = new Date(`${d.date}T00:00:00`);
     return {
       label:
-        days === 7
-          ? weekdayFmt.format(date).replace(".", "")
-          : String(date.getDate()),
+        days === 30
+          ? String(date.getDate())
+          : weekdayFmt.format(date).replace(".", ""),
       hours: Math.round((d.sleepMin / 60) * 10) / 10,
     };
   });
@@ -209,6 +211,7 @@ export function StatsScreen() {
         <BabySwitcher compact />
         <ChipGroup
           options={[
+            { value: "1", label: t("Day") },
             { value: "7", label: t("Week") },
             {
               value: "30",
@@ -229,7 +232,7 @@ export function StatsScreen() {
               void navigate({ to: "/settings" });
               return;
             }
-            setDays(Number(v) as 7 | 30);
+            setDays(Number(v) as 1 | 7 | 30);
           }}
         />
       </div>
@@ -240,13 +243,13 @@ export function StatsScreen() {
           <StatCard
             icon={IconMoon}
             tint="text-sleep"
-            label={t("Sleep / day")}
+            label={days === 1 ? t("Sleep today") : t("Sleep / day")}
             value={s ? sleepFmt(s.avgSleepMin) : "—"}
           />
           <StatCard
             icon={IconBabyBottle}
             tint="text-feed"
-            label={t("Intake / day")}
+            label={days === 1 ? t("Intake today") : t("Intake / day")}
             value={s ? `${s.avgIntakeMl} ml` : "—"}
             sub={
               s
@@ -270,7 +273,7 @@ export function StatsScreen() {
                   dataKey="label"
                   tickLine={false}
                   axisLine={false}
-                  interval={days === 7 ? 0 : 4}
+                  interval={days === 30 ? 4 : 0}
                   tick={{
                     fontSize: 11,
                     fill: "var(--color-muted)",
@@ -292,14 +295,18 @@ export function StatsScreen() {
                   dataKey="hours"
                   fill="var(--color-sleep)"
                   radius={[5, 5, 0, 0]}
-                  maxBarSize={days === 7 ? 28 : 8}
+                  maxBarSize={days === 30 ? 8 : 28}
                 />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </Card>
 
-        <Card className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setMeasureOpen(true)}
+          className="flex w-full items-center gap-3 rounded-xl2 border border-line bg-surface p-4 text-left active:bg-surface-2"
+        >
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-2 text-growth">
             <IconRuler className="h-5 w-5" />
           </div>
@@ -331,7 +338,15 @@ export function StatsScreen() {
               </p>
             )}
           </div>
-        </Card>
+        </button>
+        {baby && (
+          <OtherLogSheet
+            open={measureOpen}
+            onOpenChange={setMeasureOpen}
+            babyId={baby.id}
+            kind="measurement"
+          />
+        )}
 
         {baby &&
           (premium ? (

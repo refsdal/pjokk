@@ -382,3 +382,29 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   The Welcome invite-only wall is gone; family-less users get the create
   flow (family → baby → plan) with an "Invited to a family?" pointer and
   sign-out escape below the form.
+
+## Feedback batch (2026-08-25)
+
+- **Night mode's "On" chip is the manual override, not a schedule toggle**:
+  at 20:54 the schedule wasn't active yet, so the tester's "On" tap was
+  read as "force on regardless of schedule" — that behavior was already
+  correct, only the label was misleading. Fixed the label; the
+  schedule-vs-override logic itself is untouched, and the override remains
+  device-local (localStorage), same as the rest of night mode.
+- **Solids are still stored in `amountMl`** — grams are written into the
+  same column, with the unit derived from the feed's `type` (`solids` →
+  grams, `bottle`/`breast` → ml) everywhere the value is read or
+  displayed. Avoided an `amountG` column/migration for a unit that's
+  cosmetic at the storage layer. Intake sums (stats, home status card,
+  CSV) count **bottle-only** ml, so solids grams never get added into a
+  ml total.
+- **Custom sleep locations are stored by name in `sleep_log.location`**,
+  the same free-text column defaults (Crib, Arms/Contact nap, Car, …)
+  already used. Defaults and family-defined customs are merged
+  client-side into one chip list; there's no `sleep_location` foreign key
+  on the log row. The `asLocation` coercion (that clamped free text back
+  onto the default enum) was removed since customs are now first-class.
+- **Per-side nursing minutes live in new nullable columns** on
+  `feed_log` (left/right minutes), additive to the existing
+  `durationMin`, which stays the total and is what CSV export reports —
+  CSV does not break out per-side minutes.

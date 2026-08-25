@@ -147,10 +147,13 @@ const nb: Record<string, string> = {
     "Ingenting her ennå — logg noe fra Hjem.",
 
   // Stats
+  Day: "Dag",
   Week: "Uke",
   Month: "Måned",
   "Sleep / day": "Søvn / dag",
   "Intake / day": "Inntak / dag",
+  "Sleep today": "Søvn i dag",
+  "Intake today": "Inntak i dag",
   "Sleep per day": "Søvn per dag",
   h: "t",
   m: "m",
