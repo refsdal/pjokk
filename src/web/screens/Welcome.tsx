@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { api, unwrap } from "@/lib/api";
 import { authClient, useSession } from "@/lib/auth-client";
 import { t } from "@/lib/i18n";
+import { toLocalDateInput } from "@/lib/time";
 import { toast } from "@/lib/toast";
 
 // Family founders land here once (everyone else arrives via /join/CODE).
@@ -144,7 +145,7 @@ export function WelcomeScreen() {
             <input
               type="date"
               value={birthDate}
-              max={new Date().toISOString().slice(0, 10)}
+              max={toLocalDateInput()}
               onChange={(e) => setBirthDate(e.target.value)}
               className="mt-1 h-12 w-full rounded-xl2 border border-line bg-surface px-4 text-base text-ink"
             />

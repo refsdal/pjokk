@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull, lt, max, ne, notExists } from "drizzle-orm";
+import { and, eq, gt, isNull, lt, max, ne, notExists, or } from "drizzle-orm";
 import { createDb, schema } from "./db";
 import { pushToUser } from "./push";
 import { TOMBSTONE_ID } from "./routes/admin";
@@ -15,7 +15,9 @@ export async function purgeOrphanUsers(env: Env, now = Date.now()) {
     .from(schema.user)
     .where(
       and(
-        isNull(schema.user.role),
+        // better-auth's admin plugin stamps role="user" on every account it
+        // creates, so match that AND legacy NULLs — never admins.
+        or(isNull(schema.user.role), eq(schema.user.role, "user")),
         ne(schema.user.id, TOMBSTONE_ID),
         lt(schema.user.createdAt, cutoff),
         notExists(
@@ -109,6 +111,8 @@ const BACKUP_TABLES = [
   "family_invite",
   "push_subscription",
   "push_pref",
+  "api_key",
+  "admin_audit",
 ];
 
 export async function runBackup(env: Env, now = new Date()) {

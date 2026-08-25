@@ -19,7 +19,9 @@ import {
 } from "@/components/sheets/OtherLogSheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
 import { useSession } from "@/lib/auth-client";
+import { useQueryClient } from "@tanstack/react-query";
 import {
+  prefetchOtherLists,
   useBabies,
   useFeeds,
   useSummary,
@@ -57,6 +59,7 @@ export function HomeScreen() {
   const [otherKind, setOtherKind] = useState<OtherKind>("medicine");
   const { night } = useAppearance();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   if (babies.isSuccess && babies.data.length === 0) {
     return (
@@ -79,7 +82,9 @@ export function HomeScreen() {
   const s = summary.data;
   const active = s?.activeSleep ?? null;
 
-  if (night) {
+  // Never switch layouts while a sheet is open: the 22:00 auto-flip would
+  // unmount an open More/Other sheet and discard whatever was typed.
+  if (night && (sheet === null || sheet === "feed" || sheet === "diaper" || sheet === "sleep")) {
     return (
       <NightHome
         babyId={baby.id}
@@ -167,7 +172,10 @@ export function HomeScreen() {
             icon={IconPlus}
             label={t("More")}
             tintClass="text-growth"
-            onClick={() => setSheet("more")}
+            onClick={() => {
+              prefetchOtherLists(queryClient, baby.id);
+              setSheet("more");
+            }}
           />
         </div>
       </div>

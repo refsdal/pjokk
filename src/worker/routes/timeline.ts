@@ -5,9 +5,12 @@ import { createApp, iso, jsonContent, serDiaper, serFeed, serSleep } from "../li
 
 const timelineQuery = z.object({
   babyId: z.string(),
-  // ISO cursor: return entries strictly older than this (from a previous
-  // page's nextCursor).
-  before: z.iso.datetime({ offset: true }).optional(),
+  // Opaque keyset cursor from a previous page's nextCursor: "<ms>|<id>".
+  // The id tiebreak keeps pagination lossless across equal timestamps.
+  before: z
+    .string()
+    .regex(/^\d{1,15}\|.{1,64}$/)
+    .optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   // feeds | diapers | sleep = that kind only; other = the Phase 3 types.
   filter: z.enum(timelineFilters).optional(),
@@ -32,12 +35,20 @@ export const timelineApp = createApp<FamEnv>().openapi(timeline, async (c) => {
     return c.json({ error: "Unknown baby", code: "NOT_FOUND" }, 404);
   }
   const limit = q.limit ?? 50;
+  let before: { time: Date; id: string } | undefined;
+  if (q.before) {
+    const sep = q.before.indexOf("|");
+    before = {
+      time: new Date(Number(q.before.slice(0, sep))),
+      id: q.before.slice(sep + 1),
+    };
+  }
   const opts = {
     babyId: q.babyId,
     // Each source over-fetches by the page size so the merge can always
     // fill a full page regardless of the mix.
     limit,
-    before: q.before ? new Date(q.before) : undefined,
+    before,
   };
 
   const fam = c.var.fam;
@@ -104,7 +115,11 @@ export const timelineApp = createApp<FamEnv>().openapi(timeline, async (c) => {
       sortKey: p.time.getTime(),
       entry: { ...p, kind: "pump" as const, time: iso(p.time) },
     })),
-  ].sort((a, b) => b.sortKey - a.sortKey);
+  ].sort(
+    // Global total order (time DESC, id DESC) — must match the per-source
+    // SQL ordering for the keyset cursor to be correct.
+    (a, b) => b.sortKey - a.sortKey || (b.entry.id > a.entry.id ? 1 : -1),
+  );
 
   const page = merged.slice(0, limit);
   // More pages exist if the merge already holds more than one page, OR any
@@ -121,11 +136,10 @@ export const timelineApp = createApp<FamEnv>().openapi(timeline, async (c) => {
     pumps,
   ];
   const hasMore =
-    merged.length > limit || sources.some((s) => s.length === limit);
+    merged.length > page.length || sources.some((s) => s.length === limit);
+  const last = page[page.length - 1];
   const nextCursor =
-    hasMore && page.length > 0
-      ? new Date(page[page.length - 1]!.sortKey).toISOString()
-      : null;
+    hasMore && last ? `${last.sortKey}|${last.entry.id}` : null;
 
   return c.json({ entries: page.map((p) => p.entry), nextCursor }, 200);
 });

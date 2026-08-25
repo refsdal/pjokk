@@ -137,14 +137,35 @@ export const sleepApp = createApp<FamEnv>()
         );
       }
     }
-    const created = await c.var.fam.createSleep({
-      babyId: body.babyId,
-      caretakerId: c.var.sessionData.user.id,
-      startTime: new Date(body.startTime),
-      endTime: body.endTime ? new Date(body.endTime) : null,
-      location: body.location ?? null,
-      notes: body.notes ?? null,
-    });
+    let created;
+    try {
+      created = await c.var.fam.createSleep({
+        babyId: body.babyId,
+        caretakerId: c.var.sessionData.user.id,
+        startTime: new Date(body.startTime),
+        endTime: body.endTime ? new Date(body.endTime) : null,
+        location: body.location ?? null,
+        notes: body.notes ?? null,
+      });
+    } catch (err) {
+      // The partial unique index (one active session per baby) closes the
+      // race the pre-check above can't. Drizzle wraps the SQLite error, so
+      // walk the cause chain.
+      let isUnique = false;
+      for (let e: unknown = err; e; e = (e as { cause?: unknown }).cause) {
+        if (String(e).includes("UNIQUE")) {
+          isUnique = true;
+          break;
+        }
+      }
+      if (!body.endTime && isUnique) {
+        return c.json(
+          { error: "Already sleeping", code: "ALREADY_ACTIVE" },
+          409,
+        );
+      }
+      throw err;
+    }
     return c.json(serSleep(created!), 201);
   })
   .openapi(active, async (c) => {

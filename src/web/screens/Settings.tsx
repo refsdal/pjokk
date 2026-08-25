@@ -19,7 +19,7 @@ import {
   pushSupported,
   sendTestPush,
 } from "@/lib/push";
-import { formatAge, formatRelative } from "@/lib/time";
+import { formatAge, formatRelative, toLocalDateInput } from "@/lib/time";
 import { toast } from "@/lib/toast";
 
 function SectionTitle({ children }: { children: string }) {
@@ -63,7 +63,7 @@ function BabyEditSheet({
   if (baby && !wasOpen) {
     setWasOpen(true);
     setName(baby.name);
-    setBirthDate(new Date(baby.birthDate).toISOString().slice(0, 10));
+    setBirthDate(toLocalDateInput(new Date(baby.birthDate)));
     setSex(baby.sex);
   }
   if (!baby && wasOpen) setWasOpen(false);
@@ -102,7 +102,7 @@ function BabyEditSheet({
         <input
           type="date"
           value={birthDate}
-          max={new Date().toISOString().slice(0, 10)}
+          max={toLocalDateInput()}
           onChange={(e) => setBirthDate(e.target.value)}
           className="h-12 w-full rounded-xl2 border border-line bg-surface px-4 text-base text-ink"
         />

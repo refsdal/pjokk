@@ -28,13 +28,21 @@ export function formatRelative(date: Date, now = new Date()): string {
   if (min < 1) return "just now";
   if (min < 60) return `${min} m ago`;
   const hours = Math.floor(min / 60);
-  if (hours < 24 && date.getDate() === now.getDate())
-    return `${hours} h ago`;
+  // Relative for anything within 24h regardless of the calendar day —
+  // "yesterday 22:30" at 00:30 is exactly wrong at 3am.
+  if (hours < 24) return `${hours} h ago`;
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
   if (date.toDateString() === yesterday.toDateString())
     return `yesterday ${formatClock(date)}`;
   return `${formatDay(date)} ${formatClock(date)}`;
+}
+
+/** YYYY-MM-DD in LOCAL time, for <input type="date"> value/max (an ISO
+ * slice would shift the day near midnight in non-UTC timezones). */
+export function toLocalDateInput(d = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 /** "1:42" (h:mm) or "42 min" for running sleep counters. */

@@ -192,10 +192,11 @@ export function OtherLogSheet({
   }
 
   const changeMtype = (type: MeasurementType) => {
+    if (type === mtype) return;
     setMtype(type);
-    if (!edit) {
-      setValue(lastMeasurement(type) ?? measurementConfig[type].fallback);
-    }
+    // Always re-seed the value on a type switch — kg and cm scales are
+    // disjoint, so carrying the old number over would store nonsense.
+    setValue(lastMeasurement(type) ?? measurementConfig[type].fallback);
   };
 
   const createOther = useCreateOther();

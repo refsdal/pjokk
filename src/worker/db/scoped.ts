@@ -70,7 +70,31 @@ type SimpleLogTable = SQLiteTable & {
   time: SQLiteColumn;
 };
 
-export type ListOpts = { babyId?: string; limit?: number; before?: Date };
+// Keyset cursor over the global order (time DESC, id DESC). The id tiebreak
+// makes pagination lossless when entries share a timestamp.
+export type Cursor = { time: Date; id: string };
+
+export type ListOpts = { babyId?: string; limit?: number; before?: Cursor };
+
+function beforeCursor(
+  timeCol: SQLiteColumn,
+  idCol: SQLiteColumn,
+  cursor: Cursor | undefined,
+) {
+  if (!cursor) return undefined;
+  return or(
+    lt(timeCol, cursor.time),
+    and(eq(timeCol, cursor.time), lt(idCol, cursor.id)),
+  );
+}
+
+// Drizzle's .set() throws on an object with no defined values, so every
+// update strips undefineds first and treats an empty patch as a no-op read.
+function compactPatch<T extends object>(patch: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(patch).filter(([, v]) => v !== undefined),
+  ) as Partial<T>;
+}
 
 export type LogCrud<Row, Insert> = {
   list(opts?: ListOpts): Promise<Row[]>;
@@ -113,10 +137,10 @@ function logCrud<Row, Insert>(
         .where(
           and(
             scope(opts.babyId),
-            opts.before ? lt(table.time, opts.before) : undefined,
+            beforeCursor(table.time, table.id, opts.before),
           ),
         )
-        .orderBy(desc(table.time))
+        .orderBy(desc(table.time), desc(table.id))
         .limit(opts.limit ?? 50);
       return rows as Row[];
     },
@@ -136,9 +160,11 @@ function logCrud<Row, Insert>(
       return this.get((rows[0] as { id: string }).id);
     },
     async update(id, patch) {
+      const set = compactPatch(patch);
+      if (Object.keys(set).length === 0) return this.get(id);
       const rows = await db
         .update(table)
-        .set(patch as never)
+        .set(set as never)
         .where(and(eq(table.id, id), eq(table.familyId, familyId)))
         .returning({ id: table.id });
       return rows[0] ? this.get(id) : null;
@@ -265,9 +291,11 @@ export function familyScope(db: Db, familyId: string) {
         sex: "girl" | "boy" | null;
       }>,
     ) {
+      const set = compactPatch(patch);
+      if (Object.keys(set).length === 0) return this.getBaby(id);
       const rows = await db
         .update(baby)
-        .set(patch)
+        .set(set)
         .where(and(eq(baby.id, id), eq(baby.familyId, familyId)))
         .returning();
       return rows[0] ?? null;
@@ -275,7 +303,7 @@ export function familyScope(db: Db, familyId: string) {
 
     // --- feeds ---
     async listFeeds(
-      opts: { babyId?: string; limit?: number; before?: Date } = {},
+      opts: ListOpts = {},
     ) {
       return db
         .select(feedCols)
@@ -284,10 +312,10 @@ export function familyScope(db: Db, familyId: string) {
         .where(
           and(
             feedScope(opts.babyId),
-            opts.before ? lt(feedLog.time, opts.before) : undefined,
+            beforeCursor(feedLog.time, feedLog.id, opts.before),
           ),
         )
-        .orderBy(desc(feedLog.time))
+        .orderBy(desc(feedLog.time), desc(feedLog.id))
         .limit(opts.limit ?? 50);
     },
 
@@ -328,9 +356,11 @@ export function familyScope(db: Db, familyId: string) {
         notes: string | null;
       }>,
     ) {
+      const set = compactPatch(patch);
+      if (Object.keys(set).length === 0) return this.getFeed(id);
       const rows = await db
         .update(feedLog)
-        .set(patch)
+        .set(set)
         .where(and(eq(feedLog.id, id), eq(feedLog.familyId, familyId)))
         .returning({ id: feedLog.id });
       return rows[0] ? this.getFeed(id) : null;
@@ -346,7 +376,7 @@ export function familyScope(db: Db, familyId: string) {
 
     // --- diapers ---
     async listDiapers(
-      opts: { babyId?: string; limit?: number; before?: Date } = {},
+      opts: ListOpts = {},
     ) {
       return db
         .select(diaperCols)
@@ -355,10 +385,10 @@ export function familyScope(db: Db, familyId: string) {
         .where(
           and(
             diaperScope(opts.babyId),
-            opts.before ? lt(diaperLog.time, opts.before) : undefined,
+            beforeCursor(diaperLog.time, diaperLog.id, opts.before),
           ),
         )
-        .orderBy(desc(diaperLog.time))
+        .orderBy(desc(diaperLog.time), desc(diaperLog.id))
         .limit(opts.limit ?? 50);
     },
 
@@ -393,9 +423,11 @@ export function familyScope(db: Db, familyId: string) {
         notes: string | null;
       }>,
     ) {
+      const set = compactPatch(patch);
+      if (Object.keys(set).length === 0) return this.getDiaper(id);
       const rows = await db
         .update(diaperLog)
-        .set(patch)
+        .set(set)
         .where(and(eq(diaperLog.id, id), eq(diaperLog.familyId, familyId)))
         .returning({ id: diaperLog.id });
       return rows[0] ? this.getDiaper(id) : null;
@@ -411,7 +443,7 @@ export function familyScope(db: Db, familyId: string) {
 
     // --- sleep ---
     async listSleeps(
-      opts: { babyId?: string; limit?: number; before?: Date } = {},
+      opts: ListOpts = {},
     ) {
       return db
         .select(sleepCols)
@@ -420,10 +452,10 @@ export function familyScope(db: Db, familyId: string) {
         .where(
           and(
             sleepScope(opts.babyId),
-            opts.before ? lt(sleepLog.startTime, opts.before) : undefined,
+            beforeCursor(sleepLog.startTime, sleepLog.id, opts.before),
           ),
         )
-        .orderBy(desc(sleepLog.startTime))
+        .orderBy(desc(sleepLog.startTime), desc(sleepLog.id))
         .limit(opts.limit ?? 50);
     },
 
@@ -488,9 +520,11 @@ export function familyScope(db: Db, familyId: string) {
         notes: string | null;
       }>,
     ) {
+      const set = compactPatch(patch);
+      if (Object.keys(set).length === 0) return this.getSleep(id);
       const rows = await db
         .update(sleepLog)
-        .set(patch)
+        .set(set)
         .where(and(eq(sleepLog.id, id), eq(sleepLog.familyId, familyId)))
         .returning({ id: sleepLog.id });
       return rows[0] ? this.getSleep(id) : null;

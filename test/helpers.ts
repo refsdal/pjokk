@@ -19,6 +19,9 @@ export async function createUser(name: string) {
     name,
     email,
     emailVerified: true,
+    // Mirror production: better-auth's admin plugin stamps role "user" on
+    // every account it creates (a NULL here once masked a purge bug).
+    role: "user",
     createdAt: now,
     updatedAt: now,
   });

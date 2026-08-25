@@ -6,6 +6,7 @@ import {
   real,
   sqliteTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { organization, user } from "./auth-schema";
 
@@ -91,6 +92,11 @@ export const sleepLog = sqliteTable(
   (t) => [
     index("sleep_family_start_idx").on(t.familyId, t.startTime),
     index("sleep_baby_idx").on(t.babyId),
+    // One active session per baby, enforced at the DB so a double-tap or an
+    // offline-queue replay can't race past the route's check.
+    uniqueIndex("sleep_one_active_per_baby")
+      .on(t.babyId)
+      .where(sql`end_time IS NULL`),
   ],
 );
 

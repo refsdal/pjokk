@@ -43,6 +43,13 @@
       "when": 1787609388471,
       "tag": "0005_phase-sec-hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1787644660230,
+      "tag": "0006_defect-fixes",
+      "breakpoints": true
     }
   ]
 }

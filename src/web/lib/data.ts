@@ -272,6 +272,22 @@ export interface DeleteOtherVars {
   id: string;
 }
 
+// Warm the per-kind prefill caches when the More picker opens, so the
+// last-value prefill has data by the time a kind is chosen (first-ever open
+// included).
+export function prefetchOtherLists(qc: QueryClient, babyId: string) {
+  for (const kind of Object.keys(otherApi) as OtherKind[]) {
+    void qc.prefetchQuery({
+      queryKey: ["other", kind, babyId],
+      queryFn: async () =>
+        unwrap<Record<string, unknown>[]>(
+          await otherApi[kind].$get({ query: { babyId, limit: "10" } }),
+        ),
+      staleTime: 60_000,
+    });
+  }
+}
+
 export function useOtherList(
   kind: OtherKind,
   babyId: string | undefined,

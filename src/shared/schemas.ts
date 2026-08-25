@@ -298,8 +298,9 @@ export const TimelineEntrySchema = z
 export const TimelineSchema = z
   .object({
     entries: z.array(TimelineEntrySchema),
-    // Pass back as ?before= to fetch the next (older) page.
-    nextCursor: isoTime().nullable(),
+    // Opaque keyset cursor ("<ms>|<id>"); pass back as ?before= for the next
+    // (older) page.
+    nextCursor: z.string().nullable(),
   })
   .openapi("Timeline");
 

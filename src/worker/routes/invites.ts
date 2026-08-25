@@ -145,7 +145,9 @@ function classifyInvite(row: InviteRow | undefined, now: number) {
 
 export const invitesPublicApp = createApp<AppEnv>()
   .openapi(inviteInfo, async (c) => {
-    const { code } = c.req.valid("param");
+    // Codes are generated uppercase to be read aloud; accept them typed in
+    // any case.
+    const code = c.req.valid("param").code.toUpperCase();
     const rows = await c.var.db
       .select()
       .from(schema.familyInvite)
@@ -177,7 +179,7 @@ export const invitesPublicApp = createApp<AppEnv>()
     if (!session) {
       return c.json({ error: "Not signed in", code: "UNAUTHENTICATED" }, 401);
     }
-    const { code } = c.req.valid("json");
+    const code = c.req.valid("json").code.toUpperCase();
     const userId = session.user.id;
     const now = Date.now();
 
