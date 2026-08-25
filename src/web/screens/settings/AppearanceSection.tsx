@@ -52,12 +52,19 @@ export function AppearanceSection() {
               value: "auto",
               label: `${t("Auto")} (${schedule.startHour}–${String(schedule.endHour).padStart(2, "0")})`,
             },
-            { value: "on", label: t("On") },
+            { value: "on", label: t("Always on") },
             { value: "off", label: t("Off") },
           ]}
           value={mode}
           onChange={setMode}
         />
+        <p className="text-sm text-muted">
+          {mode === "on"
+            ? t("Night mode stays on until you switch it off.")
+            : mode === "auto"
+              ? `${t("Turns on at")} ${String(schedule.startHour).padStart(2, "0")}:00 · ${t("off at")} ${String(schedule.endHour).padStart(2, "0")}:00`
+              : t("Night mode is off.")}
+        </p>
         {mode === "auto" && (
           <div className="space-y-3">
             <div>

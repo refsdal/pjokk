@@ -222,7 +222,12 @@ const nb: Record<string, string> = {
   English: "English",
   Norwegian: "Norsk",
   "Night mode": "Nattmodus",
-  On: "På",
+  "Always on": "Alltid på",
+  "Night mode stays on until you switch it off.":
+    "Nattmodus forblir på til du slår den av.",
+  "Turns on at": "Slås på kl.",
+  "off at": "av kl.",
+  "Night mode is off.": "Nattmodus er av.",
   From: "Fra",
   Until: "Til",
   "API keys": "API-nøkler",
