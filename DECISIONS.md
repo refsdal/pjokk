@@ -413,3 +413,10 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   spec's "2 h 10 m" wording — consistency with every other duration on
   the app (active sleep banner, timeline spans) won out over matching the
   spec's prose exactly.
+- **Toolchain pinned with mise** (`.mise.toml`: node 22, pnpm 11) — replaces
+  reliance on corepack, whose shim broke locally (ERR_VM_DYNAMIC_IMPORT_
+  CALLBACK_MISSING under node 22.22 + corepack pnpm 11.23). `mise install`
+  in the repo is the whole setup; CI keeps its own version pins in ci.yml.
+  Considered and rejected: switching the package manager to Bun — installs
+  are already fast, and @cloudflare/vitest-pool-workers requires vitest
+  under Node, so the risk sits exactly where this project is unusual.
