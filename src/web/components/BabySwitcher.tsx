@@ -1,9 +1,12 @@
-import { IconChevronDown, IconPlus } from "@tabler/icons-react";
+import { IconChevronDown, IconLock, IconPlus } from "@tabler/icons-react";
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { BabySheet } from "@/components/sheets/BabySheet";
 import { Sheet } from "@/components/Sheet";
+import { usePremium } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { useSelectedBaby } from "@/lib/selected-baby";
+import { toast } from "@/lib/toast";
 import { formatAge } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
@@ -12,9 +15,12 @@ import { cn } from "@/lib/utils";
 // used on Timeline/Stats.
 export function BabySwitcher({ compact = false }: { compact?: boolean }) {
   const { babies, baby, selectBaby } = useSelectedBaby();
+  const navigate = useNavigate();
+  const premium = usePremium();
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const many = (babies.data?.length ?? 0) > 1;
+  const atLimit = !premium && (babies.data?.length ?? 0) >= 1;
 
   if (!baby) return null;
 
@@ -81,13 +87,31 @@ export function BabySwitcher({ compact = false }: { compact?: boolean }) {
           <button
             type="button"
             onClick={() => {
+              if (atLimit) {
+                toast(t("Premium feature — upgrade in Settings"));
+                setOpen(false);
+                void navigate({ to: "/settings" });
+                return;
+              }
               setOpen(false);
               setAdding(true);
             }}
-            className="flex w-full items-center gap-2 rounded-xl2 border border-dashed border-line px-4 py-3 text-left font-semibold text-ink-soft active:bg-surface-2"
+            className={cn(
+              "flex w-full items-center gap-2 rounded-xl2 border border-dashed border-line px-4 py-3 text-left font-semibold text-ink-soft active:bg-surface-2",
+              atLimit && "text-muted opacity-60",
+            )}
           >
-            <IconPlus className="h-5 w-5" />
+            {atLimit ? (
+              <IconLock className="h-5 w-5" />
+            ) : (
+              <IconPlus className="h-5 w-5" />
+            )}
             {t("Add baby")}
+            {atLimit && (
+              <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-bold text-accent">
+                {t("Premium")}
+              </span>
+            )}
           </button>
         </div>
       </Sheet>

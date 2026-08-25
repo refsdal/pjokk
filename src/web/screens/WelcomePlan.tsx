@@ -36,7 +36,7 @@ const FREE_FEATURES = [
 ];
 const PREMIUM_FEATURES = [
   "More babies",
-  "Bath, notes, milestones & pump",
+  "Bath, notes, milestones & more",
   "Growth charts (WHO)",
   "Month stats",
   "CSV export",

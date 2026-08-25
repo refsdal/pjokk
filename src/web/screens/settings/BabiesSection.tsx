@@ -1,10 +1,9 @@
 import { IconLock, IconPlus } from "@tabler/icons-react";
-import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Baby } from "@shared/schemas";
 import { BabySheet } from "@/components/sheets/BabySheet";
 import { Card } from "@/components/ui/card";
-import { useBabies, useFamily } from "@/lib/data";
+import { useBabies, usePremium } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { formatAge } from "@/lib/time";
@@ -13,8 +12,7 @@ import { SectionTitle } from "./lib";
 
 export function BabiesSection({ isAdmin }: { isAdmin: boolean }) {
   const babies = useBabies();
-  const navigate = useNavigate();
-  const premium = (useFamily().data?.plan ?? "free") !== "free";
+  const premium = usePremium();
   const atLimit = !premium && (babies.data?.length ?? 0) >= 1;
   const [editBaby, setEditBaby] = useState<Baby | null>(null);
   const [adding, setAdding] = useState(false);
@@ -43,7 +41,9 @@ export function BabiesSection({ isAdmin }: { isAdmin: boolean }) {
             atLimit
               ? () => {
                   toast(t("Premium feature — upgrade in Settings"));
-                  void navigate({ to: "/settings" });
+                  document
+                    .getElementById("billing")
+                    ?.scrollIntoView({ behavior: "smooth" });
                 }
               : () => setAdding(true)
           }

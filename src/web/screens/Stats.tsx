@@ -23,7 +23,7 @@ import { ChipGroup } from "@/components/Chips";
 import { Card } from "@/components/ui/card";
 import { OtherLogSheet } from "@/components/sheets/OtherLogSheet";
 import { BabySwitcher } from "@/components/BabySwitcher";
-import { useFamily, useMeasurements, useStats } from "@/lib/data";
+import { useFamily, useMeasurements, usePremium, useStats } from "@/lib/data";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import { toast } from "@/lib/toast";
 import {
@@ -173,7 +173,7 @@ export function StatsScreen() {
   const stats = useStats(baby?.id, days);
   const s = stats.data;
 
-  const premium = (family.data?.plan ?? "free") !== "free";
+  const premium = usePremium();
 
   useEffect(() => {
     if (days === 30 && family.isSuccess && !premium) setDays(7);
@@ -304,7 +304,14 @@ export function StatsScreen() {
 
         <button
           type="button"
-          onClick={() => setMeasureOpen(true)}
+          onClick={() => {
+            if (!premium) {
+              toast(t("Premium feature — upgrade in Settings"));
+              void navigate({ to: "/settings" });
+              return;
+            }
+            setMeasureOpen(true);
+          }}
           className="flex w-full items-center gap-3 rounded-xl2 border border-line bg-surface p-4 text-left active:bg-surface-2"
         >
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-2 text-growth">
@@ -334,7 +341,9 @@ export function StatsScreen() {
               </p>
             ) : (
               <p className="text-sm text-muted">
-                {t("Log a weight under More → Measurement")}
+                {premium
+                  ? t("Log a weight under More → Measurement")
+                  : t("Weight tracking is a Premium feature.")}
               </p>
             )}
           </div>

@@ -360,6 +360,11 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   "otherActivities" | "multipleBabies" | "growthCharts" | "apiKeys" |
   "csvExport" | "statsMonth"`. All plan reads go through `canUse(family,
   feature)`, unchanged API.
+- An offline-queued create of a gated kind (e.g. a second baby, or a bath/note
+  logged while offline) that replays after the family has downgraded is
+  rejected with 402 `PLAN_REQUIRED` and dropped with a toast rather than
+  retried or silently kept queued — accepted under the same soft-lock
+  semantics as the online gate.
 
 ## Infra
 

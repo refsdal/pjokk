@@ -1,9 +1,19 @@
 import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
 import type { MeasurementType, MedicineUnit } from "@shared/schemas";
-import { api, unwrap } from "../api";
+import { api, ApiError, unwrap } from "../api";
 import { t } from "../i18n";
 import { toast } from "../toast";
 import { invalidateLogs } from "./keys";
+
+// Server 402s for a gated kind carry `code: "PLAN_REQUIRED"` — surface the
+// friendly upgrade copy instead of the raw server message in that case.
+function toastMutationError(prefix: string, err: Error) {
+  if (err instanceof ApiError && err.code === "PLAN_REQUIRED") {
+    toast(t("Premium feature — upgrade in Settings"), "error");
+    return;
+  }
+  toast(prefix + err.message, "error");
+}
 
 // The six Phase 3 activity types: one generic client path for all of them.
 
@@ -129,8 +139,7 @@ export function registerOtherMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["createOther"], {
     mutationFn: async ({ kind, ...body }: CreateOtherVars) =>
       unwrap(await otherApi[kind].$post({ json: body })),
-    onError: (err: Error) =>
-      toast(t("Could not save: ") + err.message, "error"),
+    onError: (err: Error) => toastMutationError(t("Could not save: "), err),
     onSettled: () => invalidateLogs(qc),
   });
   qc.setMutationDefaults(["updateOther"], {

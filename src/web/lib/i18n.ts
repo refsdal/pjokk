@@ -165,6 +165,8 @@ const nb: Record<string, string> = {
   "set sex in Settings for percentiles":
     "angi kjønn i Innstillinger for persentiler",
   "Log a weight under More → Measurement": "Logg en vekt under Mer → Måling",
+  "Weight tracking is a Premium feature.":
+    "Vektsporing er en Premium-funksjon.",
   "Month view is a Premium feature": "Månedsvisning er en Premium-funksjon",
   "Growth chart": "Vekstkurve",
   "WHO percentile curves are a Premium feature.":
@@ -306,7 +308,7 @@ const nb: Record<string, string> = {
   "Week stats": "Ukestatistikk",
   "Reminders & night mode": "Påminnelser og nattmodus",
   "More babies": "Flere babyer",
-  "Bath, notes, milestones & pump": "Bad, notater, milepæler og pumping",
+  "Bath, notes, milestones & more": "Bad, notater, milepæler og mer",
   "Growth charts (WHO)": "Vekstkurver (WHO)",
   "Month stats": "Månedsstatistikk",
   "CSV export": "CSV-eksport",

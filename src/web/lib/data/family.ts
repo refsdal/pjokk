@@ -9,6 +9,12 @@ export function useFamily() {
   });
 }
 
+// Shared premium check — the same `plan !== "free"` read used across every
+// client-side entitlement gate.
+export function usePremium(): boolean {
+  return (useFamily().data?.plan ?? "free") !== "free";
+}
+
 export function useBabies() {
   return useQuery({
     queryKey: ["babies"],
