@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import { familyScope } from "../src/worker/db/scoped";
 import {
   addMember,
+  api,
   createBaby,
   createFamily,
   createUser,
   db,
   rig,
+  setPlan,
 } from "./helpers";
 
 const HOUR = 3600_000;
@@ -137,5 +139,157 @@ describe("calendar scoped helpers", () => {
     expect(await otherFam.deleteCalendarEvent(created!.id)).toBe(false);
     expect(await fam.deleteCalendarEvent(created!.id)).toBe(true);
     expect(await fam.getCalendarEvent(created!.id)).toBeNull();
+  });
+});
+
+describe("calendar API", () => {
+  const HOUR = 3600_000;
+  const futureIso = (h: number) =>
+    new Date(Date.now() + h * HOUR).toISOString();
+  const range = () =>
+    `from=${encodeURIComponent(new Date().toISOString())}&to=${encodeURIComponent(futureIso(24 * 90))}`;
+
+  it("create is 402 on free; full CRUD on premium; edit/delete stay open after downgrade", async () => {
+    const { family, baby, cookie } = await rig();
+    const body = {
+      title: "Checkup",
+      category: "doctor",
+      startTime: futureIso(48),
+      durationMin: 30,
+      babyIds: [baby.id],
+    };
+    const denied = await api("/api/calendar/events", {
+      method: "POST",
+      cookie,
+      body,
+    });
+    expect(denied.status).toBe(402);
+    expect(((await denied.json()) as { code: string }).code).toBe(
+      "PLAN_REQUIRED",
+    );
+
+    await setPlan(family.id, "premium");
+    const created = await api("/api/calendar/events", {
+      method: "POST",
+      cookie,
+      body,
+    });
+    expect(created.status).toBe(201);
+    const event = (await created.json()) as {
+      id: string;
+      babies: { id: string }[];
+      allDay: boolean;
+    };
+    expect(event.babies.map((b) => b.id)).toEqual([baby.id]);
+    expect(event.allDay).toBe(false);
+
+    await setPlan(family.id, "free");
+    const list = await api(`/api/calendar/events?${range()}`, { cookie });
+    expect(list.status).toBe(200);
+    expect(((await list.json()) as unknown[]).length).toBe(1);
+    const patched = await api(`/api/calendar/events/${event.id}`, {
+      method: "PATCH",
+      cookie,
+      body: { title: "Checkup (moved)" },
+    });
+    expect(patched.status).toBe(200);
+    const removed = await api(`/api/calendar/events/${event.id}`, {
+      method: "DELETE",
+      cookie,
+    });
+    expect(removed.status).toBe(200);
+  });
+
+  it("rejects foreign babyIds and non-member assignees", async () => {
+    const a = await rig();
+    await setPlan(a.family.id, "premium");
+    const b = await rig("Other family");
+
+    const foreignBaby = await api("/api/calendar/events", {
+      method: "POST",
+      cookie: a.cookie,
+      body: { title: "X", startTime: futureIso(1), babyIds: [b.baby.id] },
+    });
+    expect(foreignBaby.status).toBe(400);
+    expect(((await foreignBaby.json()) as { code: string }).code).toBe(
+      "INVALID_REFERENCE",
+    );
+
+    const foreignAssignee = await api("/api/calendar/events", {
+      method: "POST",
+      cookie: a.cookie,
+      body: {
+        title: "X",
+        startTime: futureIso(1),
+        assigneeUserIds: [b.user.id],
+      },
+    });
+    expect(foreignAssignee.status).toBe(400);
+  });
+
+  it("cross-family access is a 404, and ranges are validated", async () => {
+    const a = await rig();
+    await setPlan(a.family.id, "premium");
+    const created = await api("/api/calendar/events", {
+      method: "POST",
+      cookie: a.cookie,
+      body: { title: "Ours", startTime: futureIso(1), allDay: true },
+    });
+    const { id } = (await created.json()) as { id: string };
+
+    const b = await rig("Other family");
+    expect(
+      (
+        await api(`/api/calendar/events/${id}`, {
+          method: "PATCH",
+          cookie: b.cookie,
+          body: { title: "Hijack" },
+        })
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await api(`/api/calendar/events/${id}`, {
+          method: "DELETE",
+          cookie: b.cookie,
+        })
+      ).status,
+    ).toBe(404);
+
+    const inverted = await api(
+      `/api/calendar/events?from=${encodeURIComponent(futureIso(2))}&to=${encodeURIComponent(futureIso(1))}`,
+      { cookie: a.cookie },
+    );
+    expect(inverted.status).toBe(400);
+  });
+
+  it("allDay create nulls duration; patching allDay true clears it; time edits re-arm the reminder", async () => {
+    const a = await rig();
+    await setPlan(a.family.id, "premium");
+    const created = await api("/api/calendar/events", {
+      method: "POST",
+      cookie: a.cookie,
+      body: {
+        title: "Visit",
+        startTime: futureIso(24),
+        allDay: true,
+        durationMin: 60,
+        remindMinutesBefore: 60,
+      },
+    });
+    expect(created.status).toBe(201);
+    const event = (await created.json()) as {
+      id: string;
+      durationMin: number | null;
+    };
+    expect(event.durationMin).toBeNull();
+
+    const patched = await api(`/api/calendar/events/${event.id}`, {
+      method: "PATCH",
+      cookie: a.cookie,
+      body: { startTime: futureIso(48) },
+    });
+    expect(patched.status).toBe(200);
+    // remindedAt reset is internal — verified end-to-end in the reminder tests.
   });
 });

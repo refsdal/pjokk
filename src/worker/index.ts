@@ -18,6 +18,7 @@ import { rateLimit } from "./middleware/rate-limit";
 import { audit, requireSysadmin } from "./middleware/sysadmin";
 import { adminApp } from "./routes/admin";
 import { billingApp } from "./routes/billing";
+import { calendarApp } from "./routes/calendar";
 import { exportApp } from "./routes/export";
 import { keysApp } from "./routes/keys";
 import { otherLogsApp } from "./routes/other-logs";
@@ -121,6 +122,7 @@ const domainApp = domainBase
   .route("/", sleepLocationsApp)
   .route("/", otherLogsApp)
   .route("/", timelineApp)
+  .route("/", calendarApp)
   .route("/", statsApp)
   .route("/", exportApp)
   .route("/", pushApp)
