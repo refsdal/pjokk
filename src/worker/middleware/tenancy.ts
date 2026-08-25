@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import type { AppEnv, FamEnv } from "../context";
 import { schema } from "../db";
 import { familyScope } from "../db/scoped";
+import { audit } from "./sysadmin";
 
 // Resolves the session once per request; never rejects (routes decide).
 // Skipped when API-key auth already populated a synthetic session.
@@ -48,6 +49,21 @@ export const requireFamily = createMiddleware<FamEnv>(async (c, next) => {
   c.set("familyId", familyId);
   c.set("memberRole", membership[0].role);
   c.set("fam", familyScope(c.var.db, familyId));
+
+  // Issue #7: domain WRITES made while impersonating leave a trace with
+  // both identities.
+  const impersonator = (session.session as { impersonatedBy?: string | null })
+    .impersonatedBy;
+  if (impersonator && !["GET", "HEAD"].includes(c.req.method)) {
+    await audit(
+      c.var.db,
+      impersonator,
+      "impersonated.write",
+      session.user.id,
+      `${c.req.method} ${c.req.path}`,
+    ).catch(() => {});
+  }
+
   await next();
 });
 

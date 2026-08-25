@@ -12,7 +12,7 @@
     "db:migrate:local": "wrangler d1 migrations apply pjokk --local",
     "db:migrate:remote": "wrangler d1 migrations apply pjokk --remote",
     "deploy": "vite build && wrangler deploy -c dist/pjokk/wrangler.json",
-    "seed:local": "node scripts/seed.mjs && wrangler d1 execute pjokk --local --file .seed.sql",
+    "seed:local": "node scripts/seed.mjs && wrangler d1 execute pjokk --local --command \"CREATE TABLE IF NOT EXISTS _local_dev_only (x INTEGER)\" && wrangler d1 execute pjokk --local --file .seed.sql",
     "cf-typegen": "wrangler types",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."

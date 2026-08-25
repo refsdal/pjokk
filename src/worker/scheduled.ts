@@ -119,7 +119,13 @@ export async function runBackup(env: Env, now = new Date()) {
   const dump: Record<string, unknown[]> = {};
   for (const table of BACKUP_TABLES) {
     const res = await env.DB.prepare(`SELECT * FROM "${table}"`).all();
-    dump[table] = res.results;
+    // Issue #4: keep credential material out of the snapshot. A restore
+    // loses dev passwords (Google/passkey users are unaffected) — that's
+    // the right trade.
+    dump[table] =
+      table === "account"
+        ? res.results.map((row) => ({ ...row, password: null }))
+        : res.results;
   }
   const key = `backups/${now.toISOString().slice(0, 10)}.json`;
   await env.FILES.put(

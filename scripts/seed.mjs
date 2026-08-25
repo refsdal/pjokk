@@ -23,7 +23,13 @@ const KRISTINE = "user_kristine";
 const NORA = "baby_nora";
 const hash = await hashPassword(PASSWORD);
 
-const rows = [];
+const rows = [
+  // Safety interlock (issue #3): this table only exists in the LOCAL dev
+  // database (created by the seed:local npm script). On any other target the
+  // first statement errors and wrangler aborts the whole file before any
+  // destructive DELETE runs.
+  "DELETE FROM _local_dev_only;",
+];
 const del = (table) => rows.push(`DELETE FROM ${table};`);
 // Idempotent re-seed: wipe domain + auth data (dev database only!).
 for (const table of [

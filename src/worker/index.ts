@@ -15,7 +15,7 @@ import { feedsApp } from "./routes/feeds";
 import { invitesAdminApp, invitesPublicApp } from "./routes/invites";
 import { apiKeyAuth, rejectApiKey } from "./middleware/api-key";
 import { rateLimit } from "./middleware/rate-limit";
-import { requireSysadmin } from "./middleware/sysadmin";
+import { audit, requireSysadmin } from "./middleware/sysadmin";
 import { adminApp } from "./routes/admin";
 import { exportApp } from "./routes/export";
 import { keysApp } from "./routes/keys";
@@ -58,6 +58,28 @@ app.use(
   rateLimit({ name: "auth-signin", limit: 20, windowSeconds: 600 }),
 );
 
+// Server-side audit of better-auth admin operations (issue #6): the client
+// no longer self-reports; every successful /api/auth/admin/* call writes the
+// trail from the actual request.
+app.use("/api/auth/admin/*", async (c, next) => {
+  const body = (await c.req.raw
+    .clone()
+    .json()
+    .catch(() => null)) as { userId?: string } | null;
+  await next();
+  if (c.res.status < 400) {
+    const session = await c.var.auth.api.getSession({
+      headers: c.req.raw.headers,
+    });
+    if (session) {
+      const action = `auth.${c.req.path.split("/api/auth/admin/")[1] ?? "?"}`;
+      await audit(c.var.db, session.user.id, action, body?.userId ?? "-").catch(
+        () => {},
+      );
+    }
+  }
+});
+
 // better-auth owns /api/auth/* (must be registered before the session
 // middleware so it terminates the chain itself).
 app.on(["GET", "POST"], "/api/auth/*", (c) =>
@@ -94,8 +116,16 @@ const domainApp = domainBase
   .route("/", keysApp)
   .route("/", invitesAdminApp);
 
-// Docs are public: registered before the tenancy-gated domain mount so the
-// requireFamily middleware never sees these paths.
+// API docs require a signed-in session (issue #2): registered before the
+// tenancy-gated domain mount, but not open to the world.
+const requireSession = createMiddleware<AppEnv>(async (c, next) => {
+  if (!c.var.sessionData) {
+    return c.json({ error: "Not signed in", code: "UNAUTHENTICATED" }, 401);
+  }
+  await next();
+});
+app.use("/api/openapi.json", requireSession);
+app.use("/api/docs", requireSession);
 app.doc("/api/openapi.json", {
   openapi: "3.1.0",
   info: {

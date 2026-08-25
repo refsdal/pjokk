@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { api, unwrap } from "@/lib/api";
 import { authClient, useSession } from "@/lib/auth-client";
 import { toast } from "@/lib/toast";
-import { note, type AdminUser } from "./lib";
+import type { AdminUser } from "./lib";
 
 function UserSheet({
   user,
@@ -23,15 +23,10 @@ function UserSheet({
   const { data: session } = useSession();
   const isSelf = user?.id === session?.user.id;
 
-  const run = async (
-    label: string,
-    fn: () => Promise<unknown>,
-    // null = the server writes its own audit entry for this op.
-    auditAction: string | null,
-  ) => {
+  // Auditing happens server-side for every admin op (issue #6).
+  const run = async (label: string, fn: () => Promise<unknown>) => {
     try {
       await fn();
-      if (auditAction) note(auditAction, user!.id, user!.email);
       toast(`${label} ✓`);
       refresh();
       onClose();
@@ -58,10 +53,8 @@ function UserSheet({
             size="full"
             variant="outline"
             onClick={() =>
-              void run(
-                "Sessions revoked",
-                () => authClient.admin.revokeUserSessions({ userId: user.id }),
-                "user.revoke-sessions",
+              void run("Sessions revoked", () =>
+                authClient.admin.revokeUserSessions({ userId: user.id }),
               )
             }
           >
@@ -79,14 +72,11 @@ function UserSheet({
               variant="secondary"
               disabled={password.length < 8}
               onClick={() =>
-                void run(
-                  "Password set",
-                  () =>
-                    authClient.admin.setUserPassword({
-                      userId: user.id,
-                      newPassword: password,
-                    }),
-                  "user.set-password",
+                void run("Password set", () =>
+                  authClient.admin.setUserPassword({
+                    userId: user.id,
+                    newPassword: password,
+                  }),
                 )
               }
             >
@@ -100,16 +90,13 @@ function UserSheet({
                 size="full"
                 variant="outline"
                 onClick={() =>
-                  void run(
-                    user.banned ? "Unbanned" : "Banned",
-                    () =>
-                      user.banned
-                        ? authClient.admin.unbanUser({ userId: user.id })
-                        : authClient.admin.banUser({
-                            userId: user.id,
-                            banReason: "banned via admin console",
-                          }),
-                    user.banned ? "user.unban" : "user.ban",
+                  void run(user.banned ? "Unbanned" : "Banned", () =>
+                    user.banned
+                      ? authClient.admin.unbanUser({ userId: user.id })
+                      : authClient.admin.banUser({
+                          userId: user.id,
+                          banReason: "banned via admin console",
+                        }),
                   )
                 }
               >
@@ -120,16 +107,12 @@ function UserSheet({
                 size="full"
                 variant="secondary"
                 onClick={() =>
-                  void run(
-                    "Impersonating",
-                    async () => {
-                      await authClient.admin.impersonateUser({
-                        userId: user.id,
-                      });
-                      window.location.assign("/");
-                    },
-                    "user.impersonate",
-                  )
+                  void run("Impersonating", async () => {
+                    await authClient.admin.impersonateUser({
+                      userId: user.id,
+                    });
+                    window.location.assign("/");
+                  })
                 }
               >
                 Impersonate
@@ -147,7 +130,6 @@ function UserSheet({
                           param: { id: user.id },
                         }),
                       ),
-                    null,
                   )
                 }
               />

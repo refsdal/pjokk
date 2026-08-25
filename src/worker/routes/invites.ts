@@ -107,6 +107,13 @@ const inviteInfo = createRoute({
     "What the /join page shows before sign-in: which family, which role, still valid?",
   middleware: [
     rateLimit({ name: "invite-info", limit: 30, windowSeconds: 600 }),
+    // Global backstop against distributed code guessing (issue #1).
+    rateLimit({
+      name: "invite-info-global",
+      limit: 500,
+      windowSeconds: 600,
+      scope: "global",
+    }),
   ] as const,
   request: { params: z.object({ code: z.string() }) },
   responses: {
@@ -122,6 +129,12 @@ const redeem = createRoute({
     "Join a family with an invite code. Requires a signed-in session; membership + use-count are written atomically in one D1 batch.",
   middleware: [
     rateLimit({ name: "invite-redeem", limit: 10, windowSeconds: 600 }),
+    rateLimit({
+      name: "invite-redeem-global",
+      limit: 200,
+      windowSeconds: 600,
+      scope: "global",
+    }),
   ] as const,
   request: {
     body: { content: { "application/json": { schema: RedeemSchema } } },
