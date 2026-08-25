@@ -23,6 +23,7 @@ import {
 import type { FamEnv } from "../context";
 import type { FamilyScope } from "../db/scoped";
 import type { LogCrud } from "../db/scoped";
+import { canUse } from "../entitlements";
 import { createApp, jsonContent } from "../lib";
 
 // The Phase 1 CRUD-route pattern, built once and instantiated per activity
@@ -50,6 +51,10 @@ function makeLogRoutes<
   updateSchema: TUpdate;
   crud: (fam: FamilyScope) => LogCrud<Row, Insert>;
   toApi: (row: Row) => z.output<TLog>;
+  // Medicine is never gated; the other five Phase 3 kinds require premium
+  // on create only (GET/PATCH/DELETE stay open so a downgraded family keeps
+  // read/edit/delete access to entries it already made).
+  gated: boolean;
 }) {
   const collection = `/api/${cfg.base}` as `/api/${Base}`;
   const item = `/api/${cfg.base}/{id}` as `/api/${Base}/{id}`;
@@ -73,6 +78,7 @@ function makeLogRoutes<
     },
     responses: {
       201: jsonContent(cfg.logSchema, "Created"),
+      402: jsonContent(ErrorSchema, "Premium required"),
       404: jsonContent(ErrorSchema, "Unknown baby"),
     },
   });
@@ -120,6 +126,9 @@ function makeLogRoutes<
   };
 
   const createHandler = async (c: LooseCtx) => {
+    if (cfg.gated && !canUse({ plan: c.var.plan }, "otherActivities")) {
+      return c.json({ error: "Premium required", code: "PLAN_REQUIRED" }, 402);
+    }
     const body = c.req.valid("json") as {
       babyId: string;
       time: string;
@@ -181,6 +190,7 @@ export const otherLogsApp = createApp<FamEnv>()
       updateSchema: UpdateMedicineSchema,
       crud: (fam) => fam.medicine,
       toApi: (row) => ({ ...row, time: iso(row.time) }),
+      gated: false,
     }),
   )
   .route(
@@ -192,6 +202,7 @@ export const otherLogsApp = createApp<FamEnv>()
       updateSchema: UpdateBathSchema,
       crud: (fam) => fam.bath,
       toApi: (row) => ({ ...row, time: iso(row.time) }),
+      gated: true,
     }),
   )
   .route(
@@ -203,6 +214,7 @@ export const otherLogsApp = createApp<FamEnv>()
       updateSchema: UpdateNoteSchema,
       crud: (fam) => fam.note,
       toApi: (row) => ({ ...row, time: iso(row.time) }),
+      gated: true,
     }),
   )
   .route(
@@ -214,6 +226,7 @@ export const otherLogsApp = createApp<FamEnv>()
       updateSchema: UpdateMilestoneSchema,
       crud: (fam) => fam.milestone,
       toApi: (row) => ({ ...row, time: iso(row.time) }),
+      gated: true,
     }),
   )
   .route(
@@ -225,6 +238,7 @@ export const otherLogsApp = createApp<FamEnv>()
       updateSchema: UpdateMeasurementSchema,
       crud: (fam) => fam.measurement,
       toApi: (row) => ({ ...row, time: iso(row.time) }),
+      gated: true,
     }),
   )
   .route(
@@ -236,5 +250,6 @@ export const otherLogsApp = createApp<FamEnv>()
       updateSchema: UpdatePumpSchema,
       crud: (fam) => fam.pump,
       toApi: (row) => ({ ...row, time: iso(row.time) }),
+      gated: true,
     }),
   );

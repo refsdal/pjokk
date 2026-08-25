@@ -8,12 +8,16 @@ import {
   createUser,
   db,
   rig,
+  setPlan,
   signIn,
 } from "./helpers";
 
 describe("multiple babies per household", () => {
   it("adds a second baby with isolated summaries", async () => {
     const a = await rig();
+    // multipleBabies is a Task 1 entitlement gate; this test is about
+    // per-baby data isolation, not the plan gate, so lift to premium first.
+    await setPlan(a.family.id, "premium");
     const res = await api("/api/babies", {
       method: "POST",
       cookie: a.cookie,

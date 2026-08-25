@@ -73,6 +73,9 @@ describe("stats", () => {
 
   it("returns latest weight with its predecessor", async () => {
     const a = await rig();
+    // measurements is a gated activity type (Task 1 entitlement rework);
+    // this test is about stats math, not the plan gate.
+    await setPlan(a.family.id, "premium");
     const post = (daysAgo: number, value: number) =>
       api("/api/measurements", {
         method: "POST",

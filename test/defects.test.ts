@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { schema } from "../src/worker/db";
 import { formatRelative, toLocalDateInput } from "../src/web/lib/time";
-import { api, db, rig } from "./helpers";
+import { api, db, rig, setPlan } from "./helpers";
 import type { Timeline } from "../src/shared/schemas";
 
 // Regression tests for the 2026-08-25 review findings.
@@ -9,6 +9,10 @@ import type { Timeline } from "../src/shared/schemas";
 describe("empty PATCH bodies are no-ops, not 500s", () => {
   it("core and generic update endpoints accept {}", async () => {
     const a = await rig();
+    // Bath is a gated activity type (Task 1 entitlement rework) — this test
+    // is about PATCH no-ops, not the create gate, so lift the family to
+    // premium before creating one.
+    await setPlan(a.family.id, "premium");
     const feed = (await (
       await api("/api/feeds", {
         method: "POST",

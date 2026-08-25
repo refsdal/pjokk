@@ -8,6 +8,7 @@ import {
   UpdateBabySchema,
 } from "@shared/schemas";
 import type { FamEnv } from "../context";
+import { canUse } from "../entitlements";
 import { createApp, jsonContent, serBaby } from "../lib";
 
 const listBabies = createRoute({
@@ -28,6 +29,7 @@ const createBaby = createRoute({
   },
   responses: {
     201: jsonContent(BabySchema, "Created"),
+    402: jsonContent(ErrorSchema, "Premium required"),
   },
 });
 
@@ -84,6 +86,12 @@ export const babiesApp = createApp<FamEnv>()
     return c.json(babies.map(serBaby), 200);
   })
   .openapi(createBaby, async (c) => {
+    if (
+      !canUse({ plan: c.var.plan }, "multipleBabies") &&
+      (await c.var.fam.listBabies()).length >= 1
+    ) {
+      return c.json({ error: "Premium required", code: "PLAN_REQUIRED" }, 402);
+    }
     const body = c.req.valid("json");
     const created = await c.var.fam.createBaby({
       name: body.name,

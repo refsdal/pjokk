@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { api, rig } from "./helpers";
+import { api, rig, setPlan } from "./helpers";
 import type { Timeline } from "../src/shared/schemas";
 
 // The six Phase 3 types share one generic CRUD + route factory. Medicine is
@@ -103,6 +103,10 @@ describe("phase 3 activity types", () => {
 
   it("all six types create and land on the timeline (other filter)", async () => {
     const a = await rig();
+    // Five of the six kinds are gated (otherActivities, Task 1 entitlement
+    // rework); medicine is exempt. This test is about the CRUD/timeline
+    // wiring, not the plan gate, so lift the family to premium first.
+    await setPlan(a.family.id, "premium");
     const now = Date.now();
     const at = (minAgo: number) =>
       new Date(now - minAgo * 60_000).toISOString();
