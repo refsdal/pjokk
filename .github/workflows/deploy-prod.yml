@@ -1,0 +1,74 @@
+name: Deploy production
+
+# Manually triggered (Actions → Deploy production → Run workflow, or
+# `gh workflow run deploy-prod.yml`). The button is the approval gate:
+# GitHub's required-reviewers environment rule needs a paid plan on private
+# repos, so the dispatch itself plays that role — only collaborators can
+# trigger it, and the full test suite still gates the deploy. If the repo
+# ever moves to GitHub Pro/Team, add required reviewers to the "production"
+# environment and this workflow picks the gate up unchanged.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint + typecheck
+        run: pnpm check
+
+      - name: Tests (workers runtime)
+        run: pnpm test
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://app.pjokk.no
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Migrations before deploy on purpose: new code must never reference
+      # a table that doesn't exist yet. Migrations are append-only, so the
+      # brief window where old code runs against a newer schema is safe.
+      - name: Apply D1 migrations (pjokk)
+        run: pnpm db:migrate:remote
+
+      - name: Deploy production
+        # `run` is required: bare `pnpm deploy` hits pnpm's builtin deploy
+        # command instead of the package script.
+        run: pnpm run deploy

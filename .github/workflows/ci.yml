@@ -34,8 +34,8 @@ jobs:
 
   # Every green push to main auto-deploys the test environment
   # (app-test.pjokk.no, worker pjokk-test, isolated D1/KV/R2 + Stripe test
-  # mode). Production remains a manual `pnpm deploy`. Skips gracefully while
-  # the CLOUDFLARE_API_TOKEN repo secret is not configured.
+  # mode). Skips gracefully while the CLOUDFLARE_API_TOKEN repo secret is
+  # not configured.
   deploy-test:
     needs: ci
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
