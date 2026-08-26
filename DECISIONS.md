@@ -450,3 +450,24 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   Considered and rejected: switching the package manager to Bun — installs
   are already fast, and @cloudflare/vitest-pool-workers requires vitest
   under Node, so the risk sits exactly where this project is unusual.
+
+## Calendar (2026-08-25)
+
+- Bespoke module (sleep-locations pattern), NOT logCrud: events have no
+  required baby, a start+duration shape, and two join tables
+  (calendar_event_baby, calendar_assignee) the factory can't express.
+- Single range endpoint (GET /api/calendar/events?from=&to=), no cursor
+  pagination — family calendars are dozens of rows; range capped at 366 days.
+- Free tier sees the full calendar UI with a locked Add button and an upsell
+  empty state (not a hard upsell page): keeps the soft-lock promise that
+  downgraded families can still see and edit existing events.
+- Calendar mutations skip the offline paused-mutation queue: planning is a
+  deliberate online act, unlike 3am logging.
+- Reminders: one lead time per event (60/1440 min chips), targeted at
+  assignees when set, else all members; latched via remindedAt; events >60 min
+  past are latched silently (no late reminders after downtime); editing
+  startTime or the lead re-arms the latch.
+- v1 exclusions (spec'd): recurrence, multi-day events, ICS, timeline
+  integration.
+- Note (review): reminders may fire up to 60 min after start (cron-tick
+  tolerance inside the grace window) — spec-intended.

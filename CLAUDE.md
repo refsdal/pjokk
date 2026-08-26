@@ -220,6 +220,11 @@ sheet pattern — build the pattern well once.
 > enabled as the dev/demo path (signup stays closed), log sheets omit the
 > notes field until the edit sheet lands in Phase 2, and Google OAuth
 > credentials are still placeholders (see SMOKE-TEST.md for go-live steps).
+> Post-Phase-9: the premium Calendar shipped — fifth tab (month/week grid +
+> upcoming list), family-wide events with multi-baby + multi-assignee chips,
+> category tints reusing the existing tokens, 402-gated creation
+> (edit/delete stay open per the soft-lock rule), and calendar push
+> reminders on the */15 cron with a remindedAt latch + 60-min grace window.
 
 1. **Core loop:** schema, auth (social + orgs + invite codes), tenancy
    middleware, home screen with status cards + Feed/Diaper/Sleep sheets,
