@@ -206,36 +206,39 @@ export function StatsScreen() {
 
   return (
     <div className="mx-auto max-w-md px-4 pt-safe">
-      <div className="flex items-center justify-between gap-2 py-4">
+      <div className="flex items-center justify-between gap-2 pt-4 pb-2">
         <h1 className="text-2xl font-extrabold text-ink">{t("Stats")}</h1>
         <BabySwitcher compact />
-        <ChipGroup
-          options={[
-            { value: "1", label: t("Day") },
-            { value: "7", label: t("Week") },
-            {
-              value: "30",
-              label: premium ? (
-                t("Month")
-              ) : (
-                <span className="inline-flex items-center gap-1">
-                  {t("Month")}
-                  <IconLock className="h-3.5 w-3.5" />
-                </span>
-              ),
-            },
-          ]}
-          value={String(days)}
-          onChange={(v) => {
-            if (v === "30" && !premium) {
-              toast(t("Month view is a Premium feature"));
-              void navigate({ to: "/settings" });
-              return;
-            }
-            setDays(Number(v) as 1 | 7 | 30);
-          }}
-        />
       </div>
+      {/* Own row: sharing the title line made the chips wrap on narrow
+          phones. */}
+      <ChipGroup
+        className="pb-3"
+        options={[
+          { value: "1", label: t("Day") },
+          { value: "7", label: t("Week") },
+          {
+            value: "30",
+            label: premium ? (
+              t("Month")
+            ) : (
+              <span className="inline-flex items-center gap-1">
+                {t("Month")}
+                <IconLock className="h-3.5 w-3.5" />
+              </span>
+            ),
+          },
+        ]}
+        value={String(days)}
+        onChange={(v) => {
+          if (v === "30" && !premium) {
+            toast(t("Month view is a Premium feature"));
+            void navigate({ to: "/settings" });
+            return;
+          }
+          setDays(Number(v) as 1 | 7 | 30);
+        }}
+      />
 
       <div className="space-y-3 pb-tabbar">
         {stats.isError && <ErrorState onRetry={() => void stats.refetch()} />}
