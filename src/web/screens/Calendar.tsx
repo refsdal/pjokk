@@ -82,6 +82,7 @@ function EventRow({
           {eventTimeLine(event)}
           {event.location ? ` · ${event.location}` : ""}
           {people ? ` · ${people}` : ""}
+          {` · ${t("by")} ${event.createdByName}`}
         </span>
       </span>
     </button>

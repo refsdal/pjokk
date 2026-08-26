@@ -106,10 +106,16 @@ export async function runReminders(env: Env, now = Date.now()) {
 // editing an event's time or lead resets it (see routes/calendar.ts). Events
 // whose start is >60 min past are latched WITHOUT sending — after downtime a
 // late reminder is worse than none.
-const clockFmt = new Intl.DateTimeFormat("nb-NO", {
+// workerd's default TZ is UTC, so without an explicit zone a 14:00 CEST
+// appointment would push as "12:00" (repo convention: Norwegian defaults,
+// quietly — see CLAUDE.md). Exported so tests can assert Oslo-local
+// formatting directly; the pushed body itself is unobservable through the
+// test fetch stub (web-push encrypts the payload before the HTTP call).
+export const clockFmt = new Intl.DateTimeFormat("nb-NO", {
   hour: "2-digit",
   minute: "2-digit",
   hour12: false,
+  timeZone: "Europe/Oslo",
 });
 
 export async function runCalendarReminders(env: Env, now = Date.now()) {

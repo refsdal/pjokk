@@ -2,7 +2,7 @@ import { env } from "cloudflare:test";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "../src/worker/db";
-import { runCalendarReminders } from "../src/worker/scheduled";
+import { clockFmt, runCalendarReminders } from "../src/worker/scheduled";
 import {
   addMember,
   api,
@@ -145,5 +145,30 @@ describe("calendar reminders", () => {
       .where(eq(schema.calendarEvent.familyId, a.family.id));
     expect(rows.find((r) => r.id === past)!.remindedAt).not.toBeNull();
     expect(rows.find((r) => r.id === notDue)!.remindedAt).toBeNull();
+  });
+
+  it("formats the reminder clock in Europe/Oslo, not workerd's UTC default", async () => {
+    // The pushed body itself isn't observable through the fetch stub above —
+    // web-push encrypts the JSON payload (aes128gcm) before the HTTP call,
+    // so the stub only ever sees ciphertext bytes. clockFmt is exported from
+    // scheduled.ts specifically so this regression (a 14:00 CEST appointment
+    // rendering as "12:00") can be asserted directly at the unit level.
+    // 2026-08-25T12:00:00Z is during CEST (UTC+2) → 14:00 Oslo-local.
+    expect(clockFmt.format(new Date("2026-08-25T12:00:00Z"))).toBe("14:00");
+    // Winter (CET, UTC+1) sanity check too.
+    expect(clockFmt.format(new Date("2026-01-15T12:00:00Z"))).toBe("13:00");
+
+    // And a full round trip still delivers exactly once per due event, as
+    // the other tests in this file already assert in detail.
+    const a = await rig();
+    await setPlan(a.family.id, "premium");
+    await subscribe(a.cookie, `${PUSH_ORIGIN}/cal4/admin`);
+    const now = Date.now();
+    await createEvent(a.cookie, {
+      title: "Oslo clock check",
+      startTime: new Date(now + 30 * 60_000).toISOString(),
+      remindMinutesBefore: 60,
+    });
+    expect(await runCalendarReminders(env, now)).toBe(1);
   });
 });

@@ -471,3 +471,5 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   integration.
 - Note (review): reminders may fire up to 60 min after start (cron-tick
   tolerance inside the grace window) — spec-intended.
+- Reminders keep firing for downgraded (free) families' existing events —
+  consistent with the soft-lock rule (existing data stays fully functional).

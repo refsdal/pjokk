@@ -202,6 +202,23 @@ describe("calendar API", () => {
     expect(removed.status).toBe(200);
   });
 
+  it("dedupes duplicate babyIds instead of throwing on the pair-PK insert", async () => {
+    const { family, baby, cookie } = await rig();
+    await setPlan(family.id, "premium");
+    const created = await api("/api/calendar/events", {
+      method: "POST",
+      cookie,
+      body: {
+        title: "Checkup",
+        startTime: futureIso(48),
+        babyIds: [baby.id, baby.id],
+      },
+    });
+    expect(created.status).toBe(201);
+    const event = (await created.json()) as { babies: { id: string }[] };
+    expect(event.babies.map((b) => b.id)).toEqual([baby.id]);
+  });
+
   it("rejects foreign babyIds and non-member assignees", async () => {
     const a = await rig();
     await setPlan(a.family.id, "premium");

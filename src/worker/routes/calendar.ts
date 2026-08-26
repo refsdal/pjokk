@@ -120,6 +120,8 @@ export const calendarApp = createApp<FamEnv>()
         400,
       );
     }
+    // Dedupe: the pair-PK insert (event_id, baby_id | user_id) violates and
+    // the D1 batch throws on a duplicate id — an API-key caller can send one.
     const created = await c.var.fam.createCalendarEvent({
       createdBy: c.var.sessionData.user.id,
       title: body.title,
@@ -130,8 +132,8 @@ export const calendarApp = createApp<FamEnv>()
       allDay: body.allDay,
       durationMin: body.durationMin ?? null,
       remindMinutesBefore: body.remindMinutesBefore ?? null,
-      babyIds: body.babyIds,
-      assigneeUserIds: body.assigneeUserIds,
+      babyIds: [...new Set(body.babyIds)],
+      assigneeUserIds: [...new Set(body.assigneeUserIds)],
     });
     return c.json(serCalendarEvent(created!), 201);
   })
@@ -148,6 +150,11 @@ export const calendarApp = createApp<FamEnv>()
         400,
       );
     }
+    // Dedupe: same pair-PK hazard as create.
+    const babyIds = body.babyIds && [...new Set(body.babyIds)];
+    const assigneeUserIds = body.assigneeUserIds && [
+      ...new Set(body.assigneeUserIds),
+    ];
     const rearm =
       body.startTime !== undefined || body.remindMinutesBefore !== undefined;
     // The invariant (allDay => durationMin null) must hold against the
@@ -170,7 +177,7 @@ export const calendarApp = createApp<FamEnv>()
         // Moving the event (or its reminder) re-arms the sweep latch.
         remindedAt: rearm ? null : undefined,
       },
-      { babyIds: body.babyIds, assigneeUserIds: body.assigneeUserIds },
+      { babyIds, assigneeUserIds },
     );
     if (!updated) {
       return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
