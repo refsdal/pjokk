@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "../src/worker/db";
-import { api, db, rig } from "./helpers";
+import { TOMBSTONE_ID } from "../src/worker/db/tombstone";
+import {
+  addMember,
+  api,
+  createUser,
+  db,
+  rig,
+  setPlan,
+  signIn,
+} from "./helpers";
 import type { AdminFamilySchema } from "../src/shared/schemas";
 import type { z } from "@hono/zod-openapi";
 
@@ -110,6 +119,49 @@ describe("system admin", () => {
     expect(audit[0]!.action).toBe("family.delete");
     expect(audit[0]!.target).toBe(victim.family.id);
     expect(audit[0]!.detail).toBe("Doomed family");
+  });
+
+  it("deletes a user who created and was assigned to a calendar event (calendar FKs)", async () => {
+    const a = await rig("Calendar admin family");
+    await makeSysadmin(a.user.id);
+    await setPlan(a.family.id, "premium");
+
+    const victim = await createUser("Calendar victim");
+    await addMember(victim.id, a.family.id, "member");
+    const victimCookie = await signIn(victim.email);
+
+    const created = await api("/api/calendar/events", {
+      method: "POST",
+      cookie: victimCookie,
+      body: {
+        title: "Doctor checkup",
+        startTime: new Date(Date.now() + 24 * 3600_000).toISOString(),
+        assigneeUserIds: [victim.id],
+      },
+    });
+    expect(created.status).toBe(201);
+    const event = (await created.json()) as { id: string };
+
+    const del = await api(`/api/admin/users/${victim.id}/delete`, {
+      method: "POST",
+      cookie: a.cookie,
+    });
+    expect(del.status).toBe(200);
+
+    // Event survives, attribution tombstoned; the assignment row is gone
+    // (an assignee pointing at the tombstone would be meaningless).
+    const eventRows = await db()
+      .select({ createdBy: schema.calendarEvent.createdBy })
+      .from(schema.calendarEvent)
+      .where(eq(schema.calendarEvent.id, event.id));
+    expect(eventRows).toHaveLength(1);
+    expect(eventRows[0]!.createdBy).toBe(TOMBSTONE_ID);
+
+    const assigneeRows = await db()
+      .select()
+      .from(schema.calendarAssignee)
+      .where(eq(schema.calendarAssignee.eventId, event.id));
+    expect(assigneeRows).toHaveLength(0);
   });
 
   it("better-auth admin endpoints honor the role", async () => {

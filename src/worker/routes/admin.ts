@@ -281,6 +281,16 @@ export const adminApp = createApp<AppEnv>()
       .update(schema.adminAudit)
       .set({ adminId: TOMBSTONE_ID })
       .where(eq(schema.adminAudit.adminId, id));
+    await db
+      .update(schema.calendarEvent)
+      .set({ createdBy: TOMBSTONE_ID })
+      .where(eq(schema.calendarEvent.createdBy, id));
+    // Assignee, not attribution — reassigning to the tombstone would be
+    // meaningless (and could violate the (event_id, user_id) PK if the
+    // tombstone is already assigned). Just drop the assignment.
+    await db
+      .delete(schema.calendarAssignee)
+      .where(eq(schema.calendarAssignee.userId, id));
 
     await audit(db, self, "user.delete", id, target[0].email);
     // Cascades take sessions, accounts, passkeys, memberships, push

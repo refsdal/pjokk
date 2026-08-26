@@ -552,6 +552,73 @@ export const RedeemResultSchema = z
   })
   .openapi("RedeemResult");
 
+// --- Calendar (premium): family-wide planned events ---
+
+export const calendarCategories = [
+  "doctor",
+  "vaccination",
+  "babysitting",
+  "family",
+  "other",
+] as const;
+
+export const CalendarEventSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    description: z.string().nullable(),
+    location: z.string().nullable(),
+    category: z.enum(calendarCategories),
+    startTime: isoTime(),
+    allDay: z.boolean(),
+    durationMin: z.number().int().nullable(),
+    remindMinutesBefore: z.number().int().nullable(),
+    createdBy: z.string(),
+    createdByName: z.string(),
+    // Zero babies = family-wide event.
+    babies: z.array(z.object({ id: z.string(), name: z.string() })),
+    assignees: z.array(z.object({ userId: z.string(), name: z.string() })),
+  })
+  .openapi("CalendarEvent");
+
+export const CreateCalendarEventSchema = z
+  .object({
+    title: z.string().min(1).max(200),
+    description: z.string().max(2000).optional(),
+    location: z.string().max(200).optional(),
+    category: z.enum(calendarCategories).default("other"),
+    startTime: isoTime(),
+    // All-day events are single-day; the server nulls durationMin when set.
+    allDay: z.boolean().default(false),
+    durationMin: z.number().int().min(5).max(1440).optional(),
+    remindMinutesBefore: z.number().int().min(15).max(10080).optional(),
+    babyIds: z.array(z.string()).max(10).default([]),
+    assigneeUserIds: z.array(z.string()).max(20).default([]),
+  })
+  .openapi("CreateCalendarEvent");
+
+export const UpdateCalendarEventSchema = z
+  .object({
+    title: z.string().min(1).max(200).optional(),
+    description: z.string().max(2000).nullable().optional(),
+    location: z.string().max(200).nullable().optional(),
+    category: z.enum(calendarCategories).optional(),
+    startTime: isoTime().optional(),
+    allDay: z.boolean().optional(),
+    durationMin: z.number().int().min(5).max(1440).nullable().optional(),
+    remindMinutesBefore: z
+      .number()
+      .int()
+      .min(15)
+      .max(10080)
+      .nullable()
+      .optional(),
+    // Present = replace the link set; omitted = untouched.
+    babyIds: z.array(z.string()).max(10).optional(),
+    assigneeUserIds: z.array(z.string()).max(20).optional(),
+  })
+  .openapi("UpdateCalendarEvent");
+
 // --- Errors ---
 
 export const ErrorSchema = z
@@ -588,3 +655,7 @@ export type StatsDay = z.infer<typeof StatsDaySchema>;
 export type BabySex = (typeof babySexes)[number];
 export type ApiKey = z.infer<typeof ApiKeySchema>;
 export type ApiKeyCreated = z.infer<typeof ApiKeyCreatedSchema>;
+export type CalendarEvent = z.infer<typeof CalendarEventSchema>;
+export type CreateCalendarEvent = z.infer<typeof CreateCalendarEventSchema>;
+export type UpdateCalendarEvent = z.infer<typeof UpdateCalendarEventSchema>;
+export type CalendarCategory = (typeof calendarCategories)[number];

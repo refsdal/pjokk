@@ -35,3 +35,41 @@ export function ChipGroup<T extends string>({
     </div>
   );
 }
+
+// Multi-select sibling of ChipGroup — used where several people/babies can be
+// picked at once (calendar assignees + babies).
+export function MultiChipGroup<T extends string>({
+  options,
+  values,
+  onToggle,
+  className,
+}: {
+  options: { value: T; label: ReactNode }[];
+  values: T[];
+  onToggle: (v: T) => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex flex-wrap gap-2", className)}>
+      {options.map((opt) => {
+        const active = values.includes(opt.value);
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onToggle(opt.value)}
+            className={cn(
+              "h-11 min-w-16 rounded-full border px-4 text-sm font-semibold transition-colors select-none active:scale-[0.97]",
+              active
+                ? "border-accent bg-accent text-on-accent"
+                : "border-line bg-surface text-ink-soft",
+            )}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}

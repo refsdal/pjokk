@@ -9,21 +9,23 @@ describe("stats", () => {
     const a = await rig();
     // Fixed local timezone for determinism: UTC (tz=0).
     const now = new Date();
-    const todayMidnight = Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate(),
-    );
+    // Anchor on YESTERDAY's midnight so the whole scenario lies in the past:
+    // the stats route clips sessions at `now`, and a session ending 06:00
+    // today would be truncated when the suite runs between 00:00 and 06:00
+    // UTC (this test used to flake in exactly that window).
+    const anchorMidnight =
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) -
+      24 * H;
 
-    // A session from 22:00 yesterday to 06:00 today (UTC): 2h yesterday,
-    // 6h today.
+    // A session from 22:00 two days ago to 06:00 yesterday (UTC): 2h in
+    // days[4], 6h in days[5].
     await api("/api/sleep", {
       method: "POST",
       cookie: a.cookie,
       body: {
         babyId: a.baby.id,
-        startTime: new Date(todayMidnight - 2 * H).toISOString(),
-        endTime: new Date(todayMidnight + 6 * H).toISOString(),
+        startTime: new Date(anchorMidnight - 2 * H).toISOString(),
+        endTime: new Date(anchorMidnight + 6 * H).toISOString(),
       },
     });
     // Feeds: 200ml yesterday, 120+60 today. Breast feed adds no ml.
@@ -37,16 +39,16 @@ describe("stats", () => {
           ...body,
         },
       });
-    await feed(todayMidnight - 5 * H, { type: "bottle", amountMl: 200 });
-    await feed(todayMidnight + 1 * H, { type: "bottle", amountMl: 120 });
-    await feed(todayMidnight + 2 * H, { type: "solids", amountMl: 60 });
-    await feed(todayMidnight + 3 * H, { type: "breast", side: "left" });
+    await feed(anchorMidnight - 5 * H, { type: "bottle", amountMl: 200 });
+    await feed(anchorMidnight + 1 * H, { type: "bottle", amountMl: 120 });
+    await feed(anchorMidnight + 2 * H, { type: "solids", amountMl: 60 });
+    await feed(anchorMidnight + 3 * H, { type: "breast", side: "left" });
     await api("/api/diapers", {
       method: "POST",
       cookie: a.cookie,
       body: {
         babyId: a.baby.id,
-        time: new Date(todayMidnight + 1 * H).toISOString(),
+        time: new Date(anchorMidnight + 1 * H).toISOString(),
         type: "wet",
       },
     });
@@ -58,15 +60,15 @@ describe("stats", () => {
     const stats = (await res.json()) as Stats;
     expect(stats.days).toHaveLength(7);
 
-    const today = stats.days[6]!;
-    const yesterday = stats.days[5]!;
-    expect(yesterday.sleepMin).toBe(120);
-    expect(today.sleepMin).toBe(360);
-    expect(yesterday.intakeMl).toBe(200);
+    const anchorDay = stats.days[5]!;
+    const dayBefore = stats.days[4]!;
+    expect(dayBefore.sleepMin).toBe(120);
+    expect(anchorDay.sleepMin).toBe(360);
+    expect(dayBefore.intakeMl).toBe(200);
     // Intake sums bottle ml only — the solids feed's 60 (grams) don't count.
-    expect(today.intakeMl).toBe(120);
-    expect(today.feeds).toBe(3);
-    expect(today.diapers).toBe(1);
+    expect(anchorDay.intakeMl).toBe(120);
+    expect(anchorDay.feeds).toBe(3);
+    expect(anchorDay.diapers).toBe(1);
     expect(stats.avgSleepMin).toBe(Math.round((120 + 360) / 7));
     expect(stats.avgIntakeMl).toBe(Math.round(320 / 7));
   });

@@ -52,6 +52,15 @@ const statsRoute = createRoute({
   component: lazyRouteComponent(() => import("@/screens/Stats"), "StatsScreen"),
 });
 
+const calendarRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/calendar",
+  component: lazyRouteComponent(
+    () => import("@/screens/Calendar"),
+    "CalendarScreen",
+  ),
+});
+
 const settingsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/settings",
@@ -131,7 +140,13 @@ const adminAuditRoute = createRoute({
 });
 
 const routeTree = rootRoute.addChildren([
-  appRoute.addChildren([homeRoute, timelineRoute, statsRoute, settingsRoute]),
+  appRoute.addChildren([
+    homeRoute,
+    timelineRoute,
+    calendarRoute,
+    statsRoute,
+    settingsRoute,
+  ]),
   loginRoute,
   joinRoute,
   welcomeRoute,
