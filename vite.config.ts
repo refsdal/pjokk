@@ -6,15 +6,46 @@ import { VitePWA } from "vite-plugin-pwa";
 import path from "node:path";
 import type { Plugin } from "vite";
 
-// robots.txt is a static asset, and the Worker never sees requests for it
-// (run_worker_first only names /api/* and /), so which one ships has to be
-// decided at build time. `pnpm deploy:test` sets CLOUDFLARE_ENV=test.
-function robots(): Plugin {
+// Security headers for everything served from the asset store. The Worker
+// sets its own on /api/* and on the landing page at /, but assets — the SPA
+// shell, /privacy, /terms, icons — only ever get these.
+const BASE_HEADERS = `/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: same-origin
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+`;
+
+// robots.txt, sitemap.xml and _headers are static assets, and the Worker
+// never sees requests for them (run_worker_first only names /api/* and /), so
+// which ones ship has to be decided at build time. `pnpm deploy:test` sets
+// CLOUDFLARE_ENV=test.
+//
+// _headers is generated here rather than kept in public/ because it differs
+// per environment: only the test build carries the noindex header. Keeping a
+// copy in public/ as well would race with this one for the same output path.
+function staticFiles(): Plugin {
   const isProd = process.env.CLOUDFLARE_ENV !== "test";
   return {
-    name: "pjokk-robots",
+    name: "pjokk-static-files",
     apply: "build",
     generateBundle() {
+      // Cloudflare's Managed robots.txt PREPENDS its own `User-agent: *
+      // Allow: /` group to whatever we serve. Crawlers merge same-agent
+      // groups and, for rules of equal length, the least restrictive wins —
+      // so our `Disallow: /` loses and robots.txt alone cannot keep the test
+      // environment out of an index. X-Robots-Tag is the signal that
+      // actually holds, and it means "do not index" rather than merely "do
+      // not crawl". The Worker sets it on /; this covers every other path.
+      this.emitFile({
+        type: "asset",
+        fileName: "_headers",
+        source: isProd
+          ? BASE_HEADERS
+          : `${BASE_HEADERS}  X-Robots-Tag: noindex, nofollow\n`,
+      });
       this.emitFile({
         type: "asset",
         fileName: "robots.txt",
@@ -46,7 +77,7 @@ function robots(): Plugin {
 
 export default defineConfig({
   plugins: [
-    robots(),
+    staticFiles(),
     react(),
     tailwindcss(),
     cloudflare(),

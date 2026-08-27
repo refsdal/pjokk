@@ -172,9 +172,16 @@ invite is live, and warn anyone holding one.
     in, reloading `/` shows **Open app** linking to `/home`.
 38. A Norwegian device (or `curl -H "Accept-Language: nb-NO"`) gets Norwegian;
     the header toggle flips it and the choice survives a reload.
-39. `https://pjokk.no/robots.txt` allows crawling and `/sitemap.xml` resolves;
-    `https://test.pjokk.no/robots.txt` disallows everything and its landing
-    page returns `X-Robots-Tag: noindex` (`curl -I`).
+39. `https://pjokk.no/robots.txt` allows crawling and `/sitemap.xml` resolves.
+    On test, check the HEADER rather than robots.txt — Cloudflare's Managed
+    robots.txt prepends its own `Allow: /` group, which wins over ours:
+
+    ```sh
+    curl -sI https://test.pjokk.no/         | grep -i x-robots-tag  # Worker
+    curl -sI https://test.pjokk.no/privacy  | grep -i x-robots-tag  # assets
+    ```
+
+    Both must report `noindex, nofollow`, and production must report neither.
 40. With the PWA installed, opening `https://pjokk.no/` in the browser still
     shows the landing page rather than the cached app shell, and a push
     notification opens `/home`.
