@@ -531,3 +531,39 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   collides on the file number. Write the SQL by hand and match the existing
   style; `wrangler d1 migrations apply` orders by filename and ignores
   drizzle's journal entirely.
+
+## GDPR hardening (2026-08-27)
+
+The app stores Article 9 special-category health data — vaccines, medicine,
+measurements, and arguably an infant's whole feed/sleep record. That has
+been true since Phase 3; the vaccine feature only made it obvious.
+
+- **CSV export is free on every plan.** `csvExport` stays in the Feature
+  union with `requiresPremium: false` rather than being deleted, so the
+  decision reads as deliberate. Access (Art. 15) and portability (Art. 20)
+  must be provided free of charge; paywalling a family's own data is not
+  defensible. Stats beyond 7 days remain premium — that is analysis we
+  built, not the underlying data, and the export returns everything.
+- **Backups expire after 30 days** (`BACKUP_RETENTION_DAYS`), pruned by the
+  nightly cron. Unbounded snapshots both breached storage limitation and
+  quietly defeated erasure: a deleted family lived on in every older
+  snapshot. 30 days is what the privacy policy commits to as the window for
+  a deletion to fully take effect, so the number and the promise must move
+  together.
+- **Vaccine document uploads are OFF** (`DOCUMENT_UPLOADS_ENABLED = false`).
+  Parents photograph the helsestasjon card, which can carry a
+  fødselsnummer — Norwegian law treats that specially, and it is not worth
+  taking on before the privacy work around it is reviewed. Reading and
+  deleting stay open so anything already stored can still be retrieved and
+  erased; disabling a feature must never strand data. The tables, routes
+  and tests remain so re-enabling is one constant.
+- **Logs carry ids, never emails.** Workers logs sit outside our retention
+  control, so an address written there is personal data we cannot later
+  erase.
+- **/privacy and /terms are public routes**, readable without an account: a
+  prospective member deciding whether to accept an invite, and a supervisory
+  authority, both need them. Linked from Settings, the login screen, and —
+  most importantly — the invite screen, which is the actual moment of
+  consent. Written as prose rather than through `t()`: a policy split across
+  hundreds of dictionary keys would rot. A Norwegian version is outstanding
+  and matters legally for Norwegian users.

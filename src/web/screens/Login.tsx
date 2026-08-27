@@ -1,4 +1,4 @@
-import { Navigate, useNavigate } from "@tanstack/react-router";
+import { Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,6 +91,11 @@ export function LoginScreen({ redirectTo = "/" }: { redirectTo?: string }) {
 
       <p className="text-center text-xs text-muted">
         {t("Pjokk is invite-only. Ask a family admin for an invite link.")}
+      </p>
+
+      <p className="flex justify-center gap-4 text-xs font-semibold text-muted">
+        <Link to="/privacy">{t("Privacy policy")}</Link>
+        <Link to="/terms">{t("Terms")}</Link>
       </p>
     </div>
   );

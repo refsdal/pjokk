@@ -29,6 +29,7 @@ import { sleepLocationsApp } from "./routes/sleep-locations";
 import { statsApp } from "./routes/stats";
 import { filesApp, vaccinesApp } from "./routes/vaccines";
 import {
+  pruneBackups,
   purgeOrphanUsers,
   reconcilePlans,
   runBackup,
@@ -177,6 +178,10 @@ export default {
     if (event.cron === "15 3 * * *") {
       const key = await runBackup(env);
       console.log(`cron: backup written to ${key}`);
+      const pruned = await pruneBackups(env);
+      if (pruned.length > 0) {
+        console.log(`cron: pruned ${pruned.length} expired backup(s)`);
+      }
       const purged = await purgeOrphanUsers(env);
       if (purged > 0) console.log(`cron: purged ${purged} orphan account(s)`);
       const reconciled = await reconcilePlans(env);

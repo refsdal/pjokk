@@ -129,6 +129,15 @@ const nb: Record<string, string> = {
   "Schedule follows": "Planen følger",
   "Check with your helsestasjon.": "Sjekk med helsestasjonen din.",
   Back: "Tilbake",
+
+  // Legal
+  About: "Om",
+  Terms: "Vilkår",
+  "Privacy policy": "Personvernerklæring",
+  "By joining you accept our": "Ved å bli med godtar du våre",
+  and: "og",
+  ", including that Pjokk stores health information about your child.":
+    ", inkludert at Pjokk lagrer helseopplysninger om barnet ditt.",
   Dismiss: "Skjul",
   Dismissed: "Skjulte",
   Restore: "Vis igjen",

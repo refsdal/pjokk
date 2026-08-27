@@ -79,25 +79,31 @@ export function SettingsScreen() {
           <p className="text-sm text-muted">
             {t("Everything ever logged, one row per entry — plain CSV.")}
           </p>
+          {/* Never paywalled: this is how a family exercises their right of
+              access and portability. */}
           <Button
             size="full"
             variant="outline"
-            onClick={() =>
-              premium
-                ? window.location.assign(`${API_BASE}/api/export.csv`)
-                : document
-                    .getElementById("billing")
-                    ?.scrollIntoView({ behavior: "smooth" })
-            }
+            onClick={() => window.location.assign(`${API_BASE}/api/export.csv`)}
           >
-            {premium ? (
-              t("Export CSV")
-            ) : (
-              <>
-                {t("Export CSV")} · {t("Premium")}
-              </>
-            )}
+            {t("Export CSV")}
           </Button>
+        </Card>
+
+        <SectionTitle>{t("About")}</SectionTitle>
+        <Card className="divide-y divide-line p-0">
+          <Link
+            to="/privacy"
+            className="block px-4 py-3 font-semibold text-ink active:bg-surface-2"
+          >
+            {t("Privacy policy")}
+          </Link>
+          <Link
+            to="/terms"
+            className="block px-4 py-3 font-semibold text-ink active:bg-surface-2"
+          >
+            {t("Terms")}
+          </Link>
         </Card>
 
         <SectionTitle>{t("Account")}</SectionTitle>

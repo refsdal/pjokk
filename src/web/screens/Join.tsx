@@ -117,6 +117,22 @@ export function JoinScreen() {
               </p>
             </div>
           )}
+
+          {/* Shown at the moment of consent, not buried in Settings: joining
+              a family means recording a child's health information. */}
+          <p className="text-xs leading-relaxed text-muted">
+            {t("By joining you accept our")}{" "}
+            <Link to="/terms" className="font-semibold text-accent">
+              {t("Terms")}
+            </Link>{" "}
+            {t("and")}{" "}
+            <Link to="/privacy" className="font-semibold text-accent">
+              {t("Privacy policy")}
+            </Link>
+            {t(
+              ", including that Pjokk stores health information about your child.",
+            )}
+          </p>
         </>
       )}
     </div>

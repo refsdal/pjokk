@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import type { FamEnv } from "../context";
-import { canUse } from "../entitlements";
 
 // CSV export of every log in the family, chronological, one row per entry.
 // A plain (non-OpenAPI) route: browsers download it by navigation, and it
@@ -40,9 +39,6 @@ type Row = Partial<Record<(typeof HEADERS)[number], unknown>> & {
 export const exportApp = new Hono<FamEnv>().get(
   "/api/export.csv",
   async (c) => {
-    if (!canUse({ plan: c.var.plan }, "csvExport")) {
-      return c.json({ error: "Premium required", code: "PLAN_REQUIRED" }, 402);
-    }
     const fam = c.var.fam;
     const babies = await fam.listBabies();
     const babyName = new Map(babies.map((b) => [b.id, b.name]));

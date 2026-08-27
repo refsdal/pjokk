@@ -2,10 +2,9 @@ import {
   IconExternalLink,
   IconFile,
   IconInfoCircle,
-  IconPaperclip,
   IconTrash,
 } from "@tabler/icons-react";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type { VaccineLog } from "@shared/schemas";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet } from "@/components/Sheet";
@@ -13,14 +12,12 @@ import { ChipGroup } from "@/components/Chips";
 import { TimeField } from "@/components/TimeField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { API_BASE, ApiError } from "@/lib/api";
+import { API_BASE } from "@/lib/api";
 import {
   useCreateVaccine,
   useDeleteVaccine,
   useDeleteVaccineDocument,
-  usePremium,
   useUpdateVaccine,
-  useUploadVaccineDocument,
 } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
@@ -163,8 +160,10 @@ export function VaccineSheet({
           onChange={(e) => setNotes(e.target.value)}
         />
 
-        {/* Attachments need an id, so they only exist in edit mode. */}
-        {edit && <Documents entry={edit} />}
+        {/* Attachments are disabled (see routes/vaccines.ts): a photographed
+            helsestasjon card can carry a fødselsnummer. Existing files stay
+            listed so they can be opened and deleted — only adding is gone. */}
+        {edit && edit.documents.length > 0 && <Documents entry={edit} />}
 
         <Button size="full" onClick={save} disabled={name.trim().length === 0}>
           {t("Save")}
@@ -191,18 +190,7 @@ export function VaccineSheet({
 }
 
 function Documents({ entry }: { entry: VaccineLog }) {
-  const premium = usePremium();
-  const upload = useUploadVaccineDocument();
   const removeDoc = useDeleteVaccineDocument();
-  const fileInput = useRef<HTMLInputElement>(null);
-
-  const pick = () => {
-    if (!premium) {
-      toast(t("Premium feature — upgrade in Settings"));
-      return;
-    }
-    fileInput.current?.click();
-  };
 
   return (
     <div className="space-y-2">
@@ -238,41 +226,6 @@ function Documents({ entry }: { entry: VaccineLog }) {
           </button>
         </div>
       ))}
-
-      <input
-        ref={fileInput}
-        type="file"
-        accept="image/*,application/pdf"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = "";
-          if (!file) return;
-          upload.mutate(
-            { id: entry.id, file },
-            {
-              onError: (err) => {
-                if (err instanceof ApiError && err.code === "PLAN_REQUIRED") {
-                  toast(t("Premium feature — upgrade in Settings"), "error");
-                  return;
-                }
-                toast(err.message, "error");
-              },
-            },
-          );
-        }}
-      />
-
-      <Button
-        size="full"
-        variant="outline"
-        onClick={pick}
-        disabled={upload.isPending}
-      >
-        <IconPaperclip className="mr-1.5 h-4 w-4" />
-        {upload.isPending ? t("Uploading…") : t("Attach document")}
-        {!premium && ` · ${t("Premium")}`}
-      </Button>
     </div>
   );
 }
