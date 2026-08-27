@@ -1,4 +1,10 @@
-import { IconFile, IconPaperclip, IconTrash } from "@tabler/icons-react";
+import {
+  IconExternalLink,
+  IconFile,
+  IconInfoCircle,
+  IconPaperclip,
+  IconTrash,
+} from "@tabler/icons-react";
 import { useRef, useState } from "react";
 import type { VaccineLog } from "@shared/schemas";
 import { DeleteButton } from "@/components/DeleteButton";
@@ -18,7 +24,11 @@ import {
 } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import type { ProgrammeSlot } from "@/lib/vaccine-programme";
+import {
+  infoUrlForName,
+  infoUrlForSlot,
+  type ProgrammeSlot,
+} from "@/lib/vaccine-programme";
 
 // The Norwegian programme tops out at five doses; a stored value beyond
 // that (an imported record, a course given abroad) still gets its chip.
@@ -60,6 +70,12 @@ export function VaccineSheet({
     setNotes(edit?.notes ?? "");
   }
   if (!open && wasOpen) setWasOpen(false);
+
+  // Prefer the slot key (exact), fall back to matching the typed name, so a
+  // hand-written "MMR" still finds FHI's page.
+  const infoUrl =
+    infoUrlForSlot(edit?.scheduleSlot ?? slot?.key ?? null) ??
+    infoUrlForName(name);
 
   const create = useCreateVaccine();
   const update = useUpdateVaccine();
@@ -120,6 +136,24 @@ export function VaccineSheet({
             onChange={(v) => setDose(Number(v))}
           />
         </div>
+
+        {/* We say nothing about any vaccine ourselves — this is a pointer to
+            the government's own page and nothing more. Absent (rather than
+            guessed) for anything outside the programme. */}
+        {infoUrl && (
+          <a
+            href={infoUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="flex min-h-11 items-center gap-2 rounded-xl2 border border-line bg-surface px-3 py-2 text-sm font-semibold text-accent active:bg-surface-2"
+          >
+            <IconInfoCircle className="h-5 w-5 shrink-0" />
+            <span className="min-w-0 flex-1">
+              {t("About this vaccine at FHI")}
+            </span>
+            <IconExternalLink className="h-4 w-4 shrink-0 text-muted" />
+          </a>
+        )}
 
         <TimeField key={`v${instance}`} value={time} onChange={setTime} />
 

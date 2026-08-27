@@ -402,6 +402,30 @@ export const vaccineDocument = sqliteTable(
   ],
 );
 
+// Programme slots a family has waved away for one baby ("not for us", "we
+// had that abroad", "not offered here"). Stores the slot KEY, not a foreign
+// key: the bundled programme is data that can change without a migration,
+// and a dismissal of a key that no longer exists simply stops matching.
+export const vaccineDismissal = sqliteTable(
+  "vaccine_dismissal",
+  {
+    id: id(),
+    familyId: familyId(),
+    babyId: babyId(),
+    slotKey: text("slot_key").notNull(),
+    dismissedBy: text("dismissed_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("vaccine_dismissal_family_idx").on(t.familyId),
+    // One dismissal per slot per baby, so a double-tap or an offline replay
+    // can't duplicate a row.
+    uniqueIndex("vaccine_dismissal_baby_slot").on(t.babyId, t.slotKey),
+  ],
+);
+
 // --- Play (premium): timed activities — tummy time, a walk, playing.
 // Structurally a sleep_log: end_time NULL means the session is running, and
 // the partial unique index is what makes the timer server-side. No durable

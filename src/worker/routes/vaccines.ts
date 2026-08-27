@@ -1,8 +1,10 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import {
+  CreateVaccineDismissalSchema,
   CreateVaccineSchema,
   ErrorSchema,
   UpdateVaccineSchema,
+  VaccineDismissalSchema,
   VaccineLogSchema,
 } from "@shared/schemas";
 import type { FamEnv } from "../context";
@@ -88,7 +90,78 @@ const remove = createRoute({
   },
 });
 
+// Dismissals are free, like the log: waving away a suggestion the app
+// itself made is data hygiene, not a feature.
+const listDismissals = createRoute({
+  method: "get",
+  path: "/api/vaccines/dismissals",
+  tags: ["vaccines"],
+  request: { query: z.object({ babyId: z.string().optional() }) },
+  responses: {
+    200: jsonContent(
+      z.array(VaccineDismissalSchema),
+      "Dismissed programme slots",
+    ),
+  },
+});
+
+const createDismissal = createRoute({
+  method: "post",
+  path: "/api/vaccines/dismissals",
+  tags: ["vaccines"],
+  description:
+    "Hide a programme slot for one baby. Idempotent: dismissing twice returns the existing row.",
+  request: {
+    body: {
+      content: {
+        "application/json": { schema: CreateVaccineDismissalSchema },
+      },
+    },
+  },
+  responses: {
+    201: jsonContent(VaccineDismissalSchema, "Dismissed"),
+    404: jsonContent(ErrorSchema, "Unknown baby"),
+  },
+});
+
+const deleteDismissal = createRoute({
+  method: "delete",
+  path: "/api/vaccines/dismissals/{id}",
+  tags: ["vaccines"],
+  description: "Restore a dismissed slot.",
+  request: { params: idParam },
+  responses: {
+    200: jsonContent(z.object({ ok: z.literal(true) }), "Restored"),
+    404: jsonContent(ErrorSchema, "Not found"),
+  },
+});
+
 export const vaccinesApp = createApp<FamEnv>()
+  // Registered before /api/vaccines/{id} so "dismissals" is never captured
+  // as an id.
+  .openapi(listDismissals, async (c) => {
+    const { babyId } = c.req.valid("query");
+    return c.json(await c.var.fam.listVaccineDismissals(babyId), 200);
+  })
+  .openapi(createDismissal, async (c) => {
+    const body = c.req.valid("json");
+    if (!(await c.var.fam.getBaby(body.babyId))) {
+      return c.json({ error: "Unknown baby", code: "NOT_FOUND" }, 404);
+    }
+    const created = await c.var.fam.createVaccineDismissal({
+      babyId: body.babyId,
+      slotKey: body.slotKey,
+      dismissedBy: c.var.sessionData.user.id,
+    });
+    return c.json(created!, 201);
+  })
+  .openapi(deleteDismissal, async (c) => {
+    const { id } = c.req.valid("param");
+    if (!(await c.var.fam.deleteVaccineDismissal(id))) {
+      return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+    }
+    return c.json({ ok: true as const }, 200);
+  })
   .openapi(list, async (c) => {
     const q = c.req.valid("query");
     const rows = await c.var.fam.listVaccines(q);

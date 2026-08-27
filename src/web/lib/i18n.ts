@@ -129,6 +129,10 @@ const nb: Record<string, string> = {
   "Schedule follows": "Planen følger",
   "Check with your helsestasjon.": "Sjekk med helsestasjonen din.",
   Back: "Tilbake",
+  Dismiss: "Skjul",
+  Dismissed: "Skjulte",
+  Restore: "Vis igjen",
+  "About this vaccine at FHI": "Om denne vaksinen hos FHI",
   // Programme age labels (passed through t() dynamically — keep in sync with
   // data/no-vaccine-programme.json).
   "6 weeks": "6 uker",
