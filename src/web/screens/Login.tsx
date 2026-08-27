@@ -8,7 +8,7 @@ import { toast } from "@/lib/toast";
 
 // The provider list is a stacked column on purpose: a third button (Apple)
 // drops in without rework if a store build ever ships.
-export function LoginScreen({ redirectTo = "/" }: { redirectTo?: string }) {
+export function LoginScreen({ redirectTo = "/home" }: { redirectTo?: string }) {
   const { data: session, isPending } = useSession();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");

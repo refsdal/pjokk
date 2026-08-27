@@ -87,7 +87,7 @@ export async function runReminders(env: Env, now = Date.now()) {
     const delivered = await pushToUser(db, env, pref.userId, {
       title: "Pjokk",
       body: `No feed logged for ${hours} h`,
-      url: "/",
+      url: "/home",
     });
     sent += delivered;
     await db

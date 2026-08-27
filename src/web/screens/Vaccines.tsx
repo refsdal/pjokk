@@ -69,7 +69,7 @@ export function VaccinesScreen() {
         <button
           type="button"
           aria-label={t("Back")}
-          onClick={() => void navigate({ to: "/" })}
+          onClick={() => void navigate({ to: "/home" })}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink active:bg-surface-2"
         >
           <IconArrowLeft className="h-5 w-5" />

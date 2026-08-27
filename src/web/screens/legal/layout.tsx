@@ -90,9 +90,10 @@ export function LegalPage({
       <nav className="mt-10 flex gap-4 border-t border-line pt-6 text-sm font-semibold text-accent">
         <Link to="/privacy">{lang === "nb" ? "Personvern" : "Privacy"}</Link>
         <Link to="/terms">{lang === "nb" ? "Vilkår" : "Terms"}</Link>
-        <Link to="/">
-          {lang === "nb" ? "Tilbake til Pjokk" : "Back to Pjokk"}
-        </Link>
+        {/* A plain anchor, not <Link>: "/" is the Worker-rendered landing
+            page and has no route in this SPA. It shows "Open app" to a reader
+            who already has a session, so this lands everyone somewhere sane. */}
+        <a href="/">{lang === "nb" ? "Tilbake til Pjokk" : "Back to Pjokk"}</a>
       </nav>
     </div>
   );

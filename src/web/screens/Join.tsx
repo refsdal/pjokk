@@ -56,7 +56,7 @@ export function JoinScreen() {
       });
       await queryClient.invalidateQueries();
       toast(t("Welcome to ") + result.familyName);
-      void navigate({ to: "/" });
+      void navigate({ to: "/home" });
     } catch (err) {
       toast(err instanceof Error ? err.message : t("Join failed"), "error");
     } finally {

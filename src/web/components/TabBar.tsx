@@ -16,8 +16,8 @@ export interface TabItem {
   to: string;
   label: string;
   icon: TablerIcon;
-  // Exact-match tabs (section roots like "/" or "/admin") only highlight on
-  // their own path; others highlight for their whole subtree.
+  // Exact-match tabs (section roots like "/home" or "/admin") only highlight
+  // on their own path; others highlight for their whole subtree.
   exact?: boolean;
   // Premium-gated tab: shows a small lock badge for free-tier families.
   // Existing data on the tab stays fully usable — this is a visual nudge,
@@ -26,7 +26,7 @@ export interface TabItem {
 }
 
 const mainTabs: TabItem[] = [
-  { to: "/", label: "Home", icon: IconHome, exact: true },
+  { to: "/home", label: "Home", icon: IconHome, exact: true },
   { to: "/timeline", label: "Timeline", icon: IconList },
   { to: "/calendar", label: "Calendar", icon: IconCalendar, gated: true },
   { to: "/stats", label: "Stats", icon: IconChartBar },

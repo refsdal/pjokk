@@ -33,9 +33,12 @@ const appRoute = createRoute({
   component: AppShell,
 });
 
+// "/" belongs to the Worker-rendered landing page, so the app's own home
+// screen lives at /home. Nothing in the SPA may route to "/": links back to
+// the landing page must be plain anchors that leave the SPA.
 const homeRoute = createRoute({
   getParentRoute: () => appRoute,
-  path: "/",
+  path: "/home",
   component: HomeScreen,
 });
 
@@ -87,7 +90,7 @@ const loginRoute = createRoute({
 
 function LoginRoute() {
   const { redirect } = loginRoute.useSearch();
-  return <LoginScreen redirectTo={redirect ?? "/"} />;
+  return <LoginScreen redirectTo={redirect ?? "/home"} />;
 }
 
 const joinRoute = createRoute({
