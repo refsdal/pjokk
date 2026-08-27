@@ -48,6 +48,29 @@ is reserved for a separate landing page that only links to the app.
   the `web-push` npm package is expected to work — verify early, fall back to a
   WebCrypto-based implementation if it trips).
 
+**EU jurisdiction is mandatory for every new Cloudflare resource**
+- The app stores GDPR Article 9 health data about children. Every stateful
+  resource MUST be created pinned to the EU jurisdiction:
+  - D1: `wrangler d1 create <name> --jurisdiction eu`
+  - R2: `wrangler r2 bucket create <name> -J eu`, and the binding in
+    `wrangler.jsonc` needs `"jurisdiction": "eu"` or the Worker will look in
+    the default jurisdiction and not find the bucket.
+- **Jurisdiction can only be set at creation and can never be changed** —
+  there is no `d1 update`. Getting it wrong means creating a replacement and
+  migrating, so check before you create, not after.
+- A **location hint** (`--location weur`) is NOT a substitute: it is a
+  placement preference, not a guarantee. Verify with `wrangler d1 info <name>`
+  — `jurisdiction` must read `eu`, not `null`.
+- Resources live in separate jurisdictional namespaces: an EU bucket does not
+  appear in `wrangler r2 bucket list` without `-J eu`. That isolation is the
+  point.
+- **KV is the exception and cannot be pinned** — it is globally replicated by
+  design and takes no jurisdiction flag. Therefore KV must never hold personal
+  data: the rate limiter stores a SHA-256 hash of the client IP, never the
+  address. Keep it that way.
+- The same applies to anything added later (Durable Objects, Queues,
+  Hyperdrive, Vectorize): pin it, or do not use it.
+
 **Auth & tenancy**
 - better-auth with the **Organizations plugin**. An organization IS a family.
   Members can belong to multiple families; the session's active organization is
@@ -160,8 +183,12 @@ sheet pattern — build the pattern well once.
 - No transactions — only `batch()`. Multi-row atomic writes (e.g. redeem invite:
   validate + increment + addMember) must be structured as batches; design so
   partial failure is safe.
-- Backups: scheduled Cron export to R2 (no "copy the .db file" story).
-- D1 is regional; fine for this app, don't chase edge-read tricks.
+- Backups: scheduled Cron export to R2 (no "copy the .db file" story), pruned
+  after 30 days — the window the privacy policy commits to for a deletion to
+  take full effect.
+- D1 is regional; fine for this app, don't chase edge-read tricks. Pinned to
+  the EU jurisdiction (see the Stack section) — that is a hard requirement,
+  not a preference.
 
 ## Phased roadmap
 

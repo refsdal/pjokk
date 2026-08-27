@@ -567,3 +567,32 @@ been true since Phase 3; the vaccine feature only made it obvious.
   consent. Written as prose rather than through `t()`: a policy split across
   hundreds of dictionary keys would rot. A Norwegian version is outstanding
   and matters legally for Norwegian users.
+
+## EU jurisdiction (2026-08-27)
+
+- `wrangler d1 info pjokk` showed `running_in_region: EEUR` but
+  `jurisdiction: null`. Those are different claims: the region is where the
+  database happened to be placed, the jurisdiction is the only enforceable
+  guarantee. A privacy policy saying "stored within the European Union"
+  cannot rest on a location hint.
+- Jurisdiction is settable **only at creation** — there is no `d1 update`,
+  and the D1 subcommands are create/info/list/delete/execute/export/
+  time-travel/migrations/insights. So the resources were recreated:
+  `pjokk-eu`, `pjokk-test-eu` (D1, `--jurisdiction eu`) and
+  `pjokk-files-eu`, `pjokk-test-files-eu` (R2, `-J eu`), all verified.
+- Recreated rather than migrated: nothing is in production yet, so the old
+  430 kB carried no value worth a data migration. The old resources are left
+  in place, untouched, until the new ones are confirmed working — deleting
+  them is a separate, deliberate step.
+- R2 jurisdictions are separate namespaces: `wrangler r2 bucket list` does
+  not show an EU bucket without `-J eu`, and the binding in wrangler.jsonc
+  needs `"jurisdiction": "eu"` or the Worker looks in the wrong namespace.
+- **KV cannot be pinned** — no jurisdiction flag exists, because KV is
+  globally replicated by design. Recreating it would have achieved nothing.
+  Instead the rate limiter now hashes the client IP (SHA-256, truncated)
+  before using it as a key, so KV holds a pseudonymous bucket id rather than
+  an address. Same brake, no personal data in a global store.
+- Consequence of recreating: the new databases are EMPTY. Migrations apply on
+  the next deploy (the workflow runs them first), but the founder account and
+  every existing family are gone — the first account must be created again
+  through the OPEN_SIGNUP=1 path documented in SMOKE-TEST.md.

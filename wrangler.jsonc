@@ -11,20 +11,28 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"]
   },
+  // Every stateful resource is pinned to the EU jurisdiction — not merely a
+  // location hint, which is a preference rather than a guarantee. Jurisdiction
+  // can ONLY be set when a resource is created, so a new one must be created
+  // correctly from the start; see CLAUDE.md.
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "pjokk",
-      "database_id": "e9d50b4e-2680-4819-ad7e-ef8a20553568",
+      "database_name": "pjokk-eu",
+      "database_id": "3864bfdc-bb09-41fe-b200-cde45ba81121",
       "migrations_dir": "migrations"
     }
   ],
   "r2_buckets": [
     {
       "binding": "FILES",
-      "bucket_name": "pjokk-files"
+      "bucket_name": "pjokk-files-eu",
+      "jurisdiction": "eu"
     }
   ],
+  // KV has no jurisdiction option — it is globally replicated by design, so
+  // recreating it would buy nothing. Keep it free of personal data: the
+  // rate limiter stores a HASH of the client IP, never the address itself.
   "kv_namespaces": [
     {
       "binding": "KV",
@@ -60,12 +68,18 @@
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "pjokk-test",
-          "database_id": "15666cdc-4db9-4c2b-9583-8f1725f0ab42",
+          "database_name": "pjokk-test-eu",
+          "database_id": "2c07adf8-ff38-4650-9397-a36958faf0fe",
           "migrations_dir": "migrations"
         }
       ],
-      "r2_buckets": [{ "binding": "FILES", "bucket_name": "pjokk-test-files" }],
+      "r2_buckets": [
+        {
+          "binding": "FILES",
+          "bucket_name": "pjokk-test-files-eu",
+          "jurisdiction": "eu"
+        }
+      ],
       "kv_namespaces": [
         { "binding": "KV", "id": "8f32ad05796a4c7f86ab9e1f81f1640c" }
       ],

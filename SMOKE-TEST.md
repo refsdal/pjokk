@@ -68,7 +68,7 @@ wrangler secret put GOOGLE_CLIENT_SECRET
     older than 3 h, a reminder arrives within 15 min (cron). Logging a feed
     resets the gap; you get at most one nudge per gap.
 21. Backups: after 03:15 UTC, `backups/YYYY-MM-DD.json` appears in the
-    pjokk-files R2 bucket.
+    pjokk-files-eu R2 bucket.
 
 ## 5. PWA + polish
 
@@ -106,8 +106,8 @@ section 7. Production only ever holds live keys.
 
 ## 7. Test environment (app-test.pjokk.no) — one-time setup
 
-Infrastructure already provisioned (D1 `pjokk-test`, KV, R2
-`pjokk-test-files`, custom domain, crons, `BETTER_AUTH_SECRET` + fresh
+Infrastructure already provisioned (D1 `pjokk-test-eu`, KV, R2
+`pjokk-test-files-eu`, custom domain, crons, `BETTER_AUTH_SECRET` + fresh
 VAPID pair). CI auto-deploys it on every green push to main once the
 GitHub secret exists. Remaining manual steps:
 
@@ -132,7 +132,7 @@ GitHub secret exists. Remaining manual steps:
     Variables, or edit wrangler.jsonc env.test and redeploy), sign in with
     Google at `https://app-test.pjokk.no`, then set it back to "0".
     Promote yourself to sysadmin by setting `role = 'admin'` on your user
-    row: `wrangler d1 execute pjokk-test --env test --remote --command
+    row: `wrangler d1 execute pjokk-test-eu --env test --remote --command
     "UPDATE user SET role='admin' WHERE email='<you>'"` — then create a
     family from `/admin`.
 30. Manual deploys remain available: `pnpm deploy:test` (test) and

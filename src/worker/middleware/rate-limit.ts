@@ -1,5 +1,6 @@
 import { createMiddleware } from "hono/factory";
 import type { AppEnv } from "../context";
+import { sha256Hex } from "../db/scoped";
 
 // Fixed-window counter in KV. Coarse (KV is eventually consistent) but it
 // turns brute-forcing invite codes from cheap into pointless.
@@ -19,8 +20,14 @@ export function rateLimit(opts: {
       opts.scope === "global"
         ? "global"
         : (c.req.header("cf-connecting-ip") ?? "unknown");
+    // Hashed, never the address itself: KV is globally replicated and has no
+    // jurisdiction option (unlike D1 and R2), and an IP is personal data. A
+    // hash still buckets each client exactly the same way, so the brake is
+    // unchanged — we simply never write an address into a global store.
+    const bucket =
+      ip === "global" ? "global" : (await sha256Hex(ip)).slice(0, 32);
     const window = Math.floor(Date.now() / 1000 / opts.windowSeconds);
-    const key = `rl:${opts.name}:${ip}:${window}`;
+    const key = `rl:${opts.name}:${bucket}:${window}`;
     const current = Number((await c.env.KV.get(key)) ?? "0");
     if (current >= opts.limit) {
       return c.json(
