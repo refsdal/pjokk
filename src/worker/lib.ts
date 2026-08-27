@@ -28,6 +28,16 @@ export function jsonContent<T extends z.ZodType>(
   return { content: { "application/json": { schema } }, description };
 }
 
+// Partial unique indexes ("one active session per baby") are the real guard
+// against a double-tap or an offline-queue replay. Drizzle wraps the SQLite
+// error, so recognizing one means walking the cause chain.
+export function isUniqueViolation(err: unknown): boolean {
+  for (let e: unknown = err; e; e = (e as { cause?: unknown }).cause) {
+    if (String(e).includes("UNIQUE")) return true;
+  }
+  return false;
+}
+
 export const iso = (d: Date) => d.toISOString();
 export const isoOrNull = (d: Date | null) => (d ? d.toISOString() : null);
 

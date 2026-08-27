@@ -59,6 +59,7 @@ export const exportApp = new Hono<FamEnv>().get(
       milestones,
       meas,
       pumps,
+      plays,
     ] = await Promise.all([
       fam.listFeeds(opts),
       fam.listDiapers(opts),
@@ -69,6 +70,7 @@ export const exportApp = new Hono<FamEnv>().get(
       fam.milestone.list(opts),
       fam.measurement.list(opts),
       fam.pump.list(opts),
+      fam.listPlays(opts),
     ]);
 
     const rows: Row[] = [
@@ -161,6 +163,19 @@ export const exportApp = new Hono<FamEnv>().get(
         unit: r.amountMl != null ? "ml" : null,
         side: r.side,
         duration_min: r.durationMin,
+        caretaker: r.caretakerName,
+        notes: r.notes,
+      })),
+      ...plays.map((r) => ({
+        sortMs: r.startTime.getTime(),
+        kind: "play",
+        baby: babyName.get(r.babyId),
+        time: r.startTime.toISOString(),
+        end_time: r.endTime?.toISOString() ?? null,
+        type: r.type,
+        duration_min: r.endTime
+          ? Math.round((r.endTime.getTime() - r.startTime.getTime()) / 60_000)
+          : null,
         caretaker: r.caretakerName,
         notes: r.notes,
       })),

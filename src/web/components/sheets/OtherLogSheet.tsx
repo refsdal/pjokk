@@ -13,6 +13,7 @@ import { useState } from "react";
 import type {
   MeasurementType,
   MedicineUnit,
+  PlayType,
   TimelineEntry,
 } from "@shared/schemas";
 import { ChipGroup } from "@/components/Chips";
@@ -32,6 +33,7 @@ import {
   type OtherKind,
 } from "@/lib/data";
 import { t } from "@/lib/i18n";
+import { playKindMeta, playTypeOrder } from "@/lib/play-ui";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
@@ -101,23 +103,47 @@ export function MoreSheet({
   open,
   onOpenChange,
   onPick,
+  onPickPlay,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPick: (kind: OtherKind) => void;
+  onPickPlay: (type: PlayType) => void;
 }) {
   const navigate = useNavigate();
   const premium = (useFamily().data?.plan ?? "free") !== "free";
 
+  // Play kinds are timed sessions with their own endpoints, so they sit
+  // beside the generic kinds here rather than inside otherKindMeta.
+  const tiles: {
+    key: string;
+    label: string;
+    icon: TablerIcon;
+    tint: string;
+    locked: boolean;
+    pick: () => void;
+  }[] = [
+    ...(Object.keys(otherKindMeta) as OtherKind[]).map((kind) => ({
+      key: kind,
+      ...otherKindMeta[kind],
+      locked: !premium && GATED_KINDS.has(kind),
+      pick: () => onPick(kind),
+    })),
+    ...playTypeOrder.map((type) => ({
+      key: `play:${type}`,
+      ...playKindMeta[type],
+      locked: !premium,
+      pick: () => onPickPlay(type),
+    })),
+  ];
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange} title={t("Log something")}>
       <div className="grid grid-cols-3 gap-3 pt-1 pb-6">
-        {(Object.keys(otherKindMeta) as OtherKind[]).map((kind) => {
-          const { label, icon: Icon, tint } = otherKindMeta[kind];
-          const locked = !premium && GATED_KINDS.has(kind);
+        {tiles.map(({ key, label, icon: Icon, tint, locked, pick }) => {
           return (
             <button
-              key={kind}
+              key={key}
               type="button"
               onClick={
                 locked
@@ -126,7 +152,7 @@ export function MoreSheet({
                       onOpenChange(false);
                       void navigate({ to: "/settings" });
                     }
-                  : () => onPick(kind)
+                  : pick
               }
               className={cn(
                 "flex h-24 flex-col items-center justify-center gap-2 rounded-xl2 border border-line bg-surface select-none active:scale-[0.97] active:bg-surface-2",

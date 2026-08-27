@@ -14,6 +14,7 @@ import {
   otherKindMeta,
   type OtherEntry,
 } from "@/components/sheets/OtherLogSheet";
+import { PlaySheet } from "@/components/sheets/PlaySheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
 import { ChipGroup } from "@/components/Chips";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
@@ -22,11 +23,13 @@ import { BabySwitcher } from "@/components/BabySwitcher";
 import { useFeeds, useTimeline } from "@/lib/data";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import { t } from "@/lib/i18n";
+import { playKindMeta } from "@/lib/play-ui";
 import { formatClock, formatDay, formatDuration } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
+// Sessions (sleep, play) sort and display by their start time.
 const entryTime = (e: TimelineEntry): Date =>
-  new Date(e.kind === "sleep" ? e.startTime : e.time);
+  new Date(e.kind === "sleep" || e.kind === "play" ? e.startTime : e.time);
 
 function dayLabel(d: Date, now = new Date()): string {
   if (d.toDateString() === now.toDateString()) return t("Today");
@@ -118,6 +121,18 @@ function entryMain(e: TimelineEntry): { title: string; detail: string | null } {
       detail: `${e.value.toFixed(1)} ${e.type === "weight" ? "kg" : "cm"}`,
     };
   }
+  if (e.kind === "play") {
+    const start = new Date(e.startTime);
+    const title = t(playKindMeta[e.type].label);
+    if (!e.endTime) {
+      return { title, detail: `${t("since")} ${formatClock(start)}` };
+    }
+    const end = new Date(e.endTime);
+    return {
+      title,
+      detail: `${formatClock(start)}–${formatClock(end)} · ${formatDuration(end.getTime() - start.getTime())}`,
+    };
+  }
   return {
     title: t("Pump"),
     detail: [e.side, e.amountMl != null ? `${e.amountMl} ml` : null]
@@ -139,6 +154,8 @@ const kindStyle: Record<
   milestone: otherKindMeta.milestone,
   measurement: otherKindMeta.measurement,
   pump: otherKindMeta.pump,
+  // Every play type shares the row icon; the title carries which one.
+  play: { icon: playKindMeta.tummy.icon, tint: playKindMeta.tummy.tint },
 };
 
 function Row({
@@ -150,7 +167,8 @@ function Row({
 }) {
   const { icon: Icon, tint } = kindStyle[entry.kind];
   const { title, detail } = entryMain(entry);
-  const active = entry.kind === "sleep" && !entry.endTime;
+  const active =
+    (entry.kind === "sleep" || entry.kind === "play") && !entry.endTime;
   return (
     <button
       type="button"
@@ -293,12 +311,19 @@ export function TimelineScreen() {
         lastLocation={null}
         edit={editEntry?.kind === "sleep" ? editEntry : null}
       />
+      <PlaySheet
+        open={editEntry?.kind === "play"}
+        onOpenChange={(o) => !o && setEditEntry(null)}
+        babyId={baby?.id ?? ""}
+        edit={editEntry?.kind === "play" ? editEntry : null}
+      />
       {(() => {
         const otherEdit =
           editEntry &&
           editEntry.kind !== "feed" &&
           editEntry.kind !== "diaper" &&
-          editEntry.kind !== "sleep"
+          editEntry.kind !== "sleep" &&
+          editEntry.kind !== "play"
             ? (editEntry as OtherEntry)
             : null;
         return (

@@ -6,8 +6,12 @@ import {
   IconPlus,
 } from "@tabler/icons-react";
 import { useState } from "react";
+import type { PlayType } from "@shared/schemas";
 import { useNavigate } from "@tanstack/react-router";
-import { ActiveSleepBanner } from "@/components/ActiveSleepBanner";
+import {
+  ActivePlayBanner,
+  ActiveSleepBanner,
+} from "@/components/ActiveSessionBanner";
 import { BabySwitcher } from "@/components/BabySwitcher";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { LogButton } from "@/components/LogButton";
@@ -16,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { DiaperSheet } from "@/components/sheets/DiaperSheet";
 import { FeedSheet } from "@/components/sheets/FeedSheet";
 import { MoreSheet, OtherLogSheet } from "@/components/sheets/OtherLogSheet";
+import { PlaySheet } from "@/components/sheets/PlaySheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
 import { useSession } from "@/lib/auth-client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,9 +35,15 @@ import { t } from "@/lib/i18n";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import { formatDuration } from "@/lib/time";
 import { useAppearance } from "@/lib/appearance";
-import { toast } from "@/lib/toast";
 
-type OpenSheet = "feed" | "diaper" | "sleep" | "more" | "other" | null;
+type OpenSheet =
+  | "feed"
+  | "diaper"
+  | "sleep"
+  | "more"
+  | "other"
+  | "play"
+  | null;
 
 function feedDetail(feed: {
   type: string;
@@ -55,6 +66,7 @@ export function HomeScreen() {
   const feeds = useFeeds(baby?.id);
   const [sheet, setSheet] = useState<OpenSheet>(null);
   const [otherKind, setOtherKind] = useState<OtherKind>("medicine");
+  const [playType, setPlayType] = useState<PlayType>("tummy");
   const { night } = useAppearance();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -91,6 +103,7 @@ export function HomeScreen() {
 
   const s = summary.data;
   const active = s?.activeSleep ?? null;
+  const activePlay = s?.activePlay ?? null;
 
   // Never switch layouts while a sheet is open: the 22:00 auto-flip would
   // unmount an open More/Other sheet and discard whatever was typed.
@@ -128,6 +141,7 @@ export function HomeScreen() {
 
       <div className="space-y-3 pb-tabbar">
         {active && <ActiveSleepBanner session={active} />}
+        {activePlay && <ActivePlayBanner session={activePlay} />}
 
         {/* Status before action: last feed / last diaper at a glance */}
         <div className="grid grid-cols-1 gap-3">
@@ -229,12 +243,22 @@ export function HomeScreen() {
           setOtherKind(kind);
           setSheet("other");
         }}
+        onPickPlay={(type) => {
+          setPlayType(type);
+          setSheet("play");
+        }}
       />
       <OtherLogSheet
         open={sheet === "other"}
         onOpenChange={(o) => setSheet(o ? "other" : null)}
         babyId={baby.id}
         kind={otherKind}
+      />
+      <PlaySheet
+        open={sheet === "play"}
+        onOpenChange={(o) => setSheet(o ? "play" : null)}
+        babyId={baby.id}
+        type={playType}
       />
     </div>
   );

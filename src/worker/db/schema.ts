@@ -348,6 +348,38 @@ export const sleepLocation = sqliteTable(
   (t) => [index("sleep_location_family_idx").on(t.familyId)],
 );
 
+// --- Play (premium): timed activities — tummy time, a walk, playing.
+// Structurally a sleep_log: end_time NULL means the session is running, and
+// the partial unique index is what makes the timer server-side. No durable
+// object needed; "active" is a row shape, and the client renders the counter
+// from start_time.
+
+export const playLog = sqliteTable(
+  "play_log",
+  {
+    id: id(),
+    familyId: familyId(),
+    babyId: babyId(),
+    caretakerId: caretakerId(),
+    type: text("type", { enum: ["tummy", "walk", "play"] }).notNull(),
+    startTime: integer("start_time", { mode: "timestamp_ms" }).notNull(),
+    // NULL while the activity is running.
+    endTime: integer("end_time", { mode: "timestamp_ms" }),
+    notes: text("notes"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("play_family_start_idx").on(t.familyId, t.startTime),
+    index("play_baby_idx").on(t.babyId),
+    // One running activity per baby, enforced at the DB so a double-tap or
+    // an offline-queue replay can't race past the route's check — same
+    // guarantee sleep_one_active_per_baby gives.
+    uniqueIndex("play_one_active_per_baby")
+      .on(t.babyId)
+      .where(sql`end_time IS NULL`),
+  ],
+);
+
 // --- Contacts (premium): the family's people — doctor, helsestasjon,
 // grandparents. The first domain entity that is NOT a log: no time column,
 // no caretaker attribution. Babies attach via contact_baby; zero rows means

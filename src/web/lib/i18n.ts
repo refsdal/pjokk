@@ -97,6 +97,21 @@ const nb: Record<string, string> = {
   "Could not start sleep: ": "Kunne ikke starte søvn: ",
   "Could not update sleep: ": "Kunne ikke oppdatere søvn: ",
   "Could not wake: ": "Kunne ikke avslutte søvn: ",
+
+  // Play sheet
+  "Tummy time": "Mageleie",
+  Walk: "Tur",
+  Play: "Lek",
+  "Edit activity": "Rediger aktivitet",
+  Started: "Startet",
+  Ended: "Avsluttet",
+  "Log finished activity": "Logg ferdig aktivitet",
+  "Still running — finish it with Stop on Home.":
+    "Pågår fortsatt — avslutt den med Stopp på Hjem.",
+  "The end time is before the start time.":
+    "Sluttidspunktet er før starttidspunktet.",
+  "Could not stop: ": "Kunne ikke stoppe: ",
+  activity: "aktivitet",
   "Could not delete: ": "Kunne ikke slette: ",
 
   // More / other activity types

@@ -287,6 +287,44 @@ export const UpdatePumpSchema = z
   })
   .openapi("UpdatePump");
 
+// --- Play (premium): timed activities, same session shape as sleep ---
+
+export const playTypes = ["tummy", "walk", "play"] as const;
+
+export const PlayLogSchema = z
+  .object({
+    ...logBase,
+    type: z.enum(playTypes),
+    startTime: isoTime(),
+    // null = still running.
+    endTime: isoTime().nullable(),
+  })
+  .openapi("PlayLog");
+
+export const CreatePlaySchema = z
+  .object({
+    babyId: z.string(),
+    type: z.enum(playTypes),
+    startTime: isoTime(),
+    // Omit to start a running session; supply both to log after the fact.
+    endTime: isoTime().nullable().optional(),
+    notes: z.string().max(2000).optional(),
+  })
+  .openapi("CreatePlay");
+
+export const UpdatePlaySchema = z
+  .object({
+    type: z.enum(playTypes).optional(),
+    startTime: isoTime().optional(),
+    endTime: isoTime().nullable().optional(),
+    notes: z.string().max(2000).nullable().optional(),
+  })
+  .openapi("UpdatePlay");
+
+export const StopPlaySchema = z
+  .object({ endTime: isoTime().optional() })
+  .openapi("StopPlay");
+
 // --- Timeline: the merged, day-groupable feed of everything ---
 
 // "other" = all Phase 3 activity types together.
@@ -303,6 +341,7 @@ export const TimelineEntrySchema = z
     MilestoneLogSchema.extend({ kind: z.literal("milestone") }),
     MeasurementLogSchema.extend({ kind: z.literal("measurement") }),
     PumpLogSchema.extend({ kind: z.literal("pump") }),
+    PlayLogSchema.extend({ kind: z.literal("play") }),
   ])
   .openapi("TimelineEntry");
 
@@ -323,6 +362,8 @@ export const SummarySchema = z
     lastDiaper: DiaperLogSchema.nullable(),
     activeSleep: SleepLogSchema.nullable(),
     lastSleep: SleepLogSchema.nullable(),
+    // The running timed activity (tummy time, a walk), or null.
+    activePlay: PlayLogSchema.nullable(),
     // Local-day totals for the requester's timezone (see the `tz` query param).
     today: z.object({
       feeds: z.number().int(),
@@ -725,3 +766,5 @@ export type Contact = z.infer<typeof ContactSchema>;
 export type CreateContact = z.infer<typeof CreateContactSchema>;
 export type UpdateContact = z.infer<typeof UpdateContactSchema>;
 export type ContactIcon = (typeof contactIcons)[number];
+export type PlayLog = z.infer<typeof PlayLogSchema>;
+export type PlayType = (typeof playTypes)[number];

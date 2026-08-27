@@ -8,7 +8,14 @@ import {
   WakeSchema,
 } from "@shared/schemas";
 import type { FamEnv } from "../context";
-import { createApp, jsonContent, serDiaper, serFeed, serSleep } from "../lib";
+import {
+  createApp,
+  isUniqueViolation,
+  jsonContent,
+  serDiaper,
+  serFeed,
+  serSleep,
+} from "../lib";
 
 const listQuery = z.object({
   babyId: z.string().optional(),
@@ -152,16 +159,8 @@ export const sleepApp = createApp<FamEnv>()
       });
     } catch (err) {
       // The partial unique index (one active session per baby) closes the
-      // race the pre-check above can't. Drizzle wraps the SQLite error, so
-      // walk the cause chain.
-      let isUnique = false;
-      for (let e: unknown = err; e; e = (e as { cause?: unknown }).cause) {
-        if (String(e).includes("UNIQUE")) {
-          isUnique = true;
-          break;
-        }
-      }
-      if (!body.endTime && isUnique) {
+      // race the pre-check above can't.
+      if (!body.endTime && isUniqueViolation(err)) {
         return c.json(
           { error: "Already sleeping", code: "ALREADY_ACTIVE" },
           409,
@@ -266,6 +265,7 @@ export const sleepApp = createApp<FamEnv>()
         lastDiaper: s.lastDiaper ? serDiaper(s.lastDiaper) : null,
         activeSleep: s.activeSleep ? serSleep(s.activeSleep) : null,
         lastSleep: s.lastSleep ? serSleep(s.lastSleep) : null,
+        activePlay: s.activePlay ? serSleep(s.activePlay) : null,
         today,
       },
       200,

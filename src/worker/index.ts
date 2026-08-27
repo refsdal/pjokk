@@ -23,6 +23,7 @@ import { contactsApp } from "./routes/contacts";
 import { exportApp } from "./routes/export";
 import { keysApp } from "./routes/keys";
 import { otherLogsApp } from "./routes/other-logs";
+import { playApp } from "./routes/play";
 import { pushApp } from "./routes/push";
 import { sleepLocationsApp } from "./routes/sleep-locations";
 import { statsApp } from "./routes/stats";
@@ -123,6 +124,7 @@ const domainApp = domainBase
   .route("/", sleepApp)
   .route("/", sleepLocationsApp)
   .route("/", otherLogsApp)
+  .route("/", playApp)
   .route("/", timelineApp)
   .route("/", calendarApp)
   .route("/", contactsApp)

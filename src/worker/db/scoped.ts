@@ -31,6 +31,7 @@ import {
   milestoneLog,
   noteLog,
   organization,
+  playLog,
   pumpLog,
   sleepLocation,
   sleepLog,
@@ -74,6 +75,19 @@ const sleepCols = {
   endTime: sleepLog.endTime,
   location: sleepLog.location,
   notes: sleepLog.notes,
+};
+
+export type PlayTypeKey = "tummy" | "walk" | "play";
+
+const playCols = {
+  id: playLog.id,
+  babyId: playLog.babyId,
+  caretakerId: playLog.caretakerId,
+  caretakerName: user.name,
+  type: playLog.type,
+  startTime: playLog.startTime,
+  endTime: playLog.endTime,
+  notes: playLog.notes,
 };
 
 // The Phase 3 activity types share one structural shape (id, familyId,
@@ -379,6 +393,11 @@ export function familyScope(db: Db, familyId: string) {
     and(
       eq(sleepLog.familyId, familyId),
       babyId ? eq(sleepLog.babyId, babyId) : undefined,
+    );
+  const playScope = (babyId?: string) =>
+    and(
+      eq(playLog.familyId, familyId),
+      babyId ? eq(playLog.babyId, babyId) : undefined,
     );
 
   return {
@@ -766,17 +785,19 @@ export function familyScope(db: Db, familyId: string) {
 
     // One query bundle for the home screen glance.
     async summary(babyId: string) {
-      const [feeds, diapers, active, sleeps] = await Promise.all([
+      const [feeds, diapers, active, sleeps, play] = await Promise.all([
         this.listFeeds({ babyId, limit: 1 }),
         this.listDiapers({ babyId, limit: 1 }),
         this.activeSleep(babyId),
         this.listSleeps({ babyId, limit: 1 }),
+        this.activePlay(babyId),
       ]);
       return {
         lastFeed: feeds[0] ?? null,
         lastDiaper: diapers[0] ?? null,
         activeSleep: active,
         lastSleep: sleeps[0] ?? null,
+        activePlay: play,
       };
     },
 
@@ -944,6 +965,101 @@ export function familyScope(db: Db, familyId: string) {
           and(eq(sleepLocation.id, id), eq(sleepLocation.familyId, familyId)),
         )
         .returning({ id: sleepLocation.id });
+      return rows.length > 0;
+    },
+
+    // --- play (premium): timed activities, same session shape as sleep ---
+    async listPlays(opts: ListOpts = {}) {
+      return db
+        .select(playCols)
+        .from(playLog)
+        .innerJoin(user, eq(playLog.caretakerId, user.id))
+        .where(
+          and(
+            playScope(opts.babyId),
+            beforeCursor(playLog.startTime, playLog.id, opts.before),
+          ),
+        )
+        .orderBy(desc(playLog.startTime), desc(playLog.id))
+        .limit(opts.limit ?? 50);
+    },
+
+    async getPlay(id: string) {
+      const rows = await db
+        .select(playCols)
+        .from(playLog)
+        .innerJoin(user, eq(playLog.caretakerId, user.id))
+        .where(and(eq(playLog.id, id), eq(playLog.familyId, familyId)));
+      return rows[0] ?? null;
+    },
+
+    // The running activity for a baby (endTime IS NULL), if any.
+    async activePlay(babyId?: string) {
+      const rows = await db
+        .select(playCols)
+        .from(playLog)
+        .innerJoin(user, eq(playLog.caretakerId, user.id))
+        .where(and(playScope(babyId), isNull(playLog.endTime)))
+        .orderBy(desc(playLog.startTime))
+        .limit(1);
+      return rows[0] ?? null;
+    },
+
+    async createPlay(data: {
+      babyId: string;
+      caretakerId: string;
+      type: PlayTypeKey;
+      startTime: Date;
+      endTime?: Date | null;
+      notes?: string | null;
+    }) {
+      const rows = await db
+        .insert(playLog)
+        .values({ ...data, familyId })
+        .returning({ id: playLog.id });
+      return this.getPlay(rows[0]!.id);
+    },
+
+    // Ends the running activity; the NULL guard makes a double-stop harmless.
+    async stopPlay(id: string, endTime: Date) {
+      const rows = await db
+        .update(playLog)
+        .set({ endTime })
+        .where(
+          and(
+            eq(playLog.id, id),
+            eq(playLog.familyId, familyId),
+            isNull(playLog.endTime),
+          ),
+        )
+        .returning({ id: playLog.id });
+      return rows[0] ? this.getPlay(id) : null;
+    },
+
+    async updatePlay(
+      id: string,
+      patch: Partial<{
+        type: PlayTypeKey;
+        startTime: Date;
+        endTime: Date | null;
+        notes: string | null;
+      }>,
+    ) {
+      const set = compactPatch(patch);
+      if (Object.keys(set).length === 0) return this.getPlay(id);
+      const rows = await db
+        .update(playLog)
+        .set(set)
+        .where(and(eq(playLog.id, id), eq(playLog.familyId, familyId)))
+        .returning({ id: playLog.id });
+      return rows[0] ? this.getPlay(id) : null;
+    },
+
+    async deletePlay(id: string) {
+      const rows = await db
+        .delete(playLog)
+        .where(and(eq(playLog.id, id), eq(playLog.familyId, familyId)))
+        .returning({ id: playLog.id });
       return rows.length > 0;
     },
 

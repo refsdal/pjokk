@@ -80,6 +80,7 @@ if (args.includes("--inspect")) {
     "Measurement",
     "MedicineLog",
     "Contact",
+    "PlayLog",
   ])
     console.log(`${t}: ${count(t)} rows`);
   process.exit(0);
@@ -409,6 +410,60 @@ for (const r of rows(`SELECT * FROM MedicineLog WHERE deletedAt IS NULL`)) {
       r.doseAmount ?? "NULL",
       PJOKK_UNITS.has(unit) ? esc(unit) : "NULL",
       escOrNull(r.notes),
+      now,
+    ],
+  );
+}
+
+// Play. sprout has five PlayTypes; Pjokk has three, so the two indoor/
+// outdoor variants and CUSTOM collapse into "play" with the original type
+// preserved in notes. A row with no endTime imports as a RUNNING session,
+// which the partial unique index caps at one per baby — later ones are
+// dropped by INSERT OR IGNORE rather than failing the import.
+const PLAY_TYPE = {
+  TUMMY_TIME: "tummy",
+  WALK: "walk",
+  INDOOR_PLAY: "play",
+  OUTDOOR_PLAY: "play",
+  CUSTOM: "play",
+};
+for (const r of rows(`SELECT * FROM PlayLog WHERE deletedAt IS NULL`)) {
+  const b = base(r, ms(r.startTime));
+  if (!b) continue;
+  const [id, fam, babyId, caretakerId, startMs] = b;
+  const type = PLAY_TYPE[r.type];
+  if (!type) {
+    skip(`play type ${r.type}`);
+    continue;
+  }
+  // Keep the distinction the enum loses, plus sprout's free-text activities.
+  const original =
+    r.type === "INDOOR_PLAY" || r.type === "OUTDOOR_PLAY" || r.type === "CUSTOM"
+      ? r.type.toLowerCase().replace("_", " ")
+      : null;
+  const notes = [original, r.activities, r.notes].filter(Boolean).join(" · ") || null;
+  insert(
+    "play_log",
+    [
+      "id",
+      "family_id",
+      "baby_id",
+      "caretaker_id",
+      "type",
+      "start_time",
+      "end_time",
+      "notes",
+      "created_at",
+    ],
+    [
+      id,
+      fam,
+      babyId,
+      caretakerId,
+      esc(type),
+      startMs,
+      ms(r.endTime) ?? "NULL",
+      escOrNull(notes),
       now,
     ],
   );
