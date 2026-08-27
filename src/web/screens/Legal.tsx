@@ -10,14 +10,17 @@ import { Link, useRouter } from "@tanstack/react-router";
 // A Norwegian version is outstanding and matters legally for Norwegian
 // users; see DECISIONS.md.
 //
-// BEFORE PUBLISHING, these must be filled in for real (see the PR checklist):
-//   - the company's organisasjonsnummer and postal address
-//   - a personvern@pjokk.no mailbox that a human actually reads
-//   - confirmation that the data really is stored in the EU
-// and the whole thing wants review by someone qualified.
+// STILL OUTSTANDING before these are relied upon (see the PR checklist):
+//   - a Norwegian version
+//   - review by someone qualified — these were drafted by an AI
+// Done: the contact mailbox is live, the company details below are real, and
+// D1/R2 are pinned to the EU jurisdiction, so the storage claim is true.
 
 const UPDATED = "27 August 2026";
 const CONTACT = "personvern@pjokk.no";
+const COMPANY = "Refsdal Holding AS";
+const ORG_NR = "932 516 470";
+const ADDRESS = "Marstrandgata 13B, 0566 Oslo, Norway";
 
 function LegalPage({
   title,
@@ -73,8 +76,19 @@ export function PrivacyScreen() {
 
       <H>Who is responsible</H>
       <p>
-        Refsdal Holding AS is the data controller for the information you put
-        into Pjokk at app.pjokk.no. You can reach us at {CONTACT}.
+        {COMPANY} is the data controller for the information you put into Pjokk
+        at app.pjokk.no.
+      </p>
+      <p className="text-sm text-muted">
+        {COMPANY}
+        <br />
+        Org. nr. {ORG_NR}
+        <br />
+        {ADDRESS}
+        <br />
+        <a href={`mailto:${CONTACT}`} className="font-semibold text-accent">
+          {CONTACT}
+        </a>
       </p>
 
       <H>What we store</H>
@@ -244,8 +258,9 @@ export function TermsScreen() {
   return (
     <LegalPage title="Terms">
       <p>
-        These terms cover your use of Pjokk at app.pjokk.no, operated by Refsdal
-        Holding AS. By creating an account you accept them.
+        These terms cover your use of Pjokk at app.pjokk.no, operated by{" "}
+        {COMPANY} (org. nr. {ORG_NR}), {ADDRESS}. By creating an account you
+        accept them.
       </p>
 
       <H>What Pjokk is</H>
