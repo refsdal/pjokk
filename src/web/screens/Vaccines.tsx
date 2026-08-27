@@ -110,9 +110,20 @@ export function VaccinesScreen() {
               {t("Log vaccine")}
             </Button>
 
+            {/* The source is a link, not just a name: a schedule we assert
+                is one a parent must be able to check against the original.
+                -my-1/py-1 grows the tap target without shifting the line. */}
             <p className="px-1 text-xs text-muted">
               {t("Schedule follows")} {vaccineProgramme.name} (
-              {vaccineProgramme.source}). {t("Check with your helsestasjon.")}
+              <a
+                href={vaccineProgramme.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="-my-1 py-1 font-semibold text-accent underline underline-offset-2"
+              >
+                {vaccineProgramme.source}
+              </a>
+              ). {t("Check with your helsestasjon.")}
             </p>
           </>
         )}
