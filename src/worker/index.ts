@@ -19,6 +19,7 @@ import { audit, requireSysadmin } from "./middleware/sysadmin";
 import { adminApp } from "./routes/admin";
 import { billingApp } from "./routes/billing";
 import { calendarApp } from "./routes/calendar";
+import { contactsApp } from "./routes/contacts";
 import { exportApp } from "./routes/export";
 import { keysApp } from "./routes/keys";
 import { otherLogsApp } from "./routes/other-logs";
@@ -124,6 +125,7 @@ const domainApp = domainBase
   .route("/", otherLogsApp)
   .route("/", timelineApp)
   .route("/", calendarApp)
+  .route("/", contactsApp)
   .route("/", statsApp)
   .route("/", exportApp)
   .route("/", pushApp)

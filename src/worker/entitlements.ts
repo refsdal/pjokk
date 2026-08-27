@@ -7,7 +7,8 @@ export type Feature =
   | "statsMonth"
   | "otherActivities"
   | "multipleBabies"
-  | "calendar";
+  | "calendar"
+  | "contacts";
 
 const requiresPremium: Record<Feature, boolean> = {
   growthCharts: true,
@@ -17,6 +18,7 @@ const requiresPremium: Record<Feature, boolean> = {
   otherActivities: true,
   multipleBabies: true,
   calendar: true,
+  contacts: true,
 };
 
 export function canUse(family: { plan: string }, feature: Feature): boolean {

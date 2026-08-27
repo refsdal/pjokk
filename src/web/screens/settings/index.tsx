@@ -9,6 +9,7 @@ import { ApiKeysSection } from "./ApiKeysSection";
 import { AppearanceSection } from "./AppearanceSection";
 import { BabiesSection } from "./BabiesSection";
 import { BillingSection } from "./BillingSection";
+import { ContactsSection } from "./ContactsSection";
 import { FamilySection } from "./FamilySection";
 import { SectionTitle } from "./lib";
 import { NotificationsSection } from "./NotificationsSection";
@@ -28,6 +29,7 @@ export function SettingsScreen() {
       <div className="pb-tabbar">
         <FamilySection isAdmin={isAdmin} />
         <BabiesSection isAdmin={isAdmin} />
+        <ContactsSection />
 
         {isAdmin && (
           <>

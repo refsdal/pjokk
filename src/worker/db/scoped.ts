@@ -20,6 +20,8 @@ import {
   calendarAssignee,
   calendarEvent,
   calendarEventBaby,
+  contact,
+  contactBaby,
   diaperLog,
   familyInvite,
   feedLog,
@@ -260,6 +262,67 @@ const calendarCols = {
   createdBy: calendarEvent.createdBy,
   createdByName: user.name,
 };
+
+export type ContactIconKey =
+  | "user"
+  | "doctor"
+  | "nurse"
+  | "hospital"
+  | "dental"
+  | "family"
+  | "grandparent"
+  | "daycare"
+  | "friend"
+  | "phone";
+
+export type ContactRow = {
+  id: string;
+  name: string;
+  role: string | null;
+  icon: ContactIconKey | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  notes: string | null;
+  babies: { id: string; name: string }[];
+};
+
+const contactCols = {
+  id: contact.id,
+  name: contact.name,
+  role: contact.role,
+  icon: contact.icon,
+  phone: contact.phone,
+  email: contact.email,
+  website: contact.website,
+  notes: contact.notes,
+};
+
+type ContactBaseRow = Omit<ContactRow, "babies">;
+
+// One IN-query + client-side grouping, same shape as the calendar hydrate.
+async function hydrateContacts(
+  db: Db,
+  rows: ContactBaseRow[],
+): Promise<ContactRow[]> {
+  if (rows.length === 0) return [];
+  const ids = rows.map((r) => r.id);
+  const linkRows = await db
+    .select({
+      contactId: contactBaby.contactId,
+      id: baby.id,
+      name: baby.name,
+    })
+    .from(contactBaby)
+    .innerJoin(baby, eq(contactBaby.babyId, baby.id))
+    .where(inArray(contactBaby.contactId, ids));
+  return rows.map((r) => ({
+    ...r,
+    babies: linkRows
+      .filter((l) => l.contactId === r.id)
+      .map(({ id, name }) => ({ id, name })),
+  }));
+}
 
 type CalendarBaseRow = Omit<CalendarEventRow, "babies" | "assignees">;
 
@@ -881,6 +944,119 @@ export function familyScope(db: Db, familyId: string) {
           and(eq(sleepLocation.id, id), eq(sleepLocation.familyId, familyId)),
         )
         .returning({ id: sleepLocation.id });
+      return rows.length > 0;
+    },
+
+    // --- contacts (premium): family people, hydrated with baby links ---
+    async listContacts() {
+      const rows = await db
+        .select(contactCols)
+        .from(contact)
+        .where(eq(contact.familyId, familyId))
+        .orderBy(asc(contact.name), asc(contact.id));
+      return hydrateContacts(db, rows);
+    },
+
+    async getContact(id: string) {
+      const rows = await db
+        .select(contactCols)
+        .from(contact)
+        .where(and(eq(contact.id, id), eq(contact.familyId, familyId)));
+      if (!rows[0]) return null;
+      const hydrated = await hydrateContacts(db, rows);
+      return hydrated[0] ?? null;
+    },
+
+    async createContact(data: {
+      name: string;
+      role?: string | null;
+      icon?: ContactIconKey | null;
+      phone?: string | null;
+      email?: string | null;
+      website?: string | null;
+      notes?: string | null;
+      babyIds: string[];
+    }) {
+      const id = crypto.randomUUID();
+      // Contact row first, links after — same ordering rationale as
+      // createCalendarEvent: never leave dangling link rows.
+      const statements: BatchItem<"sqlite">[] = [
+        db.insert(contact).values({
+          id,
+          familyId,
+          name: data.name,
+          role: data.role ?? null,
+          icon: data.icon ?? null,
+          phone: data.phone ?? null,
+          email: data.email ?? null,
+          website: data.website ?? null,
+          notes: data.notes ?? null,
+        }),
+      ];
+      if (data.babyIds.length > 0) {
+        statements.push(
+          db
+            .insert(contactBaby)
+            .values(data.babyIds.map((babyId) => ({ contactId: id, babyId }))),
+        );
+      }
+      await db.batch(statements as never);
+      return this.getContact(id);
+    },
+
+    async updateContact(
+      id: string,
+      patch: Partial<{
+        name: string;
+        role: string | null;
+        icon: ContactIconKey | null;
+        phone: string | null;
+        email: string | null;
+        website: string | null;
+        notes: string | null;
+      }>,
+      links: { babyIds?: string[] },
+    ) {
+      const set = compactPatch(patch);
+      if (Object.keys(set).length > 0) {
+        const rows = await db
+          .update(contact)
+          .set(set)
+          .where(and(eq(contact.id, id), eq(contact.familyId, familyId)))
+          .returning({ id: contact.id });
+        if (!rows[0]) return null;
+      } else {
+        // Ownership check even for a link-only update.
+        const rows = await db
+          .select({ id: contact.id })
+          .from(contact)
+          .where(and(eq(contact.id, id), eq(contact.familyId, familyId)));
+        if (!rows[0]) return null;
+      }
+      if (links.babyIds !== undefined) {
+        const statements: BatchItem<"sqlite">[] = [
+          db.delete(contactBaby).where(eq(contactBaby.contactId, id)),
+        ];
+        if (links.babyIds.length > 0) {
+          statements.push(
+            db
+              .insert(contactBaby)
+              .values(
+                links.babyIds.map((babyId) => ({ contactId: id, babyId })),
+              ),
+          );
+        }
+        await db.batch(statements as never);
+      }
+      return this.getContact(id);
+    },
+
+    async deleteContact(id: string) {
+      // Link rows go with it via ON DELETE cascade.
+      const rows = await db
+        .delete(contact)
+        .where(and(eq(contact.id, id), eq(contact.familyId, familyId)))
+        .returning({ id: contact.id });
       return rows.length > 0;
     },
 

@@ -79,6 +79,7 @@ if (args.includes("--inspect")) {
     "BathLog",
     "Measurement",
     "MedicineLog",
+    "Contact",
   ])
     console.log(`${t}: ${count(t)} rows`);
   process.exit(0);
@@ -408,6 +409,51 @@ for (const r of rows(`SELECT * FROM MedicineLog WHERE deletedAt IS NULL`)) {
       r.doseAmount ?? "NULL",
       PJOKK_UNITS.has(unit) ? esc(unit) : "NULL",
       escOrNull(r.notes),
+      now,
+    ],
+  );
+}
+
+// Contacts. sprout links contacts to events/medicines/vaccines, never to a
+// baby, so every imported contact lands family-wide (zero contact_baby rows)
+// — which is the right default for a doctor anyway. `address` has no Pjokk
+// column and folds into notes.
+const ICON_BY_ROLE = [
+  [/doctor|lege|fastlege|gp\b/i, "doctor"],
+  [/nurse|helsesykepleier|helsestasjon/i, "nurse"],
+  [/hospital|sykehus|clinic|klinikk/i, "hospital"],
+  [/dentist|tannlege/i, "dental"],
+  [/daycare|barnehage|nursery|kindergarten/i, "daycare"],
+];
+for (const r of rows(`SELECT * FROM Contact WHERE deletedAt IS NULL`)) {
+  const role = r.role ?? "";
+  const icon = ICON_BY_ROLE.find(([re]) => re.test(role))?.[1] ?? null;
+  const notes = [r.address, r.notes].filter(Boolean).join(" · ") || null;
+  insert(
+    "contact",
+    [
+      "id",
+      "family_id",
+      "name",
+      "role",
+      "icon",
+      "phone",
+      "email",
+      "website",
+      "notes",
+      "created_at",
+    ],
+    [
+      esc(`st-${r.id}`),
+      esc(familyId),
+      esc(r.name ?? "Contact"),
+      escOrNull(r.role),
+      icon ? esc(icon) : "NULL",
+      escOrNull(r.phone),
+      escOrNull(r.email),
+      // sprout has no website column.
+      "NULL",
+      escOrNull(notes),
       now,
     ],
   );

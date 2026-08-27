@@ -214,6 +214,8 @@ const BACKUP_TABLES = [
   "pump_log",
   "family_invite",
   "sleep_location",
+  "contact",
+  "contact_baby",
   "calendar_event",
   "calendar_event_baby",
   "calendar_assignee",

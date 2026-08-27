@@ -198,6 +198,33 @@ const nb: Record<string, string> = {
   "Baby removed": "Baby fjernet",
   "Removing a baby permanently deletes every log for them.":
     "Å fjerne en baby sletter alle loggene deres for alltid.",
+
+  // Contacts
+  Contacts: "Kontakter",
+  "Add contact": "Legg til kontakt",
+  "Edit contact": "Rediger kontakt",
+  "Contact removed": "Kontakt fjernet",
+  "Doctor, helsestasjon, grandparents — the people you call.":
+    "Lege, helsestasjon, besteforeldre — de du ringer.",
+  Name: "Navn",
+  "Type (doctor, grandma, daycare…)": "Type (lege, mormor, barnehage…)",
+  Phone: "Telefon",
+  Website: "Nettside",
+  Notes: "Notater",
+  Call: "Ring",
+  "Applies to": "Gjelder for",
+  "Shared by the whole family.": "Delt av hele familien.",
+  "Only shown for the babies above.": "Vises bare for babyene over.",
+  // Contact icon labels (passed through t() dynamically, so the i18n check
+  // can't see them — keep them in sync with contactIconMeta by hand).
+  // Doctor / Family / Other already live in this dictionary further down.
+  Person: "Person",
+  Nurse: "Helsesykepleier",
+  Clinic: "Klinikk",
+  Dentist: "Tannlege",
+  Grandparent: "Besteforelder",
+  Daycare: "Barnehage",
+  Friend: "Venn",
   "Switch baby": "Bytt baby",
   "Make admin": "Gjør til admin",
   "Make member": "Gjør til medlem",

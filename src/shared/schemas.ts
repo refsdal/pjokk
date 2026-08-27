@@ -552,6 +552,68 @@ export const RedeemResultSchema = z
   })
   .openapi("RedeemResult");
 
+// --- Contacts (premium): the family's people ---
+
+// A small fixed set, mapped to Tabler glyphs in the UI. Free-form `role`
+// carries the meaning; the icon is just recognition at a glance.
+export const contactIcons = [
+  "user",
+  "doctor",
+  "nurse",
+  "hospital",
+  "dental",
+  "family",
+  "grandparent",
+  "daycare",
+  "friend",
+  "phone",
+] as const;
+
+// Website is deliberately free text, not z.url(): people type
+// "legesenteret.no" and being right about URLs matters less than the
+// contact getting saved. The UI prepends https:// when opening it.
+export const ContactSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    role: z.string().nullable(),
+    icon: z.enum(contactIcons).nullable(),
+    phone: z.string().nullable(),
+    email: z.string().nullable(),
+    website: z.string().nullable(),
+    notes: z.string().nullable(),
+    // Zero babies = a contact the whole family shares.
+    babies: z.array(z.object({ id: z.string(), name: z.string() })),
+  })
+  .openapi("Contact");
+
+export const CreateContactSchema = z
+  .object({
+    name: z.string().min(1).max(100),
+    role: z.string().max(60).optional(),
+    icon: z.enum(contactIcons).optional(),
+    phone: z.string().max(40).optional(),
+    email: z.email().max(200).optional(),
+    website: z.string().max(200).optional(),
+    notes: z.string().max(2000).optional(),
+    babyIds: z.array(z.string()).max(10).default([]),
+  })
+  .openapi("CreateContact");
+
+export const UpdateContactSchema = z
+  .object({
+    name: z.string().min(1).max(100).optional(),
+    role: z.string().max(60).nullable().optional(),
+    icon: z.enum(contactIcons).nullable().optional(),
+    phone: z.string().max(40).nullable().optional(),
+    email: z.email().max(200).nullable().optional(),
+    website: z.string().max(200).nullable().optional(),
+    notes: z.string().max(2000).nullable().optional(),
+    // Present = replace the link set; omitted = untouched.
+    babyIds: z.array(z.string()).max(10).optional(),
+  })
+  .openapi("UpdateContact");
+
 // --- Calendar (premium): family-wide planned events ---
 
 export const calendarCategories = [
@@ -659,3 +721,7 @@ export type CalendarEvent = z.infer<typeof CalendarEventSchema>;
 export type CreateCalendarEvent = z.infer<typeof CreateCalendarEventSchema>;
 export type UpdateCalendarEvent = z.infer<typeof UpdateCalendarEventSchema>;
 export type CalendarCategory = (typeof calendarCategories)[number];
+export type Contact = z.infer<typeof ContactSchema>;
+export type CreateContact = z.infer<typeof CreateContactSchema>;
+export type UpdateContact = z.infer<typeof UpdateContactSchema>;
+export type ContactIcon = (typeof contactIcons)[number];

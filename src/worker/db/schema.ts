@@ -348,6 +348,58 @@ export const sleepLocation = sqliteTable(
   (t) => [index("sleep_location_family_idx").on(t.familyId)],
 );
 
+// --- Contacts (premium): the family's people — doctor, helsestasjon,
+// grandparents. The first domain entity that is NOT a log: no time column,
+// no caretaker attribution. Babies attach via contact_baby; zero rows means
+// the contact belongs to the whole family (the doctor everyone shares),
+// which is the same convention calendar_event_baby uses.
+
+export const contact = sqliteTable(
+  "contact",
+  {
+    id: id(),
+    familyId: familyId(),
+    name: text("name").notNull(),
+    // Free-form by design: "doctor", "mormor", "barnehage" — a fixed enum
+    // would never survive contact with a real family.
+    role: text("role"),
+    // Keep in step with contactIcons in shared/schemas.ts.
+    icon: text("icon", {
+      enum: [
+        "user",
+        "doctor",
+        "nurse",
+        "hospital",
+        "dental",
+        "family",
+        "grandparent",
+        "daycare",
+        "friend",
+        "phone",
+      ],
+    }),
+    phone: text("phone"),
+    email: text("email"),
+    website: text("website"),
+    notes: text("notes"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("contact_family_idx").on(t.familyId)],
+);
+
+export const contactBaby = sqliteTable(
+  "contact_baby",
+  {
+    contactId: text("contact_id")
+      .notNull()
+      .references(() => contact.id, { onDelete: "cascade" }),
+    babyId: text("baby_id")
+      .notNull()
+      .references(() => baby.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.contactId, t.babyId] })],
+);
+
 // --- Calendar (premium): family-wide planned events. Babies and responsible
 // members attach via join tables; zero baby rows = family-wide event.
 
