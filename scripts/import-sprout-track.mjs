@@ -16,7 +16,30 @@
 //
 // Idempotent: rows get deterministic ids (st-<sproutId>) and INSERT OR
 // IGNORE, so re-running never duplicates. Soft-deleted sprout rows are
-// skipped. Units are normalized to Pjokk's (ml, kg, cm).
+// skipped. Units are normalized to Pjokk's (ml, kg, cm) — including sprout's
+// imperial defaults (OZ bottles, TBSP solids). Because it is INSERT OR
+// IGNORE, fixing a mapping and re-running does NOT update rows already
+// imported: delete the st-% rows first.
+//
+// Imported: feeds, diapers, sleep, notes, milestones, pumps, baths,
+// measurements, medicine, play, vaccines, contacts, calendar events.
+//
+// NOT imported, because Pjokk has no equivalent:
+//   MoodLog, PlayLog activities beyond the three Pjokk types (folded into
+//   notes), FoodLog/Food/BabyAllergen (solids tracker),
+//   BreastMilkAdjustment (freezer inventory), Photo/PhotoLog, Settings,
+//   and VaccineDocument files (sprout stores them encrypted on its own
+//   disk, outside the SQLite file this script reads — re-attach by hand).
+//
+// Lossy on purpose, preserved in `notes` rather than dropped:
+//   feed bottleType / reaction fields / breastMilkAmount, diaper
+//   condition / colour / blowout / cream, sleep NAP-vs-NIGHT and quality,
+//   milestone category, bath type. A DRY diaper becomes a note ("Dry nappy
+//   check") rather than a wet one, so wet-nappy counts stay true.
+//   Recurring calendar events import as their FIRST occurrence only.
+//   A breastfeed recorded as two sided rows in sprout stays two rows here.
+//
+// The summary printed at the end lists everything skipped, and why.
 import { writeFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 
@@ -81,6 +104,8 @@ if (args.includes("--inspect")) {
     "MedicineLog",
     "Contact",
     "PlayLog",
+    "VaccineLog",
+    "CalendarEvent",
   ])
     console.log(`${t}: ${count(t)} rows`);
   process.exit(0);
@@ -116,11 +141,16 @@ const resolveCaretaker = (sproutCaretakerId) => {
   return defaultCaretaker ?? null;
 };
 
-// Unit conversions → ml / kg / cm.
+// Unit conversions → ml / kg / cm. sprout's defaults are imperial (OZ for
+// bottles, TBSP for solids), so anything unconverted here silently imports
+// as the wrong number.
+const ML_PER = { oz: 29.5735, "fl oz": 29.5735, tbsp: 14.7868, tsp: 4.92892 };
 const toMl = (amount, unit) => {
   if (amount === null || amount === undefined) return null;
   const u = String(unit ?? "ml").toLowerCase();
-  if (u === "oz" || u === "fl oz") return Math.round(amount * 29.5735);
+  const factor = ML_PER[u];
+  if (factor) return Math.round(amount * factor);
+  if (u !== "ml" && u !== "g") skip(`unknown amount unit "${u}" taken as ml`);
   return Math.round(amount);
 };
 const toKg = (v, unit) => {
@@ -172,7 +202,21 @@ for (const r of rows(`SELECT * FROM FeedLog WHERE deletedAt IS NULL`)) {
       : r.startTime && r.endTime
         ? Math.round((ms(r.endTime) - ms(r.startTime)) / 60000)
         : null;
-  const notes = [r.food, r.notes].filter(Boolean).join(" · ") || null;
+  // bottleType (formula vs breast milk), reaction flags and breastMilkAmount
+  // have no Pjokk column; they are real clinical detail, so they ride along
+  // in notes rather than vanishing.
+  const notes =
+    [
+      r.food,
+      r.bottleType,
+      r.breastMilkAmount ? `${r.breastMilkAmount} breast milk` : null,
+      r.hadReaction
+        ? `reaction${r.reactionDescription ? `: ${r.reactionDescription}` : ""}${r.reactionCause ? ` (${r.reactionCause})` : ""}`
+        : null,
+      r.notes,
+    ]
+      .filter(Boolean)
+      .join(" · ") || null;
   insert(
     "feed_log",
     [
@@ -203,9 +247,40 @@ for (const r of rows(`SELECT * FROM FeedLog WHERE deletedAt IS NULL`)) {
 for (const r of rows(`SELECT * FROM DiaperLog WHERE deletedAt IS NULL`)) {
   const b = base(r, ms(r.time));
   if (!b) continue;
+  const diaperNotes =
+    [
+      r.condition,
+      r.color,
+      r.blowout ? "blowout" : null,
+      r.creamApplied ? "cream applied" : null,
+      r.notes,
+    ]
+      .filter(Boolean)
+      .join(" · ") || null;
+  // Pjokk has no DRY type, and calling a dry check "wet" would inflate every
+  // wet-nappy count forever. Keep the record as a note instead: the event
+  // survives, the diaper statistics stay true.
+  if (r.type === "DRY") {
+    insert(
+      "note_log",
+      [
+        "id",
+        "family_id",
+        "baby_id",
+        "caretaker_id",
+        "time",
+        "content",
+        "notes",
+        "created_at",
+      ],
+      [...b, esc("Dry nappy check"), escOrNull(diaperNotes), now],
+    );
+    skip("DRY diaper imported as a note (no Pjokk diaper type fits)");
+    continue;
+  }
   const type = { WET: "wet", DIRTY: "dirty", BOTH: "both" }[r.type];
   if (!type) {
-    skip(`diaper type ${r.type} (DRY has no Pjokk equivalent)`);
+    skip(`diaper type ${r.type}`);
     continue;
   }
   insert(
@@ -220,7 +295,7 @@ for (const r of rows(`SELECT * FROM DiaperLog WHERE deletedAt IS NULL`)) {
       "notes",
       "created_at",
     ],
-    [...b, esc(type), escOrNull(r.notes), now],
+    [...b, esc(type), escOrNull(diaperNotes), now],
   );
 }
 
@@ -228,6 +303,16 @@ for (const r of rows(`SELECT * FROM SleepLog WHERE deletedAt IS NULL`)) {
   const b = base(r, ms(r.startTime));
   if (!b) continue;
   const [id, fam, babyId, caretakerId, startMs] = b;
+  // Pjokk has no nap/night split and no sleep quality; both would otherwise
+  // be dropped silently, so they ride along in notes.
+  const sleepNotes =
+    [
+      r.type === "NAP" ? "nap" : r.type === "NIGHT_SLEEP" ? "night sleep" : null,
+      r.quality ? `quality: ${String(r.quality).toLowerCase()}` : null,
+      r.notes,
+    ]
+      .filter(Boolean)
+      .join(" · ") || null;
   insert(
     "sleep_log",
     [
@@ -248,8 +333,10 @@ for (const r of rows(`SELECT * FROM SleepLog WHERE deletedAt IS NULL`)) {
       caretakerId,
       startMs,
       ms(r.endTime) ?? "NULL",
-      escOrNull(r.location?.toLowerCase()),
-      escOrNull(r.notes),
+      // Not lowercased: the value is shown as-is and sits beside the
+      // family's own sleep-location chips, which are capitalized.
+      escOrNull(r.location),
+      escOrNull(sleepNotes),
       now,
     ],
   );
@@ -415,6 +502,44 @@ for (const r of rows(`SELECT * FROM MedicineLog WHERE deletedAt IS NULL`)) {
   );
 }
 
+// Vaccines. Documents are NOT imported: sprout stores them encrypted on its
+// own disk (VaccineDocument.storedName), so the bytes are not reachable from
+// the SQLite file this script reads. Re-attach them by hand afterwards.
+// scheduleSlot stays NULL — the Vaccines screen matches a logged dose to the
+// programme by name + dose number anyway.
+for (const r of rows(`SELECT * FROM VaccineLog WHERE deletedAt IS NULL`)) {
+  const b = base(r, ms(r.time));
+  if (!b) continue;
+  insert(
+    "vaccine_log",
+    [
+      "id",
+      "family_id",
+      "baby_id",
+      "caretaker_id",
+      "time",
+      "name",
+      "dose_number",
+      "schedule_slot",
+      "notes",
+      "created_at",
+    ],
+    [
+      ...b,
+      esc(r.vaccineName ?? "Vaccine"),
+      r.doseNumber ?? "NULL",
+      "NULL",
+      escOrNull(r.notes),
+      now,
+    ],
+  );
+}
+// Counted individually so the summary reads "N × vaccine document …".
+const vaccineDocs = rows(`SELECT count(*) AS n FROM VaccineDocument`)[0].n;
+for (let i = 0; i < vaccineDocs; i++) {
+  skip("vaccine document (the file lives outside the db)");
+}
+
 // Play. sprout has five PlayTypes; Pjokk has three, so the two indoor/
 // outdoor variants and CUSTOM collapse into "play" with the original type
 // preserved in notes. A row with no endTime imports as a RUNNING session,
@@ -467,6 +592,114 @@ for (const r of rows(`SELECT * FROM PlayLog WHERE deletedAt IS NULL`)) {
       now,
     ],
   );
+}
+
+// Calendar events. sprout's recurrence has no Pjokk equivalent, so a
+// recurring event imports as its FIRST occurrence only, flagged in the
+// description — silently importing one row for a weekly series would be
+// worse than saying so. Reminders come across as remind_minutes_before with
+// remindedAt pre-set for anything already in the past, so the import can
+// never fire a burst of notifications for old events.
+const CAL_CATEGORY = {
+  APPOINTMENT: "doctor",
+  CARETAKER_SCHEDULE: "babysitting",
+  REMINDER: "other",
+  CUSTOM: "other",
+};
+const eventBabies = new Map();
+for (const r of rows(`SELECT * FROM BabyEvent`)) {
+  if (!eventBabies.has(r.eventId)) eventBabies.set(r.eventId, []);
+  eventBabies.get(r.eventId).push(r.babyId);
+}
+const eventCaretakers = new Map();
+for (const r of rows(`SELECT * FROM CaretakerEvent`)) {
+  if (!eventCaretakers.has(r.eventId)) eventCaretakers.set(r.eventId, []);
+  eventCaretakers.get(r.eventId).push(r.caretakerId);
+}
+
+for (const r of rows(`SELECT * FROM CalendarEvent WHERE deletedAt IS NULL`)) {
+  const startMs = ms(r.startTime);
+  if (startMs === null) {
+    skip("calendar event with unparseable start time");
+    continue;
+  }
+  const createdBy = resolveCaretaker(null);
+  if (!createdBy) {
+    skip("calendar event (set --default-caretaker)");
+    continue;
+  }
+  const id = `st-${r.id}`;
+  const endMs = ms(r.endTime);
+  const durationMin =
+    !r.allDay && endMs && endMs > startMs
+      ? Math.min(1440, Math.max(5, Math.round((endMs - startMs) / 60000)))
+      : null;
+  const description =
+    [
+      r.recurring
+        ? `imported from a recurring series (${String(r.recurrencePattern ?? "custom").toLowerCase()}) — first occurrence only`
+        : null,
+      r.description,
+    ]
+      .filter(Boolean)
+      .join(" · ") || null;
+  insert(
+    "calendar_event",
+    [
+      "id",
+      "family_id",
+      "created_by",
+      "title",
+      "description",
+      "location",
+      "category",
+      "start_time",
+      "all_day",
+      "duration_min",
+      "remind_minutes_before",
+      "reminded_at",
+      "created_at",
+    ],
+    [
+      esc(id),
+      esc(familyId),
+      esc(createdBy),
+      esc(r.title ?? "Event"),
+      escOrNull(description),
+      escOrNull(r.location),
+      esc(CAL_CATEGORY[r.type] ?? "other"),
+      startMs,
+      r.allDay ? 1 : 0,
+      durationMin ?? "NULL",
+      r.reminderTime ?? "NULL",
+      // Latch past reminders shut; future ones stay armed.
+      startMs < now ? now : "NULL",
+      now,
+    ],
+  );
+  for (const sproutBabyId of new Set(eventBabies.get(r.id) ?? [])) {
+    const babyId = babyMap.get(sproutBabyId);
+    if (!babyId) continue;
+    insert(
+      "calendar_event_baby",
+      ["event_id", "baby_id"],
+      [esc(id), esc(babyId)],
+    );
+  }
+  for (const sproutCaretakerId of new Set(eventCaretakers.get(r.id) ?? [])) {
+    const userId = resolveCaretaker(sproutCaretakerId);
+    // resolveCaretaker falls back to the default, which would silently
+    // assign every unmapped caretaker to one person — only take real hits.
+    const mapped =
+      caretakerByKey.get(sproutCaretakerId) ??
+      caretakerByKey.get(caretakers.get(sproutCaretakerId) ?? "");
+    if (!mapped || !userId) continue;
+    insert(
+      "calendar_assignee",
+      ["event_id", "user_id"],
+      [esc(id), esc(userId)],
+    );
+  }
 }
 
 // Contacts. sprout links contacts to events/medicines/vaccines, never to a
