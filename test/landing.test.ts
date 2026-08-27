@@ -97,6 +97,15 @@ describe("landing page", () => {
       expect(res.headers.get("set-cookie")).toBeNull();
     });
 
+    it("points link previews at an absolute image URL", async () => {
+      const html = await (await get()).text();
+      // Scrapers do not resolve relative paths — this must be absolute.
+      expect(html).toContain(
+        `<meta property="og:image" content="${env.APP_URL}/og.png">`,
+      );
+      expect(html).toContain('content="summary_large_image"');
+    });
+
     it("offers the other language to crawlers and readers alike", async () => {
       const html = await (await get()).text();
       expect(html).toContain('hreflang="nb"');

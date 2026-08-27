@@ -68,10 +68,13 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
 <meta property="og:description" content="${esc(c.description)}">
 <meta property="og:url" content="${origin}/">
 <meta property="og:locale" content="${lang === "nb" ? "nb_NO" : "en_GB"}">
-<!-- og:image intentionally absent: a 1200x630 og.png dropped into public/
-     completes the card, and needs a real screenshot rather than a generated
-     placeholder. -->
-<meta name="twitter:card" content="summary">
+<!-- Regenerate with: node scripts/gen-og.mjs -->
+<meta property="og:image" content="${origin}/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="${esc(c.ogImageAlt)}">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#faf9f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#171512" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">

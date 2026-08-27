@@ -178,9 +178,9 @@ invite is live, and warn anyone holding one.
 40. With the PWA installed, opening `https://pjokk.no/` in the browser still
     shows the landing page rather than the cached app shell, and a push
     notification opens `/home`.
-41. Optional: drop a 1200×630 `og.png` into `public/` and add the matching
-    `og:image` tag in `src/worker/landing/page.ts` — link previews currently
-    render without an image.
+41. Paste `https://pjokk.no` into a chat (Messenger, Slack, iMessage) — the
+    preview shows the title, the description and the brand card. Regenerate
+    that card with `node scripts/gen-og.mjs` if the icon ever changes.
 
 ## Verified automatically (already done)
 

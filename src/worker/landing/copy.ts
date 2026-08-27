@@ -43,6 +43,8 @@ export interface LandingCopy {
   footerTerms: string;
   /** Alt/aria text for the animated mock-up. */
   demoAlt: string;
+  /** Alt text for the link-preview card (public/og.png). */
+  ogImageAlt: string;
   /** Strings baked into the mock-up itself. */
   demo: {
     baby: string;
@@ -85,6 +87,7 @@ const en: LandingCopy = {
   demoCaption: "The home screen, doing the only thing it has to do.",
   demoAlt:
     "An animation of the Pjokk home screen: a feed is logged in two taps and the status card updates.",
+  ogImageAlt: "The Pjokk app icon: a crescent moon and a small star.",
   pointsTitle: "What it is",
   points: [
     {
@@ -146,6 +149,7 @@ const nb: LandingCopy = {
   demoCaption: "Hjemskjermen, som gjør det eneste den må gjøre.",
   demoAlt:
     "En animasjon av hjemskjermen i Pjokk: et måltid logges på to trykk, og statuskortet oppdaterer seg.",
+  ogImageAlt: "Pjokk-ikonet: en månesigd og en liten stjerne.",
   pointsTitle: "Hva det er",
   points: [
     {
