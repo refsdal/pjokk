@@ -91,9 +91,7 @@ export function useRestoreVaccineSlot() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) =>
-      unwrap(
-        await api.vaccines.dismissals[":id"].$delete({ param: { id } }),
-      ),
+      unwrap(await api.vaccines.dismissals[":id"].$delete({ param: { id } })),
     onSuccess: () => invalidateLogs(qc),
   });
 }
