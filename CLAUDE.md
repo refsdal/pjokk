@@ -225,6 +225,19 @@ sheet pattern — build the pattern well once.
 > category tints reusing the existing tokens, 402-gated creation
 > (edit/delete stay open per the soft-lock rule), and calendar push
 > reminders on the */15 cron with a remindedAt latch + 60-min grace window.
+> Phase 10 (2026-08-27) closed the biggest sprout-track migration gaps:
+> **Contacts** (premium) — family address book under Settings → Family,
+> shared across babies via a contact_baby join table where zero rows means
+> the whole family; **Play** (premium) — tummy time / walk / play with
+> server-side timers built as a sleep_log clone (end_time IS NULL =
+> running, partial unique index, activePlay on /api/summary, running
+> banner on Home), no Durable Object; **Vaccines** (free log, premium
+> documents) — the bundled barnevaksinasjonsprogrammet as a reference
+> overlay at /vaccines, plus the first real R2 file path
+> (`/api/files/:id`, allowlisted images+PDF, 10 MB, 5 per entry,
+> attachment-only). The sprout-track importer gained mappings for all
+> three and stopped silently dropping TBSP amounts, DRY diapers, sleep
+> type/quality, diaper detail, feed reaction fields and calendar events.
 
 1. **Core loop:** schema, auth (social + orgs + invite codes), tenancy
    middleware, home screen with status cards + Feed/Diaper/Sleep sheets,

@@ -473,3 +473,61 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   tolerance inside the grace window) — spec-intended.
 - Reminders keep firing for downgraded (free) families' existing events —
   consistent with the soft-lock rule (existing data stays fully functional).
+
+## Contacts, play, vaccines (2026-08-27)
+
+- **Contacts are a bespoke module, not logCrud** — the first domain entity
+  with no `time` and no caretaker attribution. Baby links reuse the
+  calendar's convention: zero `contact_baby` rows = the whole family owns
+  the contact (the shared doctor), some rows = scoped (grandma for one
+  sibling). `role` is free text on purpose; an enum would never survive a
+  real family. `icon` is a fixed key set so it stays a Tabler glyph rather
+  than arbitrary emoji.
+- **Contacts live in Settings → Family** (inline section, like Babies), not
+  a sixth tab and not a sub-route — Settings has no sub-screens anywhere
+  else, and a phone list is reference data, not a daily glance.
+- **Play timers are a database row, not a Durable Object.** `play_log`
+  mirrors `sleep_log`: `end_time IS NULL` means running, a partial unique
+  index (`play_one_active_per_baby`) makes double-start impossible, and the
+  client computes elapsed from `start_time`. A DO would add a stateful
+  class and a second source of truth to buy nothing the row shape doesn't
+  already give; it would only start earning its keep for push-based
+  realtime or per-activity alarms, and the */15 cron covers nudges.
+- **activePlay rides on /api/summary**, not its own query — the home screen
+  already makes that call, so the banner costs no extra round trip.
+- **A running play session may coexist with a running sleep session.** They
+  are independent one-per-baby slots; policing the combination would be
+  guessing at the family's intent.
+- **Play collapses sprout's five PlayTypes into three** (tummy, walk, play)
+  with the original kept in notes — two types would have silently dropped
+  INDOOR_PLAY/OUTDOOR_PLAY/CUSTOM rows on import.
+- **Vaccine log free, documents premium.** The record is health data and
+  gating it would be indefensible; only the files cost storage. Same
+  soft-lock rule as everywhere else: upload 402s, read and delete never do.
+- **The Norwegian programme is a reference overlay, never a constraint.**
+  Bundled static JSON (the WHO-LMS pattern), matched to logged doses by
+  explicit `scheduleSlot` or by name + dose number, so imported and
+  hand-typed records still land in the right row. Anything unmatched shows
+  under "Other vaccines" rather than disappearing. The schedule is FHI's
+  published programme and should be re-checked against fhi.no before
+  anyone relies on it; ages are nominal, and the helsestasjon decides.
+  A per-country programme is a later data change, not a redesign.
+- **Vaccines are a screen (/vaccines), not a sheet** — a 14-row schedule
+  needs more room than the More tray.
+- **First real R2 path.** `/api/files/:id` was specified in CLAUDE.md from
+  the start but only built now. Object keys are server-generated (a client
+  filename never reaches the store), types are allowlisted to images+PDF,
+  10 MB cap, 5 per entry, and everything is served
+  `Content-Disposition: attachment` + `nosniff` so an uploaded file can
+  never execute in the app's origin. Images are downscaled to 1600px in the
+  browser before upload. No per-family quota: invite-only signup is the
+  real limit, and quota accounting can be added without a redesign.
+- **Deleting a vaccine deletes its R2 objects**, after the row is gone — a
+  failure there leaks an orphan object rather than leaving a document row
+  pointing at nothing.
+- **Migrations are hand-written from 0007 on.** `drizzle-kit generate`
+  diffs against `meta/0006_snapshot.json`, which predates billing, feedback
+  and calendar, so it emits CREATE TABLE for tables that already exist and
+  collides on the file number. Write the SQL by hand and match the existing
+  style; `wrangler d1 migrations apply` orders by filename and ignores
+  drizzle's journal entirely.
