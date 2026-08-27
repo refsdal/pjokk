@@ -3,6 +3,7 @@ import {
   IconDiaper,
   IconMoon,
   IconNote,
+  IconVaccine,
   type Icon as TablerIcon,
 } from "@tabler/icons-react";
 import { useState } from "react";
@@ -16,6 +17,7 @@ import {
 } from "@/components/sheets/OtherLogSheet";
 import { PlaySheet } from "@/components/sheets/PlaySheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
+import { VaccineSheet } from "@/components/sheets/VaccineSheet";
 import { ChipGroup } from "@/components/Chips";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { Button } from "@/components/ui/button";
@@ -133,6 +135,12 @@ function entryMain(e: TimelineEntry): { title: string; detail: string | null } {
       detail: `${formatClock(start)}–${formatClock(end)} · ${formatDuration(end.getTime() - start.getTime())}`,
     };
   }
+  if (e.kind === "vaccine") {
+    return {
+      title: e.name,
+      detail: e.doseNumber ? `${t("Dose")} ${e.doseNumber}` : null,
+    };
+  }
   return {
     title: t("Pump"),
     detail: [e.side, e.amountMl != null ? `${e.amountMl} ml` : null]
@@ -156,6 +164,7 @@ const kindStyle: Record<
   pump: otherKindMeta.pump,
   // Every play type shares the row icon; the title carries which one.
   play: { icon: playKindMeta.tummy.icon, tint: playKindMeta.tummy.tint },
+  vaccine: { icon: IconVaccine, tint: "text-growth" },
 };
 
 function Row({
@@ -317,13 +326,20 @@ export function TimelineScreen() {
         babyId={baby?.id ?? ""}
         edit={editEntry?.kind === "play" ? editEntry : null}
       />
+      <VaccineSheet
+        open={editEntry?.kind === "vaccine"}
+        onOpenChange={(o) => !o && setEditEntry(null)}
+        babyId={baby?.id ?? ""}
+        edit={editEntry?.kind === "vaccine" ? editEntry : null}
+      />
       {(() => {
         const otherEdit =
           editEntry &&
           editEntry.kind !== "feed" &&
           editEntry.kind !== "diaper" &&
           editEntry.kind !== "sleep" &&
-          editEntry.kind !== "play"
+          editEntry.kind !== "play" &&
+          editEntry.kind !== "vaccine"
             ? (editEntry as OtherEntry)
             : null;
         return (

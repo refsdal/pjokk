@@ -6,6 +6,7 @@ import {
   IconPill,
   IconRuler,
   IconSparkles,
+  IconVaccine,
   type Icon as TablerIcon,
 } from "@tabler/icons-react";
 import { useNavigate } from "@tanstack/react-router";
@@ -135,6 +136,19 @@ export function MoreSheet({
       locked: !premium,
       pick: () => onPickPlay(type),
     })),
+    // Vaccines are free and open a screen, not a sheet — the programme
+    // schedule needs more room than a tray.
+    {
+      key: "vaccines",
+      label: "Vaccines",
+      icon: IconVaccine,
+      tint: "text-growth",
+      locked: false,
+      pick: () => {
+        onOpenChange(false);
+        void navigate({ to: "/vaccines" });
+      },
+    },
   ];
 
   return (

@@ -10,5 +10,6 @@ export const invalidateLogs = (qc: QueryClient) => {
   void qc.invalidateQueries({ queryKey: ["timeline"] });
   void qc.invalidateQueries({ queryKey: ["other"] });
   void qc.invalidateQueries({ queryKey: ["play"] });
+  void qc.invalidateQueries({ queryKey: ["vaccines"] });
   void qc.invalidateQueries({ queryKey: ["stats"] });
 };

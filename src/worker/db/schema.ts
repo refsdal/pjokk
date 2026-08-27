@@ -348,6 +348,60 @@ export const sleepLocation = sqliteTable(
   (t) => [index("sleep_location_family_idx").on(t.familyId)],
 );
 
+// --- Vaccines (free): what was given, and when. The bundled Norwegian
+// programme (web/data/no-vaccine-programme.json) is a reference overlay
+// only — it never constrains what can be logged, so a vaccine given abroad
+// or off-programme records exactly the same way.
+
+export const vaccineLog = sqliteTable(
+  "vaccine_log",
+  {
+    id: id(),
+    familyId: familyId(),
+    babyId: babyId(),
+    caretakerId: caretakerId(),
+    time: time(),
+    name: text("name").notNull(),
+    doseNumber: integer("dose_number"),
+    // Slot key from the bundled programme ("mmr:1"); NULL when the dose
+    // isn't part of it. Nullable and unvalidated on purpose: the programme
+    // is data that can change without a migration.
+    scheduleSlot: text("schedule_slot"),
+    notes: text("notes"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("vaccine_family_time_idx").on(t.familyId, t.time),
+    index("vaccine_baby_idx").on(t.babyId),
+  ],
+);
+
+// Attachments live in R2; this table is the authorization record. Uploading
+// is premium, but reading and deleting never are.
+export const vaccineDocument = sqliteTable(
+  "vaccine_document",
+  {
+    id: id(),
+    familyId: familyId(),
+    vaccineLogId: text("vaccine_log_id")
+      .notNull()
+      .references(() => vaccineLog.id, { onDelete: "cascade" }),
+    // R2 object key. Never derived from user input.
+    objectKey: text("object_key").notNull(),
+    filename: text("filename").notNull(),
+    contentType: text("content_type").notNull(),
+    size: integer("size").notNull(),
+    uploadedBy: text("uploaded_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("vaccine_doc_log_idx").on(t.vaccineLogId),
+    index("vaccine_doc_family_idx").on(t.familyId),
+  ],
+);
+
 // --- Play (premium): timed activities — tummy time, a walk, playing.
 // Structurally a sleep_log: end_time NULL means the session is running, and
 // the partial unique index is what makes the timer server-side. No durable

@@ -287,6 +287,52 @@ export const UpdatePumpSchema = z
   })
   .openapi("UpdatePump");
 
+// --- Vaccines (free log; documents are premium to upload) ---
+
+export const VaccineDocumentSchema = z
+  .object({
+    id: z.string(),
+    filename: z.string(),
+    contentType: z.string(),
+    size: z.number().int(),
+    // Fetch through /api/files/{id} — the R2 bucket is never public.
+    url: z.string(),
+  })
+  .openapi("VaccineDocument");
+
+export const VaccineLogSchema = z
+  .object({
+    ...logBase,
+    time: isoTime(),
+    name: z.string(),
+    doseNumber: z.number().int().nullable(),
+    // Slot key from the bundled programme, or null for an off-programme dose.
+    scheduleSlot: z.string().nullable(),
+    documents: z.array(VaccineDocumentSchema),
+  })
+  .openapi("VaccineLog");
+
+export const CreateVaccineSchema = z
+  .object({
+    babyId: z.string(),
+    time: isoTime(),
+    name: z.string().min(1).max(120),
+    doseNumber: z.number().int().min(1).max(20).optional(),
+    scheduleSlot: z.string().max(60).optional(),
+    notes: z.string().max(1000).optional(),
+  })
+  .openapi("CreateVaccine");
+
+export const UpdateVaccineSchema = z
+  .object({
+    time: isoTime().optional(),
+    name: z.string().min(1).max(120).optional(),
+    doseNumber: z.number().int().min(1).max(20).nullable().optional(),
+    scheduleSlot: z.string().max(60).nullable().optional(),
+    notes: z.string().max(1000).nullable().optional(),
+  })
+  .openapi("UpdateVaccine");
+
 // --- Play (premium): timed activities, same session shape as sleep ---
 
 export const playTypes = ["tummy", "walk", "play"] as const;
@@ -342,6 +388,7 @@ export const TimelineEntrySchema = z
     MeasurementLogSchema.extend({ kind: z.literal("measurement") }),
     PumpLogSchema.extend({ kind: z.literal("pump") }),
     PlayLogSchema.extend({ kind: z.literal("play") }),
+    VaccineLogSchema.extend({ kind: z.literal("vaccine") }),
   ])
   .openapi("TimelineEntry");
 
@@ -768,3 +815,5 @@ export type UpdateContact = z.infer<typeof UpdateContactSchema>;
 export type ContactIcon = (typeof contactIcons)[number];
 export type PlayLog = z.infer<typeof PlayLogSchema>;
 export type PlayType = (typeof playTypes)[number];
+export type VaccineLog = z.infer<typeof VaccineLogSchema>;
+export type VaccineDocument = z.infer<typeof VaccineDocumentSchema>;

@@ -72,7 +72,10 @@ export function registerPlayMutationDefaults(qc: QueryClient) {
     onError: (err: Error, _vars: StartPlayVars, ctx: unknown) => {
       const snap = ctx as { babyId: string; previous?: Summary } | undefined;
       if (snap) qc.setQueryData(["summary", snap.babyId], snap.previous);
-      toast(`${t("Could not save")} (${t("activity")}): ${err.message}`, "error");
+      toast(
+        `${t("Could not save")} (${t("activity")}): ${err.message}`,
+        "error",
+      );
     },
     onSettled: () => invalidateLogs(qc),
   });
@@ -81,7 +84,10 @@ export function registerPlayMutationDefaults(qc: QueryClient) {
     mutationFn: async (vars: LogPlayVars) =>
       unwrap<PlayLog>(await api.play.$post({ json: vars })),
     onError: (err: Error) =>
-      toast(`${t("Could not save")} (${t("activity")}): ${err.message}`, "error"),
+      toast(
+        `${t("Could not save")} (${t("activity")}): ${err.message}`,
+        "error",
+      ),
     onSettled: () => invalidateLogs(qc),
   });
   qc.setMutationDefaults(["stopPlay"], {
@@ -99,7 +105,10 @@ export function registerPlayMutationDefaults(qc: QueryClient) {
         await api.play[":id"].$patch({ param: { id }, json: patch }),
       ),
     onError: (err: Error) =>
-      toast(`${t("Could not save")} (${t("activity")}): ${err.message}`, "error"),
+      toast(
+        `${t("Could not save")} (${t("activity")}): ${err.message}`,
+        "error",
+      ),
     onSettled: () => invalidateLogs(qc),
   });
   qc.setMutationDefaults(["deletePlay"], {

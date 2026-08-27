@@ -36,14 +36,7 @@ import { useSelectedBaby } from "@/lib/selected-baby";
 import { formatDuration } from "@/lib/time";
 import { useAppearance } from "@/lib/appearance";
 
-type OpenSheet =
-  | "feed"
-  | "diaper"
-  | "sleep"
-  | "more"
-  | "other"
-  | "play"
-  | null;
+type OpenSheet = "feed" | "diaper" | "sleep" | "more" | "other" | "play" | null;
 
 function feedDetail(feed: {
   type: string;

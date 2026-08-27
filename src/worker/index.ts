@@ -27,6 +27,7 @@ import { playApp } from "./routes/play";
 import { pushApp } from "./routes/push";
 import { sleepLocationsApp } from "./routes/sleep-locations";
 import { statsApp } from "./routes/stats";
+import { filesApp, vaccinesApp } from "./routes/vaccines";
 import {
   purgeOrphanUsers,
   reconcilePlans,
@@ -125,6 +126,8 @@ const domainApp = domainBase
   .route("/", sleepLocationsApp)
   .route("/", otherLogsApp)
   .route("/", playApp)
+  .route("/", vaccinesApp)
+  .route("/", filesApp)
   .route("/", timelineApp)
   .route("/", calendarApp)
   .route("/", contactsApp)

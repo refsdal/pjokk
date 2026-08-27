@@ -213,6 +213,8 @@ const BACKUP_TABLES = [
   "measurement_log",
   "pump_log",
   "play_log",
+  "vaccine_log",
+  "vaccine_document",
   "family_invite",
   "sleep_location",
   "contact",

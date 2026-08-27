@@ -112,6 +112,34 @@ const nb: Record<string, string> = {
     "Sluttidspunktet er før starttidspunktet.",
   "Could not stop: ": "Kunne ikke stoppe: ",
   activity: "aktivitet",
+
+  // Vaccines
+  Vaccines: "Vaksiner",
+  Vaccine: "Vaksine",
+  "Log vaccine": "Logg vaksine",
+  "Edit vaccine": "Rediger vaksine",
+  Dose: "Dose",
+  due: "forfalt",
+  "Other vaccines": "Andre vaksiner",
+  Documents: "Dokumenter",
+  "Attach document": "Legg ved dokument",
+  "Uploading…": "Laster opp…",
+  "Deleting a vaccine also deletes its documents.":
+    "Å slette en vaksine sletter også dokumentene dens.",
+  "Schedule follows": "Planen følger",
+  "Check with your helsestasjon.": "Sjekk med helsestasjonen din.",
+  Back: "Tilbake",
+  // Programme age labels (passed through t() dynamically — keep in sync with
+  // data/no-vaccine-programme.json).
+  "6 weeks": "6 uker",
+  "3 months": "3 måneder",
+  "5 months": "5 måneder",
+  "12 months": "12 måneder",
+  "15 months": "15 måneder",
+  "2nd grade": "2. klasse",
+  "6th grade": "6. klasse",
+  "7th grade": "7. klasse",
+  "10th grade": "10. klasse",
   "Could not delete: ": "Kunne ikke slette: ",
 
   // More / other activity types

@@ -13,6 +13,7 @@ export * from "./logs";
 export * from "./other";
 export * from "./play";
 export * from "./sleep-locations";
+export * from "./vaccines";
 
 export function registerMutationDefaults(qc: QueryClient) {
   registerLogMutationDefaults(qc);

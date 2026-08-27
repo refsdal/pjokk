@@ -36,6 +36,8 @@ import {
   sleepLocation,
   sleepLog,
   user,
+  vaccineDocument,
+  vaccineLog,
 } from "./schema";
 
 // The ONLY sanctioned way to touch domain tables. Every query in here is
@@ -76,6 +78,71 @@ const sleepCols = {
   location: sleepLog.location,
   notes: sleepLog.notes,
 };
+
+export type VaccineDocumentRow = {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+};
+
+export type VaccineRow = {
+  id: string;
+  babyId: string;
+  caretakerId: string;
+  caretakerName: string;
+  time: Date;
+  name: string;
+  doseNumber: number | null;
+  scheduleSlot: string | null;
+  notes: string | null;
+  documents: VaccineDocumentRow[];
+};
+
+const vaccineCols = {
+  id: vaccineLog.id,
+  babyId: vaccineLog.babyId,
+  caretakerId: vaccineLog.caretakerId,
+  caretakerName: user.name,
+  time: vaccineLog.time,
+  name: vaccineLog.name,
+  doseNumber: vaccineLog.doseNumber,
+  scheduleSlot: vaccineLog.scheduleSlot,
+  notes: vaccineLog.notes,
+};
+
+type VaccineBaseRow = Omit<VaccineRow, "documents">;
+
+// One IN-query for the attachments, grouped in memory — the same shape the
+// calendar and contacts hydrates use.
+async function hydrateVaccines(
+  db: Db,
+  rows: VaccineBaseRow[],
+): Promise<VaccineRow[]> {
+  if (rows.length === 0) return [];
+  const docs = await db
+    .select({
+      vaccineLogId: vaccineDocument.vaccineLogId,
+      id: vaccineDocument.id,
+      filename: vaccineDocument.filename,
+      contentType: vaccineDocument.contentType,
+      size: vaccineDocument.size,
+    })
+    .from(vaccineDocument)
+    .where(
+      inArray(
+        vaccineDocument.vaccineLogId,
+        rows.map((r) => r.id),
+      ),
+    )
+    .orderBy(asc(vaccineDocument.createdAt));
+  return rows.map((r) => ({
+    ...r,
+    documents: docs
+      .filter((d) => d.vaccineLogId === r.id)
+      .map(({ vaccineLogId: _ignored, ...doc }) => doc),
+  }));
+}
 
 export type PlayTypeKey = "tummy" | "walk" | "play";
 
@@ -398,6 +465,11 @@ export function familyScope(db: Db, familyId: string) {
     and(
       eq(playLog.familyId, familyId),
       babyId ? eq(playLog.babyId, babyId) : undefined,
+    );
+  const vaccineScope = (babyId?: string) =>
+    and(
+      eq(vaccineLog.familyId, familyId),
+      babyId ? eq(vaccineLog.babyId, babyId) : undefined,
     );
 
   return {
@@ -966,6 +1038,150 @@ export function familyScope(db: Db, familyId: string) {
         )
         .returning({ id: sleepLocation.id });
       return rows.length > 0;
+    },
+
+    // --- vaccines (free): log + R2-backed documents ---
+    async listVaccines(opts: ListOpts = {}) {
+      const rows = await db
+        .select(vaccineCols)
+        .from(vaccineLog)
+        .innerJoin(user, eq(vaccineLog.caretakerId, user.id))
+        .where(
+          and(
+            vaccineScope(opts.babyId),
+            beforeCursor(vaccineLog.time, vaccineLog.id, opts.before),
+          ),
+        )
+        .orderBy(desc(vaccineLog.time), desc(vaccineLog.id))
+        .limit(opts.limit ?? 50);
+      return hydrateVaccines(db, rows);
+    },
+
+    async getVaccine(id: string) {
+      const rows = await db
+        .select(vaccineCols)
+        .from(vaccineLog)
+        .innerJoin(user, eq(vaccineLog.caretakerId, user.id))
+        .where(and(eq(vaccineLog.id, id), eq(vaccineLog.familyId, familyId)));
+      if (!rows[0]) return null;
+      return (await hydrateVaccines(db, rows))[0] ?? null;
+    },
+
+    async createVaccine(data: {
+      babyId: string;
+      caretakerId: string;
+      time: Date;
+      name: string;
+      doseNumber?: number | null;
+      scheduleSlot?: string | null;
+      notes?: string | null;
+    }) {
+      const rows = await db
+        .insert(vaccineLog)
+        .values({ ...data, familyId })
+        .returning({ id: vaccineLog.id });
+      return this.getVaccine(rows[0]!.id);
+    },
+
+    async updateVaccine(
+      id: string,
+      patch: Partial<{
+        time: Date;
+        name: string;
+        doseNumber: number | null;
+        scheduleSlot: string | null;
+        notes: string | null;
+      }>,
+    ) {
+      const set = compactPatch(patch);
+      if (Object.keys(set).length === 0) return this.getVaccine(id);
+      const rows = await db
+        .update(vaccineLog)
+        .set(set)
+        .where(and(eq(vaccineLog.id, id), eq(vaccineLog.familyId, familyId)))
+        .returning({ id: vaccineLog.id });
+      return rows[0] ? this.getVaccine(id) : null;
+    },
+
+    // Returns the R2 keys the caller must delete; the DB rows cascade away
+    // with the log, but the objects behind them do not.
+    async deleteVaccine(id: string) {
+      const keys = await db
+        .select({ objectKey: vaccineDocument.objectKey })
+        .from(vaccineDocument)
+        .where(
+          and(
+            eq(vaccineDocument.vaccineLogId, id),
+            eq(vaccineDocument.familyId, familyId),
+          ),
+        );
+      const rows = await db
+        .delete(vaccineLog)
+        .where(and(eq(vaccineLog.id, id), eq(vaccineLog.familyId, familyId)))
+        .returning({ id: vaccineLog.id });
+      return rows.length > 0
+        ? { deleted: true, objectKeys: keys.map((k) => k.objectKey) }
+        : { deleted: false, objectKeys: [] };
+    },
+
+    async countVaccineDocuments(vaccineLogId: string) {
+      const rows = await db
+        .select({ id: vaccineDocument.id })
+        .from(vaccineDocument)
+        .where(
+          and(
+            eq(vaccineDocument.vaccineLogId, vaccineLogId),
+            eq(vaccineDocument.familyId, familyId),
+          ),
+        );
+      return rows.length;
+    },
+
+    async createVaccineDocument(data: {
+      vaccineLogId: string;
+      objectKey: string;
+      filename: string;
+      contentType: string;
+      size: number;
+      uploadedBy: string;
+    }) {
+      const rows = await db
+        .insert(vaccineDocument)
+        .values({ ...data, familyId })
+        .returning({ id: vaccineDocument.id });
+      return rows[0]!.id;
+    },
+
+    async getVaccineDocument(id: string) {
+      const rows = await db
+        .select({
+          id: vaccineDocument.id,
+          objectKey: vaccineDocument.objectKey,
+          filename: vaccineDocument.filename,
+          contentType: vaccineDocument.contentType,
+          size: vaccineDocument.size,
+        })
+        .from(vaccineDocument)
+        .where(
+          and(
+            eq(vaccineDocument.id, id),
+            eq(vaccineDocument.familyId, familyId),
+          ),
+        );
+      return rows[0] ?? null;
+    },
+
+    async deleteVaccineDocument(id: string) {
+      const rows = await db
+        .delete(vaccineDocument)
+        .where(
+          and(
+            eq(vaccineDocument.id, id),
+            eq(vaccineDocument.familyId, familyId),
+          ),
+        )
+        .returning({ objectKey: vaccineDocument.objectKey });
+      return rows[0]?.objectKey ?? null;
     },
 
     // --- play (premium): timed activities, same session shape as sleep ---

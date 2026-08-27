@@ -61,6 +61,16 @@ const calendarRoute = createRoute({
   ),
 });
 
+// Lazy: the bundled programme JSON only matters on this screen.
+const vaccinesRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/vaccines",
+  component: lazyRouteComponent(
+    () => import("@/screens/Vaccines"),
+    "VaccinesScreen",
+  ),
+});
+
 const settingsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/settings",
@@ -145,6 +155,7 @@ const routeTree = rootRoute.addChildren([
     timelineRoute,
     calendarRoute,
     statsRoute,
+    vaccinesRoute,
     settingsRoute,
   ]),
   loginRoute,
