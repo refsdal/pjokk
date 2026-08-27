@@ -382,8 +382,9 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   wrangler-config read, so the missing dist/ dir can't break tests).
 - **Test environment = a Wrangler environment, not a separate repo/config**
   (`env.test` in wrangler.jsonc → worker `pjokk-test` at app-test.pjokk.no).
-  An environment IS a standalone worker at runtime — own D1 (`pjokk-test`),
-  KV, R2 (`pjokk-test-files`), secrets, crons, custom domain — but managed
+  An environment IS a standalone worker at runtime — own D1
+  (`pjokk-test-eu`), KV, R2 (`pjokk-test-files-eu`), secrets, crons, custom
+  domain — but managed
   from the one config file so code and infra can't drift. Rejected: a
   duplicated wrangler config (drift risk) and git-integration preview URLs
   (no clean stateful isolation; auth redirect URIs and Stripe webhooks need
@@ -581,9 +582,17 @@ been true since Phase 3; the vaccine feature only made it obvious.
   `pjokk-eu`, `pjokk-test-eu` (D1, `--jurisdiction eu`) and
   `pjokk-files-eu`, `pjokk-test-files-eu` (R2, `-J eu`), all verified.
 - Recreated rather than migrated: nothing is in production yet, so the old
-  430 kB carried no value worth a data migration. The old resources are left
-  in place, untouched, until the new ones are confirmed working — deleting
-  them is a separate, deliberate step.
+  430 kB carried no value worth a data migration. The old `pjokk`,
+  `pjokk-test`, `pjokk-files` and `pjokk-test-files` have since been deleted,
+  so the account now holds EU-jurisdiction resources only — `r2 bucket list`
+  without `-J eu` returns nothing at all. No local dump was taken on the way
+  out: keeping an unencrypted copy of children's health data on a laptop
+  would contradict the point of the exercise.
+- Two wrangler traps met while doing it: `r2 object delete` operates on the
+  LOCAL simulator unless given `--remote` (and prints "Delete complete"
+  either way, including for keys that do not exist), and `r2 bucket info`
+  object counts lag well behind reality — a bucket that still reported 3
+  objects deleted cleanly as empty. Trust the delete, not the counter.
 - R2 jurisdictions are separate namespaces: `wrangler r2 bucket list` does
   not show an EU bucket without `-J eu`, and the binding in wrangler.jsonc
   needs `"jurisdiction": "eu"` or the Worker looks in the wrong namespace.
