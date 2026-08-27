@@ -34,7 +34,7 @@ async function sendOne(
           // VAPID requires https: or mailto:; local dev runs on http.
           subject: env.APP_URL.startsWith("https:")
             ? env.APP_URL
-            : "https://app.pjokk.no",
+            : "https://pjokk.no",
           publicKey: env.VAPID_PUBLIC_KEY,
           privateKey: env.VAPID_PRIVATE_KEY,
         },

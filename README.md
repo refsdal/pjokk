@@ -7,7 +7,7 @@
 
   *"en liten pjokk" — a little tyke*
 
-  [app.pjokk.no](https://app.pjokk.no) · [API docs](https://app.pjokk.no/api/docs)
+  [pjokk.no](https://pjokk.no) · [API docs](https://pjokk.no/api/docs)
 </div>
 
 ---
@@ -39,7 +39,8 @@ servers to babysit (the baby is enough).
 
 ## How it's built
 
-One Cloudflare Worker serves both the SPA and the API.
+One Cloudflare Worker serves the public landing page at `/`, the SPA from
+`/home` onwards, and the API under `/api`.
 
 | Layer | Choice |
 |---|---|

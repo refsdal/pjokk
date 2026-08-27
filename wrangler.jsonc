@@ -9,7 +9,10 @@
     "directory": "./dist/client",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    // "/" is the Worker-rendered landing page; without it here the asset
+    // worker would answer the root with the SPA shell and the Worker would
+    // never see the request. Everything else still comes from assets.
+    "run_worker_first": ["/api/*", "/"]
   },
   // Every stateful resource is pinned to the EU jurisdiction — not merely a
   // location hint, which is a preference rather than a guarantee. Jurisdiction
@@ -49,14 +52,22 @@
   "vars": {
     // Overridden locally by .dev.vars; secrets (GOOGLE_CLIENT_SECRET,
     // BETTER_AUTH_SECRET) are set with `wrangler secret put`.
-    "APP_URL": "https://app.pjokk.no",
+    "APP_URL": "https://pjokk.no",
     // Set to "1" only while creating the very first (founder) account.
-    "OPEN_SIGNUP": "0"
+    "OPEN_SIGNUP": "0",
+    // Production is the ONLY indexable environment. Anything else serves the
+    // landing page with noindex headers and a disallow-all robots.txt.
+    "INDEXABLE": "1"
   },
-  // The app lives on app.pjokk.no; the apex is a separate landing page that
-  // merely links here. workers.dev stays on as a fallback origin.
-  "workers_dev": true,
-  "routes": [{ "pattern": "app.pjokk.no", "custom_domain": true }],
+  // The app lives on the apex: pjokk.no/ is the public landing page and
+  // pjokk.no/home is the signed-in app. workers.dev is off — with a canonical
+  // apex, a second origin serving auth is a liability, not a fallback.
+  //
+  // app.pjokk.no is RETIRED. Deleting the route here is not enough: the
+  // custom domain must also be removed in the Cloudflare dashboard, or its
+  // DNS record and certificate stay attached to this Worker.
+  "workers_dev": false,
+  "routes": [{ "pattern": "pjokk.no", "custom_domain": true }],
   "env": {
     // Test environment: deploys as the `pjokk-test` worker with fully
     // isolated data (own D1/KV/R2) at app-test.pjokk.no. CI deploys it on
@@ -85,13 +96,17 @@
       ],
       "triggers": { "crons": ["15 3 * * *", "*/15 * * * *"] },
       "vars": {
-        "APP_URL": "https://app-test.pjokk.no",
-        "OPEN_SIGNUP": "0"
+        "APP_URL": "https://test.pjokk.no",
+        "OPEN_SIGNUP": "0",
+        // Never "1": the test environment must stay out of search results.
+        "INDEXABLE": "0"
       },
       // No workers.dev fallback here: that origin isn't in better-auth's
       // trusted origins, so exposing it would only serve a broken login.
       "workers_dev": false,
-      "routes": [{ "pattern": "app-test.pjokk.no", "custom_domain": true }]
+      // app-test.pjokk.no is RETIRED — delete that custom domain in the
+      // Cloudflare dashboard too, not just this line.
+      "routes": [{ "pattern": "test.pjokk.no", "custom_domain": true }]
     }
   }
 }

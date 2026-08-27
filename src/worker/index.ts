@@ -4,6 +4,7 @@ import { createAuth } from "./auth";
 import type { AppEnv, FamEnv } from "./context";
 import { createDb } from "./db";
 import { createApp } from "./lib";
+import { landing } from "./landing";
 import {
   requireAdmin,
   requireFamily,
@@ -48,6 +49,12 @@ const inject = createMiddleware<AppEnv>(async (c, next) => {
 });
 
 const app = createApp<AppEnv>();
+
+// The public landing page. Registered before everything else because it is the
+// only non-/api path the Worker owns: assets serve the rest of the site, and
+// "/" only reaches us because run_worker_first names it (see wrangler.jsonc).
+// Not an OpenAPI route — it returns HTML, not part of the API surface.
+app.get("/", landing);
 
 app.use("/api/*", inject);
 

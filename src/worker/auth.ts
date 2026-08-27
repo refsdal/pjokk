@@ -20,12 +20,10 @@ export function createAuth(env: Env) {
   return betterAuth({
     baseURL: env.APP_URL,
     secret: env.BETTER_AUTH_SECRET,
-    // workers.dev stays trusted so the app keeps working there during the
-    // transition to app.pjokk.no (and as a fallback URL).
-    trustedOrigins: [
-      env.APP_URL,
-      "https://pjokk.refsdal-holding-as.workers.dev",
-    ],
+    // Exactly one origin. The app now lives on the apex and workers.dev is
+    // switched off, so any second trusted origin would only widen the surface
+    // that can complete a sign-in.
+    trustedOrigins: [env.APP_URL],
     database: drizzleAdapter(db, { provider: "sqlite", schema }),
     // Open signup is DISABLED (closed alpha). Accounts are only created via
     // the invite redeem flow: /join/CODE calls social sign-in with
