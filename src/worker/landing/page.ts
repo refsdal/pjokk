@@ -181,6 +181,12 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
       <p>${esc(c.privacyBody)}</p>
     </section>
   </div>
+
+  <section class="wrap section story">
+    <h2>${esc(c.storyTitle)}</h2>
+    ${c.storyBody.map((p) => `<p>${esc(p)}</p>`).join("\n    ")}
+    <p class="signature">${esc(c.storySignature)}</p>
+  </section>
 </main>
 
 <footer class="site-footer">

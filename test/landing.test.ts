@@ -59,6 +59,19 @@ describe("landing page", () => {
       expect(html).toContain("Når spiste babyen sist?");
     });
 
+    it("carries the founder story in both languages", async () => {
+      const en = await (await get()).text();
+      expect(en).toContain("Built by parents, for parents");
+      expect(en).toContain("Was she eating enough?");
+
+      const nb = await (await get("/", { "accept-language": "nb-NO" })).text();
+      expect(nb).toContain("Laget av foreldre, for foreldre");
+      expect(nb).toContain("Spiste hun nok?");
+      // Both paragraphs plus the signature, not just the first.
+      expect(nb).toContain("Vi bruker Pjokk hver dag");
+      expect(nb).toContain("Oslo");
+    });
+
     it("treats no and nn as Norwegian", () => {
       expect(fromAcceptLanguage("no")).toBe("nb");
       expect(fromAcceptLanguage("nn-NO")).toBe("nb");
