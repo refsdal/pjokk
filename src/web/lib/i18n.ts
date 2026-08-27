@@ -496,6 +496,13 @@ export function getLanguageMode(): LanguageMode {
   return readMode();
 }
 
+/** The language actually in effect, with "auto" already resolved against the
+ *  device. Long-form pages (the legal ones) pick a whole body with this
+ *  rather than going through the t() dictionary. */
+export function getLanguage(): "en" | "nb" {
+  return resolve(readMode());
+}
+
 export function setLanguageMode(mode: LanguageMode): void {
   try {
     localStorage.setItem(LANG_KEY, mode);

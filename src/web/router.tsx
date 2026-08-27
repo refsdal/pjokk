@@ -109,7 +109,7 @@ const privacyRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/privacy",
   component: lazyRouteComponent(
-    () => import("@/screens/Legal"),
+    () => import("@/screens/legal/privacy"),
     "PrivacyScreen",
   ),
 });
@@ -117,7 +117,10 @@ const privacyRoute = createRoute({
 const termsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/terms",
-  component: lazyRouteComponent(() => import("@/screens/Legal"), "TermsScreen"),
+  component: lazyRouteComponent(
+    () => import("@/screens/legal/terms"),
+    "TermsScreen",
+  ),
 });
 
 // Operator console — its own layout with a bottom tab bar per concern.

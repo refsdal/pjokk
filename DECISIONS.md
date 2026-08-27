@@ -566,8 +566,14 @@ been true since Phase 3; the vaccine feature only made it obvious.
   authority, both need them. Linked from Settings, the login screen, and —
   most importantly — the invite screen, which is the actual moment of
   consent. Written as prose rather than through `t()`: a policy split across
-  hundreds of dictionary keys would rot. A Norwegian version is outstanding
-  and matters legally for Norwegian users.
+  hundreds of dictionary keys would rot. Each page therefore carries a whole
+  English body and a whole Norwegian one and picks between them, seeded from
+  the app language but switchable on the page itself — these pages are
+  public, so a reader may never have set a preference, and a Norwegian
+  reader landing on English must be able to flip. `screens/legal/` splits
+  layout from the two documents so no single file carries four bodies.
+  The Norwegian is a translation of the English, not an independent text;
+  both were drafted by an AI and want review by someone qualified.
 
 ## EU jurisdiction (2026-08-27)
 
