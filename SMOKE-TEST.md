@@ -1,8 +1,8 @@
 # Smoke test — Phase 1
 
-Live URL: **https://app.pjokk.no**
-(fallback: https://pjokk.refsdal-holding-as.workers.dev — same Worker;
-pjokk.no apex is reserved for a separate landing page)
+Live URL: **https://pjokk.no** — `/` is the public landing page, `/home` is
+the app. Test environment: **https://test.pjokk.no**. There is no workers.dev
+fallback: it is switched off so exactly one origin can complete a sign-in.
 
 ## 0. One-time setup (before Google sign-in works)
 
@@ -10,7 +10,7 @@ Google OAuth secrets are placeholders. In Google Cloud Console create an
 OAuth 2.0 Web client with redirect URI:
 
 ```
-https://app.pjokk.no/api/auth/callback/google
+https://pjokk.no/api/auth/callback/google
 ```
 
 Then:
@@ -23,7 +23,7 @@ wrangler secret put GOOGLE_CLIENT_SECRET
 ## 1. Founder account (bootstrap)
 
 1. Set `OPEN_SIGNUP` to `"1"` in wrangler.jsonc → `pnpm deploy`.
-2. Open https://app.pjokk.no on your phone → Continue with Google (as
+2. Open https://pjokk.no on your phone → Continue with Google (as
    yourself).
 3. You land on **Welcome**: create family "Refsdal", then add the baby
    (name + birth date) → you land on Home.
@@ -82,20 +82,20 @@ wrangler secret put GOOGLE_CLIENT_SECRET
 ## 6. Go-live checklist — Stripe billing (Phase 9)
 
 The test-mode pass (item 25) runs on the **test environment**
-(`app-test.pjokk.no`, worker `pjokk-test`, isolated D1/KV/R2) — see
+(`test.pjokk.no`, worker `pjokk-test`, isolated D1/KV/R2) — see
 section 7. Production only ever holds live keys.
 
 22. `wrangler secret put` all five `STRIPE_*` values (live mode, NO
     `--env` flag → production): secret key, webhook secret, and the three
     price ids (`STRIPE_PRICE_PREMIUM_MONTHLY` / `_YEARLY` / `_LIFETIME`).
 23. In the Stripe dashboard (live mode): add a webhook endpoint
-    `https://app.pjokk.no/api/auth/stripe/webhook` subscribed to
+    `https://pjokk.no/api/auth/stripe/webhook` subscribed to
     `checkout.session.completed`, `customer.subscription.created`,
     `customer.subscription.updated`, `customer.subscription.deleted`; copy
     the signing secret into `STRIPE_WEBHOOK_SECRET`.
 24. Verify all three prices are NOK and tax behavior is **inclusive**;
     confirm Stripe Tax is enabled on the account.
-25. Test-mode end-to-end pass on `app-test.pjokk.no` first (before flipping
+25. Test-mode end-to-end pass on `test.pjokk.no` first (before flipping
     live keys into production):
     - Subscribe monthly with card `4242 4242 4242 4242` → plan flips to
       `premium`; open the Customer Portal from Settings → Billing → cancel →
@@ -104,7 +104,7 @@ section 7. Production only ever holds live keys.
     - In `/admin`, comp a family (plan → `comp`) then revoke it (plan →
       `free`) → verify the audit trail records `billing.plan.set` both ways.
 
-## 7. Test environment (app-test.pjokk.no) — one-time setup
+## 7. Test environment (test.pjokk.no) — one-time setup
 
 Infrastructure already provisioned (D1 `pjokk-test-eu`, KV, R2
 `pjokk-test-files-eu`, custom domain, crons, `BETTER_AUTH_SECRET` + fresh
@@ -117,20 +117,20 @@ GitHub secret exists. Remaining manual steps:
     scope to the Refsdal Holding AS account). Until it exists the
     `deploy-test` CI job skips gracefully.
 27. Google Cloud Console → the Pjokk OAuth client → add authorized
-    redirect URI `https://app-test.pjokk.no/api/auth/callback/google`,
+    redirect URI `https://test.pjokk.no/api/auth/callback/google`,
     then replace the placeholder test-env secrets:
     `wrangler secret put GOOGLE_CLIENT_ID --env test` (and
     `GOOGLE_CLIENT_SECRET`).
 28. Stripe dashboard → **test mode**: create/copy the three Premium prices
     (NOK, inclusive tax), add a webhook endpoint
-    `https://app-test.pjokk.no/api/auth/stripe/webhook` (same four events
+    `https://test.pjokk.no/api/auth/stripe/webhook` (same four events
     as item 23), then replace the placeholders:
     `wrangler secret put STRIPE_SECRET_KEY --env test` (`sk_test_…`),
     `STRIPE_WEBHOOK_SECRET`, and the three `STRIPE_PRICE_PREMIUM_*` ids.
 29. Bootstrap the founder account: temporarily set `OPEN_SIGNUP` to "1"
     for the test env (Cloudflare dashboard → pjokk-test → Settings →
     Variables, or edit wrangler.jsonc env.test and redeploy), sign in with
-    Google at `https://app-test.pjokk.no`, then set it back to "0".
+    Google at `https://test.pjokk.no`, then set it back to "0".
     Promote yourself to sysadmin by setting `role = 'admin'` on your user
     row: `wrangler d1 execute pjokk-test-eu --env test --remote --command
     "UPDATE user SET role='admin' WHERE email='<you>'"` — then create a
@@ -138,12 +138,58 @@ GitHub secret exists. Remaining manual steps:
 30. Manual deploys remain available: `pnpm deploy:test` (test) and
     `pnpm deploy` (production). Migrations: `pnpm db:migrate:test`.
 
+## 8. Apex cutover — pjokk.no / test.pjokk.no (one-time, ordered)
+
+Moving off `app.pjokk.no` signs **everyone** out once (the session cookie is
+bound to the host) and breaks any invite link or QR code already handed out,
+because those embed `APP_URL`. Invites expire after 72 h, so run this when no
+invite is live, and warn anyone holding one.
+
+31. Deploy the test environment first (`pnpm deploy:test`) and add the
+    `test.pjokk.no` custom domain. Confirm `/` renders the landing page and
+    `/home` the app, then do the same for production.
+32. Cloudflare dashboard → Workers → **delete the `app.pjokk.no` custom
+    domain** (worker `pjokk`) and **`app-test.pjokk.no`** (worker
+    `pjokk-test`). Removing the route from `wrangler.jsonc` is not enough on
+    its own — the DNS record and certificate stay attached until deleted here.
+33. Cloudflare dashboard → the pjokk.no zone → Rules → **Redirect Rules**: add
+    `www.pjokk.no/*` → `https://pjokk.no/$1`, 301, preserve query string. The
+    Worker cannot do this: `run_worker_first` only routes `/api/*` and `/`.
+34. Google Cloud Console → the Pjokk OAuth client → add
+    `https://pjokk.no/api/auth/callback/google` and
+    `https://test.pjokk.no/api/auth/callback/google`; remove both `app.`
+    URIs once sign-in is confirmed working on the new hosts.
+35. Stripe → repoint the webhook endpoints (live mode → `https://pjokk.no/…`,
+    test mode → `https://test.pjokk.no/…`). The signing secret changes if you
+    create a new endpoint rather than editing the existing one — re-run
+    `wrangler secret put STRIPE_WEBHOOK_SECRET` if so.
+36. Sign in again on every device, and re-install the PWA: an app installed
+    from `app.pjokk.no` still points there and will simply stop resolving.
+
+### Landing page checks
+
+37. `https://pjokk.no/` shows the landing page with **Sign in**; after signing
+    in, reloading `/` shows **Open app** linking to `/home`.
+38. A Norwegian device (or `curl -H "Accept-Language: nb-NO"`) gets Norwegian;
+    the header toggle flips it and the choice survives a reload.
+39. `https://pjokk.no/robots.txt` allows crawling and `/sitemap.xml` resolves;
+    `https://test.pjokk.no/robots.txt` disallows everything and its landing
+    page returns `X-Robots-Tag: noindex` (`curl -I`).
+40. With the PWA installed, opening `https://pjokk.no/` in the browser still
+    shows the landing page rather than the cached app shell, and a push
+    notification opens `/home`.
+41. Optional: drop a 1200×630 `og.png` into `public/` and add the matching
+    `og:image` tag in `src/worker/landing/page.ts` — link previews currently
+    render without an image.
+
 ## Verified automatically (already done)
 
-- 16 workers-runtime tests: tenancy isolation (cross-family reads/writes
-  impossible, stale session claims re-verified), invite lifecycle (atomic
-  batch redeem, expiry/revoke/exhaustion, rate limiting), active-sleep
-  state machine (single active session, idempotent wake), summary shape.
+- 185 workers-runtime tests across 24 files: the landing page (language
+  negotiation, CTA state, CSP, indexability), tenancy isolation
+  (cross-family reads/writes impossible, stale session claims re-verified),
+  invite lifecycle (atomic batch redeem, expiry/revoke/exhaustion, rate
+  limiting), active-sleep state machine (single active session, idempotent
+  wake), summary shape.
 - Live checks: SPA 200, /api/docs 200, manifest + service worker 200, SPA
   fallback on /join/CODE, auth gates on domain routes and redeem, public
   invite-info endpoint.

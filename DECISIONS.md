@@ -611,3 +611,62 @@ been true since Phase 3; the vaccine feature only made it obvious.
   the next deploy (the workflow runs them first), but the founder account and
   every existing family are gone — the first account must be created again
   through the OPEN_SIGNUP=1 path documented in SMOKE-TEST.md.
+
+## Landing page + apex domain (2026-08-27)
+
+- **The landing page is rendered by the Worker, not the SPA.** `/` is one
+  self-contained document: inline CSS, zero JavaScript, no React, no app
+  bundle. A stranger reading marketing copy should not have to download the
+  whole application first. The alternative — a public route inside the SPA —
+  was rejected once the hero mock-up was settled as *conceptual*: with nothing
+  real to reuse, staying in React bought only a blank first paint.
+- **`run_worker_first` must name `/` explicitly.** With
+  `run_worker_first: ["/api/*"]` the asset worker answers every non-API
+  request and the Worker never sees it. This is also why the noindex
+  `robots.txt` is emitted at build time by a Vite plugin and the `www` → apex
+  redirect is a zone-level Rule: for every other path, there is no Worker code
+  in the request path to put them in.
+- **The hero mock-up is a CSS animation, deliberately not the real
+  components.** Reusing `StatusCard`/`LogButton` would have dragged the app
+  bundle onto the landing page; screenshots would go stale and need
+  re-shooting in light and dark. The cost is a small duplicated colour-token
+  block in `src/worker/landing/styles.ts` — keep it in step with
+  `src/web/styles.css`.
+- **Language is negotiated server-side**: `?lang=` → `pjokk_lang` cookie →
+  `Accept-Language` → English. Nothing flashes in the wrong language and no
+  JavaScript is needed to switch. Marketing prose lives in whole per-language
+  blocks (`landing/copy.ts`), not the `t()` dictionary — same call the legal
+  pages made, for the same reason.
+- **The session cookie is sniffed for presence, never validated.** Deciding
+  between "Open app" and "Sign in" does not justify a D1 read on every page
+  view; a stale cookie costs the visitor one redirect through `/login`.
+  Matching must allow the `__Secure-` prefix better-auth adds over https —
+  the first version did not, and a test caught it.
+- **No waitlist.** Email capture was designed and dropped: a new personal-data
+  store, a public write endpoint, an admin surface and a privacy-policy
+  section, all for an alpha that is not accepting sign-ups. The CTA reads
+  `OPEN_SIGNUP` instead, so opening signup later is an env flip.
+- **Home moved from `/` to `/home`**, and the SPA has no `/` route at all.
+  Links from inside the app back to the landing page must therefore be plain
+  anchors, not `<Link>`. Two easy-to-miss consequences: the service worker
+  needs `/^\/$/` in `navigateFallbackDenylist` (or a registered SW answers
+  `/` from the precached app shell forever), and push payloads and the
+  notification-click fallback must target `/home`.
+- **`app.pjokk.no` is retired outright** rather than redirected. It breaks
+  outstanding invite links and QR codes, which embed `APP_URL` — acceptable
+  at 72 h expiry and closed-alpha scale, and it leaves exactly one origin.
+  Deleting the route from `wrangler.jsonc` does NOT delete the Cloudflare
+  custom domain; the DNS record and certificate survive until removed in the
+  dashboard.
+- **workers.dev is off in production** and `trustedOrigins` is down to
+  `[APP_URL]`. A second origin that can complete a sign-in is a liability
+  once a canonical apex exists.
+- **`INDEXABLE` var** gates the noindex headers, `robots.txt` and
+  `sitemap.xml`. Production is `"1"`; everything else is `"0"`. Chosen over
+  comparing hostnames in code so the switch sits next to the domain it
+  belongs to, in `wrangler.jsonc`.
+- Regenerating `worker-configuration.d.ts` for the new var revealed that the
+  three `STRIPE_PRICE_PREMIUM_*` types come from the local, gitignored
+  `.dev.vars` — a machine without them silently loses the types and the
+  typecheck fails. They are now present in `.dev.vars.example` *and* must be
+  present in your `.dev.vars` before running `pnpm cf-typegen`.
