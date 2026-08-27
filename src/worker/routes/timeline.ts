@@ -73,6 +73,8 @@ export const timelineApp = createApp<FamEnv>().openapi(timeline, async (c) => {
     milestones,
     measurements,
     pumps,
+    plays,
+    vaccines,
   ] = await Promise.all([
     core || q.filter === "feeds" ? fam.listFeeds(opts) : empty,
     core || q.filter === "diapers" ? fam.listDiapers(opts) : empty,
@@ -83,6 +85,8 @@ export const timelineApp = createApp<FamEnv>().openapi(timeline, async (c) => {
     other ? fam.milestone.list(opts) : empty,
     other ? fam.measurement.list(opts) : empty,
     other ? fam.pump.list(opts) : empty,
+    other ? fam.listPlays(opts) : empty,
+    other ? fam.listVaccines(opts) : empty,
   ]);
 
   const merged = [
@@ -122,6 +126,23 @@ export const timelineApp = createApp<FamEnv>().openapi(timeline, async (c) => {
       sortKey: p.time.getTime(),
       entry: { ...p, kind: "pump" as const, time: iso(p.time) },
     })),
+    // Play sorts by start time, like sleep; a running one has endTime null.
+    ...plays.map((p) => ({
+      sortKey: p.startTime.getTime(),
+      entry: { kind: "play" as const, ...serSleep(p) },
+    })),
+    ...vaccines.map((v) => ({
+      sortKey: v.time.getTime(),
+      entry: {
+        ...v,
+        kind: "vaccine" as const,
+        time: iso(v.time),
+        documents: v.documents.map((d) => ({
+          ...d,
+          url: `/api/files/${d.id}`,
+        })),
+      },
+    })),
   ].sort(
     // Global total order (time DESC, id DESC) — must match the per-source
     // SQL ordering for the keyset cursor to be correct.
@@ -141,6 +162,8 @@ export const timelineApp = createApp<FamEnv>().openapi(timeline, async (c) => {
     milestones,
     measurements,
     pumps,
+    plays,
+    vaccines,
   ];
   const hasMore =
     merged.length > page.length || sources.some((s) => s.length === limit);

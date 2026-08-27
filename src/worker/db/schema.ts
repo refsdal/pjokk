@@ -348,6 +348,144 @@ export const sleepLocation = sqliteTable(
   (t) => [index("sleep_location_family_idx").on(t.familyId)],
 );
 
+// --- Vaccines (free): what was given, and when. The bundled Norwegian
+// programme (web/data/no-vaccine-programme.json) is a reference overlay
+// only — it never constrains what can be logged, so a vaccine given abroad
+// or off-programme records exactly the same way.
+
+export const vaccineLog = sqliteTable(
+  "vaccine_log",
+  {
+    id: id(),
+    familyId: familyId(),
+    babyId: babyId(),
+    caretakerId: caretakerId(),
+    time: time(),
+    name: text("name").notNull(),
+    doseNumber: integer("dose_number"),
+    // Slot key from the bundled programme ("mmr:1"); NULL when the dose
+    // isn't part of it. Nullable and unvalidated on purpose: the programme
+    // is data that can change without a migration.
+    scheduleSlot: text("schedule_slot"),
+    notes: text("notes"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("vaccine_family_time_idx").on(t.familyId, t.time),
+    index("vaccine_baby_idx").on(t.babyId),
+  ],
+);
+
+// Attachments live in R2; this table is the authorization record. Uploading
+// is premium, but reading and deleting never are.
+export const vaccineDocument = sqliteTable(
+  "vaccine_document",
+  {
+    id: id(),
+    familyId: familyId(),
+    vaccineLogId: text("vaccine_log_id")
+      .notNull()
+      .references(() => vaccineLog.id, { onDelete: "cascade" }),
+    // R2 object key. Never derived from user input.
+    objectKey: text("object_key").notNull(),
+    filename: text("filename").notNull(),
+    contentType: text("content_type").notNull(),
+    size: integer("size").notNull(),
+    uploadedBy: text("uploaded_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("vaccine_doc_log_idx").on(t.vaccineLogId),
+    index("vaccine_doc_family_idx").on(t.familyId),
+  ],
+);
+
+// --- Play (premium): timed activities — tummy time, a walk, playing.
+// Structurally a sleep_log: end_time NULL means the session is running, and
+// the partial unique index is what makes the timer server-side. No durable
+// object needed; "active" is a row shape, and the client renders the counter
+// from start_time.
+
+export const playLog = sqliteTable(
+  "play_log",
+  {
+    id: id(),
+    familyId: familyId(),
+    babyId: babyId(),
+    caretakerId: caretakerId(),
+    type: text("type", { enum: ["tummy", "walk", "play"] }).notNull(),
+    startTime: integer("start_time", { mode: "timestamp_ms" }).notNull(),
+    // NULL while the activity is running.
+    endTime: integer("end_time", { mode: "timestamp_ms" }),
+    notes: text("notes"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("play_family_start_idx").on(t.familyId, t.startTime),
+    index("play_baby_idx").on(t.babyId),
+    // One running activity per baby, enforced at the DB so a double-tap or
+    // an offline-queue replay can't race past the route's check — same
+    // guarantee sleep_one_active_per_baby gives.
+    uniqueIndex("play_one_active_per_baby")
+      .on(t.babyId)
+      .where(sql`end_time IS NULL`),
+  ],
+);
+
+// --- Contacts (premium): the family's people — doctor, helsestasjon,
+// grandparents. The first domain entity that is NOT a log: no time column,
+// no caretaker attribution. Babies attach via contact_baby; zero rows means
+// the contact belongs to the whole family (the doctor everyone shares),
+// which is the same convention calendar_event_baby uses.
+
+export const contact = sqliteTable(
+  "contact",
+  {
+    id: id(),
+    familyId: familyId(),
+    name: text("name").notNull(),
+    // Free-form by design: "doctor", "mormor", "barnehage" — a fixed enum
+    // would never survive contact with a real family.
+    role: text("role"),
+    // Keep in step with contactIcons in shared/schemas.ts.
+    icon: text("icon", {
+      enum: [
+        "user",
+        "doctor",
+        "nurse",
+        "hospital",
+        "dental",
+        "family",
+        "grandparent",
+        "daycare",
+        "friend",
+        "phone",
+      ],
+    }),
+    phone: text("phone"),
+    email: text("email"),
+    website: text("website"),
+    notes: text("notes"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("contact_family_idx").on(t.familyId)],
+);
+
+export const contactBaby = sqliteTable(
+  "contact_baby",
+  {
+    contactId: text("contact_id")
+      .notNull()
+      .references(() => contact.id, { onDelete: "cascade" }),
+    babyId: text("baby_id")
+      .notNull()
+      .references(() => baby.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.contactId, t.babyId] })],
+);
+
 // --- Calendar (premium): family-wide planned events. Babies and responsible
 // members attach via join tables; zero baby rows = family-wide event.
 

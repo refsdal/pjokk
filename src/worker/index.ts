@@ -19,12 +19,15 @@ import { audit, requireSysadmin } from "./middleware/sysadmin";
 import { adminApp } from "./routes/admin";
 import { billingApp } from "./routes/billing";
 import { calendarApp } from "./routes/calendar";
+import { contactsApp } from "./routes/contacts";
 import { exportApp } from "./routes/export";
 import { keysApp } from "./routes/keys";
 import { otherLogsApp } from "./routes/other-logs";
+import { playApp } from "./routes/play";
 import { pushApp } from "./routes/push";
 import { sleepLocationsApp } from "./routes/sleep-locations";
 import { statsApp } from "./routes/stats";
+import { filesApp, vaccinesApp } from "./routes/vaccines";
 import {
   purgeOrphanUsers,
   reconcilePlans,
@@ -122,8 +125,12 @@ const domainApp = domainBase
   .route("/", sleepApp)
   .route("/", sleepLocationsApp)
   .route("/", otherLogsApp)
+  .route("/", playApp)
+  .route("/", vaccinesApp)
+  .route("/", filesApp)
   .route("/", timelineApp)
   .route("/", calendarApp)
+  .route("/", contactsApp)
   .route("/", statsApp)
   .route("/", exportApp)
   .route("/", pushApp)

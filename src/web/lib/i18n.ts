@@ -97,6 +97,49 @@ const nb: Record<string, string> = {
   "Could not start sleep: ": "Kunne ikke starte søvn: ",
   "Could not update sleep: ": "Kunne ikke oppdatere søvn: ",
   "Could not wake: ": "Kunne ikke avslutte søvn: ",
+
+  // Play sheet
+  "Tummy time": "Mageleie",
+  Walk: "Tur",
+  Play: "Lek",
+  "Edit activity": "Rediger aktivitet",
+  Started: "Startet",
+  Ended: "Avsluttet",
+  "Log finished activity": "Logg ferdig aktivitet",
+  "Still running — finish it with Stop on Home.":
+    "Pågår fortsatt — avslutt den med Stopp på Hjem.",
+  "The end time is before the start time.":
+    "Sluttidspunktet er før starttidspunktet.",
+  "Could not stop: ": "Kunne ikke stoppe: ",
+  activity: "aktivitet",
+
+  // Vaccines
+  Vaccines: "Vaksiner",
+  Vaccine: "Vaksine",
+  "Log vaccine": "Logg vaksine",
+  "Edit vaccine": "Rediger vaksine",
+  Dose: "Dose",
+  due: "forfalt",
+  "Other vaccines": "Andre vaksiner",
+  Documents: "Dokumenter",
+  "Attach document": "Legg ved dokument",
+  "Uploading…": "Laster opp…",
+  "Deleting a vaccine also deletes its documents.":
+    "Å slette en vaksine sletter også dokumentene dens.",
+  "Schedule follows": "Planen følger",
+  "Check with your helsestasjon.": "Sjekk med helsestasjonen din.",
+  Back: "Tilbake",
+  // Programme age labels (passed through t() dynamically — keep in sync with
+  // data/no-vaccine-programme.json).
+  "6 weeks": "6 uker",
+  "3 months": "3 måneder",
+  "5 months": "5 måneder",
+  "12 months": "12 måneder",
+  "15 months": "15 måneder",
+  "2nd grade": "2. klasse",
+  "6th grade": "6. klasse",
+  "7th grade": "7. klasse",
+  "10th grade": "10. klasse",
   "Could not delete: ": "Kunne ikke slette: ",
 
   // More / other activity types
@@ -198,6 +241,33 @@ const nb: Record<string, string> = {
   "Baby removed": "Baby fjernet",
   "Removing a baby permanently deletes every log for them.":
     "Å fjerne en baby sletter alle loggene deres for alltid.",
+
+  // Contacts
+  Contacts: "Kontakter",
+  "Add contact": "Legg til kontakt",
+  "Edit contact": "Rediger kontakt",
+  "Contact removed": "Kontakt fjernet",
+  "Doctor, helsestasjon, grandparents — the people you call.":
+    "Lege, helsestasjon, besteforeldre — de du ringer.",
+  Name: "Navn",
+  "Type (doctor, grandma, daycare…)": "Type (lege, mormor, barnehage…)",
+  Phone: "Telefon",
+  Website: "Nettside",
+  Notes: "Notater",
+  Call: "Ring",
+  "Applies to": "Gjelder for",
+  "Shared by the whole family.": "Delt av hele familien.",
+  "Only shown for the babies above.": "Vises bare for babyene over.",
+  // Contact icon labels (passed through t() dynamically, so the i18n check
+  // can't see them — keep them in sync with contactIconMeta by hand).
+  // Doctor / Family / Other already live in this dictionary further down.
+  Person: "Person",
+  Nurse: "Helsesykepleier",
+  Clinic: "Klinikk",
+  Dentist: "Tannlege",
+  Grandparent: "Besteforelder",
+  Daycare: "Barnehage",
+  Friend: "Venn",
   "Switch baby": "Bytt baby",
   "Make admin": "Gjør til admin",
   "Make member": "Gjør til medlem",

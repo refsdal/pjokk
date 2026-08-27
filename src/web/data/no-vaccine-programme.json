@@ -1,0 +1,108 @@
+{
+  "id": "no-barnevaksinasjon",
+  "country": "NO",
+  "name": "Barnevaksinasjonsprogrammet",
+  "source": "Folkehelseinstituttet (FHI)",
+  "sourceUrl": "https://www.fhi.no/va/barnevaksinasjonsprogrammet/",
+  "note": "Reference overlay only. Ages are the programme's nominal offer, not medical advice; the helsestasjon decides the actual schedule.",
+  "slots": [
+    {
+      "key": "rotavirus:1",
+      "name": "Rotavirus",
+      "dose": 1,
+      "ageMonths": 1.5,
+      "ageLabel": "6 weeks"
+    },
+    {
+      "key": "rotavirus:2",
+      "name": "Rotavirus",
+      "dose": 2,
+      "ageMonths": 3,
+      "ageLabel": "3 months"
+    },
+    {
+      "key": "dtp-ipv-hib-hepb:1",
+      "name": "DTP-IPV-Hib-HepB",
+      "dose": 1,
+      "ageMonths": 3,
+      "ageLabel": "3 months"
+    },
+    {
+      "key": "pneumococcal:1",
+      "name": "Pneumococcal",
+      "dose": 1,
+      "ageMonths": 3,
+      "ageLabel": "3 months"
+    },
+    {
+      "key": "dtp-ipv-hib-hepb:2",
+      "name": "DTP-IPV-Hib-HepB",
+      "dose": 2,
+      "ageMonths": 5,
+      "ageLabel": "5 months"
+    },
+    {
+      "key": "pneumococcal:2",
+      "name": "Pneumococcal",
+      "dose": 2,
+      "ageMonths": 5,
+      "ageLabel": "5 months"
+    },
+    {
+      "key": "dtp-ipv-hib-hepb:3",
+      "name": "DTP-IPV-Hib-HepB",
+      "dose": 3,
+      "ageMonths": 12,
+      "ageLabel": "12 months"
+    },
+    {
+      "key": "pneumococcal:3",
+      "name": "Pneumococcal",
+      "dose": 3,
+      "ageMonths": 12,
+      "ageLabel": "12 months"
+    },
+    {
+      "key": "mmr:1",
+      "name": "MMR",
+      "dose": 1,
+      "ageMonths": 15,
+      "ageLabel": "15 months"
+    },
+    {
+      "key": "dtp-ipv:4",
+      "name": "DTP-IPV",
+      "dose": 4,
+      "ageMonths": 84,
+      "ageLabel": "2nd grade"
+    },
+    {
+      "key": "mmr:2",
+      "name": "MMR",
+      "dose": 2,
+      "ageMonths": 132,
+      "ageLabel": "6th grade"
+    },
+    {
+      "key": "hpv:1",
+      "name": "HPV",
+      "dose": 1,
+      "ageMonths": 144,
+      "ageLabel": "7th grade"
+    },
+    {
+      "key": "hpv:2",
+      "name": "HPV",
+      "dose": 2,
+      "ageMonths": 150,
+      "ageLabel": "7th grade"
+    },
+    {
+      "key": "dtp-ipv:5",
+      "name": "DTP-IPV",
+      "dose": 5,
+      "ageMonths": 180,
+      "ageLabel": "10th grade"
+    }
+  ]
+}

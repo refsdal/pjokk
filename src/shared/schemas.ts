@@ -287,6 +287,90 @@ export const UpdatePumpSchema = z
   })
   .openapi("UpdatePump");
 
+// --- Vaccines (free log; documents are premium to upload) ---
+
+export const VaccineDocumentSchema = z
+  .object({
+    id: z.string(),
+    filename: z.string(),
+    contentType: z.string(),
+    size: z.number().int(),
+    // Fetch through /api/files/{id} — the R2 bucket is never public.
+    url: z.string(),
+  })
+  .openapi("VaccineDocument");
+
+export const VaccineLogSchema = z
+  .object({
+    ...logBase,
+    time: isoTime(),
+    name: z.string(),
+    doseNumber: z.number().int().nullable(),
+    // Slot key from the bundled programme, or null for an off-programme dose.
+    scheduleSlot: z.string().nullable(),
+    documents: z.array(VaccineDocumentSchema),
+  })
+  .openapi("VaccineLog");
+
+export const CreateVaccineSchema = z
+  .object({
+    babyId: z.string(),
+    time: isoTime(),
+    name: z.string().min(1).max(120),
+    doseNumber: z.number().int().min(1).max(20).optional(),
+    scheduleSlot: z.string().max(60).optional(),
+    notes: z.string().max(1000).optional(),
+  })
+  .openapi("CreateVaccine");
+
+export const UpdateVaccineSchema = z
+  .object({
+    time: isoTime().optional(),
+    name: z.string().min(1).max(120).optional(),
+    doseNumber: z.number().int().min(1).max(20).nullable().optional(),
+    scheduleSlot: z.string().max(60).nullable().optional(),
+    notes: z.string().max(1000).nullable().optional(),
+  })
+  .openapi("UpdateVaccine");
+
+// --- Play (premium): timed activities, same session shape as sleep ---
+
+export const playTypes = ["tummy", "walk", "play"] as const;
+
+export const PlayLogSchema = z
+  .object({
+    ...logBase,
+    type: z.enum(playTypes),
+    startTime: isoTime(),
+    // null = still running.
+    endTime: isoTime().nullable(),
+  })
+  .openapi("PlayLog");
+
+export const CreatePlaySchema = z
+  .object({
+    babyId: z.string(),
+    type: z.enum(playTypes),
+    startTime: isoTime(),
+    // Omit to start a running session; supply both to log after the fact.
+    endTime: isoTime().nullable().optional(),
+    notes: z.string().max(2000).optional(),
+  })
+  .openapi("CreatePlay");
+
+export const UpdatePlaySchema = z
+  .object({
+    type: z.enum(playTypes).optional(),
+    startTime: isoTime().optional(),
+    endTime: isoTime().nullable().optional(),
+    notes: z.string().max(2000).nullable().optional(),
+  })
+  .openapi("UpdatePlay");
+
+export const StopPlaySchema = z
+  .object({ endTime: isoTime().optional() })
+  .openapi("StopPlay");
+
 // --- Timeline: the merged, day-groupable feed of everything ---
 
 // "other" = all Phase 3 activity types together.
@@ -303,6 +387,8 @@ export const TimelineEntrySchema = z
     MilestoneLogSchema.extend({ kind: z.literal("milestone") }),
     MeasurementLogSchema.extend({ kind: z.literal("measurement") }),
     PumpLogSchema.extend({ kind: z.literal("pump") }),
+    PlayLogSchema.extend({ kind: z.literal("play") }),
+    VaccineLogSchema.extend({ kind: z.literal("vaccine") }),
   ])
   .openapi("TimelineEntry");
 
@@ -323,6 +409,8 @@ export const SummarySchema = z
     lastDiaper: DiaperLogSchema.nullable(),
     activeSleep: SleepLogSchema.nullable(),
     lastSleep: SleepLogSchema.nullable(),
+    // The running timed activity (tummy time, a walk), or null.
+    activePlay: PlayLogSchema.nullable(),
     // Local-day totals for the requester's timezone (see the `tz` query param).
     today: z.object({
       feeds: z.number().int(),
@@ -552,6 +640,68 @@ export const RedeemResultSchema = z
   })
   .openapi("RedeemResult");
 
+// --- Contacts (premium): the family's people ---
+
+// A small fixed set, mapped to Tabler glyphs in the UI. Free-form `role`
+// carries the meaning; the icon is just recognition at a glance.
+export const contactIcons = [
+  "user",
+  "doctor",
+  "nurse",
+  "hospital",
+  "dental",
+  "family",
+  "grandparent",
+  "daycare",
+  "friend",
+  "phone",
+] as const;
+
+// Website is deliberately free text, not z.url(): people type
+// "legesenteret.no" and being right about URLs matters less than the
+// contact getting saved. The UI prepends https:// when opening it.
+export const ContactSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    role: z.string().nullable(),
+    icon: z.enum(contactIcons).nullable(),
+    phone: z.string().nullable(),
+    email: z.string().nullable(),
+    website: z.string().nullable(),
+    notes: z.string().nullable(),
+    // Zero babies = a contact the whole family shares.
+    babies: z.array(z.object({ id: z.string(), name: z.string() })),
+  })
+  .openapi("Contact");
+
+export const CreateContactSchema = z
+  .object({
+    name: z.string().min(1).max(100),
+    role: z.string().max(60).optional(),
+    icon: z.enum(contactIcons).optional(),
+    phone: z.string().max(40).optional(),
+    email: z.email().max(200).optional(),
+    website: z.string().max(200).optional(),
+    notes: z.string().max(2000).optional(),
+    babyIds: z.array(z.string()).max(10).default([]),
+  })
+  .openapi("CreateContact");
+
+export const UpdateContactSchema = z
+  .object({
+    name: z.string().min(1).max(100).optional(),
+    role: z.string().max(60).nullable().optional(),
+    icon: z.enum(contactIcons).nullable().optional(),
+    phone: z.string().max(40).nullable().optional(),
+    email: z.email().max(200).nullable().optional(),
+    website: z.string().max(200).nullable().optional(),
+    notes: z.string().max(2000).nullable().optional(),
+    // Present = replace the link set; omitted = untouched.
+    babyIds: z.array(z.string()).max(10).optional(),
+  })
+  .openapi("UpdateContact");
+
 // --- Calendar (premium): family-wide planned events ---
 
 export const calendarCategories = [
@@ -659,3 +809,11 @@ export type CalendarEvent = z.infer<typeof CalendarEventSchema>;
 export type CreateCalendarEvent = z.infer<typeof CreateCalendarEventSchema>;
 export type UpdateCalendarEvent = z.infer<typeof UpdateCalendarEventSchema>;
 export type CalendarCategory = (typeof calendarCategories)[number];
+export type Contact = z.infer<typeof ContactSchema>;
+export type CreateContact = z.infer<typeof CreateContactSchema>;
+export type UpdateContact = z.infer<typeof UpdateContactSchema>;
+export type ContactIcon = (typeof contactIcons)[number];
+export type PlayLog = z.infer<typeof PlayLogSchema>;
+export type PlayType = (typeof playTypes)[number];
+export type VaccineLog = z.infer<typeof VaccineLogSchema>;
+export type VaccineDocument = z.infer<typeof VaccineDocumentSchema>;

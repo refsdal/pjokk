@@ -20,6 +20,8 @@ import {
   calendarAssignee,
   calendarEvent,
   calendarEventBaby,
+  contact,
+  contactBaby,
   diaperLog,
   familyInvite,
   feedLog,
@@ -29,10 +31,13 @@ import {
   milestoneLog,
   noteLog,
   organization,
+  playLog,
   pumpLog,
   sleepLocation,
   sleepLog,
   user,
+  vaccineDocument,
+  vaccineLog,
 } from "./schema";
 
 // The ONLY sanctioned way to touch domain tables. Every query in here is
@@ -72,6 +77,84 @@ const sleepCols = {
   endTime: sleepLog.endTime,
   location: sleepLog.location,
   notes: sleepLog.notes,
+};
+
+export type VaccineDocumentRow = {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+};
+
+export type VaccineRow = {
+  id: string;
+  babyId: string;
+  caretakerId: string;
+  caretakerName: string;
+  time: Date;
+  name: string;
+  doseNumber: number | null;
+  scheduleSlot: string | null;
+  notes: string | null;
+  documents: VaccineDocumentRow[];
+};
+
+const vaccineCols = {
+  id: vaccineLog.id,
+  babyId: vaccineLog.babyId,
+  caretakerId: vaccineLog.caretakerId,
+  caretakerName: user.name,
+  time: vaccineLog.time,
+  name: vaccineLog.name,
+  doseNumber: vaccineLog.doseNumber,
+  scheduleSlot: vaccineLog.scheduleSlot,
+  notes: vaccineLog.notes,
+};
+
+type VaccineBaseRow = Omit<VaccineRow, "documents">;
+
+// One IN-query for the attachments, grouped in memory — the same shape the
+// calendar and contacts hydrates use.
+async function hydrateVaccines(
+  db: Db,
+  rows: VaccineBaseRow[],
+): Promise<VaccineRow[]> {
+  if (rows.length === 0) return [];
+  const docs = await db
+    .select({
+      vaccineLogId: vaccineDocument.vaccineLogId,
+      id: vaccineDocument.id,
+      filename: vaccineDocument.filename,
+      contentType: vaccineDocument.contentType,
+      size: vaccineDocument.size,
+    })
+    .from(vaccineDocument)
+    .where(
+      inArray(
+        vaccineDocument.vaccineLogId,
+        rows.map((r) => r.id),
+      ),
+    )
+    .orderBy(asc(vaccineDocument.createdAt));
+  return rows.map((r) => ({
+    ...r,
+    documents: docs
+      .filter((d) => d.vaccineLogId === r.id)
+      .map(({ vaccineLogId: _ignored, ...doc }) => doc),
+  }));
+}
+
+export type PlayTypeKey = "tummy" | "walk" | "play";
+
+const playCols = {
+  id: playLog.id,
+  babyId: playLog.babyId,
+  caretakerId: playLog.caretakerId,
+  caretakerName: user.name,
+  type: playLog.type,
+  startTime: playLog.startTime,
+  endTime: playLog.endTime,
+  notes: playLog.notes,
 };
 
 // The Phase 3 activity types share one structural shape (id, familyId,
@@ -261,6 +344,67 @@ const calendarCols = {
   createdByName: user.name,
 };
 
+export type ContactIconKey =
+  | "user"
+  | "doctor"
+  | "nurse"
+  | "hospital"
+  | "dental"
+  | "family"
+  | "grandparent"
+  | "daycare"
+  | "friend"
+  | "phone";
+
+export type ContactRow = {
+  id: string;
+  name: string;
+  role: string | null;
+  icon: ContactIconKey | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  notes: string | null;
+  babies: { id: string; name: string }[];
+};
+
+const contactCols = {
+  id: contact.id,
+  name: contact.name,
+  role: contact.role,
+  icon: contact.icon,
+  phone: contact.phone,
+  email: contact.email,
+  website: contact.website,
+  notes: contact.notes,
+};
+
+type ContactBaseRow = Omit<ContactRow, "babies">;
+
+// One IN-query + client-side grouping, same shape as the calendar hydrate.
+async function hydrateContacts(
+  db: Db,
+  rows: ContactBaseRow[],
+): Promise<ContactRow[]> {
+  if (rows.length === 0) return [];
+  const ids = rows.map((r) => r.id);
+  const linkRows = await db
+    .select({
+      contactId: contactBaby.contactId,
+      id: baby.id,
+      name: baby.name,
+    })
+    .from(contactBaby)
+    .innerJoin(baby, eq(contactBaby.babyId, baby.id))
+    .where(inArray(contactBaby.contactId, ids));
+  return rows.map((r) => ({
+    ...r,
+    babies: linkRows
+      .filter((l) => l.contactId === r.id)
+      .map(({ id, name }) => ({ id, name })),
+  }));
+}
+
 type CalendarBaseRow = Omit<CalendarEventRow, "babies" | "assignees">;
 
 // Two IN-queries + client-side grouping beats N+1 per event at family scale.
@@ -316,6 +460,16 @@ export function familyScope(db: Db, familyId: string) {
     and(
       eq(sleepLog.familyId, familyId),
       babyId ? eq(sleepLog.babyId, babyId) : undefined,
+    );
+  const playScope = (babyId?: string) =>
+    and(
+      eq(playLog.familyId, familyId),
+      babyId ? eq(playLog.babyId, babyId) : undefined,
+    );
+  const vaccineScope = (babyId?: string) =>
+    and(
+      eq(vaccineLog.familyId, familyId),
+      babyId ? eq(vaccineLog.babyId, babyId) : undefined,
     );
 
   return {
@@ -703,17 +857,19 @@ export function familyScope(db: Db, familyId: string) {
 
     // One query bundle for the home screen glance.
     async summary(babyId: string) {
-      const [feeds, diapers, active, sleeps] = await Promise.all([
+      const [feeds, diapers, active, sleeps, play] = await Promise.all([
         this.listFeeds({ babyId, limit: 1 }),
         this.listDiapers({ babyId, limit: 1 }),
         this.activeSleep(babyId),
         this.listSleeps({ babyId, limit: 1 }),
+        this.activePlay(babyId),
       ]);
       return {
         lastFeed: feeds[0] ?? null,
         lastDiaper: diapers[0] ?? null,
         activeSleep: active,
         lastSleep: sleeps[0] ?? null,
+        activePlay: play,
       };
     },
 
@@ -881,6 +1037,358 @@ export function familyScope(db: Db, familyId: string) {
           and(eq(sleepLocation.id, id), eq(sleepLocation.familyId, familyId)),
         )
         .returning({ id: sleepLocation.id });
+      return rows.length > 0;
+    },
+
+    // --- vaccines (free): log + R2-backed documents ---
+    async listVaccines(opts: ListOpts = {}) {
+      const rows = await db
+        .select(vaccineCols)
+        .from(vaccineLog)
+        .innerJoin(user, eq(vaccineLog.caretakerId, user.id))
+        .where(
+          and(
+            vaccineScope(opts.babyId),
+            beforeCursor(vaccineLog.time, vaccineLog.id, opts.before),
+          ),
+        )
+        .orderBy(desc(vaccineLog.time), desc(vaccineLog.id))
+        .limit(opts.limit ?? 50);
+      return hydrateVaccines(db, rows);
+    },
+
+    async getVaccine(id: string) {
+      const rows = await db
+        .select(vaccineCols)
+        .from(vaccineLog)
+        .innerJoin(user, eq(vaccineLog.caretakerId, user.id))
+        .where(and(eq(vaccineLog.id, id), eq(vaccineLog.familyId, familyId)));
+      if (!rows[0]) return null;
+      return (await hydrateVaccines(db, rows))[0] ?? null;
+    },
+
+    async createVaccine(data: {
+      babyId: string;
+      caretakerId: string;
+      time: Date;
+      name: string;
+      doseNumber?: number | null;
+      scheduleSlot?: string | null;
+      notes?: string | null;
+    }) {
+      const rows = await db
+        .insert(vaccineLog)
+        .values({ ...data, familyId })
+        .returning({ id: vaccineLog.id });
+      return this.getVaccine(rows[0]!.id);
+    },
+
+    async updateVaccine(
+      id: string,
+      patch: Partial<{
+        time: Date;
+        name: string;
+        doseNumber: number | null;
+        scheduleSlot: string | null;
+        notes: string | null;
+      }>,
+    ) {
+      const set = compactPatch(patch);
+      if (Object.keys(set).length === 0) return this.getVaccine(id);
+      const rows = await db
+        .update(vaccineLog)
+        .set(set)
+        .where(and(eq(vaccineLog.id, id), eq(vaccineLog.familyId, familyId)))
+        .returning({ id: vaccineLog.id });
+      return rows[0] ? this.getVaccine(id) : null;
+    },
+
+    // Returns the R2 keys the caller must delete; the DB rows cascade away
+    // with the log, but the objects behind them do not.
+    async deleteVaccine(id: string) {
+      const keys = await db
+        .select({ objectKey: vaccineDocument.objectKey })
+        .from(vaccineDocument)
+        .where(
+          and(
+            eq(vaccineDocument.vaccineLogId, id),
+            eq(vaccineDocument.familyId, familyId),
+          ),
+        );
+      const rows = await db
+        .delete(vaccineLog)
+        .where(and(eq(vaccineLog.id, id), eq(vaccineLog.familyId, familyId)))
+        .returning({ id: vaccineLog.id });
+      return rows.length > 0
+        ? { deleted: true, objectKeys: keys.map((k) => k.objectKey) }
+        : { deleted: false, objectKeys: [] };
+    },
+
+    async countVaccineDocuments(vaccineLogId: string) {
+      const rows = await db
+        .select({ id: vaccineDocument.id })
+        .from(vaccineDocument)
+        .where(
+          and(
+            eq(vaccineDocument.vaccineLogId, vaccineLogId),
+            eq(vaccineDocument.familyId, familyId),
+          ),
+        );
+      return rows.length;
+    },
+
+    async createVaccineDocument(data: {
+      vaccineLogId: string;
+      objectKey: string;
+      filename: string;
+      contentType: string;
+      size: number;
+      uploadedBy: string;
+    }) {
+      const rows = await db
+        .insert(vaccineDocument)
+        .values({ ...data, familyId })
+        .returning({ id: vaccineDocument.id });
+      return rows[0]!.id;
+    },
+
+    async getVaccineDocument(id: string) {
+      const rows = await db
+        .select({
+          id: vaccineDocument.id,
+          objectKey: vaccineDocument.objectKey,
+          filename: vaccineDocument.filename,
+          contentType: vaccineDocument.contentType,
+          size: vaccineDocument.size,
+        })
+        .from(vaccineDocument)
+        .where(
+          and(
+            eq(vaccineDocument.id, id),
+            eq(vaccineDocument.familyId, familyId),
+          ),
+        );
+      return rows[0] ?? null;
+    },
+
+    async deleteVaccineDocument(id: string) {
+      const rows = await db
+        .delete(vaccineDocument)
+        .where(
+          and(
+            eq(vaccineDocument.id, id),
+            eq(vaccineDocument.familyId, familyId),
+          ),
+        )
+        .returning({ objectKey: vaccineDocument.objectKey });
+      return rows[0]?.objectKey ?? null;
+    },
+
+    // --- play (premium): timed activities, same session shape as sleep ---
+    async listPlays(opts: ListOpts = {}) {
+      return db
+        .select(playCols)
+        .from(playLog)
+        .innerJoin(user, eq(playLog.caretakerId, user.id))
+        .where(
+          and(
+            playScope(opts.babyId),
+            beforeCursor(playLog.startTime, playLog.id, opts.before),
+          ),
+        )
+        .orderBy(desc(playLog.startTime), desc(playLog.id))
+        .limit(opts.limit ?? 50);
+    },
+
+    async getPlay(id: string) {
+      const rows = await db
+        .select(playCols)
+        .from(playLog)
+        .innerJoin(user, eq(playLog.caretakerId, user.id))
+        .where(and(eq(playLog.id, id), eq(playLog.familyId, familyId)));
+      return rows[0] ?? null;
+    },
+
+    // The running activity for a baby (endTime IS NULL), if any.
+    async activePlay(babyId?: string) {
+      const rows = await db
+        .select(playCols)
+        .from(playLog)
+        .innerJoin(user, eq(playLog.caretakerId, user.id))
+        .where(and(playScope(babyId), isNull(playLog.endTime)))
+        .orderBy(desc(playLog.startTime))
+        .limit(1);
+      return rows[0] ?? null;
+    },
+
+    async createPlay(data: {
+      babyId: string;
+      caretakerId: string;
+      type: PlayTypeKey;
+      startTime: Date;
+      endTime?: Date | null;
+      notes?: string | null;
+    }) {
+      const rows = await db
+        .insert(playLog)
+        .values({ ...data, familyId })
+        .returning({ id: playLog.id });
+      return this.getPlay(rows[0]!.id);
+    },
+
+    // Ends the running activity; the NULL guard makes a double-stop harmless.
+    async stopPlay(id: string, endTime: Date) {
+      const rows = await db
+        .update(playLog)
+        .set({ endTime })
+        .where(
+          and(
+            eq(playLog.id, id),
+            eq(playLog.familyId, familyId),
+            isNull(playLog.endTime),
+          ),
+        )
+        .returning({ id: playLog.id });
+      return rows[0] ? this.getPlay(id) : null;
+    },
+
+    async updatePlay(
+      id: string,
+      patch: Partial<{
+        type: PlayTypeKey;
+        startTime: Date;
+        endTime: Date | null;
+        notes: string | null;
+      }>,
+    ) {
+      const set = compactPatch(patch);
+      if (Object.keys(set).length === 0) return this.getPlay(id);
+      const rows = await db
+        .update(playLog)
+        .set(set)
+        .where(and(eq(playLog.id, id), eq(playLog.familyId, familyId)))
+        .returning({ id: playLog.id });
+      return rows[0] ? this.getPlay(id) : null;
+    },
+
+    async deletePlay(id: string) {
+      const rows = await db
+        .delete(playLog)
+        .where(and(eq(playLog.id, id), eq(playLog.familyId, familyId)))
+        .returning({ id: playLog.id });
+      return rows.length > 0;
+    },
+
+    // --- contacts (premium): family people, hydrated with baby links ---
+    async listContacts() {
+      const rows = await db
+        .select(contactCols)
+        .from(contact)
+        .where(eq(contact.familyId, familyId))
+        .orderBy(asc(contact.name), asc(contact.id));
+      return hydrateContacts(db, rows);
+    },
+
+    async getContact(id: string) {
+      const rows = await db
+        .select(contactCols)
+        .from(contact)
+        .where(and(eq(contact.id, id), eq(contact.familyId, familyId)));
+      if (!rows[0]) return null;
+      const hydrated = await hydrateContacts(db, rows);
+      return hydrated[0] ?? null;
+    },
+
+    async createContact(data: {
+      name: string;
+      role?: string | null;
+      icon?: ContactIconKey | null;
+      phone?: string | null;
+      email?: string | null;
+      website?: string | null;
+      notes?: string | null;
+      babyIds: string[];
+    }) {
+      const id = crypto.randomUUID();
+      // Contact row first, links after — same ordering rationale as
+      // createCalendarEvent: never leave dangling link rows.
+      const statements: BatchItem<"sqlite">[] = [
+        db.insert(contact).values({
+          id,
+          familyId,
+          name: data.name,
+          role: data.role ?? null,
+          icon: data.icon ?? null,
+          phone: data.phone ?? null,
+          email: data.email ?? null,
+          website: data.website ?? null,
+          notes: data.notes ?? null,
+        }),
+      ];
+      if (data.babyIds.length > 0) {
+        statements.push(
+          db
+            .insert(contactBaby)
+            .values(data.babyIds.map((babyId) => ({ contactId: id, babyId }))),
+        );
+      }
+      await db.batch(statements as never);
+      return this.getContact(id);
+    },
+
+    async updateContact(
+      id: string,
+      patch: Partial<{
+        name: string;
+        role: string | null;
+        icon: ContactIconKey | null;
+        phone: string | null;
+        email: string | null;
+        website: string | null;
+        notes: string | null;
+      }>,
+      links: { babyIds?: string[] },
+    ) {
+      const set = compactPatch(patch);
+      if (Object.keys(set).length > 0) {
+        const rows = await db
+          .update(contact)
+          .set(set)
+          .where(and(eq(contact.id, id), eq(contact.familyId, familyId)))
+          .returning({ id: contact.id });
+        if (!rows[0]) return null;
+      } else {
+        // Ownership check even for a link-only update.
+        const rows = await db
+          .select({ id: contact.id })
+          .from(contact)
+          .where(and(eq(contact.id, id), eq(contact.familyId, familyId)));
+        if (!rows[0]) return null;
+      }
+      if (links.babyIds !== undefined) {
+        const statements: BatchItem<"sqlite">[] = [
+          db.delete(contactBaby).where(eq(contactBaby.contactId, id)),
+        ];
+        if (links.babyIds.length > 0) {
+          statements.push(
+            db
+              .insert(contactBaby)
+              .values(
+                links.babyIds.map((babyId) => ({ contactId: id, babyId })),
+              ),
+          );
+        }
+        await db.batch(statements as never);
+      }
+      return this.getContact(id);
+    },
+
+    async deleteContact(id: string) {
+      // Link rows go with it via ON DELETE cascade.
+      const rows = await db
+        .delete(contact)
+        .where(and(eq(contact.id, id), eq(contact.familyId, familyId)))
+        .returning({ id: contact.id });
       return rows.length > 0;
     },
 
