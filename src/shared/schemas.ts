@@ -312,6 +312,24 @@ export const VaccineLogSchema = z
   })
   .openapi("VaccineLog");
 
+// A programme slot waved away for one baby. slotKey is a key into the
+// bundled programme, deliberately not validated against it: the programme
+// is data that can change without an API change.
+export const VaccineDismissalSchema = z
+  .object({
+    id: z.string(),
+    babyId: z.string(),
+    slotKey: z.string(),
+  })
+  .openapi("VaccineDismissal");
+
+export const CreateVaccineDismissalSchema = z
+  .object({
+    babyId: z.string(),
+    slotKey: z.string().min(1).max(60),
+  })
+  .openapi("CreateVaccineDismissal");
+
 export const CreateVaccineSchema = z
   .object({
     babyId: z.string(),
@@ -817,3 +835,4 @@ export type PlayLog = z.infer<typeof PlayLogSchema>;
 export type PlayType = (typeof playTypes)[number];
 export type VaccineLog = z.infer<typeof VaccineLogSchema>;
 export type VaccineDocument = z.infer<typeof VaccineDocumentSchema>;
+export type VaccineDismissal = z.infer<typeof VaccineDismissalSchema>;

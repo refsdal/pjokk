@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { VaccineLog } from "../src/shared/schemas";
 import {
   buildSchedule,
+  infoUrlForName,
+  infoUrlForSlot,
   offProgramme,
   vaccineProgramme,
 } from "../src/web/lib/vaccine-programme";
@@ -34,6 +36,7 @@ describe("vaccine programme overlay", () => {
     const rows = buildSchedule(
       BIRTH,
       [entry({ scheduleSlot: "mmr:1" })],
+      [],
       at(20),
     );
     const mmr = rows.find((r) => r.slot.key === "mmr:1")!;
@@ -46,6 +49,7 @@ describe("vaccine programme overlay", () => {
       BIRTH,
       // No slot key — the shape an import or a free-form log produces.
       [entry({ scheduleSlot: null, name: "mmr", doseNumber: 1 })],
+      [],
       at(20),
     );
     expect(rows.find((r) => r.slot.key === "mmr:1")!.status).toBe("given");
@@ -55,6 +59,7 @@ describe("vaccine programme overlay", () => {
     const rows = buildSchedule(
       BIRTH,
       [entry({ scheduleSlot: null, name: "MMR", doseNumber: 1 })],
+      [],
       at(200),
     );
     expect(rows.find((r) => r.slot.key === "mmr:1")!.status).toBe("given");
@@ -62,7 +67,7 @@ describe("vaccine programme overlay", () => {
   });
 
   it("separates due from upcoming by the baby's age", () => {
-    const rows = buildSchedule(BIRTH, [], at(4));
+    const rows = buildSchedule(BIRTH, [], [], at(4));
     // 3-month slots have come round; the 5-month ones have not.
     expect(rows.find((r) => r.slot.key === "dtp-ipv-hib-hepb:1")!.status).toBe(
       "due",
@@ -80,13 +85,76 @@ describe("vaccine programme overlay", () => {
       scheduleSlot: null,
     });
     const entries = [entry({ scheduleSlot: "mmr:1" }), yellowFever];
-    const schedule = buildSchedule(BIRTH, entries, at(20));
+    const schedule = buildSchedule(BIRTH, entries, [], at(20));
     expect(offProgramme(entries, schedule).map((e) => e.id)).toEqual(["v2"]);
   });
 
   it("never reports an entry as both scheduled and off-programme", () => {
     const entries = [entry({ scheduleSlot: "mmr:1" })];
-    const schedule = buildSchedule(BIRTH, entries, at(20));
+    const schedule = buildSchedule(BIRTH, entries, [], at(20));
     expect(offProgramme(entries, schedule)).toEqual([]);
+  });
+
+  it("marks a dismissed slot dismissed instead of due", () => {
+    const rows = buildSchedule(BIRTH, [], ["mmr:1"], at(20));
+    expect(rows.find((r) => r.slot.key === "mmr:1")!.status).toBe("dismissed");
+    // Its neighbours are untouched.
+    expect(rows.find((r) => r.slot.key === "mmr:2")!.status).toBe("upcoming");
+  });
+
+  it("lets a logged dose beat a dismissal, so no row is in two lists", () => {
+    const rows = buildSchedule(
+      BIRTH,
+      [entry({ scheduleSlot: "mmr:1" })],
+      ["mmr:1"],
+      at(20),
+    );
+    expect(rows.find((r) => r.slot.key === "mmr:1")!.status).toBe("given");
+    expect(rows.filter((r) => r.status === "dismissed")).toEqual([]);
+  });
+
+  it("ignores a dismissal whose slot no longer exists in the programme", () => {
+    const rows = buildSchedule(BIRTH, [], ["something:99"], at(20));
+    expect(rows.filter((r) => r.status === "dismissed")).toEqual([]);
+  });
+});
+
+describe("FHI info links", () => {
+  it("gives every programme slot a source link", () => {
+    for (const slot of vaccineProgramme.slots) {
+      expect(infoUrlForSlot(slot.key), `no FHI link for ${slot.key}`).toMatch(
+        /^https:\/\/www\.fhi\.no\//,
+      );
+    }
+  });
+
+  it("points every vaccine at fhi.no over https", () => {
+    for (const [key, v] of Object.entries(vaccineProgramme.vaccines)) {
+      expect(v.infoUrl, key).toMatch(
+        /^https:\/\/www\.fhi\.no\/va\/vaksiner-barn\//,
+      );
+    }
+  });
+
+  it("resolves a hand-typed vaccine name to the same page", () => {
+    expect(infoUrlForName("MMR")).toBe(infoUrlForSlot("mmr:1"));
+    expect(infoUrlForName("  mmr ")).toBe(infoUrlForSlot("mmr:1"));
+  });
+
+  it("returns null rather than guessing for anything off-programme", () => {
+    expect(infoUrlForName("Yellow fever")).toBeNull();
+    expect(infoUrlForSlot(null)).toBeNull();
+    expect(infoUrlForSlot("nonexistent:1")).toBeNull();
+  });
+
+  it("keeps every slot pointing at a vaccine that exists", () => {
+    for (const slot of vaccineProgramme.slots) {
+      expect(
+        vaccineProgramme.vaccines[slot.vaccine],
+        `slot ${slot.key} references unknown vaccine ${slot.vaccine}`,
+      ).toBeDefined();
+      // The key's prefix is what infoUrlForSlot looks up, so they must agree.
+      expect(slot.key.split(":")[0]).toBe(slot.vaccine);
+    }
   });
 });

@@ -1,5 +1,5 @@
 import { env, SELF } from "cloudflare:test";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { schema } from "../src/worker/db";
 import { familyScope } from "../src/worker/db/scoped";
 import {
@@ -331,5 +331,168 @@ describe("vaccine documents", () => {
       bytes: png(),
     });
     expect(res.status).toBe(404);
+  });
+});
+
+describe("vaccine dismissals", () => {
+  // One sign-in for the whole block: the KV brute-force brake caps sign-ins
+  // per IP, and a file that logs in per test eventually trips it. Each test
+  // gets its own baby instead, which is the isolation that actually matters
+  // here — dismissals are per-baby.
+  let shared: Awaited<ReturnType<typeof rig>>;
+  beforeAll(async () => {
+    shared = await rig("Dismissal family");
+  });
+  const freshBaby = (name: string) => createBaby(shared.family.id, name);
+
+  it("dismisses a slot, lists it, and restores it — all on the free plan", async () => {
+    const { cookie } = shared;
+    const baby = await freshBaby("Dismiss baby");
+
+    const created = await api("/api/vaccines/dismissals", {
+      method: "POST",
+      cookie,
+      body: { babyId: baby.id, slotKey: "hpv:1" },
+    });
+    expect(created.status).toBe(201);
+    const dismissal = (await created.json()) as {
+      id: string;
+      slotKey: string;
+    };
+    expect(dismissal.slotKey).toBe("hpv:1");
+
+    const listed = await api(`/api/vaccines/dismissals?babyId=${baby.id}`, {
+      cookie,
+    });
+    expect((await listed.json()) as unknown[]).toHaveLength(1);
+
+    const restored = await api(`/api/vaccines/dismissals/${dismissal.id}`, {
+      method: "DELETE",
+      cookie,
+    });
+    expect(restored.status).toBe(200);
+    const after = await api(`/api/vaccines/dismissals?babyId=${baby.id}`, {
+      cookie,
+    });
+    expect((await after.json()) as unknown[]).toEqual([]);
+  });
+
+  it("is idempotent — dismissing twice returns the same row", async () => {
+    const { cookie } = shared;
+    const baby = await freshBaby("Idempotent baby");
+    const body = { babyId: baby.id, slotKey: "mmr:1" };
+
+    const first = await api("/api/vaccines/dismissals", {
+      method: "POST",
+      cookie,
+      body,
+    });
+    const second = await api("/api/vaccines/dismissals", {
+      method: "POST",
+      cookie,
+      body,
+    });
+    expect(second.status).toBe(201);
+    expect(((await second.json()) as { id: string }).id).toBe(
+      ((await first.json()) as { id: string }).id,
+    );
+
+    const listed = await api(`/api/vaccines/dismissals?babyId=${baby.id}`, {
+      cookie,
+    });
+    expect((await listed.json()) as unknown[]).toHaveLength(1);
+  });
+
+  it("keeps dismissals per baby, not per family", async () => {
+    const { cookie } = shared;
+    const baby = await freshBaby("Has dismissal");
+    const sibling = await freshBaby("Sibling");
+    await api("/api/vaccines/dismissals", {
+      method: "POST",
+      cookie,
+      body: { babyId: baby.id, slotKey: "mmr:1" },
+    });
+
+    const theirs = await api(`/api/vaccines/dismissals?babyId=${sibling.id}`, {
+      cookie,
+    });
+    expect((await theirs.json()) as unknown[]).toEqual([]);
+  });
+
+  it("does not block logging the vaccine afterwards", async () => {
+    const { cookie } = shared;
+    const baby = await freshBaby("Logs anyway");
+    await api("/api/vaccines/dismissals", {
+      method: "POST",
+      cookie,
+      body: { babyId: baby.id, slotKey: "mmr:1" },
+    });
+
+    const logged = await api("/api/vaccines", {
+      method: "POST",
+      cookie,
+      body: {
+        babyId: baby.id,
+        time: new Date().toISOString(),
+        name: "MMR",
+        doseNumber: 1,
+        scheduleSlot: "mmr:1",
+      },
+    });
+    expect(logged.status).toBe(201);
+  });
+
+  it("404s on an unknown baby", async () => {
+    const { cookie } = shared;
+    const otherFamily = await createFamily("Other dismissal family");
+    const theirBaby = await createBaby(otherFamily.id, "Their baby");
+
+    const foreign = await api("/api/vaccines/dismissals", {
+      method: "POST",
+      cookie,
+      body: { babyId: theirBaby.id, slotKey: "mmr:1" },
+    });
+    expect(foreign.status).toBe(404);
+  });
+
+  it("never lets another family restore our dismissal", async () => {
+    const { cookie } = shared;
+    const baby = await freshBaby("Guarded baby");
+    const ours = await api("/api/vaccines/dismissals", {
+      method: "POST",
+      cookie,
+      body: { babyId: baby.id, slotKey: "mmr:1" },
+    });
+    const { id } = (await ours.json()) as { id: string };
+
+    const outsider = await createUser("Dismissal outsider");
+    const otherFamily = await createFamily("Outsider family");
+    await addMember(outsider.id, otherFamily.id, "admin");
+    const otherCookie = await signIn(outsider.email);
+
+    expect(
+      (
+        await api(`/api/vaccines/dismissals/${id}`, {
+          method: "DELETE",
+          cookie: otherCookie,
+        })
+      ).status,
+    ).toBe(404);
+    // Still ours, i.e. the refusal deleted nothing.
+    const listed = await api(`/api/vaccines/dismissals?babyId=${baby.id}`, {
+      cookie,
+    });
+    expect((await listed.json()) as unknown[]).toHaveLength(1);
+  });
+
+  it("does not mistake the dismissals path for a vaccine id", async () => {
+    const { cookie } = shared;
+    const baby = await freshBaby("Routing baby");
+    // Ordering hazard: /api/vaccines/{id} could swallow "dismissals".
+    const res = await api(`/api/vaccines/dismissals?babyId=${baby.id}`, {
+      cookie,
+    });
+    expect(res.status).toBe(200);
+    expect(Array.isArray(await res.json())).toBe(true);
   });
 });

@@ -36,6 +36,7 @@ import {
   sleepLocation,
   sleepLog,
   user,
+  vaccineDismissal,
   vaccineDocument,
   vaccineLog,
 } from "./schema";
@@ -1182,6 +1183,73 @@ export function familyScope(db: Db, familyId: string) {
         )
         .returning({ objectKey: vaccineDocument.objectKey });
       return rows[0]?.objectKey ?? null;
+    },
+
+    // --- vaccine dismissals: programme slots waved away for one baby ---
+    async listVaccineDismissals(babyId?: string) {
+      return db
+        .select({
+          id: vaccineDismissal.id,
+          babyId: vaccineDismissal.babyId,
+          slotKey: vaccineDismissal.slotKey,
+        })
+        .from(vaccineDismissal)
+        .where(
+          and(
+            eq(vaccineDismissal.familyId, familyId),
+            babyId ? eq(vaccineDismissal.babyId, babyId) : undefined,
+          ),
+        )
+        .orderBy(asc(vaccineDismissal.createdAt));
+    },
+
+    // Idempotent: dismissing twice returns the row that already exists
+    // rather than failing on the unique index.
+    async createVaccineDismissal(data: {
+      babyId: string;
+      slotKey: string;
+      dismissedBy: string;
+    }) {
+      const rows = await db
+        .insert(vaccineDismissal)
+        .values({ ...data, familyId })
+        .onConflictDoNothing({
+          target: [vaccineDismissal.babyId, vaccineDismissal.slotKey],
+        })
+        .returning({
+          id: vaccineDismissal.id,
+          babyId: vaccineDismissal.babyId,
+          slotKey: vaccineDismissal.slotKey,
+        });
+      if (rows[0]) return rows[0];
+      const existing = await db
+        .select({
+          id: vaccineDismissal.id,
+          babyId: vaccineDismissal.babyId,
+          slotKey: vaccineDismissal.slotKey,
+        })
+        .from(vaccineDismissal)
+        .where(
+          and(
+            eq(vaccineDismissal.familyId, familyId),
+            eq(vaccineDismissal.babyId, data.babyId),
+            eq(vaccineDismissal.slotKey, data.slotKey),
+          ),
+        );
+      return existing[0] ?? null;
+    },
+
+    async deleteVaccineDismissal(id: string) {
+      const rows = await db
+        .delete(vaccineDismissal)
+        .where(
+          and(
+            eq(vaccineDismissal.id, id),
+            eq(vaccineDismissal.familyId, familyId),
+          ),
+        )
+        .returning({ id: vaccineDismissal.id });
+      return rows.length > 0;
     },
 
     // --- play (premium): timed activities, same session shape as sleep ---

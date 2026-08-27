@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { VaccineLog } from "@shared/schemas";
+import type { VaccineDismissal, VaccineLog } from "@shared/schemas";
 import { API_BASE, api, unwrap } from "../api";
 import { invalidateLogs } from "./keys";
 
@@ -61,6 +61,37 @@ export function useDeleteVaccine() {
   return useMutation({
     mutationFn: async (id: string) =>
       unwrap(await api.vaccines[":id"].$delete({ param: { id } })),
+    onSuccess: () => invalidateLogs(qc),
+  });
+}
+
+export function useVaccineDismissals(babyId: string | undefined) {
+  return useQuery({
+    queryKey: ["vaccine-dismissals", babyId],
+    enabled: !!babyId,
+    queryFn: async () =>
+      unwrap<VaccineDismissal[]>(
+        await api.vaccines.dismissals.$get({ query: { babyId: babyId! } }),
+      ),
+  });
+}
+
+export function useDismissVaccineSlot() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: { babyId: string; slotKey: string }) =>
+      unwrap<VaccineDismissal>(
+        await api.vaccines.dismissals.$post({ json: vars }),
+      ),
+    onSuccess: () => invalidateLogs(qc),
+  });
+}
+
+export function useRestoreVaccineSlot() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await api.vaccines.dismissals[":id"].$delete({ param: { id } })),
     onSuccess: () => invalidateLogs(qc),
   });
 }

@@ -215,6 +215,7 @@ const BACKUP_TABLES = [
   "play_log",
   "vaccine_log",
   "vaccine_document",
+  "vaccine_dismissal",
   "family_invite",
   "sleep_location",
   "contact",
