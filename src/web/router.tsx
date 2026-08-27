@@ -102,6 +102,27 @@ const welcomeRoute = createRoute({
   component: WelcomeScreen,
 });
 
+// Public and lazy: readable without an account (a prospective member, or a
+// supervisory authority, must be able to reach them), and never part of the
+// app-shell bundle.
+const privacyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/privacy",
+  component: lazyRouteComponent(
+    () => import("@/screens/legal/privacy"),
+    "PrivacyScreen",
+  ),
+});
+
+const termsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/terms",
+  component: lazyRouteComponent(
+    () => import("@/screens/legal/terms"),
+    "TermsScreen",
+  ),
+});
+
 // Operator console — its own layout with a bottom tab bar per concern.
 // Lazy chunks; role-guarded in the shell.
 const adminRoute = createRoute({
@@ -161,6 +182,8 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   joinRoute,
   welcomeRoute,
+  privacyRoute,
+  termsRoute,
   adminRoute.addChildren([
     adminOverviewRoute,
     adminFamiliesRoute,

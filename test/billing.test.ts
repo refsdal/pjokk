@@ -19,16 +19,19 @@ import { schema } from "../src/worker/db";
 
 describe("canUse", () => {
   it("denies premium features on free, allows on every paid plan", () => {
-    for (const feature of [
-      "growthCharts",
-      "apiKeys",
-      "csvExport",
-      "statsMonth",
-    ] as const) {
+    for (const feature of ["growthCharts", "apiKeys", "statsMonth"] as const) {
       expect(canUse({ plan: "free" }, feature)).toBe(false);
       expect(canUse({ plan: "premium" }, feature)).toBe(true);
       expect(canUse({ plan: "lifetime" }, feature)).toBe(true);
       expect(canUse({ plan: "comp" }, feature)).toBe(true);
+    }
+  });
+
+  it("keeps the CSV export free on every plan", () => {
+    // GDPR access/portability: a family's own data is never behind the
+    // paywall, whatever the plan says.
+    for (const plan of ["free", "premium", "lifetime", "comp"]) {
+      expect(canUse({ plan }, "csvExport")).toBe(true);
     }
   });
 });
@@ -175,9 +178,11 @@ describe("premium gates", () => {
     expect(ok.status).toBe(201);
   });
 
-  it("GET /api/export.csv is 402 on free, 200 on comp", async () => {
+  it("GET /api/export.csv is 200 on every plan, free included", async () => {
+    // Not a premium gate: the export is how a family exercises their GDPR
+    // right of access and portability, which cannot be charged for.
     const { family, cookie } = await rig();
-    expect((await api("/api/export.csv", { cookie })).status).toBe(402);
+    expect((await api("/api/export.csv", { cookie })).status).toBe(200);
     await setPlan(family.id, "comp");
     expect((await api("/api/export.csv", { cookie })).status).toBe(200);
   });

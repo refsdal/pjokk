@@ -11,8 +11,8 @@
 //        --default-caretaker user_anders
 //
 // 3) Apply (test locally first, then remote):
-//      wrangler d1 execute pjokk --local  --file .import.sql
-//      wrangler d1 execute pjokk --remote --file .import.sql
+//      wrangler d1 execute pjokk-eu --local  --file .import.sql
+//      wrangler d1 execute pjokk-eu --remote --file .import.sql
 //
 // Idempotent: rows get deterministic ids (st-<sproutId>) and INSERT OR
 // IGNORE, so re-running never duplicates. Soft-deleted sprout rows are

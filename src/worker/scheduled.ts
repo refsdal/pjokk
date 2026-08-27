@@ -48,7 +48,9 @@ export async function purgeOrphanUsers(env: Env, now = Date.now()) {
     try {
       await db.delete(schema.user).where(eq(schema.user.id, orphan.id));
       purged++;
-      console.log(`purge: removed orphan account ${orphan.email}`);
+      // Id, never the email: Workers logs are outside our retention control,
+      // and an address there is personal data we cannot later erase.
+      console.log(`purge: removed orphan account ${orphan.id}`);
     } catch {
       // FK references (historical data) — leave it alone.
     }
@@ -285,4 +287,36 @@ export async function runBackup(env: Env, now = new Date()) {
     { httpMetadata: { contentType: "application/json" } },
   );
   return key;
+}
+
+// Backups hold every table, health data included, so keeping them forever
+// would both breach storage limitation and quietly defeat erasure: a
+// deleted family would live on in every older snapshot. Thirty days is the
+// window the privacy policy commits to for a deletion to fully take effect.
+export const BACKUP_RETENTION_DAYS = 30;
+
+/** Deletes backup snapshots older than the retention window. Returns the
+ *  keys removed, so the cron can log a count. */
+export async function pruneBackups(env: Env, now = new Date()) {
+  const cutoff = new Date(
+    now.getTime() - BACKUP_RETENTION_DAYS * 24 * 3600_000,
+  );
+  const removed: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await env.FILES.list({ prefix: "backups/", cursor });
+    const stale = page.objects.filter((o) => {
+      // Prefer the date in the key (stable, and what names the snapshot);
+      // fall back to R2's upload time for anything unexpected.
+      const match = /^backups\/(\d{4}-\d{2}-\d{2})\.json$/.exec(o.key);
+      const stamp = match ? new Date(`${match[1]}T00:00:00Z`) : o.uploaded;
+      return stamp.getTime() < cutoff.getTime();
+    });
+    if (stale.length > 0) {
+      await env.FILES.delete(stale.map((o) => o.key));
+      removed.push(...stale.map((o) => o.key));
+    }
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  return removed;
 }

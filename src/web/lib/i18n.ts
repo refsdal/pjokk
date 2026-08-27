@@ -129,6 +129,15 @@ const nb: Record<string, string> = {
   "Schedule follows": "Planen følger",
   "Check with your helsestasjon.": "Sjekk med helsestasjonen din.",
   Back: "Tilbake",
+
+  // Legal
+  About: "Om",
+  Terms: "Vilkår",
+  "Privacy policy": "Personvernerklæring",
+  "By joining you accept our": "Ved å bli med godtar du våre",
+  and: "og",
+  ", including that Pjokk stores health information about your child.":
+    ", inkludert at Pjokk lagrer helseopplysninger om barnet ditt.",
   Dismiss: "Skjul",
   Dismissed: "Skjulte",
   Restore: "Vis igjen",
@@ -485,6 +494,13 @@ let active: Record<string, string> | null =
 
 export function getLanguageMode(): LanguageMode {
   return readMode();
+}
+
+/** The language actually in effect, with "auto" already resolved against the
+ *  device. Long-form pages (the legal ones) pick a whole body with this
+ *  rather than going through the t() dictionary. */
+export function getLanguage(): "en" | "nb" {
+  return resolve(readMode());
 }
 
 export function setLanguageMode(mode: LanguageMode): void {

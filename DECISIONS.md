@@ -382,8 +382,9 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   wrangler-config read, so the missing dist/ dir can't break tests).
 - **Test environment = a Wrangler environment, not a separate repo/config**
   (`env.test` in wrangler.jsonc → worker `pjokk-test` at app-test.pjokk.no).
-  An environment IS a standalone worker at runtime — own D1 (`pjokk-test`),
-  KV, R2 (`pjokk-test-files`), secrets, crons, custom domain — but managed
+  An environment IS a standalone worker at runtime — own D1
+  (`pjokk-test-eu`), KV, R2 (`pjokk-test-files-eu`), secrets, crons, custom
+  domain — but managed
   from the one config file so code and infra can't drift. Rejected: a
   duplicated wrangler config (drift risk) and git-integration preview URLs
   (no clean stateful isolation; auth redirect URIs and Stripe webhooks need
@@ -531,3 +532,82 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   collides on the file number. Write the SQL by hand and match the existing
   style; `wrangler d1 migrations apply` orders by filename and ignores
   drizzle's journal entirely.
+
+## GDPR hardening (2026-08-27)
+
+The app stores Article 9 special-category health data — vaccines, medicine,
+measurements, and arguably an infant's whole feed/sleep record. That has
+been true since Phase 3; the vaccine feature only made it obvious.
+
+- **CSV export is free on every plan.** `csvExport` stays in the Feature
+  union with `requiresPremium: false` rather than being deleted, so the
+  decision reads as deliberate. Access (Art. 15) and portability (Art. 20)
+  must be provided free of charge; paywalling a family's own data is not
+  defensible. Stats beyond 7 days remain premium — that is analysis we
+  built, not the underlying data, and the export returns everything.
+- **Backups expire after 30 days** (`BACKUP_RETENTION_DAYS`), pruned by the
+  nightly cron. Unbounded snapshots both breached storage limitation and
+  quietly defeated erasure: a deleted family lived on in every older
+  snapshot. 30 days is what the privacy policy commits to as the window for
+  a deletion to fully take effect, so the number and the promise must move
+  together.
+- **Vaccine document uploads are OFF** (`DOCUMENT_UPLOADS_ENABLED = false`).
+  Parents photograph the helsestasjon card, which can carry a
+  fødselsnummer — Norwegian law treats that specially, and it is not worth
+  taking on before the privacy work around it is reviewed. Reading and
+  deleting stay open so anything already stored can still be retrieved and
+  erased; disabling a feature must never strand data. The tables, routes
+  and tests remain so re-enabling is one constant.
+- **Logs carry ids, never emails.** Workers logs sit outside our retention
+  control, so an address written there is personal data we cannot later
+  erase.
+- **/privacy and /terms are public routes**, readable without an account: a
+  prospective member deciding whether to accept an invite, and a supervisory
+  authority, both need them. Linked from Settings, the login screen, and —
+  most importantly — the invite screen, which is the actual moment of
+  consent. Written as prose rather than through `t()`: a policy split across
+  hundreds of dictionary keys would rot. Each page therefore carries a whole
+  English body and a whole Norwegian one and picks between them, seeded from
+  the app language but switchable on the page itself — these pages are
+  public, so a reader may never have set a preference, and a Norwegian
+  reader landing on English must be able to flip. `screens/legal/` splits
+  layout from the two documents so no single file carries four bodies.
+  The Norwegian is a translation of the English, not an independent text;
+  both were drafted by an AI and want review by someone qualified.
+
+## EU jurisdiction (2026-08-27)
+
+- `wrangler d1 info pjokk` showed `running_in_region: EEUR` but
+  `jurisdiction: null`. Those are different claims: the region is where the
+  database happened to be placed, the jurisdiction is the only enforceable
+  guarantee. A privacy policy saying "stored within the European Union"
+  cannot rest on a location hint.
+- Jurisdiction is settable **only at creation** — there is no `d1 update`,
+  and the D1 subcommands are create/info/list/delete/execute/export/
+  time-travel/migrations/insights. So the resources were recreated:
+  `pjokk-eu`, `pjokk-test-eu` (D1, `--jurisdiction eu`) and
+  `pjokk-files-eu`, `pjokk-test-files-eu` (R2, `-J eu`), all verified.
+- Recreated rather than migrated: nothing is in production yet, so the old
+  430 kB carried no value worth a data migration. The old `pjokk`,
+  `pjokk-test`, `pjokk-files` and `pjokk-test-files` have since been deleted,
+  so the account now holds EU-jurisdiction resources only — `r2 bucket list`
+  without `-J eu` returns nothing at all. No local dump was taken on the way
+  out: keeping an unencrypted copy of children's health data on a laptop
+  would contradict the point of the exercise.
+- Two wrangler traps met while doing it: `r2 object delete` operates on the
+  LOCAL simulator unless given `--remote` (and prints "Delete complete"
+  either way, including for keys that do not exist), and `r2 bucket info`
+  object counts lag well behind reality — a bucket that still reported 3
+  objects deleted cleanly as empty. Trust the delete, not the counter.
+- R2 jurisdictions are separate namespaces: `wrangler r2 bucket list` does
+  not show an EU bucket without `-J eu`, and the binding in wrangler.jsonc
+  needs `"jurisdiction": "eu"` or the Worker looks in the wrong namespace.
+- **KV cannot be pinned** — no jurisdiction flag exists, because KV is
+  globally replicated by design. Recreating it would have achieved nothing.
+  Instead the rate limiter now hashes the client IP (SHA-256, truncated)
+  before using it as a key, so KV holds a pseudonymous bucket id rather than
+  an address. Same brake, no personal data in a global store.
+- Consequence of recreating: the new databases are EMPTY. Migrations apply on
+  the next deploy (the workflow runs them first), but the founder account and
+  every existing family are gone — the first account must be created again
+  through the OPEN_SIGNUP=1 path documented in SMOKE-TEST.md.

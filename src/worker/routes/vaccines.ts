@@ -219,8 +219,22 @@ export const vaccinesApp = createApp<FamEnv>()
 // route tree (zod-openapi models JSON bodies; these are file transfers) but
 // still behind the same family-scoped middleware. ---
 
+// Uploads are OFF. A photographed helsestasjon card can carry a
+// fødselsnummer, and Norwegian law treats that specially — we are not
+// taking that on until the privacy work around it is finished and reviewed.
+// Reading and deleting stay open on purpose so anything already stored can
+// still be retrieved and erased. Flip this back on deliberately, not by
+// accident: see DECISIONS.md.
+const DOCUMENT_UPLOADS_ENABLED = false;
+
 export const filesApp = createApp<FamEnv>()
   .post("/api/vaccines/:id/documents", async (c) => {
+    if (!DOCUMENT_UPLOADS_ENABLED) {
+      return c.json(
+        { error: "Attachments are disabled", code: "FEATURE_DISABLED" },
+        403,
+      );
+    }
     if (!canUse({ plan: c.var.plan }, "vaccineDocuments")) {
       return c.json({ error: "Premium required", code: "PLAN_REQUIRED" }, 402);
     }

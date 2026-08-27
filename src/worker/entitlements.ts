@@ -15,7 +15,11 @@ export type Feature =
 const requiresPremium: Record<Feature, boolean> = {
   growthCharts: true,
   apiKeys: true,
-  csvExport: true,
+  // Free, deliberately: the export is how a family exercises their GDPR
+  // right of access and portability, and that cannot be charged for.
+  // Keeping the key (rather than deleting the gate) so the decision is
+  // visible here rather than looking like an oversight.
+  csvExport: false,
   statsMonth: true,
   otherActivities: true,
   multipleBabies: true,
