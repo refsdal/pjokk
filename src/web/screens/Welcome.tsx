@@ -92,7 +92,7 @@ export function WelcomeScreen() {
       {hasFamily && showPlan ? (
         <PlanStep
           familyId={session?.session.activeOrganizationId ?? ""}
-          onFree={() => void navigate({ to: "/" })}
+          onFree={() => void navigate({ to: "/home" })}
         />
       ) : !hasFamily ? (
         <form

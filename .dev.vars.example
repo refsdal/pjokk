@@ -1,4 +1,8 @@
-# Copy to .dev.vars for local dev. In production set these with:
+# Copy to .dev.vars for local dev. Keep EVERY key below present even if the
+# value is blank: `wrangler types` derives the Env interface partly from this
+# file, so a missing key silently drops it from Env and `pnpm check` fails.
+#
+# In production set these with:
 #   wrangler secret put BETTER_AUTH_SECRET   (generate: openssl rand -base64 32)
 #   wrangler secret put GOOGLE_CLIENT_ID
 #   wrangler secret put GOOGLE_CLIENT_SECRET

@@ -12,7 +12,8 @@ self.addEventListener("push", (event) => {
       body: data.body || "",
       icon: "/icon.svg",
       badge: "/icon.svg",
-      data: { url: data.url || "/" },
+      // "/" is the public landing page — a notification must open the app.
+      data: { url: data.url || "/home" },
     }),
   );
 });
@@ -26,7 +27,9 @@ self.addEventListener("notificationclick", (event) => {
         for (const client of windows) {
           if ("focus" in client) return client.focus();
         }
-        return self.clients.openWindow(event.notification.data?.url || "/");
+        return self.clients.openWindow(
+          event.notification.data?.url || "/home",
+        );
       }),
   );
 });

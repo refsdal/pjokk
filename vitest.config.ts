@@ -31,6 +31,10 @@ export default defineConfig(async () => {
             TEST_MIGRATIONS: migrations,
             BETTER_AUTH_SECRET: "test-secret-please-ignore",
             APP_URL: "http://localhost",
+            // Landing-page switches. Declared here (rather than left
+            // undefined) so test/landing.test.ts can flip them and restore.
+            OPEN_SIGNUP: "0",
+            INDEXABLE: "0",
             GOOGLE_CLIENT_ID: "test",
             GOOGLE_CLIENT_SECRET: "test",
             VAPID_PUBLIC_KEY: vapid.publicKey,

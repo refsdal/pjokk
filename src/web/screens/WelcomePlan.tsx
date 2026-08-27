@@ -108,7 +108,8 @@ export function PlanStep({
         referenceId: familyId,
         customerType: "organization",
         successUrl: "/settings?billing=success",
-        cancelUrl: "/",
+        // Abandoning checkout lands in the app, not on the marketing page.
+        cancelUrl: "/home",
       });
       if (error) {
         throw new Error(error.message ?? t("Something went wrong"));

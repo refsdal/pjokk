@@ -111,7 +111,7 @@ function UserSheet({
                     await authClient.admin.impersonateUser({
                       userId: user.id,
                     });
-                    window.location.assign("/");
+                    window.location.assign("/home");
                   })
                 }
               >

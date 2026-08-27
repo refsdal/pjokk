@@ -195,7 +195,7 @@ export const pushApp = createApp<FamEnv>()
     const sent = await pushToUser(c.var.db, c.env, c.var.sessionData.user.id, {
       title: "Pjokk",
       body: "Push works on this device ✅",
-      url: "/",
+      url: "/home",
     });
     return c.json({ sent }, 200);
   });

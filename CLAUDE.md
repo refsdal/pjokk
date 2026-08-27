@@ -3,8 +3,10 @@
 Pjokk ("en liten pjokk" — a little tyke) is a self-hosted baby tracker for families,
 running entirely on Cloudflare Workers. It is a from-scratch replacement for
 sprout-track (https://github.com/Oak-and-Sprout/sprout-track), built mobile-first
-as a PWA. Domain: the app lives at **app.pjokk.no** (live); the pjokk.no apex
-is reserved for a separate landing page that only links to the app.
+as a PWA. Domain: everything lives on the apex, **pjokk.no** (live) — `/` is a
+public landing page rendered by the Worker itself, `/home` is the signed-in
+app. Test environment: **test.pjokk.no**. The old `app.pjokk.no` /
+`app-test.pjokk.no` hostnames are retired.
 
 ## Product principles (read before writing any UI)
 
@@ -85,7 +87,7 @@ is reserved for a separate landing page that only links to the app.
   grain for QR-at-Sunday-dinner). Table:
   `family_invite(code, familyId, role, expiresAt, maxUses, usedCount)`.
   Defaults: 72 h expiry, revocable, role baked into the code. Redeem endpoint is
-  rate-limited (codes are credentials). Flow: open `https://app.pjokk.no/join/CODE`
+  rate-limited (codes are credentials). Flow: open `https://pjokk.no/join/CODE`
   (also rendered as QR) → social sign-in → validate code → addMember → land on
   family home.
 - **Cloudflare Workers gotcha:** D1 bindings only exist inside the request
@@ -192,9 +194,8 @@ sheet pattern — build the pattern well once.
 
 ## Phased roadmap
 
-> **Status (2026-08-24): Phases 1–4 SHIPPED** to https://app.pjokk.no
-> (custom domain; workers.dev fallback stays enabled; Refsdal Holding AS
-> account). Phase 2 delivered the day-grouped timeline (merged
+> **Status (2026-08-24): Phases 1–4 SHIPPED** to https://pjokk.no
+> (custom domain; workers.dev is off; Refsdal Holding AS account). Phase 2 delivered the day-grouped timeline (merged
 > `/api/timeline` endpoint with before-cursor pagination), edit/delete
 > through the same log sheets (incl. the notes field), filter chips, day
 > summaries, and dark mode (system/light/dark — night mode still overrides).
@@ -265,6 +266,19 @@ sheet pattern — build the pattern well once.
 > attachment-only). The sprout-track importer gained mappings for all
 > three and stopped silently dropping TBSP amounts, DRY diapers, sleep
 > type/quality, diaper detail, feed reaction fields and calendar events.
+> **Landing page + apex move (2026-08-27):** the app moved to the apex
+> (`pjokk.no`, test `test.pjokk.no`; the `app.` hostnames are retired,
+> workers.dev off, `trustedOrigins` down to one) and the signed-in home
+> screen moved from `/` to `/home`. `/` is now a public landing page
+> rendered BY THE WORKER — one self-contained document, inline CSS, zero
+> JavaScript, no app bundle — which required adding `"/"` to the assets
+> `run_worker_first` list. Language is negotiated server-side (`?lang=` →
+> `pjokk_lang` cookie → `Accept-Language`), and the call to action is
+> derived from a session-cookie presence check plus `OPEN_SIGNUP`, so
+> opening signup is an env flip rather than a code change. The mock-up in
+> the hero is a CSS animation, deliberately conceptual rather than the real
+> components. A new `INDEXABLE` var gates `robots.txt`, `sitemap.xml` and
+> the noindex headers so only production is crawlable.
 
 1. **Core loop:** schema, auth (social + orgs + invite codes), tenancy
    middleware, home screen with status cards + Feed/Diaper/Sleep sheets,

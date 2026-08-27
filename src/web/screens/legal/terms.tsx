@@ -20,9 +20,9 @@ function En() {
   return (
     <>
       <p>
-        These terms cover your use of Pjokk at app.pjokk.no, operated by{" "}
-        {COMPANY} (org. nr. {ORG_NR}), {ADDRESS_EN}. By creating an account you
-        accept them.
+        These terms cover your use of Pjokk at pjokk.no, operated by {COMPANY}{" "}
+        (org. nr. {ORG_NR}), {ADDRESS_EN}. By creating an account you accept
+        them.
       </p>
 
       <H>What Pjokk is</H>
@@ -126,7 +126,7 @@ function Nb() {
   return (
     <>
       <p>
-        Disse vilkårene gjelder din bruk av Pjokk på app.pjokk.no, drevet av{" "}
+        Disse vilkårene gjelder din bruk av Pjokk på pjokk.no, drevet av{" "}
         {COMPANY} (org.nr. {ORG_NR}), {ADDRESS_NB}. Ved å opprette en konto
         godtar du dem.
       </p>

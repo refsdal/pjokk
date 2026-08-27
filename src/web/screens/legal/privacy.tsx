@@ -29,7 +29,7 @@ function En() {
       <H>Who is responsible</H>
       <p>
         {COMPANY} is the data controller for the information you put into Pjokk
-        at app.pjokk.no.
+        at pjokk.no.
       </p>
       <ControllerCard lang="en" />
 
@@ -210,7 +210,7 @@ function Nb() {
       <H>Hvem er ansvarlig</H>
       <p>
         {COMPANY} er behandlingsansvarlig for opplysningene du legger inn i
-        Pjokk på app.pjokk.no.
+        Pjokk på pjokk.no.
       </p>
       <ControllerCard lang="nb" />
 

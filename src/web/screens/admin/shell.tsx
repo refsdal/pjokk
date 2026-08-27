@@ -24,7 +24,7 @@ export function AdminShell() {
   const { data: session, isPending } = useSession();
   if (isPending) return <div className="min-h-dvh" />;
   if (!session) return <Navigate to="/login" />;
-  if (!isSysadmin(session)) return <Navigate to="/" />;
+  if (!isSysadmin(session)) return <Navigate to="/home" />;
 
   return (
     <div className="min-h-dvh">
