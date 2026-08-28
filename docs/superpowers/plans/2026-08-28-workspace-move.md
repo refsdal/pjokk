@@ -809,12 +809,27 @@ try {
       "scripts/**",
       "*.ts",
       "!apps/frontend/src/data",
+      "!apps/api/migrations/meta",
       "!scripts/import-sprout-track.mjs"
     ]
 ```
 
 The `worker-configuration.d.ts` exclusion goes — that file is gone with
 Cloudflare.
+
+`!apps/api/migrations/meta` is **required**, not optional. Broadening the
+include from `src/**` to `apps/**` pulls drizzle-kit's generated snapshot and
+journal into lint scope for the first time. Formatting them is actively wrong:
+drizzle-kit owns those files and writes `_journal.json` with no trailing
+newline, so biome's reformat is reverted by the next `drizzle-kit generate` and
+`bun run check` starts failing in CI on an unrelated change. This follows the
+existing `!apps/frontend/src/data` precedent for bundled data that no human
+edits.
+
+Broadening the include also reaches `apps/frontend/public/` for the first time.
+Formatting `push-sw.js` and adding the `<title>` element biome's a11y rule
+requires to the two PWA icon SVGs is correct and in scope — those are hand-
+written source, unlike the generated migration metadata.
 
 - [ ] **Step 3: Update the `check` script**
 
