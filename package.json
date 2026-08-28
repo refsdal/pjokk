@@ -15,7 +15,8 @@
     "db:migrate": "drizzle-kit migrate",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "migrate": "bun src/server/migrate.ts"
+    "migrate": "bun src/server/migrate.ts",
+    "seed": "bun scripts/seed.mjs"
   },
   "dependencies": {
     "@better-auth/passkey": "1.7.1",

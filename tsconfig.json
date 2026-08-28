@@ -36,7 +36,6 @@
     "src/web",
     "src/shared",
     "src/server",
-    "worker-configuration.d.ts",
     "vite.config.ts",
     "drizzle.config.ts"
   ]

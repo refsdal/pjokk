@@ -2,18 +2,21 @@
 // Anders (admin) + Kristine (member), and a realistic day of logs so the
 // home screen and prefills demo well.
 //
-//   node scripts/seed.mjs          # writes .seed.sql
-//   pnpm seed:local                # generates + applies to the local D1
+//   bun run seed                   # applies straight to DATABASE_URL
 //
 // Sign in locally with anders@pjokk.local / pjokk-dev (or kristine@...).
-import { writeFileSync } from "node:fs";
+import { SQL } from "bun";
 import { hashPassword } from "better-auth/crypto";
 
 const PASSWORD = "pjokk-dev";
 const now = Date.now();
 const H = 3600_000;
-const ms = (hoursAgo) => Math.round(now - hoursAgo * H);
 const esc = (s) => `'${String(s).replaceAll("'", "''")}'`;
+// Timestamps are timestamptz now, not epoch-ms integers: emit ISO literals,
+// which Postgres parses directly.
+const at = (msValue) => `'${new Date(msValue).toISOString()}'`;
+const ms = (hoursAgo) => at(Math.round(now - hoursAgo * H));
+const NOW = at(now);
 let n = 0;
 const id = (p) => `${p}_seed_${(n++).toString(36).padStart(3, "0")}`;
 
@@ -24,14 +27,26 @@ const NORA = "baby_nora";
 const EMIL = "baby_emil";
 const hash = await hashPassword(PASSWORD);
 
-const rows = [
-  // Safety interlock (issue #3): this table only exists in the LOCAL dev
-  // database (created by the seed:local npm script). On any other target the
-  // first statement errors and wrangler aborts the whole file before any
-  // destructive DELETE runs.
-  "DELETE FROM _local_dev_only;",
-];
-const del = (table) => rows.push(`DELETE FROM ${table};`);
+const DATABASE_URL =
+  process.env.DATABASE_URL ?? "postgres://pjokk:pjokk@127.0.0.1:5432/pjokk";
+
+// Safety interlock. This script DELETEs every table before inserting, so
+// pointing it at the wrong database destroys it. The old guard was a table
+// that only existed locally; the equivalent here is refusing anything that
+// is not plainly a local database, with --force as the deliberate override.
+const host = new URL(DATABASE_URL).hostname;
+const isLocal = host === "localhost" || host === "127.0.0.1" || host === "db";
+if (!isLocal && !process.argv.includes("--force")) {
+  console.error(
+    `refusing to seed a non-local database (${host}).\n` +
+      "This DELETEs every table. Pass --force if you really mean it.",
+  );
+  process.exit(1);
+}
+
+const rows = [];
+// "user" is a reserved word in Postgres, so every identifier is quoted.
+const del = (table) => rows.push(`DELETE FROM "${table}";`);
 // Idempotent re-seed: wipe domain + auth data (dev database only!).
 for (const table of [
   "sleep_log",
@@ -62,8 +77,8 @@ for (const table of [
 
 const user = (uid, name, email, role = null) => {
   rows.push(
-    `INSERT INTO user (id, name, email, email_verified, role, created_at, updated_at) VALUES (${esc(uid)}, ${esc(name)}, ${esc(email)}, 1, ${role ? esc(role) : "NULL"}, ${now}, ${now});`,
-    `INSERT INTO account (id, issuer, account_id, provider_id, user_id, password, created_at, updated_at) VALUES (${esc(id("acc"))}, 'local:credential', ${esc(uid)}, 'credential', ${esc(uid)}, ${esc(hash)}, ${now}, ${now});`,
+    `INSERT INTO "user" (id, name, email, email_verified, role, created_at, updated_at) VALUES (${esc(uid)}, ${esc(name)}, ${esc(email)}, true, ${role ? esc(role) : "NULL"}, ${NOW}, ${NOW});`,
+    `INSERT INTO account (id, issuer, account_id, provider_id, user_id, password, created_at, updated_at) VALUES (${esc(id("acc"))}, 'local:credential', ${esc(uid)}, 'credential', ${esc(uid)}, ${esc(hash)}, ${NOW}, ${NOW});`,
   );
 };
 
@@ -72,32 +87,32 @@ user(ANDERS, "Anders", "anders@pjokk.local", "admin");
 user(KRISTINE, "Kristine", "kristine@pjokk.local");
 
 rows.push(
-  `INSERT INTO organization (id, name, slug, created_at, plan) VALUES (${esc(FAM)}, 'Pjokk test', 'pjokk-test', ${now}, 'free');`,
-  `INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (${esc(id("mem"))}, ${esc(FAM)}, ${esc(ANDERS)}, 'admin', ${now});`,
-  `INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (${esc(id("mem"))}, ${esc(FAM)}, ${esc(KRISTINE)}, 'member', ${now});`,
+  `INSERT INTO organization (id, name, slug, created_at, plan) VALUES (${esc(FAM)}, 'Pjokk test', 'pjokk-test', ${NOW}, 'free');`,
+  `INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (${esc(id("mem"))}, ${esc(FAM)}, ${esc(ANDERS)}, 'admin', ${NOW});`,
+  `INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (${esc(id("mem"))}, ${esc(FAM)}, ${esc(KRISTINE)}, 'member', ${NOW});`,
 );
 
 // Nora (~10 months) and big brother Emil (~2.5 years).
 const birth = now - Math.round(10 * 30.4 * 24) * H;
 const emilBirth = now - Math.round(30 * 30.4 * 24) * H;
 rows.push(
-  `INSERT INTO baby (id, family_id, name, birth_date, sex, created_at) VALUES (${esc(NORA)}, ${esc(FAM)}, 'Nora', ${birth}, 'girl', ${now});`,
-  `INSERT INTO baby (id, family_id, name, birth_date, sex, created_at) VALUES (${esc(EMIL)}, ${esc(FAM)}, 'Emil', ${emilBirth}, 'boy', ${now + 1});`,
-  `INSERT INTO feed_log (id, family_id, baby_id, caretaker_id, time, type, amount_ml, created_at) VALUES (${esc(id("feed"))}, ${esc(FAM)}, ${esc(EMIL)}, ${esc(KRISTINE)}, ${ms(3)}, 'solids', 250, ${now});`,
-  `INSERT INTO sleep_log (id, family_id, baby_id, caretaker_id, start_time, end_time, location, created_at) VALUES (${esc(id("slp"))}, ${esc(FAM)}, ${esc(EMIL)}, ${esc(ANDERS)}, ${ms(6)}, ${ms(4.5)}, 'crib', ${now});`,
+  `INSERT INTO baby (id, family_id, name, birth_date, sex, created_at) VALUES (${esc(NORA)}, ${esc(FAM)}, 'Nora', ${at(birth)}, 'girl', ${NOW});`,
+  `INSERT INTO baby (id, family_id, name, birth_date, sex, created_at) VALUES (${esc(EMIL)}, ${esc(FAM)}, 'Emil', ${at(emilBirth)}, 'boy', ${at(now + 1)});`,
+  `INSERT INTO feed_log (id, family_id, baby_id, caretaker_id, time, type, amount_ml, created_at) VALUES (${esc(id("feed"))}, ${esc(FAM)}, ${esc(EMIL)}, ${esc(KRISTINE)}, ${ms(3)}, 'solids', 250, ${NOW});`,
+  `INSERT INTO sleep_log (id, family_id, baby_id, caretaker_id, start_time, end_time, location, created_at) VALUES (${esc(id("slp"))}, ${esc(FAM)}, ${esc(EMIL)}, ${esc(ANDERS)}, ${ms(6)}, ${ms(4.5)}, 'crib', ${NOW});`,
 );
 
 const feed = (hoursAgo, by, type, extra) =>
   rows.push(
-    `INSERT INTO feed_log (id, family_id, baby_id, caretaker_id, time, type, amount_ml, side, duration_min, created_at) VALUES (${esc(id("feed"))}, ${esc(FAM)}, ${esc(NORA)}, ${esc(by)}, ${ms(hoursAgo)}, ${esc(type)}, ${extra.amountMl ?? "NULL"}, ${extra.side ? esc(extra.side) : "NULL"}, ${extra.durationMin ?? "NULL"}, ${now});`,
+    `INSERT INTO feed_log (id, family_id, baby_id, caretaker_id, time, type, amount_ml, side, duration_min, created_at) VALUES (${esc(id("feed"))}, ${esc(FAM)}, ${esc(NORA)}, ${esc(by)}, ${ms(hoursAgo)}, ${esc(type)}, ${extra.amountMl ?? "NULL"}, ${extra.side ? esc(extra.side) : "NULL"}, ${extra.durationMin ?? "NULL"}, ${NOW});`,
   );
 const diaper = (hoursAgo, by, type) =>
   rows.push(
-    `INSERT INTO diaper_log (id, family_id, baby_id, caretaker_id, time, type, created_at) VALUES (${esc(id("dia"))}, ${esc(FAM)}, ${esc(NORA)}, ${esc(by)}, ${ms(hoursAgo)}, ${esc(type)}, ${now});`,
+    `INSERT INTO diaper_log (id, family_id, baby_id, caretaker_id, time, type, created_at) VALUES (${esc(id("dia"))}, ${esc(FAM)}, ${esc(NORA)}, ${esc(by)}, ${ms(hoursAgo)}, ${esc(type)}, ${NOW});`,
   );
 const sleep = (startHoursAgo, endHoursAgo, by, location) =>
   rows.push(
-    `INSERT INTO sleep_log (id, family_id, baby_id, caretaker_id, start_time, end_time, location, created_at) VALUES (${esc(id("slp"))}, ${esc(FAM)}, ${esc(NORA)}, ${esc(by)}, ${ms(startHoursAgo)}, ${endHoursAgo === null ? "NULL" : ms(endHoursAgo)}, ${location ? esc(location) : "NULL"}, ${now});`,
+    `INSERT INTO sleep_log (id, family_id, baby_id, caretaker_id, start_time, end_time, location, created_at) VALUES (${esc(id("slp"))}, ${esc(FAM)}, ${esc(NORA)}, ${esc(by)}, ${ms(startHoursAgo)}, ${endHoursAgo === null ? "NULL" : ms(endHoursAgo)}, ${location ? esc(location) : "NULL"}, ${NOW});`,
   );
 
 // A realistic day, relative to "now" so the home screen always demos well.
@@ -120,7 +135,7 @@ feed(0.8, KRISTINE, "breast", { side: "right", durationMin: 15 });
 const simple = (table, hoursAgo, by, cols) => {
   const keys = Object.keys(cols);
   rows.push(
-    `INSERT INTO ${table} (id, family_id, baby_id, caretaker_id, time${keys.length ? `, ${keys.map((k) => cols[k].col).join(", ")}` : ""}, created_at) VALUES (${esc(id("oth"))}, ${esc(FAM)}, ${esc(NORA)}, ${esc(by)}, ${ms(hoursAgo)}${keys.length ? `, ${keys.map((k) => cols[k].val).join(", ")}` : ""}, ${now});`,
+    `INSERT INTO ${table} (id, family_id, baby_id, caretaker_id, time${keys.length ? `, ${keys.map((k) => cols[k].col).join(", ")}` : ""}, created_at) VALUES (${esc(id("oth"))}, ${esc(FAM)}, ${esc(NORA)}, ${esc(by)}, ${ms(hoursAgo)}${keys.length ? `, ${keys.map((k) => cols[k].val).join(", ")}` : ""}, ${NOW});`,
   );
 };
 simple("medicine_log", 12.8, ANDERS, {
@@ -149,5 +164,10 @@ simple("pump_log", 9, KRISTINE, {
   durationMin: { col: "duration_min", val: 15 },
 });
 
-writeFileSync(".seed.sql", `${rows.join("\n")}\n`);
-console.log(`wrote .seed.sql (${rows.length} statements)`);
+// Applied in one transaction: a half-seeded database is worse than none.
+const sql = new SQL(DATABASE_URL);
+await sql.begin(async (tx) => {
+  for (const statement of rows) await tx.unsafe(statement);
+});
+await sql.end();
+console.log(`seeded ${rows.length} statements into ${host}`);
