@@ -22,6 +22,11 @@ Drizzle, Postgres.
   (`migrate.ts`'s `migrationsFolder`). Anything else that seems to need a logic
   change is a signal to stop and ask, not to improvise.
 - **`git mv`, never delete-and-recreate.** `git log --follow` must keep working.
+- **The root `bunfig.toml`'s `[install] linker = "hoisted"` must survive to the
+  end of the PR.** Bun 1.4 defaults to the isolated linker when `workspaces`
+  exists, which does not link an unreferenced workspace member. Removing that
+  setting breaks `@pjokk/shared` resolution repo-wide. Only the `[test]`
+  section moves into `apps/api/bunfig.toml`.
 - Package names: `@pjokk/api`, `@pjokk/server`, `@pjokk/frontend`,
   `@pjokk/shared`.
 - Third-party dependencies stay in the **root** `package.json` (Bun workspaces
@@ -371,11 +376,19 @@ two-entry public/infrastructure split.
 
 - [ ] **Step 7: Move the test preload config into the package**
 
-Delete the root `bunfig.toml` and create `apps/api/bunfig.toml` with the same
-content — the path is already package-relative, so it needs no edit.
+**Do NOT delete the root `bunfig.toml`.** Task 1 added an `[install]` section
+to it that the workspace depends on: Bun 1.4 defaults to the *isolated* linker
+once a `workspaces` field exists, and the isolated linker only symlinks a
+workspace member that some `package.json` actually declares as a dependency.
+`linker = "hoisted"` restores the flat `node_modules` layout this repo used
+before workspaces, which links every member by name. Deleting the file
+un-links `@pjokk/shared` and every import of it fails.
+
+Instead, remove ONLY the `[test]` section from the root `bunfig.toml`, leaving
+`[install]` and its comment intact, and create `apps/api/bunfig.toml` with the
+preload — the path is already package-relative, so it needs no edit.
 
 ```bash
-git rm bunfig.toml
 cat > apps/api/bunfig.toml <<'EOF'
 [test]
 # Applies the schema once and empties the database before each test. Lives in
@@ -388,6 +401,16 @@ EOF
 git add apps/api/bunfig.toml
 git rm tsconfig.server.json
 ```
+
+Verify the linker survived the edit before moving on — this is the failure this
+step exists to avoid:
+
+```bash
+bun install
+ls -l node_modules/@pjokk/
+```
+
+Expected: `shared -> ../../packages/shared` and `api -> ../../apps/api`.
 
 - [ ] **Step 8: Point the root scripts at the workspaces**
 
