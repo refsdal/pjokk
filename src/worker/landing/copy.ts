@@ -180,7 +180,7 @@ const nb: LandingCopy = {
     "Pjokk drives fra Norge av Refsdal Holding AS. Hver database, fil og sikkerhetskopi er låst til Cloudflares EU-jurisdiksjon — ikke en preferanse, men en garanti. Ingenting selges videre, og denne siden har ingen sporing fra tredjepart.",
   storyTitle: "Laget av foreldre, for foreldre",
   storyBody: [
-    "Da vi fikk vår datter, var vi like usikre som alle andre. Spiste hun nok? Var det normalt at hun tisset så mye? Hadde hun fått i seg mindre i dag enn i går — og ville vi i det hele tatt merket det?",
+    "Da datteren vår ble født, var vi like usikre som alle andre. Spiste hun nok? Var det normalt at hun tisset så mye? Hadde hun fått i seg mindre i dag enn i går — og ville vi i det hele tatt merket det?",
     "Så vi bygde det vi selv manglet: et sted å notere det som skjer, som svarer med én gang du åpner appen. Vi bruker Pjokk hver dag med vår egen datter, og nå deler vi det med andre foreldre.",
   ],
   storySignature: "— Anders, Oslo",
