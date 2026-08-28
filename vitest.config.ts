@@ -50,6 +50,10 @@ export default defineConfig(async () => {
     ],
     test: {
       include: ["test/**/*.test.ts"],
+      // Files already migrated to `bun test` against Postgres. Both runners
+      // stay green while the port proceeds file by file; this list shrinks to
+      // nothing and vitest goes away with it.
+      exclude: ["test/config.test.ts"],
       setupFiles: ["./test/apply-migrations.ts"],
     },
   };
