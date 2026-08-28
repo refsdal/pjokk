@@ -1,12 +1,17 @@
 # CLAUDE.md — Pjokk
 
-Pjokk ("en liten pjokk" — a little tyke) is a self-hosted baby tracker for families,
-running entirely on Cloudflare Workers. It is a from-scratch replacement for
+Pjokk ("en liten pjokk" — a little tyke) is a self-hosted baby tracker for
+families, shipped as a Docker container. It is a from-scratch replacement for
 sprout-track (https://github.com/Oak-and-Sprout/sprout-track), built mobile-first
 as a PWA. Domain: everything lives on the apex, **pjokk.no** (live) — `/` is a
-public landing page rendered by the Worker itself, `/home` is the signed-in
-app. Test environment: **test.pjokk.no**. The old `app.pjokk.no` /
-`app-test.pjokk.no` hostnames are retired.
+public landing page rendered by the server itself, `/home` is the signed-in
+app. Test environment: **test.pjokk.no**.
+
+> **Runtime note (2026-08-28):** the app ran on Cloudflare Workers + D1 + R2 +
+> KV through Phase 10. It now runs as a Bun process in a container against
+> Postgres and S3-compatible storage. Comments through the codebase that say
+> "this used to be X on Workers" are deliberate: they record why a piece of
+> code is shaped the way it is.
 
 ## Product principles (read before writing any UI)
 
@@ -34,44 +39,50 @@ app. Test environment: **test.pjokk.no**. The old `app.pjokk.no` /
 ## Stack (decided — do not substitute)
 
 **Backend**
-- Cloudflare Workers, single Worker serving both the SPA (static assets binding)
-  and the API. One `wrangler deploy`. No CORS in the default setup.
+- Bun, one process serving both the SPA (static files) and the API. One
+  container image. No CORS in the default setup (same origin).
 - Hono for routing. All routes built with `@hono/zod-openapi` — each endpoint's
   zod schema does triple duty: runtime validation, OpenAPI spec, inferred types
   for the RPC client. ONE route tree (no separate "RPC for us / OpenAPI for
   others"). Serve interactive docs with Scalar at `/api/docs`.
-- Drizzle ORM + D1 (SQLite). Migrations via drizzle-kit generate →
-  `wrangler d1 migrations apply`. Set `migrations_dir` in wrangler config.
-- R2 for files (baby photos, backup exports). Never a public bucket — stream
-  through an authed Hono route (`/api/files/:id`).
-- KV for rate-limiting counters and any session-cache secondary storage.
-- Cron Triggers for scheduled work (reminders, nightly D1 export to R2).
-- Compatibility date ≥ 2026-08-04 (Node.js compat incl. node:crypto is default;
-  the `web-push` npm package is expected to work — verify early, fall back to a
-  WebCrypto-based implementation if it trips).
+- Drizzle ORM + Postgres (`drizzle-orm/bun-sql`, Bun's native client).
+  Migrations via drizzle-kit generate → `bun src/server/migrate.ts`, run as a
+  ONE-OFF job. Never at app startup: drizzle's migrator does not coordinate
+  between processes, so replicas would race to apply the same DDL.
+- Any S3-compatible store for files (MinIO in compose; S3/R2/Ceph in
+  production). Never a public bucket — stream through an authed Hono route
+  (`/api/files/:id`). Access it ONLY through `src/server/storage.ts`, whose
+  `put` takes `Blob | string` and NOT a ReadableStream: Bun's S3 client
+  silently writes the string "[object ReadableStream]" if handed one.
+- A `rate_limit` Postgres table for rate-limiting counters.
+- Scheduled work (reminders, nightly backup) runs via `bun run cron
+  <nightly|frequent>`. Under Kubernetes drive it from CronJobs and leave
+  `SCHEDULER=0`; the in-process scheduler is for single-container deployments
+  only, because with N replicas it fires every job N times.
+- Configuration is environment variables, parsed and validated with zod at
+  startup (`src/server/config.ts`). Add new settings there, never by reading
+  `process.env` at a call site.
 
-**EU jurisdiction is mandatory for every new Cloudflare resource**
+**EU data residency is mandatory**
 - The app stores GDPR Article 9 health data about children. Every stateful
-  resource MUST be created pinned to the EU jurisdiction:
-  - D1: `wrangler d1 create <name> --jurisdiction eu`
-  - R2: `wrangler r2 bucket create <name> -J eu`, and the binding in
-    `wrangler.jsonc` needs `"jurisdiction": "eu"` or the Worker will look in
-    the default jurisdiction and not find the bucket.
-- **Jurisdiction can only be set at creation and can never be changed** —
-  there is no `d1 update`. Getting it wrong means creating a replacement and
-  migrating, so check before you create, not after.
-- A **location hint** (`--location weur`) is NOT a substitute: it is a
-  placement preference, not a guarantee. Verify with `wrangler d1 info <name>`
-  — `jurisdiction` must read `eu`, not `null`.
-- Resources live in separate jurisdictional namespaces: an EU bucket does not
-  appear in `wrangler r2 bucket list` without `-J eu`. That isolation is the
-  point.
-- **KV is the exception and cannot be pinned** — it is globally replicated by
-  design and takes no jurisdiction flag. Therefore KV must never hold personal
-  data: the rate limiter stores a SHA-256 hash of the client IP, never the
-  address. Keep it that way.
-- The same applies to anything added later (Durable Objects, Queues,
-  Hyperdrive, Vectorize): pin it, or do not use it.
+  component — Postgres, the object store, and any backup of either — MUST live
+  in the EU.
+- This used to be enforced by Cloudflare's jurisdiction flags, which pinned a
+  resource at creation and could never be changed. That mechanism is gone: it
+  is now a **deployment-time** property, which means it is easier to get wrong
+  and nothing will warn you. Whoever provisions the database and the bucket
+  owns this guarantee.
+- Practically: choose an EU region for the managed Postgres and the S3 bucket,
+  and confirm the backup target is EU too. The nightly snapshot contains every
+  table, health data included, so a bucket in the wrong region undoes the
+  whole arrangement.
+- The rate limiter still stores a SHA-256 hash of the client IP rather than
+  the address. The original reason (KV was globally replicated and could not
+  be pinned) no longer applies now that counters live in the same EU database,
+  but there is still no reason to start recording addresses. Keep it that way.
+- The privacy policy (`src/web/screens/legal/privacy.tsx`) names the
+  processors and promises EU storage. **It must be kept in step with where the
+  container is actually deployed** — it is a legal statement, not decoration.
 
 **Auth & tenancy**
 - better-auth with the **Organizations plugin**. An organization IS a family.
@@ -90,9 +101,15 @@ app. Test environment: **test.pjokk.no**. The old `app.pjokk.no` /
   rate-limited (codes are credentials). Flow: open `https://pjokk.no/join/CODE`
   (also rendered as QR) → social sign-in → validate code → addMember → land on
   family home.
-- **Cloudflare Workers gotcha:** D1 bindings only exist inside the request
-  handler. Create the better-auth instance per-request via a factory, stash it
-  on Hono context in middleware. Never initialize at module scope.
+- The better-auth instance is built ONCE at startup (`src/server/services.ts`)
+  and handed to requests through Hono context. It used to be per-request
+  because D1 bindings only existed inside the handler — which meant every
+  request rebuilt a Stripe client and the whole plugin chain. Do not
+  reintroduce that.
+- Billing is optional: `createStripe` returns null without credentials and the
+  stripe plugin is then not registered at all. The SDK throws from its
+  constructor on an empty key, so anything that assumes a client exists must
+  handle null.
 - Enable the better-auth **bearer plugin** from day one (cookies for web,
   bearer tokens for a future Capacitor shell — both coexist).
 
@@ -180,17 +197,29 @@ Later phases add: medicine (+units), bath, note, milestone, measurement
 (weight/length/head), pump. These are structural copies of the Phase 1 CRUD +
 sheet pattern — build the pattern well once.
 
-## D1 constraints (respect these)
+## Postgres notes (respect these)
 
-- No transactions — only `batch()`. Multi-row atomic writes (e.g. redeem invite:
-  validate + increment + addMember) must be structured as batches; design so
-  partial failure is safe.
-- Backups: scheduled Cron export to R2 (no "copy the .db file" story), pruned
-  after 30 days — the window the privacy policy commits to for a deletion to
-  take full effect.
-- D1 is regional; fine for this app, don't chase edge-read tricks. Pinned to
-  the EU jurisdiction (see the Stack section) — that is a hard requirement,
-  not a preference.
+- **Real transactions.** Multi-row atomic writes use `db.transaction()`. D1
+  had only `batch()`, which is why several writes were once split into a
+  batch plus a separate ownership check, and why invite redemption was
+  hand-written SQL with duplicated guards and a compensating DELETE. Those are
+  gone; do not reintroduce the pattern.
+- **Dialect traps that types cannot catch.** All three of these were live bugs
+  during the port:
+  - `COUNT()` is bigint, and the driver returns bigints as **strings**. Cast
+    raw aggregates: `COUNT(*)::int`.
+  - Postgres `real` is 4-byte single precision, unlike SQLite's 8-byte REAL.
+    Use `doublePrecision` for anything measured (weights, doses).
+  - `timestamptz - integer` is not an operator. Lead times are intervals:
+    `start_time - (minutes * interval '1 minute')`.
+- **Unique violations** are detected by SQLSTATE `23505` via
+  `isUniqueViolation()`, never by matching error text.
+- **`user` is a reserved word.** Quote it in any hand-written SQL.
+- Timestamps are `timestamptz` everywhere, via the `ts()` column factory.
+  Drizzle maps them to JS `Date`, exactly as the old epoch-ms integers did.
+- Backups: a nightly row dump to object storage, pruned after 30 days — the
+  window the privacy policy commits to for a deletion to take full effect. A
+  row dump rather than `pg_dump` so the image needs no Postgres client binary.
 
 ## Phased roadmap
 
@@ -279,6 +308,23 @@ sheet pattern — build the pattern well once.
 > the hero is a CSS animation, deliberately conceptual rather than the real
 > components. A new `INDEXABLE` var gates `robots.txt`, `sitemap.xml` and
 > the noindex headers so only production is crawlable.
+> **Docker/Postgres port (2026-08-28):** the app left Cloudflare entirely.
+> Bun in a container replaces Workers; Postgres replaces D1; S3-compatible
+> storage replaces R2; a `rate_limit` table replaces KV; `bun run cron`
+> replaces cron triggers. `src/worker` is now `src/server`, the package
+> manager is bun, and the suite is `bun test` against a real Postgres (200
+> green). Deliverables: `Dockerfile`, `docker-compose.yml` (app + Postgres +
+> MinIO, with one-off `migrate` and `minio-init` services),
+> `docker-compose.test.yml`, `/healthz` + `/readyz`, and a one-shot cron CLI
+> so a Kubernetes CronJob runs the same image. No production data was
+> migrated — the port started from an empty database. `robots.txt`,
+> `sitemap.xml` and the security headers moved from build time to runtime, so
+> ONE image now serves both test and production. Bugs the port surfaced and
+> fixed: single-precision `real` rounding recorded weights, `COUNT()` served
+> as a string, SQLite-worded unique-violation detection, epoch-ms interval
+> arithmetic, an unconditional Stripe client that crash-looped without
+> credentials, and a rate limiter that silently degraded to one shared bucket
+> behind an ingress.
 
 1. **Core loop:** schema, auth (social + orgs + invite codes), tenancy
    middleware, home screen with status cards + Feed/Diaper/Sleep sheets,
@@ -309,10 +355,12 @@ sheet pattern — build the pattern well once.
 - Keep bundle size honest (Workers limits; Drizzle not Prisma partly for this).
 - Category color tokens defined once in the Tailwind theme; used by home grid,
   timeline, charts.
-- Tests: colocate; prioritize the tenancy middleware, invite redeem flow, and
-  active-session logic. Use @cloudflare/vitest-pool-workers so tests run in the
-  real runtime — and ensure wrangler config itself has the right compat date
-  (the vitest plugin injects nodejs_compat, which can mask a missing flag).
+- Tests: `bun test`, run against a REAL Postgres (`docker compose -f
+  docker-compose.test.yml up -d`) — the database is the thing most likely to
+  differ, so faking it defeats the purpose. Object storage is substituted with
+  an in-memory `Storage`. Prioritize the tenancy middleware, invite redeem
+  flow, and active-session logic. Each test FILE starts from an empty database;
+  rate-limit counters are cleared between individual tests.
 - Commit style: small, scoped commits following **Conventional Commits**
   (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, …). Reference the
   roadmap phase in the body when the work is phase-scoped, e.g.

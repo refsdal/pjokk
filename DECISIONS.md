@@ -706,3 +706,65 @@ been true since Phase 3; the vaccine feature only made it obvious.
   path. The production output is byte-identical to the file it replaced —
   worth re-checking after any edit, since this one file carries every
   security header for the SPA, `/privacy` and `/terms`.
+
+## Docker/Postgres port (2026-08-28)
+
+- **Docker replaces Cloudflare outright**, rather than the two being
+  maintained side by side. A dual target would have meant two Drizzle schema
+  files (34 tables, two dialects) kept in lockstep forever: Drizzle binds a
+  schema to one dialect, and that is the one part of the stack no adapter
+  layer can hide. Everything else was already adapter-shaped — all database
+  access funnels through `scoped.ts`, storage was 7 call sites, KV was 2.
+- **No data migration.** The port starts from an empty database; the alpha
+  data was expendable. This is why `migrations/` is a single generated
+  baseline rather than a hand-translated chain of the 15 SQLite migrations —
+  a translated chain nobody ever ran would be fiction. The old files remain
+  in git history.
+- **`timestamptz`, not epoch-millisecond `bigint`.** The initial instinct was
+  to keep epoch-ms to minimize churn; that reasoning was wrong. Drizzle maps
+  BOTH `integer(mode: "timestamp_ms")` and `timestamp(mode: "date")` to a JS
+  `Date`, so the application code is identical either way — which makes
+  timestamptz simultaneously the idiomatic choice and the low-churn one. The
+  entire cost was one query: the calendar reminder window.
+- **Services are memoized on the Env object's identity (a `WeakMap`)**, not
+  held in a mutable module-level global. Production has exactly one Env, so
+  this builds one set; each test suite brings its own and gets its own, with
+  no boot-order coupling and nothing to reset between runs. The consequence
+  worth knowing: `Bindings` must be ONE long-lived object, so building a
+  fresh `{ ...env, server }` per request would silently rebuild the
+  connection pool every time.
+- **`bun test` over vitest.** The suite used no vitest-specific API at all
+  (zero `vi.*`), and all Cloudflare coupling sat in `helpers.ts`, so the port
+  was a shim plus 10 import lines rather than 24 rewrites. Runtime went from
+  81s to ~23s.
+- **Tests use a real Postgres but an in-memory `Storage`.** The database is
+  the thing that actually changed dialect, so faking it would defeat the
+  purpose; object storage is four methods whose real behaviour was verified
+  directly against MinIO while `storage.ts` was written. Requiring a running
+  S3 to test the timeline would be a poor trade.
+- **Test isolation is per FILE, not per test.** That matches what
+  vitest-pool-workers gave each Worker, and the suites were written against
+  it — they build fixtures in `beforeAll`, so truncating between tests
+  deletes the rows they are about to assert on. Rate-limit counters are the
+  exception and are cleared per test: they used to live in a per-Worker KV,
+  and one shared table otherwise starts 429-ing partway through the suite.
+- **Migrations run as a one-off, never at app startup.** Drizzle's migrator
+  does not coordinate between processes, so N replicas booting together would
+  race to apply the same DDL. `src/server/migrate.ts` uses drizzle-orm's
+  migrator rather than the drizzle-kit CLI, so it works in a production image
+  where drizzle-kit is not installed.
+- **The app cannot create its own bucket.** `minio-init` does it in compose,
+  and an operator does it in production. An app that can create a bucket can
+  create the wrong one, in the wrong region — which for Article 9 health data
+  is the failure that matters, and nobody notices until the data is already
+  there.
+- **`storage.put` takes `Blob | string`, never a `ReadableStream`.** Bun's S3
+  client does not reject a stream: it writes the literal string
+  "[object ReadableStream]" and reports success. The R2 code passed
+  `file.stream()`, so accepting one would have made silent upload corruption
+  both easy and invisible. A `File` is a `Blob`, so call sites lose nothing.
+- **The release workflow publishes an image and stops.** Where the container
+  runs is deployment infrastructure this repo does not own, so the workflow
+  documents the rollout order instead of pretending to perform it.
+- **Package manager is bun** — see the entry near the top; that one was forced
+  by a broken corepack pnpm, not chosen.
