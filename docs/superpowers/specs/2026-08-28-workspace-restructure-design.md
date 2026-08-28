@@ -471,9 +471,13 @@ truncates every table.
 
 Piece 1 keeps the current two-stage build: `vite build` for the SPA,
 `bun build --target=bun` for the three server entrypoints, and a runtime stage
-with no `node_modules` at all. The Dockerfile moves to `apps/server/Dockerfile`
-with the repo root as build context, since a workspace install needs the root
-`package.json` and `bun.lock`.
+with no `node_modules` at all. The Dockerfile **stays at the repo root**. It
+needs the root as its build context regardless, because a workspace install
+needs the root `package.json` and `bun.lock` plus every member's manifest — and
+nothing references it by path: CI and `docker-compose.yml` both rely on the
+default root location, so moving it under `apps/server/` would mean adding
+explicit `-f` flags in several places and buy nothing. (An earlier draft of
+this spec said it moves; PR #15 did not move it, deliberately.)
 
 `migrations/` moves under `apps/api/` but is still copied into the image as
 data — `migrate.js` reads the SQL at run time, so it is not part of any bundle.
