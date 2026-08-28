@@ -111,6 +111,32 @@ Behind a reverse proxy, set `TRUSTED_PROXY_HOPS` to the number of proxies in
 front, or the rate limiter cannot tell clients apart. `/healthz` is liveness,
 `/readyz` additionally checks Postgres.
 
+### Versioning and images
+
+Versions are computed from [Conventional Commits](https://www.conventionalcommits.org)
+since the last `v*` tag — nobody types a version number:
+
+```sh
+bun scripts/next-version.mjs        # what would the next release be, and why
+```
+
+`feat` bumps the minor, `fix`/`perf` the patch, `!`/`BREAKING CHANGE` the
+major. While the major is 0 a breaking change bumps the minor instead, so
+reaching 1.0 stays a decision rather than a side effect of a commit message.
+
+CI publishes a **preview** image for every branch and PR — after the smoke
+test passes, never before:
+
+```
+ghcr.io/refsdal/pjokk:<next-version>-preview.<sha>
+ghcr.io/refsdal/pjokk:branch-<branch>
+```
+
+The **Release** workflow (manual dispatch, `dry_run` on by default) builds,
+pushes `:<version>`, `:latest` and `:sha-<sha>`, then creates the git tag —
+in that order, so a failed push never leaves a tag pointing at an image that
+does not exist.
+
 ## Repository layout
 
 ```

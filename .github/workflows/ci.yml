@@ -51,21 +51,64 @@ jobs:
       - name: Build
         run: bun run build
 
-  # The image has to build, not merely typecheck. Built on every push and PR;
-  # publishing is a separate concern and deliberately not wired up here until
-  # there is a registry to publish to.
+  # The image has to build and RUN, not merely typecheck — and it is published
+  # as a preview so the publish path itself is exercised on every change
+  # rather than being first tried during a release.
+  #
+  # Preview tags are prerelease-versioned (0.2.0-preview.abc1234) so they sort
+  # below the real release and can never be mistaken for one. The release
+  # workflow is what produces a bare version tag and `latest`.
   image:
     needs: ci
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
     steps:
+      # Full history and tags: the version is computed from Conventional
+      # Commits since the last v* tag, and a shallow clone has neither.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4"
+
+      - name: Compute version
+        id: version
+        run: bun scripts/next-version.mjs
 
       - uses: docker/setup-buildx-action@v3
+
+      # A pull request from a fork gets a read-only GITHUB_TOKEN, so pushing
+      # would fail on something unrelated to the change. Build-only there.
+      - name: Can this run push?
+        id: gate
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ] &&              [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
+            echo "push=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "push=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Log in to the container registry
+        if: steps.gate.outputs.push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build image
         uses: docker/build-push-action@v6
         with:
           context: .
+          # Loaded locally so the smoke test below runs against the exact
+          # image that was pushed.
           push: false
           load: true
           tags: pjokk:ci
@@ -136,6 +179,30 @@ jobs:
           # And the cron entrypoint has to run from the same image.
           docker run --rm --network pjokk-ci "${env_args[@]}" pjokk:ci \
             bun cron-cli.js frequent
+
+      # Only after the smoke test: an image that does not serve must never
+      # reach the registry, not even as a preview.
+      - name: Push preview image
+        if: steps.gate.outputs.push == 'true'
+        run: |
+          short=$(git rev-parse --short HEAD)
+          branch=$(echo "${{ github.head_ref || github.ref_name }}" | tr '/' '-' | tr -cd '[:alnum:]._-')
+          preview="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}-preview.${short}"
+          moving="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:branch-${branch}"
+          docker tag pjokk:ci "$preview"
+          docker tag pjokk:ci "$moving"
+          docker push "$preview"
+          docker push "$moving"
+          {
+            echo "### Preview image"
+            echo
+            echo '```'
+            echo "docker pull $preview"
+            echo '```'
+            echo
+            echo "Also tagged \`$moving\` (moves with the branch)."
+            echo "Next release would be **${{ steps.version.outputs.tag }}** (bump: ${{ steps.version.outputs.bump || 'none' }})."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Container logs on failure
         if: failure()
