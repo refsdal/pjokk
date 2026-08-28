@@ -1,9 +1,8 @@
-import type { Auth } from "./auth";
 import type { Env } from "./config";
 import type { Db } from "./db";
 import type { FamilyScope } from "./db/scoped";
-import type { RateLimitStore } from "./rate-limit-store";
-import type { Storage } from "./storage";
+import type { Auth } from "./infrastructure/auth";
+import type { RateLimitStore, Storage } from "./ports";
 
 type SessionResult = Awaited<ReturnType<Auth["api"]["getSession"]>>;
 export type SessionData = NonNullable<SessionResult>;

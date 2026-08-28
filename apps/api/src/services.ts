@@ -1,10 +1,14 @@
-import type { Auth } from "./auth";
-import { createAuth } from "./auth";
 import type { Env } from "./config";
 import type { Db } from "./db";
-import { createDb, createPool } from "./db";
-import { createRateLimitStore, type RateLimitStore } from "./rate-limit-store";
-import { createStorage, type Storage } from "./storage";
+import {
+  createAuth,
+  createDb,
+  createRateLimitStore,
+  createStorage,
+  createStripe,
+} from "./infrastructure";
+import type { Auth } from "./infrastructure/auth";
+import type { RateLimitStore, Storage } from "./ports";
 
 // The long-lived collaborators: one database pool, one better-auth instance,
 // one storage client, one rate-limit store.
@@ -46,12 +50,35 @@ export function servicesFor(
   const existing = perEnv.get(env);
   if (existing) return existing;
 
-  const db = overrides.db ?? createDb(createPool(env.DATABASE_URL));
+  const db = overrides.db ?? createDb(env.DATABASE_URL);
   const services: Services = {
     env,
     db,
-    auth: overrides.auth ?? createAuth(env, db),
-    storage: overrides.storage ?? createStorage(env),
+    auth:
+      overrides.auth ??
+      createAuth(
+        {
+          appUrl: env.APP_URL,
+          secret: env.BETTER_AUTH_SECRET,
+          googleClientId: env.GOOGLE_CLIENT_ID,
+          googleClientSecret: env.GOOGLE_CLIENT_SECRET,
+          stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET,
+          stripePriceMonthly: env.STRIPE_PRICE_PREMIUM_MONTHLY,
+          stripePriceYearly: env.STRIPE_PRICE_PREMIUM_YEARLY,
+          openSignup: env.OPEN_SIGNUP === "1",
+        },
+        db,
+        createStripe(env.STRIPE_SECRET_KEY),
+      ),
+    storage:
+      overrides.storage ??
+      createStorage({
+        bucket: env.S3_BUCKET,
+        endpoint: env.S3_ENDPOINT,
+        accessKeyId: env.S3_ACCESS_KEY_ID,
+        secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+        region: env.S3_REGION,
+      }),
     rateLimit: overrides.rateLimit ?? createRateLimitStore(db),
   };
   perEnv.set(env, services);

@@ -1,4 +1,4 @@
-import type { Storage, StoredObject } from "../src/storage";
+import type { Storage, StoredObject } from "../src/ports";
 
 // An in-memory Storage for tests.
 //

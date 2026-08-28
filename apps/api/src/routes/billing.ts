@@ -1,8 +1,8 @@
 import { createRoute } from "@hono/zod-openapi";
 import { CheckoutUrlSchema, ErrorSchema } from "@pjokk/shared";
 import type { FamEnv } from "../context";
+import { createStripe } from "../infrastructure/stripe";
 import { createApp, jsonContent } from "../lib";
-import { createStripe } from "../stripe";
 
 // The lifetime plan is a one-time payment, which the better-auth stripe
 // plugin doesn't model — this route creates the Checkout Session itself and
@@ -30,7 +30,7 @@ export const billingApp = createApp<FamEnv>().openapi(
         409,
       );
     }
-    const stripe = createStripe(c.env);
+    const stripe = createStripe(c.env.STRIPE_SECRET_KEY);
     if (!stripe) {
       // Self-hosted instances run without billing configured; the route
       // exists but cannot do anything, so say that rather than 500.

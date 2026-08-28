@@ -1,5 +1,4 @@
 import Stripe from "stripe";
-import type { Env } from "./config";
 
 // Built once with the auth instance (see services.ts) rather than per
 // request, as it had to be on Workers. The fetch-based HTTP client and async
@@ -14,9 +13,9 @@ import type { Env } from "./config";
  * than a feature that is simply off. On Workers the key was always present,
  * so this state was never reachable.
  */
-export function createStripe(env: Env): Stripe | null {
-  if (!env.STRIPE_SECRET_KEY) return null;
-  return new Stripe(env.STRIPE_SECRET_KEY, {
+export function createStripe(secretKey: string): Stripe | null {
+  if (!secretKey) return null;
+  return new Stripe(secretKey, {
     // Pinned together with the SDK (22.5.0 in package.json). The SDK pins the
     // API version it is built against, so upgrading stripe forces this to
     // 2026-08-26.dahlia — a behavioural change against live billing that the

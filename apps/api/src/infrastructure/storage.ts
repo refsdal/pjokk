@@ -1,5 +1,5 @@
 import { S3Client } from "bun";
-import type { Env } from "./config";
+import type { Storage, StoredObject } from "../ports";
 
 // Object storage, replacing the R2 binding. Backed by any S3-compatible
 // service: MinIO in docker-compose, real S3/R2/Ceph in production.
@@ -9,35 +9,21 @@ import type { Env } from "./config";
 // it, list the backup snapshots — so the call sites stay readable and the
 // storage backend stays swappable.
 
-export type StoredObject = { key: string; uploadedAt: Date };
-
-export type Storage = {
-  /**
-   * Stores an object.
-   *
-   * The body is Blob | string ON PURPOSE. Bun's S3 client does NOT accept a
-   * ReadableStream: handed one it silently writes the string
-   * "[object ReadableStream]" instead of the bytes, with no error. The old
-   * R2 code passed `file.stream()`, so accepting a stream here would make
-   * that mistake both easy and invisible. A File IS a Blob, so upload call
-   * sites pass the File itself and lose nothing.
-   */
-  put(key: string, body: Blob | string, contentType?: string): Promise<void>;
-  /** Streams an object back, or null when it does not exist. */
-  getStream(key: string): Promise<ReadableStream | null>;
-  /** Deletes one or many objects. Missing keys are not an error. */
-  delete(keys: string | string[]): Promise<void>;
-  /** Every object under a prefix, paginating internally. */
-  list(prefix: string): Promise<StoredObject[]>;
+export type S3Config = {
+  bucket: string;
+  endpoint: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  region: string;
 };
 
-export function createStorage(env: Env): Storage {
+export function createStorage(cfg: S3Config): Storage {
   const client = new S3Client({
-    accessKeyId: env.S3_ACCESS_KEY_ID,
-    secretAccessKey: env.S3_SECRET_ACCESS_KEY,
-    bucket: env.S3_BUCKET,
-    endpoint: env.S3_ENDPOINT,
-    region: env.S3_REGION,
+    accessKeyId: cfg.accessKeyId,
+    secretAccessKey: cfg.secretAccessKey,
+    bucket: cfg.bucket,
+    endpoint: cfg.endpoint,
+    region: cfg.region,
   });
 
   return {

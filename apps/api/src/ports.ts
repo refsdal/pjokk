@@ -10,8 +10,10 @@ export type Storage = {
    *
    * The body is Blob | string ON PURPOSE. Bun's S3 client does NOT accept a
    * ReadableStream: handed one it silently writes the string
-   * "[object ReadableStream]" instead of the bytes, with no error. A File IS
-   * a Blob, so upload call sites pass the File itself and lose nothing.
+   * "[object ReadableStream]" instead of the bytes, with no error. The old
+   * R2 code passed `file.stream()`, so accepting a stream here would make
+   * that mistake both easy and invisible. A File IS a Blob, so upload call
+   * sites pass the File itself and lose nothing.
    */
   put(key: string, body: Blob | string, contentType?: string): Promise<void>;
   /** Streams an object back, or null when it does not exist. */

@@ -14,7 +14,7 @@ import {
   sql,
 } from "drizzle-orm";
 import { schema } from "./db";
-import { pushToUser } from "./push";
+import { createPushSender } from "./infrastructure";
 import type { Services } from "./services";
 import { TOMBSTONE_ID } from "./db/tombstone";
 import { PREMIUM_STATUSES, applySubscriptionStatus } from "./billing";
@@ -64,6 +64,11 @@ export async function purgeOrphanUsers(services: Services, now = Date.now()) {
 // a new feed starts a new gap (lastRemindedAt < lastFeed gates re-sending).
 export async function runReminders(services: Services, now = Date.now()) {
   const { db, env } = services;
+  const push = createPushSender(db, {
+    appUrl: env.APP_URL,
+    publicKey: env.VAPID_PUBLIC_KEY,
+    privateKey: env.VAPID_PRIVATE_KEY,
+  });
   const prefs = await db
     .select()
     .from(schema.pushPref)
@@ -85,7 +90,7 @@ export async function runReminders(services: Services, now = Date.now()) {
     if (gapMs < threshold || alreadyReminded) continue;
 
     const hours = Math.floor(gapMs / 3600_000);
-    const delivered = await pushToUser(db, env, pref.userId, {
+    const delivered = await push.toUser(pref.userId, {
       title: "Pjokk",
       body: `No feed logged for ${hours} h`,
       url: "/home",
@@ -126,6 +131,11 @@ export async function runCalendarReminders(
   now = Date.now(),
 ) {
   const { db, env } = services;
+  const push = createPushSender(db, {
+    appUrl: env.APP_URL,
+    publicKey: env.VAPID_PUBLIC_KEY,
+    privateKey: env.VAPID_PRIVATE_KEY,
+  });
   const pending = and(
     isNotNull(schema.calendarEvent.remindMinutesBefore),
     isNull(schema.calendarEvent.remindedAt),
@@ -184,7 +194,7 @@ export async function runCalendarReminders(
       ? event.title
       : `${event.title} · ${clockFmt.format(event.startTime)}`;
     for (const userId of targets) {
-      sent += await pushToUser(db, env, userId, {
+      sent += await push.toUser(userId, {
         title: "Pjokk",
         body,
         url: "/calendar",

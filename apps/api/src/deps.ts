@@ -1,4 +1,4 @@
-import type { Auth } from "./auth";
+import type { Auth } from "./infrastructure/auth";
 import type { Db } from "./db";
 import type {
   Clock,

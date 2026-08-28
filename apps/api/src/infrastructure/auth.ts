@@ -5,20 +5,34 @@ import { passkey } from "@better-auth/passkey";
 import { stripe } from "@better-auth/stripe";
 import type Stripe from "stripe";
 import { and, eq } from "drizzle-orm";
-import type { Env } from "./config";
-import type { Db } from "./db";
-import { schema } from "./db";
-import { createStripe } from "./stripe";
-import { applySubscriptionStatus, grantLifetime } from "./billing";
+import type { Db } from "../db";
+import { schema } from "../db";
+import { applySubscriptionStatus, grantLifetime } from "../billing";
+
+export type AuthConfig = {
+  appUrl: string;
+  secret: string;
+  googleClientId: string;
+  googleClientSecret: string;
+  stripeWebhookSecret: string;
+  stripePriceMonthly: string;
+  stripePriceYearly: string;
+  /** Founder-bootstrap escape hatch; see CLAUDE.md. Flips off implicit
+   *  Google sign-up once the very first account exists. */
+  openSignup: boolean;
+};
 
 // Built ONCE at startup and shared (see services.ts). On Workers this had to
 // run per-request, because D1 bindings only existed inside the request
 // handler — which meant every request rebuilt a Stripe client and the entire
 // plugin chain. The database is now passed in rather than constructed here,
 // so the instance owns no connection lifecycle of its own.
-export function createAuth(env: Env, db: Db) {
-  const url = new URL(env.APP_URL);
-  const stripeClient = createStripe(env);
+export function createAuth(
+  cfg: AuthConfig,
+  db: Db,
+  stripeClient: Stripe | null,
+) {
+  const url = new URL(cfg.appUrl);
 
   // Billing is optional: without Stripe keys the plugin is not registered
   // at all, so the /api/auth billing routes are absent rather than present
@@ -27,15 +41,15 @@ export function createAuth(env: Env, db: Db) {
   const billingPlugin = stripeClient
     ? stripe({
         stripeClient,
-        stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET,
+        stripeWebhookSecret: cfg.stripeWebhookSecret,
         organization: { enabled: true },
         subscription: {
           enabled: true,
           plans: [
             {
               name: "premium",
-              priceId: env.STRIPE_PRICE_PREMIUM_MONTHLY,
-              annualDiscountPriceId: env.STRIPE_PRICE_PREMIUM_YEARLY,
+              priceId: cfg.stripePriceMonthly,
+              annualDiscountPriceId: cfg.stripePriceYearly,
             },
           ],
           // Only family admins may buy/cancel/restore/list for a family.
@@ -122,12 +136,12 @@ export function createAuth(env: Env, db: Db) {
     : null;
 
   return betterAuth({
-    baseURL: env.APP_URL,
-    secret: env.BETTER_AUTH_SECRET,
+    baseURL: cfg.appUrl,
+    secret: cfg.secret,
     // Exactly one origin. The app now lives on the apex and workers.dev is
     // switched off, so any second trusted origin would only widen the surface
     // that can complete a sign-in.
-    trustedOrigins: [env.APP_URL],
+    trustedOrigins: [cfg.appUrl],
     database: drizzleAdapter(db, { provider: "pg", schema }),
     // Open signup is DISABLED (closed alpha). Accounts are only created via
     // the invite redeem flow: /join/CODE calls social sign-in with
@@ -138,11 +152,11 @@ export function createAuth(env: Env, db: Db) {
     },
     socialProviders: {
       google: {
-        clientId: env.GOOGLE_CLIENT_ID,
-        clientSecret: env.GOOGLE_CLIENT_SECRET,
-        // OPEN_SIGNUP=1 is the founder-bootstrap escape hatch: flip it on for
+        clientId: cfg.googleClientId,
+        clientSecret: cfg.googleClientSecret,
+        // openSignup is the founder-bootstrap escape hatch: flip it on for
         // the very first account (no invite exists yet), then back off.
-        disableImplicitSignUp: String(env.OPEN_SIGNUP) !== "1",
+        disableImplicitSignUp: !cfg.openSignup,
       },
     },
     databaseHooks: {
@@ -186,7 +200,7 @@ export function createAuth(env: Env, db: Db) {
       passkey({
         rpID: url.hostname,
         rpName: "Pjokk",
-        origin: env.APP_URL,
+        origin: cfg.appUrl,
       }),
       // Cookies for web, bearer tokens for a future Capacitor shell.
       bearer(),

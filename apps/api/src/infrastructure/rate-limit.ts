@@ -1,6 +1,7 @@
 import { lt, sql } from "drizzle-orm";
-import type { Db } from "./db";
-import { rateLimit } from "./db/schema";
+import type { Db } from "../db";
+import { rateLimit } from "../db/schema";
+import type { RateLimitStore } from "../ports";
 
 // Fixed-window rate-limit counters, replacing the KV namespace.
 //
@@ -9,13 +10,6 @@ import { rateLimit } from "./db/schema";
 // invariant". Postgres removes the compromise: one statement increments and
 // returns the new value atomically, so the limit is exact even when several
 // replicas serve the same attacker concurrently.
-
-export type RateLimitStore = {
-  /** Increments the window's counter and returns its new value. */
-  hit(key: string, windowSeconds: number): Promise<number>;
-  /** Drops expired rows. KV expired them for us; nothing does here. */
-  sweep(now?: Date): Promise<number>;
-};
 
 export function createRateLimitStore(db: Db): RateLimitStore {
   return {
