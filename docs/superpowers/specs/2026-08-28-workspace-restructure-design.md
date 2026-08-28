@@ -463,7 +463,7 @@ truncates every table.
 
 | Destination | Files |
 |---|---|
-| `apps/api/test/` | 22 test files + `rig.ts`, `helpers.ts`, `memory-storage.ts`, `setup.ts`. Needs `bunfig.toml` with the preload and a live Postgres. |
+| `apps/api/test/` | 23 test files + `rig.ts`, `helpers.ts`, `memory-storage.ts`, `setup.ts`. Needs `bunfig.toml` with the preload and a live Postgres. |
 | `apps/frontend/test/` | `growth.test.ts`, `vaccine-programme.test.ts`, and the time-helper block split out of `defects.test.ts`. No preload, no database. |
 | `apps/server/test/` | `config.test.ts` — but only once `loadEnv` moves in PR #16. It stays in `apps/api/test/` for PR #15. |
 
