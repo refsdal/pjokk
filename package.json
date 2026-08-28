@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "vite dev",
+    "dev": "bun run --filter @pjokk/frontend dev",
     "dev:server": "bun --watch apps/server/src/main.ts",
     "build": "bun run build:client && bun run build:server",
     "start": "bun apps/server/src/main.ts",
@@ -22,7 +22,7 @@
     "lint:fix": "biome check --write .",
     "migrate": "MIGRATIONS_DIR=apps/api/migrations bun apps/server/src/migrate.ts",
     "seed": "bun scripts/seed.mjs",
-    "build:client": "vite build",
+    "build:client": "bun run --filter @pjokk/frontend build",
     "build:server": "bun build apps/server/src/main.ts apps/server/src/cron-cli.ts apps/server/src/migrate.ts --target=bun --outdir=dist/server --sourcemap=linked"
   },
   "dependencies": {

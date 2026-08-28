@@ -16,7 +16,7 @@ import path from "node:path";
 export default defineConfig({
   build: {
     // Where main.ts serves static files from (STATIC_DIR).
-    outDir: "dist/client",
+    outDir: "../../dist/client",
     emptyOutDir: true,
   },
   server: {
@@ -94,7 +94,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "src/web"),
+      "@": path.resolve(__dirname, "src"),
     },
   },
 });
