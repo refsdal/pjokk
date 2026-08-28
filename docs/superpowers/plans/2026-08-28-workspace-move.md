@@ -400,6 +400,13 @@ each package with its own working directory, which is what makes the per-package
     "start": "bun apps/server/src/main.ts",
     "cron": "bun apps/server/src/cron-cli.ts",
     "migrate": "MIGRATIONS_DIR=apps/api/migrations bun apps/server/src/migrate.ts",
+```
+
+`MIGRATIONS_DIR` is inert until Task 5 Step 1 makes `migrate.ts` read it.
+Nothing between here and there runs `bun run migrate`, so setting it now keeps
+the script edits in one place.
+
+```json
     "test": "bun run --filter '*' test",
     "typecheck": "bun run --filter '*' typecheck",
     "build:server": "bun build apps/server/src/main.ts apps/server/src/cron-cli.ts apps/server/src/migrate.ts --target=bun --outdir=dist/server --sourcemap=linked"
@@ -782,14 +789,34 @@ docs
 .idea
 ```
 
-- [ ] **Step 5: Update the Dockerfile's migrations path**
+- [ ] **Step 5: Update the Dockerfile**
 
-Only one line changes — the build and runtime stages are otherwise unaffected,
-because `bun run build` still emits `dist/server` and `dist/client`.
+Two changes. First, the **deps stage must copy every workspace manifest**
+before installing. It currently copies only the root `package.json`, which
+worked when there was one package; with `workspaces` declared, `bun install
+--frozen-lockfile` needs each member's `package.json` present to resolve the
+`workspace:*` links. Replace the two COPY/RUN lines in the `deps` stage with:
+
+```dockerfile
+COPY package.json bun.lock ./
+# Every workspace manifest, and ONLY the manifests: this stage exists so that
+# editing source never reinstalls, and copying whole packages here would
+# reintroduce exactly the cache busting it avoids.
+COPY apps/api/package.json ./apps/api/
+COPY apps/server/package.json ./apps/server/
+COPY apps/frontend/package.json ./apps/frontend/
+COPY packages/shared/package.json ./packages/shared/
+RUN bun install --frozen-lockfile
+```
+
+Second, the runtime stage's migrations path:
 
 ```dockerfile
 COPY apps/api/migrations ./migrations
 ```
+
+The build and runtime stages are otherwise unaffected, because `bun run build`
+still emits `dist/server` and `dist/client`.
 
 - [ ] **Step 6: Verify check, tests and build together**
 
