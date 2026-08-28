@@ -107,8 +107,8 @@ function En() {
       </p>
       <List>
         <li>
-          <strong>Cloudflare</strong> — hosting, database, file storage. All
-          application data lives here.
+          <strong>Our hosting provider</strong> — servers, database and file
+          storage, all within the EU. All application data lives here.
         </li>
         <li>
           <strong>Stripe</strong> — payments, if you subscribe.
@@ -290,8 +290,8 @@ function Nb() {
       </p>
       <List>
         <li>
-          <strong>Cloudflare</strong> — drift, database, fillagring. Alle
-          appdata ligger her.
+          <strong>Vår driftsleverandør</strong> — servere, database og
+          fillagring, alt innenfor EU. Alle appdata ligger her.
         </li>
         <li>
           <strong>Stripe</strong> — betaling, hvis du abonnerer.
