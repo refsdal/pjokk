@@ -1,7 +1,6 @@
-import { afterAll, beforeAll, beforeEach } from "bun:test";
+import { afterAll, beforeEach } from "bun:test";
 import { sql } from "drizzle-orm";
-import { rateLimit } from "../src/server/db/schema";
-import { services, resetDb } from "./rig";
+import { resetDb, services } from "./rig";
 
 // Preloaded before every test file (see bunfig.toml).
 //
@@ -27,25 +26,26 @@ if (!(await schemaIsApplied())) {
   );
 }
 
-// Each test FILE starts from an empty database — matching the per-file
-// isolation vitest-pool-workers gave each Worker. Not beforeEach: the suites
-// were written against that model and set their fixtures up in beforeAll, so
-// emptying between tests would delete the rows they are about to assert on.
-beforeAll(async () => {
-  await resetDb();
-});
-
-// Rate-limit counters are cleared between individual tests.
+// EVERY TEST starts from an empty database and an empty object store.
 //
-// They used to live in KV, which vitest-pool-workers gave each Worker its own
-// copy of, so every file started with an empty limiter. One shared Postgres
-// table does not reset by itself, and the sign-in brake (20 per 10 minutes,
-// all tests sharing the "unknown" bucket for want of a peer address) would
-// otherwise start 429-ing partway through the suite. Cleared per test, not
-// per file, because a single file signs in far more than twenty times —
-// while still letting one test accumulate hits and assert on the 429.
+// It has to be beforeEach, and the reason is a genuine trap: a `beforeAll`
+// registered in a PRELOAD file fires once for the whole run — only for the
+// first test file — not once per file. So resetting there left every
+// subsequent file inheriting whatever the previous ones had written, and the
+// suite passed or failed purely on file order. CI found it: backup.test.ts
+// expected the one feed it had created and saw nineteen.
+//
+// Hooks registered inside a test file ARE file-scoped, and a preload's
+// beforeEach runs before the file's own — so fixtures built in a file-level
+// beforeEach still land on a clean database.
+//
+// This also covers the rate-limit counters, which otherwise accumulate: the
+// sign-in brake is 20 per 10 minutes and every test shares the "unknown"
+// bucket for want of a peer address, so the suite would start 429-ing partway
+// through. A test that wants to assert on a 429 still can — it accumulates
+// its own hits within the test.
 beforeEach(async () => {
-  await services.db.delete(rateLimit);
+  await resetDb();
 });
 
 afterAll(async () => {

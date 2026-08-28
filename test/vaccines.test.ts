@@ -11,7 +11,7 @@ import {
   signIn,
   storage,
 } from "./helpers";
-import { beforeAll, describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { familyScope } from "../src/server/db/scoped";
 
 const BASE = "http://localhost";
@@ -217,7 +217,10 @@ describe("vaccine dismissals", () => {
   // gets its own baby instead, which is the isolation that actually matters
   // here — dismissals are per-baby.
   let shared: Awaited<ReturnType<typeof rig>>;
-  beforeAll(async () => {
+  // beforeEach, not beforeAll: the database is emptied before every test (see
+  // test/setup.ts), so a fixture built once for the whole describe block would
+  // be truncated out from under the second test.
+  beforeEach(async () => {
     shared = await rig("Dismissal family");
   });
   const freshBaby = (name: string) => createBaby(shared.family.id, name);
