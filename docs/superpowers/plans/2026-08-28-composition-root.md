@@ -473,21 +473,19 @@ export { createPushSender, type VapidConfig } from "./push";
 - [ ] **Step 5: Add the package entry**
 
 In `apps/api/package.json`, add `"./infrastructure"` **before** the wildcard
-so it wins:
+so it wins. **Leave `"."` pointing at `./src/index.ts`** — Task 3 repoints it
+when `app.ts` actually exists. Repointing it here would break
+`apps/frontend`'s `AppType` import and leave `bun run check` red for two whole
+tasks:
 
 ```json
   "exports": {
-    ".": "./src/app.ts",
+    ".": "./src/index.ts",
     "./db": "./src/db/index.ts",
     "./infrastructure": "./src/infrastructure/index.ts",
     "./*": "./src/*.ts"
   },
 ```
-
-`"."` points at `./src/app.ts`, which Task 3 creates. Until then the package's
-main entry is broken — that is expected and Task 3 fixes it. The test suite
-imports `../src/index` by relative path, not through the entry, so it keeps
-working in between.
 
 - [ ] **Step 6: Add the import guard to `biome.json`**
 
@@ -538,10 +536,12 @@ grep -rn 'from "\./storage"\|from "\./rate-limit-store"\|from "\./stripe"\|from 
 
 ```bash
 bun run test 2>&1 | tail -6
+bun run check
 ```
 
-Expected: `179 pass` / `21 pass`. `bun run check` will still fail on the
-`"."` export pointing at the not-yet-existing `app.ts`; that is Task 3.
+Expected: `179 pass` / `21 pass`, and check green. Both must pass — this task
+is additive plus moves, and nothing it does should break either gate. If check
+fails on a missing export, an importer from Step 7 was missed.
 
 - [ ] **Step 9: Commit**
 
@@ -726,10 +726,26 @@ export type AppEnv = {
 The `clientIp()` function itself is unchanged — it is pure, and its tests must
 keep passing untouched.
 
-- [ ] **Step 6: Delete `services.ts` and update `rig.ts`**
+- [ ] **Step 6: Delete `services.ts`, and rename its type in the two files that use it**
 
 ```bash
 git rm apps/api/src/services.ts
+```
+
+`cron.ts:9` and `scheduled.ts:18` both `import type { Services }` from it, so
+deleting it breaks them. Change both to `import type { Deps } from "./deps"`
+and rename the parameter and every `services.x` to `deps.x`. **That is the
+whole change to those two files in this task** — splitting `scheduled.ts` into
+`jobs/`, moving `cron.ts` to `apps/server` and swapping the scheduler onto
+`Bun.cron` are Task 5. `Deps` is structurally a superset of what `Services`
+provided (it adds `push`, `peerAddress`, `now` and the config values), so the
+rename is mechanical.
+
+Also repoint the package's main entry now that `app.ts` exists — in
+`apps/api/package.json`:
+
+```json
+    ".": "./src/app.ts",
 ```
 
 `rig.ts` becomes shorter: it builds a `Deps` directly instead of calling
@@ -950,9 +966,9 @@ comes from `createApi(deps)` and there is no `bindings` object.
 ```ts
 import { serveStatic } from "hono/bun";
 import { createApi } from "@pjokk/api";
+import { startScheduler } from "@pjokk/api/cron";
 import { disabledSubsystems, loadEnv } from "./env";
 import { createDeps } from "./deps";
-import { startScheduler } from "./cron";
 
 const env = loadEnv(process.env);
 
@@ -1076,8 +1092,15 @@ latch and the 60-minute grace window.
 git mv apps/api/src/cron.ts apps/server/src/cron.ts
 ```
 
-`runJob` keeps its current body with `Services` → `Deps`. `startScheduler`
-is replaced:
+Then switch the two importers from the package entry to the local file:
+`apps/server/src/main.ts` and `cron-cli.ts` currently say
+`from "@pjokk/api/cron"` (correct while the file lived in `apps/api`); both
+become `from "./cron"`.
+
+`runJob` already takes `Deps` — Task 3 renamed it. Its body is unchanged except
+that its `./scheduled` imports become `@pjokk/api/jobs/<name>` imports, since
+the job bodies stay in `apps/api` while the scheduling moves here.
+`startScheduler` is replaced:
 
 ```ts
 export const SCHEDULES = {
