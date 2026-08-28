@@ -17,7 +17,7 @@ choices, noted so they can be revisited deliberately.
 
 - **better-auth 1.7 requires `account.issuer`** (unique with accountId), but
   the deprecated `better-auth generate` CLI emits a stale schema without it.
-  Added by hand in `src/worker/db/auth-schema.ts` — merge, don't regenerate.
+  Added by hand in `src/server/db/auth-schema.ts` — merge, don't regenerate.
 - **Email/password sign-IN is enabled** (signup stays disabled). It's the
   local-dev/demo path (seeded users) and a fallback until Google credentials
   are configured. CLAUDE.md's "email/passkey" passkey half: the server plugin
@@ -298,7 +298,7 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   checkout), falling back to `customer_email` otherwise — so a lifetime buy
   reuses the existing customer instead of creating a duplicate. Implemented
   as a narrow `fam.stripeCustomerId()` scoped-query helper
-  (`src/worker/db/scoped.ts`), NOT by widening the existing `fam.family()`
+  (`src/server/db/scoped.ts`), NOT by widening the existing `fam.family()`
   helper: that was tried first and reverted because it leaked
   `stripeCustomerId` through `GET /api/family` to every member; a regression
   test now pins the field's absence from that response.
@@ -356,7 +356,7 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   (Settings → Billing). "Add baby" row in Settings gets the same treatment
   (lock badge, disabled state, link to Billing). Server gates (402
   `PLAN_REQUIRED`) back every client gate.
-- **Feature type expanded** (`src/worker/entitlements.ts`): `type Feature =
+- **Feature type expanded** (`src/server/entitlements.ts`): `type Feature =
   "otherActivities" | "multipleBabies" | "growthCharts" | "apiKeys" |
   "csvExport" | "statsMonth"`. All plan reads go through `canUse(family,
   feature)`, unchanged API.
@@ -630,7 +630,7 @@ been true since Phase 3; the vaccine feature only made it obvious.
   components.** Reusing `StatusCard`/`LogButton` would have dragged the app
   bundle onto the landing page; screenshots would go stale and need
   re-shooting in light and dark. The cost is a small duplicated colour-token
-  block in `src/worker/landing/styles.ts` — keep it in step with
+  block in `src/server/landing/styles.ts` — keep it in step with
   `src/web/styles.css`.
 - **Language is negotiated server-side**: `?lang=` → `pjokk_lang` cookie →
   `Accept-Language` → English. Nothing flashes in the wrong language and no

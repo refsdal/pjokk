@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { schema } from "../src/worker/db";
+import { schema } from "../src/server/db";
 import { formatRelative, toLocalDateInput } from "../src/web/lib/time";
 import { api, db, rig, setPlan } from "./helpers";
 import type { Timeline } from "../src/shared/schemas";

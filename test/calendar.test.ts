@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { schema } from "../src/worker/db";
-import { familyScope } from "../src/worker/db/scoped";
+import { schema } from "../src/server/db";
+import { familyScope } from "../src/server/db/scoped";
 import {
   addMember,
   api,

@@ -1,6 +1,6 @@
 // Used ONLY by `better-auth generate` to emit the drizzle schema for the
 // auth tables. The real runtime instance is created per-request in
-// src/worker/auth.ts (D1 bindings are request-scoped on Workers).
+// src/server/auth.ts (D1 bindings are request-scoped on Workers).
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization, bearer } from "better-auth/plugins";

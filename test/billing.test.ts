@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
 import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { canUse } from "../src/worker/entitlements";
-import { applySubscriptionStatus, grantLifetime } from "../src/worker/billing";
-import { reconcilePlans } from "../src/worker/scheduled";
+import { canUse } from "../src/server/entitlements";
+import { applySubscriptionStatus, grantLifetime } from "../src/server/billing";
+import { reconcilePlans } from "../src/server/scheduled";
 import {
   addMember,
   api,
@@ -15,7 +15,7 @@ import {
   setPlan,
   signIn,
 } from "./helpers";
-import { schema } from "../src/worker/db";
+import { schema } from "../src/server/db";
 
 describe("canUse", () => {
   it("denies premium features on free, allows on every paid plan", () => {

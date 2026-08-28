@@ -22,7 +22,7 @@ interface __BaseEnv_Env {
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
-		mainModule: typeof import("./src/worker/index");
+		mainModule: typeof import("./src/server/index");
 	}
 	interface TestEnv {
 		KV: KVNamespace;

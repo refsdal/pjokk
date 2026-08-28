@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { schema } from "../src/worker/db";
-import { TOMBSTONE_ID } from "../src/worker/db/tombstone";
+import { schema } from "../src/server/db";
+import { TOMBSTONE_ID } from "../src/server/db/tombstone";
 import {
   addMember,
   api,

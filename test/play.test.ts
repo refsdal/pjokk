@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { familyScope } from "../src/worker/db/scoped";
+import { familyScope } from "../src/server/db/scoped";
 import {
   addMember,
   api,

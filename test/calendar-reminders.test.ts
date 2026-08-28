@@ -1,8 +1,8 @@
 import { env } from "cloudflare:test";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { schema } from "../src/worker/db";
-import { clockFmt, runCalendarReminders } from "../src/worker/scheduled";
+import { schema } from "../src/server/db";
+import { clockFmt, runCalendarReminders } from "../src/server/scheduled";
 import {
   addMember,
   api,

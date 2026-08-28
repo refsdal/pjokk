@@ -1,8 +1,8 @@
 import { env } from "cloudflare:test";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { schema } from "../src/worker/db";
-import { runReminders } from "../src/worker/scheduled";
+import { schema } from "../src/server/db";
+import { runReminders } from "../src/server/scheduled";
 import { api, db, rig } from "./helpers";
 
 // A plausible browser subscription (P-256 public key + auth secret).

@@ -4,7 +4,7 @@ import {
   BACKUP_RETENTION_DAYS,
   pruneBackups,
   runBackup,
-} from "../src/worker/scheduled";
+} from "../src/server/scheduled";
 import { api, rig } from "./helpers";
 
 describe("nightly backup", () => {

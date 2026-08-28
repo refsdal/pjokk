@@ -28,7 +28,7 @@
     "resolveJsonModule": true
   },
   "include": [
-    "src/worker",
+    "src/server",
     "src/shared",
     "test",
     "worker-configuration.d.ts",

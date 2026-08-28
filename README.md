@@ -80,7 +80,7 @@ are set with `wrangler secret put` (see `SMOKE-TEST.md`).
 
 ```
 src/shared/    zod schemas — the single source of truth for API shapes
-src/worker/    Hono API, better-auth factory, tenancy middleware, Drizzle schema
+src/server/    Hono API, better-auth factory, tenancy middleware, Drizzle schema
 src/web/       React SPA (screens, log sheets, offline plumbing)
 migrations/    D1 migrations (drizzle-kit)
 test/          workers-runtime tests

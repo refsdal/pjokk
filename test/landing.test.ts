@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   fromAcceptLanguage,
   hasSessionCookie,
-} from "../src/worker/landing/index";
+} from "../src/server/landing/index";
 
 // The landing page is the one non-/api path the Worker owns. Everything it
 // decides — language, call to action, indexability — is decided server-side

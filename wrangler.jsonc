@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "pjokk",
   "account_id": "ec92f89b6cf6daf1d0f5c59bc2a975db", // Refsdal Holding AS
-  "main": "src/worker/index.ts",
+  "main": "src/server/index.ts",
   "compatibility_date": "2026-08-04",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {

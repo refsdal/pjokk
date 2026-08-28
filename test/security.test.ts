@@ -1,8 +1,8 @@
 import { env, SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { schema } from "../src/worker/db";
-import { purgeOrphanUsers } from "../src/worker/scheduled";
+import { schema } from "../src/server/db";
+import { purgeOrphanUsers } from "../src/server/scheduled";
 import { api, createUser, db, rig, signIn } from "./helpers";
 
 describe("security hardening", () => {

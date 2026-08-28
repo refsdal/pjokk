@@ -1,7 +1,7 @@
 import { env, SELF } from "cloudflare:test";
 import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
-import { createDb, schema } from "../src/worker/db";
+import { createDb, schema } from "../src/server/db";
 
 export const db = () => createDb(env.DB);
 

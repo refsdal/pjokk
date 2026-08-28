@@ -20,7 +20,7 @@ export default defineConfig(async () => {
     },
     plugins: [
       cloudflareTest({
-        main: "./src/worker/index.ts",
+        main: "./src/server/index.ts",
         miniflare: {
           compatibilityDate: "2026-08-04",
           compatibilityFlags: ["nodejs_compat"],
