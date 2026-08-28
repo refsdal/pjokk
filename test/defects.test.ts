@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { schema } from "../src/server/db";
+import { isUniqueViolation } from "../src/server/lib";
 import { formatRelative, toLocalDateInput } from "../src/web/lib/time";
 import { api, db, rig, setPlan } from "./helpers";
 import type { Timeline } from "../src/shared/schemas";
@@ -132,9 +133,12 @@ describe("one active sleep session per baby (DB-enforced)", () => {
     try {
       await db().insert(schema.sleepLog).values(base);
     } catch (err) {
-      for (let e: unknown = err; e; e = (e as { cause?: unknown }).cause) {
-        if (String(e).includes("UNIQUE")) uniqueViolation = true;
-      }
+      // Asserted through the app's own helper rather than by re-implementing
+      // the detection here. The duplicate logic previously checked for the
+      // literal "UNIQUE" — SQLite's wording — so this test would have kept
+      // passing against Postgres while the routes it stands for silently
+      // returned 500s.
+      uniqueViolation = isUniqueViolation(err);
     }
     expect(uniqueViolation).toBe(true);
     // A COMPLETED session alongside an active one is fine.

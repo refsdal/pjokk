@@ -1,5 +1,6 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { z } from "@hono/zod-openapi";
+import type { Env } from "./config";
 
 export function createApp<E extends { Bindings: Env }>() {
   return new OpenAPIHono<E>({
@@ -29,11 +30,22 @@ export function jsonContent<T extends z.ZodType>(
 }
 
 // Partial unique indexes ("one active session per baby") are the real guard
-// against a double-tap or an offline-queue replay. Drizzle wraps the SQLite
+// against a double-tap or an offline-queue replay. Drizzle wraps the driver
 // error, so recognizing one means walking the cause chain.
+//
+// 23505 is the SQL standard's unique_violation SQLSTATE, which Bun's Postgres
+// driver surfaces as `errno`. Matching the code rather than the message is
+// what makes this robust: the previous implementation looked for the literal
+// "UNIQUE" in the text, which is SQLite's wording — Postgres says "duplicate
+// key value violates unique constraint", so a text match silently stopped
+// working and turned every "already active" conflict into a 500.
+const UNIQUE_VIOLATION = "23505";
+
 export function isUniqueViolation(err: unknown): boolean {
   for (let e: unknown = err; e; e = (e as { cause?: unknown }).cause) {
-    if (String(e).includes("UNIQUE")) return true;
+    const candidate = e as { errno?: unknown; code?: unknown };
+    if (candidate.errno === UNIQUE_VIOLATION) return true;
+    if (candidate.code === UNIQUE_VIOLATION) return true;
   }
   return false;
 }

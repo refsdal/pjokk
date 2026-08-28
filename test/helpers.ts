@@ -1,9 +1,13 @@
-import { env, SELF } from "cloudflare:test";
 import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
-import { createDb, schema } from "../src/server/db";
+import { schema } from "../src/server/db";
+import { SELF, services } from "./rig";
 
-export const db = () => createDb(env.DB);
+// Re-exported so the test files keep importing their whole rig from one
+// place, exactly as they did from cloudflare:test.
+export { env, resetDb, services, SELF, storage } from "./rig";
+
+export const db = () => services.db;
 
 export const planOf = async (id: string) =>
   (

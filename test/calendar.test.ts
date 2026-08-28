@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { schema } from "../src/server/db";
 import { familyScope } from "../src/server/db/scoped";
 import {

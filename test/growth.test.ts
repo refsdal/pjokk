@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { referenceWeight, weightPercentile } from "../src/web/lib/growth";
 
 // Anchors from the WHO weight-for-age tables (canonical published medians).

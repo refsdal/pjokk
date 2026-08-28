@@ -1,13 +1,15 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   index,
   integer,
+  pgTable,
   primaryKey,
-  real,
-  sqliteTable,
+  doublePrecision,
   text,
+  timestamp,
   uniqueIndex,
-} from "drizzle-orm/sqlite-core";
+} from "drizzle-orm/pg-core";
 import { organization, user } from "./auth-schema";
 
 export * from "./auth-schema";
@@ -25,18 +27,21 @@ const familyId = () =>
     .notNull()
     .references(() => organization.id, { onDelete: "cascade" });
 
-const createdAt = () =>
-  integer("created_at", { mode: "timestamp_ms" })
-    .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
-    .notNull();
+// Every instant is a timestamptz. Drizzle maps it to a JS Date — exactly what
+// the old epoch-ms integers mapped to — so application code is unchanged by
+// the dialect switch, while the database gets a column it can reason about.
+const ts = (name: string) =>
+  timestamp(name, { withTimezone: true, mode: "date" });
 
-export const baby = sqliteTable(
+const createdAt = () => ts("created_at").defaultNow().notNull();
+
+export const baby = pgTable(
   "baby",
   {
     id: id(),
     familyId: familyId(),
     name: text("name").notNull(),
-    birthDate: integer("birth_date", { mode: "timestamp_ms" }).notNull(),
+    birthDate: ts("birth_date").notNull(),
     // Needed for WHO growth percentiles; nullable so existing babies keep
     // working until it's set.
     sex: text("sex", { enum: ["girl", "boy"] }),
@@ -49,7 +54,7 @@ export const baby = sqliteTable(
 // The key itself is shown once; only its SHA-256 lands here. Keys act as the
 // creating caretaker (attribution) and can read + write logs, but never
 // touch admin/device endpoints.
-export const apiKey = sqliteTable(
+export const apiKey = pgTable(
   "api_key",
   {
     id: id(),
@@ -61,19 +66,17 @@ export const apiKey = sqliteTable(
     createdBy: text("created_by")
       .notNull()
       .references(() => user.id),
-    lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
-    revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+    lastUsedAt: ts("last_used_at"),
+    revokedAt: ts("revoked_at"),
     // NULL = never expires.
-    expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
-    readOnly: integer("read_only", { mode: "boolean" })
-      .default(false)
-      .notNull(),
+    expiresAt: ts("expires_at"),
+    readOnly: boolean("read_only").default(false).notNull(),
     createdAt: createdAt(),
   },
   (t) => [index("api_key_family_idx").on(t.familyId)],
 );
 
-export const sleepLog = sqliteTable(
+export const sleepLog = pgTable(
   "sleep_log",
   {
     id: id(),
@@ -84,9 +87,9 @@ export const sleepLog = sqliteTable(
     caretakerId: text("caretaker_id")
       .notNull()
       .references(() => user.id),
-    startTime: integer("start_time", { mode: "timestamp_ms" }).notNull(),
+    startTime: ts("start_time").notNull(),
     // NULL while the sleep session is active.
-    endTime: integer("end_time", { mode: "timestamp_ms" }),
+    endTime: ts("end_time"),
     location: text("location"),
     notes: text("notes"),
     createdAt: createdAt(),
@@ -102,7 +105,7 @@ export const sleepLog = sqliteTable(
   ],
 );
 
-export const feedLog = sqliteTable(
+export const feedLog = pgTable(
   "feed_log",
   {
     id: id(),
@@ -113,7 +116,7 @@ export const feedLog = sqliteTable(
     caretakerId: text("caretaker_id")
       .notNull()
       .references(() => user.id),
-    time: integer("time", { mode: "timestamp_ms" }).notNull(),
+    time: ts("time").notNull(),
     type: text("type", { enum: ["bottle", "breast", "solids"] }).notNull(),
     amountMl: integer("amount_ml"),
     side: text("side", { enum: ["left", "right", "both"] }),
@@ -129,7 +132,7 @@ export const feedLog = sqliteTable(
   ],
 );
 
-export const diaperLog = sqliteTable(
+export const diaperLog = pgTable(
   "diaper_log",
   {
     id: id(),
@@ -140,7 +143,7 @@ export const diaperLog = sqliteTable(
     caretakerId: text("caretaker_id")
       .notNull()
       .references(() => user.id),
-    time: integer("time", { mode: "timestamp_ms" }).notNull(),
+    time: ts("time").notNull(),
     type: text("type", { enum: ["wet", "dirty", "both"] }).notNull(),
     notes: text("notes"),
     createdAt: createdAt(),
@@ -165,9 +168,9 @@ const caretakerId = () =>
     .notNull()
     .references(() => user.id);
 
-const time = () => integer("time", { mode: "timestamp_ms" }).notNull();
+const time = () => ts("time").notNull();
 
-export const medicineLog = sqliteTable(
+export const medicineLog = pgTable(
   "medicine_log",
   {
     id: id(),
@@ -176,7 +179,10 @@ export const medicineLog = sqliteTable(
     caretakerId: caretakerId(),
     time: time(),
     name: text("name").notNull(),
-    amount: real("amount"),
+    // doublePrecision, not real: SQLite's REAL is an 8-byte IEEE double, but
+    // Postgres' `real` is 4-byte single precision, which silently rounds a
+    // dose of 8.4 to 8.399999618530273.
+    amount: doublePrecision("amount"),
     unit: text("unit", { enum: ["ml", "mg", "drops", "dose"] }),
     notes: text("notes"),
     createdAt: createdAt(),
@@ -184,7 +190,7 @@ export const medicineLog = sqliteTable(
   (t) => [index("medicine_family_time_idx").on(t.familyId, t.time)],
 );
 
-export const bathLog = sqliteTable(
+export const bathLog = pgTable(
   "bath_log",
   {
     id: id(),
@@ -198,7 +204,7 @@ export const bathLog = sqliteTable(
   (t) => [index("bath_family_time_idx").on(t.familyId, t.time)],
 );
 
-export const noteLog = sqliteTable(
+export const noteLog = pgTable(
   "note_log",
   {
     id: id(),
@@ -213,7 +219,7 @@ export const noteLog = sqliteTable(
   (t) => [index("note_family_time_idx").on(t.familyId, t.time)],
 );
 
-export const milestoneLog = sqliteTable(
+export const milestoneLog = pgTable(
   "milestone_log",
   {
     id: id(),
@@ -229,7 +235,7 @@ export const milestoneLog = sqliteTable(
 );
 
 // Units are implied by type: weight in kg, length/head in cm.
-export const measurementLog = sqliteTable(
+export const measurementLog = pgTable(
   "measurement_log",
   {
     id: id(),
@@ -238,14 +244,16 @@ export const measurementLog = sqliteTable(
     caretakerId: caretakerId(),
     time: time(),
     type: text("type", { enum: ["weight", "length", "head"] }).notNull(),
-    value: real("value").notNull(),
+    // doublePrecision for the same reason as medicine_log.amount: `real`
+    // would round a recorded weight.
+    value: doublePrecision("value").notNull(),
     notes: text("notes"),
     createdAt: createdAt(),
   },
   (t) => [index("measurement_family_time_idx").on(t.familyId, t.time)],
 );
 
-export const pumpLog = sqliteTable(
+export const pumpLog = pgTable(
   "pump_log",
   {
     id: id(),
@@ -266,7 +274,7 @@ export const pumpLog = sqliteTable(
 
 // One row per browser/device push subscription. Endpoint is the identity;
 // rows are deleted when the push service answers 404/410.
-export const pushSubscription = sqliteTable(
+export const pushSubscription = pgTable(
   "push_subscription",
   {
     id: id(),
@@ -284,7 +292,7 @@ export const pushSubscription = sqliteTable(
 
 // Per-caretaker notification preferences (per family). feedReminderHours=0
 // means off; lastRemindedAt implements one-nudge-per-gap.
-export const pushPref = sqliteTable(
+export const pushPref = pgTable(
   "push_pref",
   {
     userId: text("user_id")
@@ -292,14 +300,14 @@ export const pushPref = sqliteTable(
       .references(() => user.id, { onDelete: "cascade" }),
     familyId: familyId(),
     feedReminderHours: integer("feed_reminder_hours").default(0).notNull(),
-    lastRemindedAt: integer("last_reminded_at", { mode: "timestamp_ms" }),
+    lastRemindedAt: ts("last_reminded_at"),
   },
   (t) => [primaryKey({ columns: [t.userId, t.familyId] })],
 );
 
 // Audit trail for system-admin actions (Phase 8): impersonations, family
 // deletes, password sets, bans. Append-only.
-export const adminAudit = sqliteTable(
+export const adminAudit = pgTable(
   "admin_audit",
   {
     id: id(),
@@ -317,16 +325,16 @@ export const adminAudit = sqliteTable(
 
 // Custom invite codes (QR-at-Sunday-dinner grain, not email-addressed).
 // Codes are credentials: the redeem endpoint is rate-limited.
-export const familyInvite = sqliteTable(
+export const familyInvite = pgTable(
   "family_invite",
   {
     code: text("code").primaryKey(),
     familyId: familyId(),
     role: text("role", { enum: ["admin", "member"] }).notNull(),
-    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    expiresAt: ts("expires_at").notNull(),
     maxUses: integer("max_uses").notNull(),
     usedCount: integer("used_count").default(0).notNull(),
-    revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+    revokedAt: ts("revoked_at"),
     createdBy: text("created_by")
       .notNull()
       .references(() => user.id),
@@ -337,7 +345,7 @@ export const familyInvite = sqliteTable(
 
 // Custom sleep locations (e.g. "Crib", "Grandma's"), per family — offered as
 // chips alongside the free-text sleep_log.location field.
-export const sleepLocation = sqliteTable(
+export const sleepLocation = pgTable(
   "sleep_location",
   {
     id: id(),
@@ -353,7 +361,7 @@ export const sleepLocation = sqliteTable(
 // only — it never constrains what can be logged, so a vaccine given abroad
 // or off-programme records exactly the same way.
 
-export const vaccineLog = sqliteTable(
+export const vaccineLog = pgTable(
   "vaccine_log",
   {
     id: id(),
@@ -378,7 +386,7 @@ export const vaccineLog = sqliteTable(
 
 // Attachments live in R2; this table is the authorization record. Uploading
 // is premium, but reading and deleting never are.
-export const vaccineDocument = sqliteTable(
+export const vaccineDocument = pgTable(
   "vaccine_document",
   {
     id: id(),
@@ -406,7 +414,7 @@ export const vaccineDocument = sqliteTable(
 // had that abroad", "not offered here"). Stores the slot KEY, not a foreign
 // key: the bundled programme is data that can change without a migration,
 // and a dismissal of a key that no longer exists simply stops matching.
-export const vaccineDismissal = sqliteTable(
+export const vaccineDismissal = pgTable(
   "vaccine_dismissal",
   {
     id: id(),
@@ -432,7 +440,7 @@ export const vaccineDismissal = sqliteTable(
 // object needed; "active" is a row shape, and the client renders the counter
 // from start_time.
 
-export const playLog = sqliteTable(
+export const playLog = pgTable(
   "play_log",
   {
     id: id(),
@@ -440,9 +448,9 @@ export const playLog = sqliteTable(
     babyId: babyId(),
     caretakerId: caretakerId(),
     type: text("type", { enum: ["tummy", "walk", "play"] }).notNull(),
-    startTime: integer("start_time", { mode: "timestamp_ms" }).notNull(),
+    startTime: ts("start_time").notNull(),
     // NULL while the activity is running.
-    endTime: integer("end_time", { mode: "timestamp_ms" }),
+    endTime: ts("end_time"),
     notes: text("notes"),
     createdAt: createdAt(),
   },
@@ -464,7 +472,7 @@ export const playLog = sqliteTable(
 // the contact belongs to the whole family (the doctor everyone shares),
 // which is the same convention calendar_event_baby uses.
 
-export const contact = sqliteTable(
+export const contact = pgTable(
   "contact",
   {
     id: id(),
@@ -497,7 +505,7 @@ export const contact = sqliteTable(
   (t) => [index("contact_family_idx").on(t.familyId)],
 );
 
-export const contactBaby = sqliteTable(
+export const contactBaby = pgTable(
   "contact_baby",
   {
     contactId: text("contact_id")
@@ -513,7 +521,7 @@ export const contactBaby = sqliteTable(
 // --- Calendar (premium): family-wide planned events. Babies and responsible
 // members attach via join tables; zero baby rows = family-wide event.
 
-export const calendarEvent = sqliteTable(
+export const calendarEvent = pgTable(
   "calendar_event",
   {
     id: id(),
@@ -529,19 +537,19 @@ export const calendarEvent = sqliteTable(
     })
       .default("other")
       .notNull(),
-    startTime: integer("start_time", { mode: "timestamp_ms" }).notNull(),
+    startTime: ts("start_time").notNull(),
     // All-day events are single-day; durationMin is NULL when set.
-    allDay: integer("all_day", { mode: "boolean" }).default(false).notNull(),
+    allDay: boolean("all_day").default(false).notNull(),
     durationMin: integer("duration_min"),
     // NULL = no reminder. remindedAt is the sweep's idempotency latch.
     remindMinutesBefore: integer("remind_minutes_before"),
-    remindedAt: integer("reminded_at", { mode: "timestamp_ms" }),
+    remindedAt: ts("reminded_at"),
     createdAt: createdAt(),
   },
   (t) => [index("calendar_family_start_idx").on(t.familyId, t.startTime)],
 );
 
-export const calendarEventBaby = sqliteTable(
+export const calendarEventBaby = pgTable(
   "calendar_event_baby",
   {
     eventId: text("event_id")
@@ -554,7 +562,7 @@ export const calendarEventBaby = sqliteTable(
   (t) => [primaryKey({ columns: [t.eventId, t.babyId] })],
 );
 
-export const calendarAssignee = sqliteTable(
+export const calendarAssignee = pgTable(
   "calendar_assignee",
   {
     eventId: text("event_id")
@@ -565,4 +573,31 @@ export const calendarAssignee = sqliteTable(
       .references(() => user.id),
   },
   (t) => [primaryKey({ columns: [t.eventId, t.userId] })],
+);
+
+// --- Rate-limit counters (replaces the KV namespace) ---
+//
+// KV was globally replicated with no jurisdiction option, which is why the
+// limiter could only ever store a HASH of the client IP. That constraint is
+// gone — this table lives in the same EU database as everything else — but
+// the hashing stays: there is no reason to start recording addresses, and a
+// hash buckets each client identically.
+//
+// Postgres also removes the old caveat. KV's read-then-write increment was
+// racy ("a brake, not an invariant", said the comment); here one
+// INSERT … ON CONFLICT DO UPDATE … RETURNING is atomic, so the limit is
+// exact even under concurrent requests — which matters once several replicas
+// share one database.
+export const rateLimit = pgTable(
+  "rate_limit",
+  {
+    // "rl:<name>:<bucket>:<window>" — the window number is part of the key,
+    // so a new fixed window is simply a new row.
+    key: text("key").primaryKey(),
+    count: integer("count").default(0).notNull(),
+    // KV expired rows for us. Nothing does here, so the sweep in the cron
+    // prunes them and this index keeps that cheap.
+    expiresAt: ts("expires_at").notNull(),
+  },
+  (t) => [index("rate_limit_expires_idx").on(t.expiresAt)],
 );

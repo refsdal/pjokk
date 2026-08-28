@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { addMember, api, createUser, rig, signIn } from "./helpers";
 
 describe("per-side nursing minutes", () => {

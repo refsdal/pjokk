@@ -1,1 +1,0 @@
-CREATE UNIQUE INDEX `sleep_one_active_per_baby` ON `sleep_log` (`baby_id`) WHERE end_time IS NULL;

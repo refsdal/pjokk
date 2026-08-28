@@ -210,7 +210,7 @@ export const vaccinesApp = createApp<FamEnv>()
     // the row is gone means a failure here leaks an orphan object rather
     // than leaving a document row pointing at nothing.
     if (objectKeys.length > 0) {
-      await c.env.FILES.delete(objectKeys);
+      await c.var.storage.delete(objectKeys);
     }
     return c.json({ ok: true as const }, 200);
   });
@@ -268,9 +268,11 @@ export const filesApp = createApp<FamEnv>()
     // The key is server-generated: a filename from the client never reaches
     // the object store.
     const objectKey = `vaccine-docs/${c.var.familyId}/${crypto.randomUUID()}`;
-    await c.env.FILES.put(objectKey, file.stream(), {
-      httpMetadata: { contentType: file.type },
-    });
+    // The File itself, NOT file.stream(): Bun's S3 client does not accept a
+    // ReadableStream and does not reject one either — it writes the string
+    // "[object ReadableStream]" and reports success, which would corrupt
+    // every upload silently. A File is a Blob, so this streams just as well.
+    await c.var.storage.put(objectKey, file, file.type);
     const docId = await c.var.fam.createVaccineDocument({
       vaccineLogId: id,
       objectKey,
@@ -296,11 +298,11 @@ export const filesApp = createApp<FamEnv>()
     if (!doc) {
       return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
     }
-    const object = await c.env.FILES.get(doc.objectKey);
-    if (!object) {
+    const body = await c.var.storage.getStream(doc.objectKey);
+    if (!body) {
       return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
     }
-    return new Response(object.body, {
+    return new Response(body, {
       headers: {
         "content-type": doc.contentType,
         "content-length": String(doc.size),
@@ -318,6 +320,6 @@ export const filesApp = createApp<FamEnv>()
     if (!objectKey) {
       return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
     }
-    await c.env.FILES.delete(objectKey);
+    await c.var.storage.delete(objectKey);
     return c.json({ ok: true as const }, 200);
   });

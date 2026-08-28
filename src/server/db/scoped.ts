@@ -10,8 +10,7 @@ import {
   lt,
   or,
 } from "drizzle-orm";
-import type { BatchItem } from "drizzle-orm/batch";
-import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
+import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
 import type { Db } from "./index";
 import {
   apiKey,
@@ -164,12 +163,12 @@ const playCols = {
 // narrow `as never` casts are the price of a table-generic drizzle query and
 // are contained here.
 
-type SimpleLogTable = SQLiteTable & {
-  id: SQLiteColumn;
-  familyId: SQLiteColumn;
-  babyId: SQLiteColumn;
-  caretakerId: SQLiteColumn;
-  time: SQLiteColumn;
+type SimpleLogTable = PgTable & {
+  id: PgColumn;
+  familyId: PgColumn;
+  babyId: PgColumn;
+  caretakerId: PgColumn;
+  time: PgColumn;
 };
 
 // Keyset cursor over the global order (time DESC, id DESC). The id tiebreak
@@ -179,8 +178,8 @@ export type Cursor = { time: Date; id: string };
 export type ListOpts = { babyId?: string; limit?: number; before?: Cursor };
 
 function beforeCursor(
-  timeCol: SQLiteColumn,
-  idCol: SQLiteColumn,
+  timeCol: PgColumn,
+  idCol: PgColumn,
   cursor: Cursor | undefined,
 ) {
   if (!cursor) return undefined;
@@ -215,7 +214,7 @@ function logCrud<Row, Insert>(
   db: Db,
   familyId: string,
   table: SimpleLogTable,
-  extraCols: Record<string, SQLiteColumn>,
+  extraCols: Record<string, PgColumn>,
 ): LogCrud<Row, Insert> {
   const cols = {
     id: table.id,
@@ -1378,10 +1377,12 @@ export function familyScope(db: Db, familyId: string) {
       babyIds: string[];
     }) {
       const id = crypto.randomUUID();
-      // Contact row first, links after — same ordering rationale as
-      // createCalendarEvent: never leave dangling link rows.
-      const statements: BatchItem<"sqlite">[] = [
-        db.insert(contact).values({
+      // Contact and its baby links commit together or not at all. On D1 this
+      // was a batch() with the rows deliberately ordered so a partial failure
+      // could only leave a link-less contact, never dangling links; a real
+      // transaction makes that ordering irrelevant.
+      await db.transaction(async (tx) => {
+        await tx.insert(contact).values({
           id,
           familyId,
           name: data.name,
@@ -1391,16 +1392,13 @@ export function familyScope(db: Db, familyId: string) {
           email: data.email ?? null,
           website: data.website ?? null,
           notes: data.notes ?? null,
-        }),
-      ];
-      if (data.babyIds.length > 0) {
-        statements.push(
-          db
+        });
+        if (data.babyIds.length > 0) {
+          await tx
             .insert(contactBaby)
-            .values(data.babyIds.map((babyId) => ({ contactId: id, babyId }))),
-        );
-      }
-      await db.batch(statements as never);
+            .values(data.babyIds.map((babyId) => ({ contactId: id, babyId })));
+        }
+      });
       return this.getContact(id);
     },
 
@@ -1418,36 +1416,39 @@ export function familyScope(db: Db, familyId: string) {
       links: { babyIds?: string[] },
     ) {
       const set = compactPatch(patch);
-      if (Object.keys(set).length > 0) {
-        const rows = await db
-          .update(contact)
-          .set(set)
-          .where(and(eq(contact.id, id), eq(contact.familyId, familyId)))
-          .returning({ id: contact.id });
-        if (!rows[0]) return null;
-      } else {
-        // Ownership check even for a link-only update.
-        const rows = await db
-          .select({ id: contact.id })
-          .from(contact)
-          .where(and(eq(contact.id, id), eq(contact.familyId, familyId)));
-        if (!rows[0]) return null;
-      }
-      if (links.babyIds !== undefined) {
-        const statements: BatchItem<"sqlite">[] = [
-          db.delete(contactBaby).where(eq(contactBaby.contactId, id)),
-        ];
-        if (links.babyIds.length > 0) {
-          statements.push(
-            db
+      // The column patch and the link replacement are now one transaction.
+      // D1 forced them apart — batch() could not span the ownership check —
+      // which left a window where a contact had its new fields but stale
+      // baby links, and a failed link write could not roll the patch back.
+      const found = await db.transaction(async (tx) => {
+        if (Object.keys(set).length > 0) {
+          const rows = await tx
+            .update(contact)
+            .set(set)
+            .where(and(eq(contact.id, id), eq(contact.familyId, familyId)))
+            .returning({ id: contact.id });
+          if (!rows[0]) return false;
+        } else {
+          // Ownership check even for a link-only update.
+          const rows = await tx
+            .select({ id: contact.id })
+            .from(contact)
+            .where(and(eq(contact.id, id), eq(contact.familyId, familyId)));
+          if (!rows[0]) return false;
+        }
+        if (links.babyIds !== undefined) {
+          await tx.delete(contactBaby).where(eq(contactBaby.contactId, id));
+          if (links.babyIds.length > 0) {
+            await tx
               .insert(contactBaby)
               .values(
                 links.babyIds.map((babyId) => ({ contactId: id, babyId })),
-              ),
-          );
+              );
+          }
         }
-        await db.batch(statements as never);
-      }
+        return true;
+      });
+      if (!found) return null;
       return this.getContact(id);
     },
 
@@ -1504,11 +1505,12 @@ export function familyScope(db: Db, familyId: string) {
       assigneeUserIds: string[];
     }) {
       const id = crypto.randomUUID();
-      // Event row first, link rows after: a partial batch failure leaves a
-      // valid (if link-less) event, never dangling links (D1 has no
-      // transactions; batch() is atomic anyway, this is belt-and-braces).
-      const statements: BatchItem<"sqlite">[] = [
-        db.insert(calendarEvent).values({
+      // Event and its link rows commit together. The old comment here noted
+      // that ordering the batch put the event first so a partial failure left
+      // a valid (if link-less) event rather than dangling links — a real
+      // transaction removes the need to reason about partial failure at all.
+      await db.transaction(async (tx) => {
+        await tx.insert(calendarEvent).values({
           id,
           familyId,
           createdBy: data.createdBy,
@@ -1520,25 +1522,20 @@ export function familyScope(db: Db, familyId: string) {
           allDay: data.allDay,
           durationMin: data.allDay ? null : (data.durationMin ?? null),
           remindMinutesBefore: data.remindMinutesBefore ?? null,
-        }),
-      ];
-      if (data.babyIds.length > 0) {
-        statements.push(
-          db
+        });
+        if (data.babyIds.length > 0) {
+          await tx
             .insert(calendarEventBaby)
-            .values(data.babyIds.map((babyId) => ({ eventId: id, babyId }))),
-        );
-      }
-      if (data.assigneeUserIds.length > 0) {
-        statements.push(
-          db
+            .values(data.babyIds.map((babyId) => ({ eventId: id, babyId })));
+        }
+        if (data.assigneeUserIds.length > 0) {
+          await tx
             .insert(calendarAssignee)
             .values(
               data.assigneeUserIds.map((userId) => ({ eventId: id, userId })),
-            ),
-        );
-      }
-      await db.batch(statements as never);
+            );
+        }
+      });
       return this.getCalendarEvent(id);
     },
 
@@ -1558,56 +1555,62 @@ export function familyScope(db: Db, familyId: string) {
       links: { babyIds?: string[]; assigneeUserIds?: string[] },
     ) {
       const set = compactPatch(patch);
-      if (Object.keys(set).length > 0) {
-        const rows = await db
-          .update(calendarEvent)
-          .set(set)
-          .where(
-            and(eq(calendarEvent.id, id), eq(calendarEvent.familyId, familyId)),
-          )
-          .returning({ id: calendarEvent.id });
-        if (!rows[0]) return null;
-      } else {
-        // Ownership check even for a link-only update.
-        const rows = await db
-          .select({ id: calendarEvent.id })
-          .from(calendarEvent)
-          .where(
-            and(eq(calendarEvent.id, id), eq(calendarEvent.familyId, familyId)),
-          );
-        if (!rows[0]) return null;
-      }
-      const statements: BatchItem<"sqlite">[] = [];
-      if (links.babyIds !== undefined) {
-        statements.push(
-          db.delete(calendarEventBaby).where(eq(calendarEventBaby.eventId, id)),
-        );
-        if (links.babyIds.length > 0) {
-          statements.push(
-            db
-              .insert(calendarEventBaby)
-              .values(links.babyIds.map((babyId) => ({ eventId: id, babyId }))),
-          );
+      // Patch, baby links and assignee links are one transaction — see
+      // updateContact for why splitting them was a D1 artefact rather than a
+      // choice. It matters more here: a reminder sweep reading between the
+      // two writes could notify a stale assignee list.
+      const found = await db.transaction(async (tx) => {
+        if (Object.keys(set).length > 0) {
+          const rows = await tx
+            .update(calendarEvent)
+            .set(set)
+            .where(
+              and(
+                eq(calendarEvent.id, id),
+                eq(calendarEvent.familyId, familyId),
+              ),
+            )
+            .returning({ id: calendarEvent.id });
+          if (!rows[0]) return false;
+        } else {
+          // Ownership check even for a link-only update.
+          const rows = await tx
+            .select({ id: calendarEvent.id })
+            .from(calendarEvent)
+            .where(
+              and(
+                eq(calendarEvent.id, id),
+                eq(calendarEvent.familyId, familyId),
+              ),
+            );
+          if (!rows[0]) return false;
         }
-      }
-      if (links.assigneeUserIds !== undefined) {
-        statements.push(
-          db.delete(calendarAssignee).where(eq(calendarAssignee.eventId, id)),
-        );
-        if (links.assigneeUserIds.length > 0) {
-          statements.push(
-            db.insert(calendarAssignee).values(
+        if (links.babyIds !== undefined) {
+          await tx
+            .delete(calendarEventBaby)
+            .where(eq(calendarEventBaby.eventId, id));
+          if (links.babyIds.length > 0) {
+            await tx
+              .insert(calendarEventBaby)
+              .values(links.babyIds.map((babyId) => ({ eventId: id, babyId })));
+          }
+        }
+        if (links.assigneeUserIds !== undefined) {
+          await tx
+            .delete(calendarAssignee)
+            .where(eq(calendarAssignee.eventId, id));
+          if (links.assigneeUserIds.length > 0) {
+            await tx.insert(calendarAssignee).values(
               links.assigneeUserIds.map((userId) => ({
                 eventId: id,
                 userId,
               })),
-            ),
-          );
+            );
+          }
         }
-      }
-      if (statements.length > 0) {
-        await db.batch(statements as never);
-      }
+        return true;
+      });
+      if (!found) return null;
       return this.getCalendarEvent(id);
     },
 

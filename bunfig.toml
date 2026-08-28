@@ -1,0 +1,4 @@
+[test]
+# Applies the schema once and empties the database before each test, the way
+# @cloudflare/vitest-pool-workers' applyD1Migrations setup file used to.
+preload = ["./test/setup.ts"]

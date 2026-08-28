@@ -1,11 +1,13 @@
 import webpush from "web-push";
 import { eq, inArray } from "drizzle-orm";
+import type { Env } from "./config";
 import type { Db } from "./db";
 import { schema } from "./db";
 
-// web-push does the aes128gcm + VAPID crypto (verified to run under
-// nodejs_compat); we do the actual HTTP ourselves so we can act on the
-// response: 404/410 mean the subscription is dead and must be deleted.
+// web-push does the aes128gcm + VAPID crypto (it ran under Workers'
+// nodejs_compat and runs natively on Bun); we do the actual HTTP ourselves so
+// we can act on the response: 404/410 mean the subscription is dead and must
+// be deleted.
 
 export interface PushPayload {
   title: string;

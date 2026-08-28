@@ -5,15 +5,18 @@ import { passkey } from "@better-auth/passkey";
 import { stripe } from "@better-auth/stripe";
 import type Stripe from "stripe";
 import { and, eq } from "drizzle-orm";
-import { createDb, schema } from "./db";
+import type { Env } from "./config";
+import type { Db } from "./db";
+import { schema } from "./db";
 import { createStripe } from "./stripe";
 import { applySubscriptionStatus, grantLifetime } from "./billing";
 
-// D1 bindings only exist inside the request handler, so the better-auth
-// instance is created per-request (stashed on Hono context in middleware).
-// Never initialize this at module scope.
-export function createAuth(env: Env) {
-  const db = createDb(env.DB);
+// Built ONCE at startup and shared (see services.ts). On Workers this had to
+// run per-request, because D1 bindings only existed inside the request
+// handler — which meant every request rebuilt a Stripe client and the entire
+// plugin chain. The database is now passed in rather than constructed here,
+// so the instance owns no connection lifecycle of its own.
+export function createAuth(env: Env, db: Db) {
   const url = new URL(env.APP_URL);
   const stripeClient = createStripe(env);
 
@@ -24,7 +27,7 @@ export function createAuth(env: Env) {
     // switched off, so any second trusted origin would only widen the surface
     // that can complete a sign-in.
     trustedOrigins: [env.APP_URL],
-    database: drizzleAdapter(db, { provider: "sqlite", schema }),
+    database: drizzleAdapter(db, { provider: "pg", schema }),
     // Open signup is DISABLED (closed alpha). Accounts are only created via
     // the invite redeem flow: /join/CODE calls social sign-in with
     // requestSignUp, everything else refuses new users.

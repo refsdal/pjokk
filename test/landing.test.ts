@@ -1,5 +1,5 @@
-import { env, SELF } from "cloudflare:test";
-import { afterEach, describe, expect, it } from "vitest";
+import { env, SELF } from "./helpers";
+import { afterEach, describe, expect, it } from "bun:test";
 import {
   fromAcceptLanguage,
   hasSessionCookie,

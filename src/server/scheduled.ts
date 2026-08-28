@@ -13,8 +13,9 @@ import {
   or,
   sql,
 } from "drizzle-orm";
-import { createDb, schema } from "./db";
+import { schema } from "./db";
 import { pushToUser } from "./push";
+import type { Services } from "./services";
 import { TOMBSTONE_ID } from "./db/tombstone";
 import { PREMIUM_STATUSES, applySubscriptionStatus } from "./billing";
 
@@ -22,8 +23,8 @@ import { PREMIUM_STATUSES, applySubscriptionStatus } from "./billing";
 // no membership and can't create one — sweep them after a week. Sysadmins
 // and anyone with a membership are never touched; FK-protected users (e.g.
 // with historical logs) are skipped.
-export async function purgeOrphanUsers(env: Env, now = Date.now()) {
-  const db = createDb(env.DB);
+export async function purgeOrphanUsers(services: Services, now = Date.now()) {
+  const { db } = services;
   const cutoff = new Date(now - 7 * 24 * 3600_000);
   const orphans = await db
     .select({ id: schema.user.id, email: schema.user.email })
@@ -48,8 +49,8 @@ export async function purgeOrphanUsers(env: Env, now = Date.now()) {
     try {
       await db.delete(schema.user).where(eq(schema.user.id, orphan.id));
       purged++;
-      // Id, never the email: Workers logs are outside our retention control,
-      // and an address there is personal data we cannot later erase.
+      // Id, never the email: logs are outside our retention control, and an
+      // address in them is personal data we cannot later erase.
       console.log(`purge: removed orphan account ${orphan.id}`);
     } catch {
       // FK references (historical data) — leave it alone.
@@ -61,8 +62,8 @@ export async function purgeOrphanUsers(env: Env, now = Date.now()) {
 // Feed reminders: one nudge per gap. A caretaker with feedReminderHours=N
 // gets a push when the family hasn't logged a feed for N hours — once, until
 // a new feed starts a new gap (lastRemindedAt < lastFeed gates re-sending).
-export async function runReminders(env: Env, now = Date.now()) {
-  const db = createDb(env.DB);
+export async function runReminders(services: Services, now = Date.now()) {
+  const { db, env } = services;
   const prefs = await db
     .select()
     .from(schema.pushPref)
@@ -108,9 +109,9 @@ export async function runReminders(env: Env, now = Date.now()) {
 // editing an event's time or lead resets it (see routes/calendar.ts). Events
 // whose start is >60 min past are latched WITHOUT sending — after downtime a
 // late reminder is worse than none.
-// workerd's default TZ is UTC, so without an explicit zone a 14:00 CEST
-// appointment would push as "12:00" (repo convention: Norwegian defaults,
-// quietly — see CLAUDE.md). Exported so tests can assert Oslo-local
+// A container's TZ is UTC unless told otherwise, so without an explicit zone
+// a 14:00 CEST appointment would push as "12:00" (repo convention: Norwegian
+// defaults, quietly — see CLAUDE.md). Exported so tests can assert Oslo-local
 // formatting directly; the pushed body itself is unobservable through the
 // test fetch stub (web-push encrypts the payload before the HTTP call).
 export const clockFmt = new Intl.DateTimeFormat("nb-NO", {
@@ -120,8 +121,11 @@ export const clockFmt = new Intl.DateTimeFormat("nb-NO", {
   timeZone: "Europe/Oslo",
 });
 
-export async function runCalendarReminders(env: Env, now = Date.now()) {
-  const db = createDb(env.DB);
+export async function runCalendarReminders(
+  services: Services,
+  now = Date.now(),
+) {
+  const { db, env } = services;
   const pending = and(
     isNotNull(schema.calendarEvent.remindMinutesBefore),
     isNull(schema.calendarEvent.remindedAt),
@@ -151,8 +155,12 @@ export async function runCalendarReminders(env: Env, now = Date.now()) {
       and(
         pending,
         gte(schema.calendarEvent.startTime, new Date(now - 3600_000)),
-        // start_time and now are both ms epochs in SQLite.
-        sql`${schema.calendarEvent.startTime} - ${schema.calendarEvent.remindMinutesBefore} * 60000 <= ${now}`,
+        // "the reminder is due": start_time minus the lead time is in the
+        // past. This was epoch-millisecond arithmetic when both sides were
+        // integers in SQLite; on a timestamptz the lead time has to be a real
+        // interval, because `timestamptz - integer` is not an operator
+        // Postgres defines.
+        sql`${schema.calendarEvent.startTime} - (${schema.calendarEvent.remindMinutesBefore} * interval '1 minute') <= ${new Date(now)}`,
       ),
     );
 
@@ -192,9 +200,12 @@ export async function runCalendarReminders(env: Env, now = Date.now()) {
   return sent;
 }
 
-// Nightly D1 → R2 backup: a JSON snapshot of every table, keyed by date.
-// (D1 offers no dump API from inside a Worker; at family scale a row dump
-// is plenty. Restores are manual by design.)
+// Nightly database → object-storage backup: a JSON snapshot of every table,
+// keyed by date. At family scale a row dump is plenty, and it stays portable
+// across whatever runs the database. Restores are manual by design.
+//
+// (A row dump rather than pg_dump on purpose: the app should not need a
+// Postgres client binary in its image to back itself up.)
 const BACKUP_TABLES = [
   "user",
   "session",
@@ -239,8 +250,8 @@ const BACKUP_TABLES = [
 // that mismatch and repairs it — one-directional only (free -> premium),
 // never a downgrade, so it can never race a subscription webhook the wrong
 // way: at worst it repeats work applySubscriptionStatus already did.
-export async function reconcilePlans(env: Env) {
-  const db = createDb(env.DB);
+export async function reconcilePlans(services: Services) {
+  const { db } = services;
   const stuck = await db
     .select({
       id: schema.organization.id,
@@ -268,23 +279,31 @@ export async function reconcilePlans(env: Env) {
   return flipped;
 }
 
-export async function runBackup(env: Env, now = new Date()) {
+export async function runBackup(services: Services, now = new Date()) {
+  const { db, storage } = services;
   const dump: Record<string, unknown[]> = {};
   for (const table of BACKUP_TABLES) {
-    const res = await env.DB.prepare(`SELECT * FROM "${table}"`).all();
+    // BACKUP_TABLES is a hard-coded list in this file, never user input, so
+    // interpolating the identifier is safe — but it is quoted all the same,
+    // because "user" is a reserved word in Postgres and an unquoted SELECT
+    // * FROM user would silently mean the current_user function.
+    // Bun's driver returns the rows directly rather than a { rows } wrapper.
+    const rows = (await db.execute(
+      sql.raw(`SELECT * FROM "${table}"`),
+    )) as unknown as Record<string, unknown>[];
     // Issue #4: keep credential material out of the snapshot. A restore
     // loses dev passwords (Google/passkey users are unaffected) — that's
     // the right trade.
     dump[table] =
       table === "account"
-        ? res.results.map((row) => ({ ...row, password: null }))
-        : res.results;
+        ? rows.map((row) => ({ ...row, password: null }))
+        : rows;
   }
   const key = `backups/${now.toISOString().slice(0, 10)}.json`;
-  await env.FILES.put(
+  await storage.put(
     key,
     JSON.stringify({ exportedAt: now.toISOString(), tables: dump }),
-    { httpMetadata: { contentType: "application/json" } },
+    "application/json",
   );
   return key;
 }
@@ -297,26 +316,22 @@ export const BACKUP_RETENTION_DAYS = 30;
 
 /** Deletes backup snapshots older than the retention window. Returns the
  *  keys removed, so the cron can log a count. */
-export async function pruneBackups(env: Env, now = new Date()) {
+export async function pruneBackups(services: Services, now = new Date()) {
   const cutoff = new Date(
     now.getTime() - BACKUP_RETENTION_DAYS * 24 * 3600_000,
   );
-  const removed: string[] = [];
-  let cursor: string | undefined;
-  do {
-    const page = await env.FILES.list({ prefix: "backups/", cursor });
-    const stale = page.objects.filter((o) => {
-      // Prefer the date in the key (stable, and what names the snapshot);
-      // fall back to R2's upload time for anything unexpected.
-      const match = /^backups\/(\d{4}-\d{2}-\d{2})\.json$/.exec(o.key);
-      const stamp = match ? new Date(`${match[1]}T00:00:00Z`) : o.uploaded;
-      return stamp.getTime() < cutoff.getTime();
-    });
-    if (stale.length > 0) {
-      await env.FILES.delete(stale.map((o) => o.key));
-      removed.push(...stale.map((o) => o.key));
-    }
-    cursor = page.truncated ? page.cursor : undefined;
-  } while (cursor);
-  return removed;
+  // Pagination now happens inside storage.list(); the cursor loop that used
+  // to live here was R2 API detail leaking into a retention policy.
+  const objects = await services.storage.list("backups/");
+  const stale = objects.filter((o) => {
+    // Prefer the date in the key (stable, and what names the snapshot); fall
+    // back to the object's upload time for anything unexpected.
+    const match = /^backups\/(\d{4}-\d{2}-\d{2})\.json$/.exec(o.key);
+    const stamp = match ? new Date(`${match[1]}T00:00:00Z`) : o.uploadedAt;
+    return stamp.getTime() < cutoff.getTime();
+  });
+  if (stale.length > 0) {
+    await services.storage.delete(stale.map((o) => o.key));
+  }
+  return stale.map((o) => o.key);
 }

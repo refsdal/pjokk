@@ -15,7 +15,6 @@
     "skipLibCheck": true,
     "noEmit": true,
     "types": [
-      "@cloudflare/vitest-pool-workers/types",
       "bun"
     ],
     "paths": {

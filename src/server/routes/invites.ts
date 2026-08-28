@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   CreateInviteSchema,
   ErrorSchema,
@@ -126,7 +126,7 @@ const redeem = createRoute({
   path: "/api/invites/redeem",
   tags: ["invites"],
   description:
-    "Join a family with an invite code. Requires a signed-in session; membership + use-count are written atomically in one D1 batch.",
+    "Join a family with an invite code. Requires a signed-in session; membership + use-count are written atomically in one transaction.",
   middleware: [
     rateLimit({ name: "invite-redeem", limit: 10, windowSeconds: 600 }),
     rateLimit({
@@ -238,55 +238,54 @@ export const invitesPublicApp = createApp<AppEnv>()
       );
     }
 
-    // Atomic redeem: one D1 batch (a single transaction). Both statements
-    // carry the SAME logical guard (invite valid pre-state + not already a
-    // member), so either both apply or neither does. The member INSERT runs
-    // first; the UPDATE's membership guard excludes the row the INSERT just
-    // created so it still sees the pre-state.
-    const memberId = crypto.randomUUID();
-    const inviteGuard = `
-      EXISTS (
-        SELECT 1 FROM family_invite
-        WHERE code = ?1 AND revoked_at IS NULL AND expires_at > ?2
-          AND used_count < max_uses
-      )`;
-    const [insertRes, updateRes] = await c.env.DB.batch([
-      c.env.DB.prepare(
-        `INSERT INTO member (id, organization_id, user_id, role, created_at)
-         SELECT ?3, ?4, ?5, ?6, ?2
-         WHERE ${inviteGuard}
-           AND NOT EXISTS (
-             SELECT 1 FROM member WHERE organization_id = ?4 AND user_id = ?5
-           )`,
-      ).bind(code, now, memberId, invite.familyId, userId, invite.role),
-      c.env.DB.prepare(
-        `UPDATE family_invite SET used_count = used_count + 1
-         WHERE code = ?1 AND revoked_at IS NULL AND expires_at > ?2
-           AND used_count < max_uses
-           AND NOT EXISTS (
-             SELECT 1 FROM member
-             WHERE organization_id = ?4 AND user_id = ?5 AND id != ?3
-           )`,
-      ).bind(code, now, memberId, invite.familyId, userId),
-    ]);
+    // Atomic redeem.
+    //
+    // This was hand-written SQL: two statements in a D1 batch carrying the
+    // same logical guard, plus a compensating DELETE/decrement in case they
+    // ever disagreed — all of it working around D1's lack of transactions.
+    // A real transaction expresses the same intent directly, and SELECT …
+    // FOR UPDATE does something the batch could only approximate: it
+    // serializes concurrent redeems of the same code, so max_uses is now
+    // genuinely enforced instead of merely being difficult to exceed.
+    const redeemed = await c.var.db.transaction(async (tx) => {
+      const locked = await tx
+        .select()
+        .from(schema.familyInvite)
+        .where(eq(schema.familyInvite.code, code))
+        .for("update");
+      // Re-checked inside the lock: the earlier read was optimistic and a
+      // concurrent redeem may have exhausted or revoked the code since.
+      const row = locked[0];
+      if (classifyInvite(row, Date.now()) !== null || !row) return false;
 
-    const inserted = (insertRes?.meta.changes ?? 0) > 0;
-    const counted = (updateRes?.meta.changes ?? 0) > 0;
-    if (!inserted || !counted) {
-      // Guards share pre-state, so a split result should be impossible; if it
-      // ever happens, compensate so no half-redeem survives.
-      if (inserted && !counted) {
-        await c.env.DB.prepare(`DELETE FROM member WHERE id = ?1`)
-          .bind(memberId)
-          .run();
-      }
-      if (!inserted && counted) {
-        await c.env.DB.prepare(
-          `UPDATE family_invite SET used_count = used_count - 1 WHERE code = ?1`,
+      // Membership is re-checked here too, for the same reason.
+      const already = await tx
+        .select({ id: schema.member.id })
+        .from(schema.member)
+        .where(
+          and(
+            eq(schema.member.organizationId, row.familyId),
+            eq(schema.member.userId, userId),
+          ),
         )
-          .bind(code)
-          .run();
-      }
+        .limit(1);
+      if (already[0]) return false;
+
+      await tx.insert(schema.member).values({
+        id: crypto.randomUUID(),
+        organizationId: row.familyId,
+        userId,
+        role: row.role,
+        createdAt: new Date(),
+      });
+      await tx
+        .update(schema.familyInvite)
+        .set({ usedCount: sql`${schema.familyInvite.usedCount} + 1` })
+        .where(eq(schema.familyInvite.code, code));
+      return true;
+    });
+
+    if (!redeemed) {
       return c.json(
         { error: "Invite no longer valid", code: "INVALID_INVITE" },
         400,

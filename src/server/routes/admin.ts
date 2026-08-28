@@ -144,8 +144,12 @@ export const adminApp = createApp<AppEnv>()
         slug: schema.organization.slug,
         plan: schema.organization.plan,
         createdAt: schema.organization.createdAt,
-        members: sql<number>`(SELECT COUNT(*) FROM member WHERE member.organization_id = ${schema.organization.id})`,
-        babies: sql<number>`(SELECT COUNT(*) FROM baby WHERE baby.family_id = ${schema.organization.id})`,
+        // ::int is load-bearing. COUNT() is bigint in Postgres, and the
+        // driver hands bigints back as STRINGS to avoid losing precision —
+        // so without the cast these came out as "3" and the sql<number>
+        // annotation quietly became a lie the API then served.
+        members: sql<number>`(SELECT COUNT(*)::int FROM member WHERE member.organization_id = ${schema.organization.id})`,
+        babies: sql<number>`(SELECT COUNT(*)::int FROM baby WHERE baby.family_id = ${schema.organization.id})`,
         lastFeedMs: max(schema.feedLog.time),
       })
       .from(schema.organization)

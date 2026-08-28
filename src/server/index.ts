@@ -1,9 +1,9 @@
 import { Scalar } from "@scalar/hono-api-reference";
+import { sql } from "drizzle-orm";
 import { createMiddleware } from "hono/factory";
-import { createAuth } from "./auth";
 import type { AppEnv, FamEnv } from "./context";
-import { createDb } from "./db";
 import { createApp } from "./lib";
+import { servicesFor } from "./services";
 import { landing } from "./landing";
 import {
   requireAdmin,
@@ -29,38 +29,84 @@ import { pushApp } from "./routes/push";
 import { sleepLocationsApp } from "./routes/sleep-locations";
 import { statsApp } from "./routes/stats";
 import { filesApp, vaccinesApp } from "./routes/vaccines";
-import {
-  pruneBackups,
-  purgeOrphanUsers,
-  reconcilePlans,
-  runBackup,
-  runCalendarReminders,
-  runReminders,
-} from "./scheduled";
 import { sleepApp } from "./routes/sleep";
 import { timelineApp } from "./routes/timeline";
 
-// Auth + db are request-scoped on Workers (D1 bindings only exist inside the
-// handler), hence the per-request factory here.
+// Hands each request the process-wide collaborators. This used to CONSTRUCT
+// them per request, because D1 bindings only existed inside the handler;
+// servicesFor() memoizes on the Env object, so the work happens once.
 const inject = createMiddleware<AppEnv>(async (c, next) => {
-  c.set("db", createDb(c.env.DB));
-  c.set("auth", createAuth(c.env));
+  const services = servicesFor(c.env);
+  c.set("db", services.db);
+  c.set("auth", services.auth);
+  c.set("storage", services.storage);
+  c.set("rateLimit", services.rateLimit);
   await next();
 });
 
 const app = createApp<AppEnv>();
 
-// The public landing page. Registered before everything else because it is the
-// only non-/api path the Worker owns: assets serve the rest of the site, and
-// "/" only reaches us because run_worker_first names it (see wrangler.jsonc).
+// The public landing page. Registered first so it wins over the static-file
+// handler that main.ts appends: on Workers this precedence came from naming
+// "/" in the assets run_worker_first list, here it is simply route order.
 // Not an OpenAPI route — it returns HTML, not part of the API surface.
 app.get("/", landing);
 
+// robots.txt and sitemap.xml. These used to be emitted at BUILD time by a
+// vite plugin keyed on CLOUDFLARE_ENV, which is why production and test
+// needed separately-built bundles. Serving them from the app makes INDEXABLE
+// a runtime switch, so one image can be promoted from test to production.
+app.get("/robots.txt", (c) => {
+  const body =
+    c.env.INDEXABLE === "1"
+      ? `User-agent: *\nAllow: /\n\nSitemap: ${new URL("/sitemap.xml", c.env.APP_URL)}\n`
+      : "User-agent: *\nDisallow: /\n";
+  c.header("Content-Type", "text/plain; charset=utf-8");
+  return c.body(body);
+});
+
+app.get("/sitemap.xml", (c) => {
+  // Nothing to advertise for an environment that must stay unindexed.
+  if (c.env.INDEXABLE !== "1") return c.notFound();
+  const origin = new URL(c.env.APP_URL).origin;
+  // One public page; a hand-written sitemap is honest and cheaper than
+  // generating one from a route tree that is entirely behind auth.
+  c.header("Content-Type", "application/xml; charset=utf-8");
+  return c.body(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>${origin}/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="${origin}/?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="nb" href="${origin}/?lang=nb"/>
+  </url>
+  <url><loc>${origin}/privacy</loc></url>
+  <url><loc>${origin}/terms</loc></url>
+</urlset>
+`);
+});
+
+// Liveness: answers as long as the process is up. Deliberately touches
+// nothing — a health check that queries the database turns a slow query into
+// a restart loop.
+app.get("/healthz", (c) => c.json({ ok: true as const }));
+
+// Readiness: refuses traffic until the dependencies actually answer, so a
+// rolling deploy does not route requests at a pod that cannot serve them.
+app.get("/readyz", async (c) => {
+  const services = servicesFor(c.env);
+  try {
+    await services.db.execute(sql`select 1`);
+  } catch (error) {
+    return c.json({ ok: false as const, error: (error as Error).message }, 503);
+  }
+  return c.json({ ok: true as const });
+});
+
 app.use("/api/*", inject);
 
-// Security headers on every API response (the SPA assets get theirs from
-// public/_headers). No CSP here — responses are JSON, and /api/docs loads
-// Scalar's bundle from a CDN.
+// Security headers on every API response (static assets get theirs in
+// main.ts, which is where the old Cloudflare _headers file went). No CSP
+// here — responses are JSON, and /api/docs loads Scalar's bundle from a CDN.
 app.use("/api/*", async (c, next) => {
   await next();
   c.header("X-Content-Type-Options", "nosniff");
@@ -70,9 +116,10 @@ app.use("/api/*", async (c, next) => {
 });
 
 // Credential brute-force brake (sec review H1): better-auth's built-in
-// limiter is memory-backed and useless across Workers isolates, so the KV
-// limiter fronts the password endpoint. 20/10 min per IP is generous for
-// humans, hopeless for guessing.
+// limiter is memory-backed, so it is per-process and useless the moment
+// there is more than one replica. The Postgres-backed limiter fronts the
+// password endpoint instead. 20/10 min per IP is generous for humans,
+// hopeless for guessing.
 app.use(
   "/api/auth/sign-in/email",
   rateLimit({ name: "auth-signin", limit: 20, windowSeconds: 600 }),
@@ -102,9 +149,7 @@ app.use("/api/auth/admin/*", async (c, next) => {
 
 // better-auth owns /api/auth/* (must be registered before the session
 // middleware so it terminates the chain itself).
-app.on(["GET", "POST"], "/api/auth/*", (c) =>
-  (c.var.auth as ReturnType<typeof createAuth>).handler(c.req.raw),
-);
+app.on(["GET", "POST"], "/api/auth/*", (c) => c.var.auth.handler(c.req.raw));
 
 // pjk_ bearer keys resolve to a synthetic session; sessionMiddleware then
 // skips cookie/session resolution for those requests.
@@ -179,29 +224,10 @@ const routes = app
 // The Hono RPC client derives its types from this.
 export type AppType = typeof routes;
 
-export default {
-  fetch: app.fetch,
-  async scheduled(event: ScheduledController, env: Env) {
-    if (event.cron === "15 3 * * *") {
-      const key = await runBackup(env);
-      console.log(`cron: backup written to ${key}`);
-      const pruned = await pruneBackups(env);
-      if (pruned.length > 0) {
-        console.log(`cron: pruned ${pruned.length} expired backup(s)`);
-      }
-      const purged = await purgeOrphanUsers(env);
-      if (purged > 0) console.log(`cron: purged ${purged} orphan account(s)`);
-      const reconciled = await reconcilePlans(env);
-      if (reconciled > 0) {
-        console.log(`cron: reconciled ${reconciled} family plan(s) to premium`);
-      }
-    } else {
-      const sent = await runReminders(env);
-      if (sent > 0) console.log(`cron: ${sent} reminder(s) sent`);
-      const calendarSent = await runCalendarReminders(env);
-      if (calendarSent > 0) {
-        console.log(`cron: ${calendarSent} calendar reminder(s) sent`);
-      }
-    }
-  },
-} satisfies ExportedHandler<Env>;
+// The API and the landing page — everything that is worth testing without a
+// filesystem. main.ts appends static-file serving and the SPA fallback, then
+// starts the server; cron.ts drives the scheduled jobs. The Workers
+// `export default { fetch, scheduled }` handler is gone with the runtime that
+// required it.
+export default app;
+export { app };

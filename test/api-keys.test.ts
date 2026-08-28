@@ -1,6 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { api, rig, setPlan } from "./helpers";
-import { SELF } from "cloudflare:test";
+import { describe, expect, it } from "bun:test";
+import { SELF, api, rig, setPlan } from "./helpers";
 
 const keyApi = (
   path: string,
