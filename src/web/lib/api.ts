@@ -1,5 +1,5 @@
 import { hc } from "hono/client";
-import type { AppType } from "../../worker/index";
+import type { AppType } from "../../server/index";
 
 // '' = same origin (the Worker serves both SPA and API). A future native
 // shell points this at the deployed origin instead.

@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { eq } from "drizzle-orm";
-import { schema } from "../src/worker/db";
+import { schema } from "../src/server/db";
 import { addMember, api, createUser, db, rig, signIn } from "./helpers";
 
 async function inviteRow(code: string) {

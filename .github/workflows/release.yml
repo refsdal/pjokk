@@ -1,0 +1,179 @@
+name: Release
+
+# Manually triggered (Actions → Release → Run workflow, or
+# `gh workflow run release.yml`). The button is the approval gate: GitHub's
+# required-reviewers environment rule needs a paid plan on private repos, so
+# the dispatch itself plays that role — only collaborators can trigger it, and
+# the full test suite still gates the release. If the repo ever moves to
+# GitHub Pro/Team, add required reviewers to the "production" environment and
+# this workflow picks the gate up unchanged.
+#
+# The version is NOT typed in by hand. It is computed from Conventional
+# Commits since the last v* tag (scripts/next-version.mjs), which is why
+# CLAUDE.md mandates the commit format — the changelog and the version number
+# are downstream of it.
+#
+# This workflow BUILDS, TAGS AND PUBLISHES. It does not roll out: where the
+# container runs is deployment infrastructure this repo does not own. Rolling
+# out means, in order:
+#
+#   1. `bun migrate.js` as a one-off (Job / initContainer / compose `migrate`
+#      service). Before the new image serves traffic: migrations are
+#      append-only, so old code running briefly against a newer schema is
+#      safe, whereas new code against an older schema is not.
+#   2. Point the deployment at the new tag and let the rollout proceed.
+#      /readyz gates each replica; SIGTERM drains it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Compute and build, but do not push or tag"
+        type: boolean
+        default: true
+      allow_major:
+        description: "Permit a 1.0.0 release (breaking changes bump minor while the major is 0)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+      bump: ${{ steps.v.outputs.bump }}
+      releasable: ${{ steps.v.outputs.releasable }}
+    steps:
+      # Tags and full history are the inputs to the calculation.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4"
+
+      - name: Compute version
+        id: v
+        run: |
+          bun scripts/next-version.mjs \
+            ${{ inputs.allow_major && '--allow-major' || '' }} \
+            | tee "$GITHUB_STEP_SUMMARY"
+
+      # Releasing "the same version again" is the mistake worth blocking: it
+      # means nothing since the last tag actually warranted a release.
+      - name: Refuse an empty release
+        if: steps.v.outputs.releasable != 'true'
+        run: |
+          echo "No feat/fix/perf/breaking commits since the last tag — nothing to release."
+          exit 1
+
+  verify:
+    needs: version
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: pjokk
+          POSTGRES_PASSWORD: pjokk
+          POSTGRES_DB: pjokk_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pjokk -d pjokk_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      TEST_DATABASE_URL: postgres://pjokk:pjokk@127.0.0.1:5432/pjokk_test
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4"
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Lint + typecheck
+        run: bun run check
+
+      - name: Tests
+        run: bun test
+
+  publish:
+    needs: [version, verify]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://pjokk.no
+    permissions:
+      contents: write   # creating the git tag
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the container registry
+        if: ${{ !inputs.dry_run }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ !inputs.dry_run }}
+          # A moving `latest` plus the immutable version and sha tags:
+          # deployments should pin one of the latter, so a rollback is naming
+          # an older tag rather than rebuilding and hoping.
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # After the push, so a failed publish never leaves a tag pointing at a
+      # release that does not exist in the registry.
+      - name: Tag the release
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ needs.version.outputs.tag }}" \
+            -m "${{ needs.version.outputs.tag }} (${{ needs.version.outputs.bump }})"
+          git push origin "${{ needs.version.outputs.tag }}"
+
+      - name: Summary
+        run: |
+          {
+            if [ "${{ inputs.dry_run }}" = "true" ]; then
+              echo "### Dry run — nothing pushed, nothing tagged"
+            else
+              echo "### Released ${{ needs.version.outputs.tag }}"
+            fi
+            echo
+            echo "- version: \`${{ needs.version.outputs.version }}\` (bump: ${{ needs.version.outputs.bump }})"
+            echo "- image:   \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

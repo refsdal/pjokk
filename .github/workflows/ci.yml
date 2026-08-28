@@ -8,63 +8,202 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+
+    services:
+      # The suite runs against a real Postgres — the whole point, given the
+      # app's dialect moved. Object storage is not here: tests substitute an
+      # in-memory Storage.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: pjokk
+          POSTGRES_PASSWORD: pjokk
+          POSTGRES_DB: pjokk_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pjokk -d pjokk_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      # docker-compose.test.yml publishes 55432 locally; the service container
+      # above is reachable on the standard port.
+      TEST_DATABASE_URL: postgres://pjokk:pjokk@127.0.0.1:5432/pjokk_test
+
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6
+      - uses: oven-sh/setup-bun@v2
         with:
-          version: 11
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
+          bun-version: "1.4"
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Lint + typecheck
-        run: pnpm check
+        run: bun run check
 
-      - name: Tests (workers runtime)
-        run: pnpm test
+      - name: Tests
+        run: bun test
 
       - name: Build
-        run: pnpm build
+        run: bun run build
 
-  # Every green push to main auto-deploys the test environment
-  # (test.pjokk.no, worker pjokk-test, isolated D1/KV/R2 + Stripe test
-  # mode). Skips gracefully while the CLOUDFLARE_API_TOKEN repo secret is
-  # not configured.
-  deploy-test:
+  # The image has to build and RUN, not merely typecheck — and it is published
+  # as a preview so the publish path itself is exercised on every change
+  # rather than being first tried during a release.
+  #
+  # Preview tags are prerelease-versioned (0.2.0-preview.abc1234) so they sort
+  # below the real release and can never be mistaken for one. The release
+  # workflow is what produces a bare version tag and `latest`.
+  image:
     needs: ci
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
     steps:
+      # Full history and tags: the version is computed from Conventional
+      # Commits since the last v* tag, and a shallow clone has neither.
       - uses: actions/checkout@v7
-
-      - uses: pnpm/action-setup@v6
         with:
-          version: 11
+          fetch-depth: 0
 
-      - uses: actions/setup-node@v7
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 24
-          cache: pnpm
+          bun-version: "1.4"
 
-      - name: Install
-        run: pnpm install --frozen-lockfile
+      - name: Compute version
+        id: version
+        run: bun scripts/next-version.mjs
 
-      - name: Apply D1 migrations (pjokk-test)
-        if: env.CLOUDFLARE_API_TOKEN != ''
-        run: pnpm db:migrate:test
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Deploy test environment
-        if: env.CLOUDFLARE_API_TOKEN != ''
-        run: pnpm deploy:test
+      # A pull request from a fork gets a read-only GITHUB_TOKEN, so pushing
+      # would fail on something unrelated to the change. Build-only there.
+      - name: Can this run push?
+        id: gate
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ] &&              [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
+            echo "push=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "push=true" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Skipped (no CLOUDFLARE_API_TOKEN secret)
-        if: env.CLOUDFLARE_API_TOKEN == ''
-        run: echo "CLOUDFLARE_API_TOKEN not set — test deploy skipped."
+      - name: Log in to the container registry
+        if: steps.gate.outputs.push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          # Loaded locally so the smoke test below runs against the exact
+          # image that was pushed.
+          push: false
+          load: true
+          tags: pjokk:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke-test the image
+        run: |
+          docker network create pjokk-ci
+          docker run -d --name pg --network pjokk-ci \
+            -e POSTGRES_USER=pjokk -e POSTGRES_PASSWORD=pjokk -e POSTGRES_DB=pjokk \
+            postgres:17-alpine
+          for i in $(seq 1 30); do
+            docker exec pg pg_isready -U pjokk -d pjokk && break
+            sleep 1
+          done
+
+          env_args=(
+            -e DATABASE_URL=postgres://pjokk:pjokk@pg:5432/pjokk
+            -e APP_URL=http://localhost:3000
+            -e BETTER_AUTH_SECRET=ci-secret-not-for-production-use
+            -e S3_BUCKET=pjokk-files
+            -e S3_ENDPOINT=http://minio:9000
+            -e S3_ACCESS_KEY_ID=ci
+            -e S3_SECRET_ACCESS_KEY=ci
+          )
+
+          # Migrations must apply from the image itself.
+          docker run --rm --network pjokk-ci "${env_args[@]}" pjokk:ci \
+            bun migrate.js
+
+          docker run -d --name app --network pjokk-ci -p 3000:3000 \
+            "${env_args[@]}" pjokk:ci
+
+          # It must actually serve, not merely start. /readyz proves it
+          # reached Postgres; "/" proves the landing page beat the SPA
+          # fallback, which is pure route ordering and easy to break.
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:3000/healthz && break
+            sleep 1
+          done
+          curl -fsS http://localhost:3000/readyz | grep -q '"ok":true'
+          curl -fsS http://localhost:3000/ | grep -qi '<title>Pjokk'
+          curl -fsS http://localhost:3000/robots.txt | grep -q 'Disallow: /'
+
+          # The server is BUNDLED (bun build), and `bun test` runs against
+          # source — so these two probes are the only thing standing between a
+          # bundling regression and production. They deliberately need no
+          # fixtures.
+          #
+          # A sign-in with unknown credentials must answer 401. Reaching that
+          # answer means better-auth loaded, its drizzle adapter resolved, and
+          # a query ran against Postgres — the code path most at risk from a
+          # bundler, since better-auth resolves adapters dynamically. A broken
+          # bundle gives 500 here, not 401.
+          status=$(curl -s -o /dev/null -w '%{http_code}' \
+            -X POST http://localhost:3000/api/auth/sign-in/email \
+            -H 'content-type: application/json' -H 'origin: http://localhost:3000' \
+            -d '{"email":"nobody@example.invalid","password":"wrong-password"}')
+          test "$status" = "401" || { echo "sign-in probe returned $status, expected 401"; exit 1; }
+
+          # That request also had to WRITE: the rate limiter increments a
+          # Postgres row per attempt. A non-empty table proves the write path
+          # works end to end in the bundle.
+          docker exec pg psql -U pjokk -d pjokk -tAc \
+            'SELECT count(*) FROM rate_limit' | grep -qvx '0'
+
+          # And the cron entrypoint has to run from the same image.
+          docker run --rm --network pjokk-ci "${env_args[@]}" pjokk:ci \
+            bun cron-cli.js frequent
+
+      # Only after the smoke test: an image that does not serve must never
+      # reach the registry, not even as a preview.
+      - name: Push preview image
+        if: steps.gate.outputs.push == 'true'
+        run: |
+          short=$(git rev-parse --short HEAD)
+          branch=$(echo "${{ github.head_ref || github.ref_name }}" | tr '/' '-' | tr -cd '[:alnum:]._-')
+          preview="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}-preview.${short}"
+          moving="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:branch-${branch}"
+          docker tag pjokk:ci "$preview"
+          docker tag pjokk:ci "$moving"
+          docker push "$preview"
+          docker push "$moving"
+          {
+            echo "### Preview image"
+            echo
+            echo '```'
+            echo "docker pull $preview"
+            echo '```'
+            echo
+            echo "Also tagged \`$moving\` (moves with the branch)."
+            echo "Next release would be **${{ steps.version.outputs.tag }}** (bump: ${{ steps.version.outputs.bump || 'none' }})."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs app || true

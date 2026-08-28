@@ -35,8 +35,7 @@
   "include": [
     "src/web",
     "src/shared",
-    "src/worker",
-    "worker-configuration.d.ts",
+    "src/server",
     "vite.config.ts",
     "drizzle.config.ts"
   ]

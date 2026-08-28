@@ -1,0 +1,33 @@
+# The database the test suite runs against:
+#
+#   docker compose -f docker-compose.test.yml up -d
+#   bun test
+#
+# Kept separate from docker-compose.yml so the deployable stack does not carry
+# a published database port or a second database it never uses. Object storage
+# is absent on purpose — the suite substitutes an in-memory Storage, so tests
+# of the timeline do not need a running S3.
+
+name: pjokk-test
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: pjokk
+      POSTGRES_PASSWORD: pjokk
+      POSTGRES_DB: pjokk_test
+    ports:
+      # An unusual port, bound to loopback: it must not collide with a
+      # Postgres the developer already runs, and it must not be reachable
+      # from anywhere else.
+      - "127.0.0.1:55432:5432"
+    # No volume. Test data is meant to be thrown away, and a stale volume is
+    # a great way to spend an afternoon debugging a schema that moved on.
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pjokk -d pjokk_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 20

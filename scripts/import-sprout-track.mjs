@@ -1,4 +1,4 @@
-// One-off importer: sprout-track SQLite database → Pjokk D1.
+// One-off importer: sprout-track SQLite database → Pjokk (Postgres).
 //
 // 1) Inspect the source db to find ids and caretaker names:
 //      node scripts/import-sprout-track.mjs sprout.db --inspect
@@ -10,16 +10,15 @@
 //        --caretaker "Anders"=user_anders --caretaker "Kristine"=user_kristine \
 //        --default-caretaker user_anders
 //
-// 3) Apply (test locally first, then remote):
-//      wrangler d1 execute pjokk-eu --local  --file .import.sql
-//      wrangler d1 execute pjokk-eu --remote --file .import.sql
+// 3) Apply (review the SQL first — it is a one-off against real data):
+//      psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f .import.sql
 //
-// Idempotent: rows get deterministic ids (st-<sproutId>) and INSERT OR
-// IGNORE, so re-running never duplicates. Soft-deleted sprout rows are
+// Idempotent: rows get deterministic ids (st-<sproutId>) and ON CONFLICT DO
+// NOTHING, so re-running never duplicates. Soft-deleted sprout rows are
 // skipped. Units are normalized to Pjokk's (ml, kg, cm) — including sprout's
-// imperial defaults (OZ bottles, TBSP solids). Because it is INSERT OR
-// IGNORE, fixing a mapping and re-running does NOT update rows already
-// imported: delete the st-% rows first.
+// imperial defaults (OZ bottles, TBSP solids). Because conflicts are ignored,
+// fixing a mapping and re-running does NOT update rows already imported:
+// delete the st-% rows first.
 //
 // Imported: feeds, diapers, sleep, notes, milestones, pumps, baths,
 // measurements, medicine, play, vaccines, contacts, calendar events.
@@ -167,9 +166,38 @@ const skipped = {};
 const skip = (why) => (skipped[why] = (skipped[why] ?? 0) + 1);
 const now = Date.now();
 
+// Postgres columns are typed, unlike SQLite's, so values are rendered by
+// column name at this single boundary rather than at each of the ~20 call
+// sites: timestamps are timestamptz (an epoch-ms integer is not accepted)
+// and flags are real booleans (1/0 is not accepted either).
+const TIMESTAMP_COLS = new Set([
+  "time",
+  "start_time",
+  "end_time",
+  "birth_date",
+  "created_at",
+  "reminded_at",
+  "expires_at",
+  "last_used_at",
+  "revoked_at",
+  "last_reminded_at",
+]);
+const BOOLEAN_COLS = new Set(["all_day", "read_only", "email_verified"]);
+
+const at = (msValue) => `'${new Date(msValue).toISOString()}'`;
+
+const render = (col, v) => {
+  if (v === "NULL" || v === null || v === undefined) return "NULL";
+  if (TIMESTAMP_COLS.has(col) && typeof v === "number") return at(v);
+  if (BOOLEAN_COLS.has(col)) return v && v !== "0" ? "true" : "false";
+  return v;
+};
+
 const insert = (table, cols, vals) =>
   out.push(
-    `INSERT OR IGNORE INTO ${table} (${cols.join(", ")}) VALUES (${vals.join(", ")});`,
+    `INSERT INTO "${table}" (${cols.join(", ")}) VALUES (${cols
+      .map((col, i) => render(col, vals[i]))
+      .join(", ")}) ON CONFLICT DO NOTHING;`,
   );
 
 const base = (r, timeMs) => {
@@ -544,7 +572,7 @@ for (let i = 0; i < vaccineDocs; i++) {
 // outdoor variants and CUSTOM collapse into "play" with the original type
 // preserved in notes. A row with no endTime imports as a RUNNING session,
 // which the partial unique index caps at one per baby — later ones are
-// dropped by INSERT OR IGNORE rather than failing the import.
+// dropped by ON CONFLICT DO NOTHING rather than failing the import.
 const PLAY_TYPE = {
   TUMMY_TIME: "tummy",
   WALK: "walk",

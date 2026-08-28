@@ -1,54 +1,12 @@
 {
   "version": "7",
-  "dialect": "sqlite",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "6",
-      "when": 1787585502955,
+      "version": "7",
+      "when": 1787913383645,
       "tag": "0000_init",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1787600151408,
-      "tag": "0001_phase3-activity-types",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1787601804628,
-      "tag": "0002_phase5-push",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1787604337440,
-      "tag": "0003_phase7-sex-apikeys",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1787606422972,
-      "tag": "0004_phase8-admin",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1787609388471,
-      "tag": "0005_phase-sec-hardening",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "6",
-      "when": 1787644660230,
-      "tag": "0006_defect-fixes",
       "breakpoints": true
     }
   ]

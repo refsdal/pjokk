@@ -1,9 +1,8 @@
-import { env, SELF } from "cloudflare:test";
-import { describe, expect, it } from "vitest";
+import { SELF, api, createUser, db, rig, services, signIn } from "./helpers";
+import { describe, expect, it } from "bun:test";
 import { eq } from "drizzle-orm";
-import { schema } from "../src/worker/db";
-import { purgeOrphanUsers } from "../src/worker/scheduled";
-import { api, createUser, db, rig, signIn } from "./helpers";
+import { schema } from "../src/server/db";
+import { purgeOrphanUsers } from "../src/server/scheduled";
 
 describe("security hardening", () => {
   it("rate-limits password sign-in attempts (H1)", async () => {
@@ -69,7 +68,7 @@ describe("security hardening", () => {
       .set({ createdAt: old })
       .where(eq(schema.user.id, memberUser.id));
 
-    const purged = await purgeOrphanUsers(env);
+    const purged = await purgeOrphanUsers(services);
     expect(purged).toBeGreaterThanOrEqual(1);
 
     const remaining = (

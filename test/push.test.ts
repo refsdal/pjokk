@@ -1,9 +1,15 @@
-import { env } from "cloudflare:test";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { api, db, rig, services } from "./helpers";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "bun:test";
 import { eq } from "drizzle-orm";
-import { schema } from "../src/worker/db";
-import { runReminders } from "../src/worker/scheduled";
-import { api, db, rig } from "./helpers";
+import { schema } from "../src/server/db";
+import { runReminders } from "../src/server/scheduled";
 
 // A plausible browser subscription (P-256 public key + auth secret).
 const SUB_KEYS = {
@@ -21,7 +27,10 @@ const statusByUrl = new Map<string, number>();
 const realFetch = globalThis.fetch;
 
 beforeAll(() => {
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = (async (
+    input: Parameters<typeof fetch>[0],
+    init?: RequestInit,
+  ) => {
     const url =
       typeof input === "string"
         ? input
@@ -175,22 +184,22 @@ describe("web push", () => {
 
     // Last feed 2h ago: below the 3h threshold — nothing sent.
     await feedAt(2 * 3600_000);
-    expect(await runReminders(env, now)).toBe(0);
+    expect(await runReminders(services, now)).toBe(0);
     expect(delivered).toHaveLength(0);
 
     // 4h later the gap exceeds 3h: exactly one push.
     const later = now + 4 * 3600_000;
-    expect(await runReminders(env, later)).toBe(1);
+    expect(await runReminders(services, later)).toBe(1);
     expect(delivered).toHaveLength(1);
 
     // Same gap, next cron run: already reminded — silent.
-    expect(await runReminders(env, later + 15 * 60_000)).toBe(0);
+    expect(await runReminders(services, later + 15 * 60_000)).toBe(0);
     expect(delivered).toHaveLength(1);
 
     // A new feed starts a new gap; once IT exceeds 3h, remind again.
     await feedAt(-(4.2 * 3600_000)); // logged at now+4.2h
     const evenLater = now + 8 * 3600_000;
-    expect(await runReminders(env, evenLater)).toBe(1);
+    expect(await runReminders(services, evenLater)).toBe(1);
     expect(delivered).toHaveLength(2);
   });
 });

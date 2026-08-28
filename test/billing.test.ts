@@ -1,21 +1,22 @@
 import { eq } from "drizzle-orm";
-import { SELF, env } from "cloudflare:test";
-import { describe, expect, it } from "vitest";
-import { canUse } from "../src/worker/entitlements";
-import { applySubscriptionStatus, grantLifetime } from "../src/worker/billing";
-import { reconcilePlans } from "../src/worker/scheduled";
 import {
+  SELF,
   addMember,
   api,
+  createFamily,
   createUser,
   db,
-  createFamily,
   planOf,
   rig,
+  services,
   setPlan,
   signIn,
 } from "./helpers";
-import { schema } from "../src/worker/db";
+import { describe, expect, it } from "bun:test";
+import { canUse } from "../src/server/entitlements";
+import { applySubscriptionStatus, grantLifetime } from "../src/server/billing";
+import { reconcilePlans } from "../src/server/scheduled";
+import { schema } from "../src/server/db";
 
 describe("canUse", () => {
   it("denies premium features on free, allows on every paid plan", () => {
@@ -83,7 +84,7 @@ describe("nightly plan reconciliation", () => {
       });
     expect(await planOf(fam.id)).toBe("free");
 
-    const flipped = await reconcilePlans(env);
+    const flipped = await reconcilePlans(services);
     expect(flipped).toBeGreaterThan(0);
     expect(await planOf(fam.id)).toBe("premium");
   });
@@ -100,7 +101,7 @@ describe("nightly plan reconciliation", () => {
         status: "active",
       });
 
-    await reconcilePlans(env);
+    await reconcilePlans(services);
     expect(await planOf(fam.id)).toBe("lifetime");
   });
 });

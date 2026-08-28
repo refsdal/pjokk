@@ -1,17 +1,24 @@
-import { env } from "cloudflare:test";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
-import { schema } from "../src/worker/db";
-import { clockFmt, runCalendarReminders } from "../src/worker/scheduled";
 import {
   addMember,
   api,
   createUser,
   db,
   rig,
+  services,
   setPlan,
   signIn,
 } from "./helpers";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "bun:test";
+import { eq } from "drizzle-orm";
+import { schema } from "../src/server/db";
+import { clockFmt, runCalendarReminders } from "../src/server/scheduled";
 
 const SUB_KEYS = {
   p256dh:
@@ -25,7 +32,10 @@ const delivered: string[] = [];
 const realFetch = globalThis.fetch;
 
 beforeAll(() => {
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = (async (
+    input: Parameters<typeof fetch>[0],
+    init?: RequestInit,
+  ) => {
     const url =
       typeof input === "string"
         ? input
@@ -88,12 +98,12 @@ describe("calendar reminders", () => {
     });
 
     // Inside the lead window: one push per member, then silence.
-    expect(await runCalendarReminders(env, now)).toBe(2);
+    expect(await runCalendarReminders(services, now)).toBe(2);
     expect(delivered.sort()).toEqual([
       `${PUSH_ORIGIN}/cal/admin`,
       `${PUSH_ORIGIN}/cal/other`,
     ]);
-    expect(await runCalendarReminders(env, now + 15 * 60_000)).toBe(0);
+    expect(await runCalendarReminders(services, now + 15 * 60_000)).toBe(0);
   });
 
   it("targets only assignees when set", async () => {
@@ -112,7 +122,7 @@ describe("calendar reminders", () => {
       remindMinutesBefore: 60,
       assigneeUserIds: [other.id],
     });
-    expect(await runCalendarReminders(env, now)).toBe(1);
+    expect(await runCalendarReminders(services, now)).toBe(1);
     expect(delivered).toEqual([`${PUSH_ORIGIN}/cal2/other`]);
   });
 
@@ -133,7 +143,7 @@ describe("calendar reminders", () => {
       remindMinutesBefore: 60,
     });
     // Simulate downtime: the sweep first runs 2h after the past event started.
-    expect(await runCalendarReminders(env, now + 3 * HOUR)).toBe(0);
+    expect(await runCalendarReminders(services, now + 3 * HOUR)).toBe(0);
     expect(delivered).toHaveLength(0);
 
     const rows = await db()
@@ -169,6 +179,6 @@ describe("calendar reminders", () => {
       startTime: new Date(now + 30 * 60_000).toISOString(),
       remindMinutesBefore: 60,
     });
-    expect(await runCalendarReminders(env, now)).toBe(1);
+    expect(await runCalendarReminders(services, now)).toBe(1);
   });
 });

@@ -1,6 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { api, rig, setPlan } from "./helpers";
-import { SELF } from "cloudflare:test";
+import { describe, expect, it } from "bun:test";
+import { SELF, api, rig, setPlan } from "./helpers";
 
 const keyApi = (
   path: string,
@@ -128,7 +127,7 @@ describe("api keys", () => {
     ).json()) as { id: string; key: string };
     expect((await keyApi("/api/babies", shortLived.key)).status).toBe(200);
     // Force-expire it.
-    const { schema } = await import("../src/worker/db");
+    const { schema } = await import("../src/server/db");
     const { eq } = await import("drizzle-orm");
     const { db } = await import("./helpers");
     await db()

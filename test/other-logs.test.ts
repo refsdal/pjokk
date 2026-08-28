@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { api, rig, setPlan } from "./helpers";
 import type { Timeline } from "../src/shared/schemas";
 

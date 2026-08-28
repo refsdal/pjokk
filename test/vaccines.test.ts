@@ -1,8 +1,5 @@
-import { env, SELF } from "cloudflare:test";
-import { beforeAll, describe, expect, it } from "vitest";
-import { schema } from "../src/worker/db";
-import { familyScope } from "../src/worker/db/scoped";
 import {
+  SELF,
   addMember,
   api,
   createBaby,
@@ -12,7 +9,10 @@ import {
   rig,
   setPlan,
   signIn,
+  storage,
 } from "./helpers";
+import { beforeEach, describe, expect, it } from "bun:test";
+import { familyScope } from "../src/server/db/scoped";
 
 const BASE = "http://localhost";
 
@@ -24,10 +24,7 @@ async function upload(
   file: { name: string; type: string; bytes: Uint8Array },
 ) {
   const form = new FormData();
-  form.append(
-    "file",
-    new File([file.bytes as BufferSource], file.name, { type: file.type }),
-  );
+  form.append("file", new File([file.bytes], file.name, { type: file.type }));
   return SELF.fetch(`${BASE}/api/vaccines/${vaccineId}/documents`, {
     method: "POST",
     headers: { origin: BASE, cookie },
@@ -166,9 +163,7 @@ describe("vaccine documents (uploads disabled)", () => {
 
     const fam = familyScope(db(), family.id);
     const objectKey = `vaccine-docs/${family.id}/seeded`;
-    await env.FILES.put(objectKey, png() as unknown as ArrayBuffer, {
-      httpMetadata: { contentType: "image/png" },
-    });
+    await storage.put(objectKey, new Blob([png()]), "image/png");
     const docId = await fam.createVaccineDocument({
       vaccineLogId: entry.id,
       objectKey,
@@ -188,7 +183,7 @@ describe("vaccine documents (uploads disabled)", () => {
       cookie,
     });
     expect(removed.status).toBe(200);
-    expect(await env.FILES.get(objectKey)).toBeNull();
+    expect(await storage.read(objectKey)).toBeNull();
   });
 
   it("still removes stored objects when the vaccine is deleted", async () => {
@@ -197,7 +192,7 @@ describe("vaccine documents (uploads disabled)", () => {
 
     const fam = familyScope(db(), family.id);
     const objectKey = `vaccine-docs/${family.id}/seeded-cascade`;
-    await env.FILES.put(objectKey, png() as unknown as ArrayBuffer);
+    await storage.put(objectKey, new Blob([png()]));
     await fam.createVaccineDocument({
       vaccineLogId: entry.id,
       objectKey,
@@ -212,7 +207,7 @@ describe("vaccine documents (uploads disabled)", () => {
         .status,
     ).toBe(200);
     // No orphan bytes left behind in the bucket.
-    expect(await env.FILES.get(objectKey)).toBeNull();
+    expect(await storage.read(objectKey)).toBeNull();
   });
 });
 
@@ -222,7 +217,10 @@ describe("vaccine dismissals", () => {
   // gets its own baby instead, which is the isolation that actually matters
   // here — dismissals are per-baby.
   let shared: Awaited<ReturnType<typeof rig>>;
-  beforeAll(async () => {
+  // beforeEach, not beforeAll: the database is emptied before every test (see
+  // test/setup.ts), so a fixture built once for the whole describe block would
+  // be truncated out from under the second test.
+  beforeEach(async () => {
     shared = await rig("Dismissal family");
   });
   const freshBaby = (name: string) => createBaby(shared.family.id, name);

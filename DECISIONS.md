@@ -5,8 +5,27 @@ choices, noted so they can be revisited deliberately.
 
 - **Work happens on `main`.** Zero-commit greenfield repo whose sole purpose is
   this build; branching would be ceremony.
-- **Package manager: pnpm.** (Environment note: npm is not installed on this
-  machine; pnpm is invoked via a corepack-downloaded binary.)
+- **Package manager: bun** (was pnpm). Forced and then confirmed: the
+  corepack-downloaded pnpm binary began crashing on every invocation
+  (`ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING` under Node 22.22.1), so no
+  dependency could be added at all. Bun was already becoming the runtime, so
+  one tool now covers runtime, installs and tests, and the corepack dependency
+  that broke is gone. `bun.lock` is committed; images build with
+  `bun install --frozen-lockfile`.
+- **`stripe` is pinned to 22.5.0; everything else is unpinned again.** The
+  temporary pins on hono and better-auth (added mid-port, when hono 4.13.5
+  appeared to cause 31 type errors) turned out to be unnecessary: almost all of
+  those errors came from `lib.ts` constraining on the ambient Cloudflare `Env`,
+  which the port removed. hono 4.13.5 + better-auth 1.7.2 typecheck clean and
+  pass all 200 tests. The `@better-auth/core` override went with them — it
+  existed to resolve a version MISMATCH (better-auth pinned at 1.7.1 while its
+  sibling adapters resolved 1.7.2), and with everything at 1.7.2 there is
+  nothing to collapse.
+  Stripe stays pinned because the SDK pins the Stripe **API version**: 22.6.0
+  requires `2026-08-26.dahlia` instead of `2026-07-29.dahlia`. That is a
+  behavioural change on the money path, and the billing tests run with fake
+  keys (`sk_test_fake`), so nothing in CI can validate it. Bump it as its own
+  change, together with the test-mode pass in SMOKE-TEST.md section 8.
 - **TanStack Router in code-based mode** (no file-based route generation) —
   fewer moving parts, no codegen watcher, same type safety at this scale.
 - **shadcn/ui components are hand-vendored**, not pulled via the CLI registry
@@ -17,7 +36,7 @@ choices, noted so they can be revisited deliberately.
 
 - **better-auth 1.7 requires `account.issuer`** (unique with accountId), but
   the deprecated `better-auth generate` CLI emits a stale schema without it.
-  Added by hand in `src/worker/db/auth-schema.ts` — merge, don't regenerate.
+  Added by hand in `src/server/db/auth-schema.ts` — merge, don't regenerate.
 - **Email/password sign-IN is enabled** (signup stays disabled). It's the
   local-dev/demo path (seeded users) and a fallback until Google credentials
   are configured. CLAUDE.md's "email/passkey" passkey half: the server plugin
@@ -298,7 +317,7 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   checkout), falling back to `customer_email` otherwise — so a lifetime buy
   reuses the existing customer instead of creating a duplicate. Implemented
   as a narrow `fam.stripeCustomerId()` scoped-query helper
-  (`src/worker/db/scoped.ts`), NOT by widening the existing `fam.family()`
+  (`src/server/db/scoped.ts`), NOT by widening the existing `fam.family()`
   helper: that was tried first and reverted because it leaked
   `stripeCustomerId` through `GET /api/family` to every member; a regression
   test now pins the field's absence from that response.
@@ -356,7 +375,7 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
   (Settings → Billing). "Add baby" row in Settings gets the same treatment
   (lock badge, disabled state, link to Billing). Server gates (402
   `PLAN_REQUIRED`) back every client gate.
-- **Feature type expanded** (`src/worker/entitlements.ts`): `type Feature =
+- **Feature type expanded** (`src/server/entitlements.ts`): `type Feature =
   "otherActivities" | "multipleBabies" | "growthCharts" | "apiKeys" |
   "csvExport" | "statsMonth"`. All plan reads go through `canUse(family,
   feature)`, unchanged API.
@@ -630,7 +649,7 @@ been true since Phase 3; the vaccine feature only made it obvious.
   components.** Reusing `StatusCard`/`LogButton` would have dragged the app
   bundle onto the landing page; screenshots would go stale and need
   re-shooting in light and dark. The cost is a small duplicated colour-token
-  block in `src/worker/landing/styles.ts` — keep it in step with
+  block in `src/server/landing/styles.ts` — keep it in step with
   `src/web/styles.css`.
 - **Language is negotiated server-side**: `?lang=` → `pjokk_lang` cookie →
   `Accept-Language` → English. Nothing flashes in the wrong language and no
@@ -689,3 +708,92 @@ been true since Phase 3; the vaccine feature only made it obvious.
   path. The production output is byte-identical to the file it replaced —
   worth re-checking after any edit, since this one file carries every
   security header for the SPA, `/privacy` and `/terms`.
+
+## Docker/Postgres port (2026-08-28)
+
+- **Docker replaces Cloudflare outright**, rather than the two being
+  maintained side by side. A dual target would have meant two Drizzle schema
+  files (34 tables, two dialects) kept in lockstep forever: Drizzle binds a
+  schema to one dialect, and that is the one part of the stack no adapter
+  layer can hide. Everything else was already adapter-shaped — all database
+  access funnels through `scoped.ts`, storage was 7 call sites, KV was 2.
+- **No data migration.** The port starts from an empty database; the alpha
+  data was expendable. This is why `migrations/` is a single generated
+  baseline rather than a hand-translated chain of the 15 SQLite migrations —
+  a translated chain nobody ever ran would be fiction. The old files remain
+  in git history.
+- **`timestamptz`, not epoch-millisecond `bigint`.** The initial instinct was
+  to keep epoch-ms to minimize churn; that reasoning was wrong. Drizzle maps
+  BOTH `integer(mode: "timestamp_ms")` and `timestamp(mode: "date")` to a JS
+  `Date`, so the application code is identical either way — which makes
+  timestamptz simultaneously the idiomatic choice and the low-churn one. The
+  entire cost was one query: the calendar reminder window.
+- **Services are memoized on the Env object's identity (a `WeakMap`)**, not
+  held in a mutable module-level global. Production has exactly one Env, so
+  this builds one set; each test suite brings its own and gets its own, with
+  no boot-order coupling and nothing to reset between runs. The consequence
+  worth knowing: `Bindings` must be ONE long-lived object, so building a
+  fresh `{ ...env, server }` per request would silently rebuild the
+  connection pool every time.
+- **`bun test` over vitest.** The suite used no vitest-specific API at all
+  (zero `vi.*`), and all Cloudflare coupling sat in `helpers.ts`, so the port
+  was a shim plus 10 import lines rather than 24 rewrites. Runtime went from
+  81s to ~23s.
+- **Tests use a real Postgres but an in-memory `Storage`.** The database is
+  the thing that actually changed dialect, so faking it would defeat the
+  purpose; object storage is four methods whose real behaviour was verified
+  directly against MinIO while `storage.ts` was written. Requiring a running
+  S3 to test the timeline would be a poor trade.
+- **Test isolation is per FILE, not per test.** That matches what
+  vitest-pool-workers gave each Worker, and the suites were written against
+  it — they build fixtures in `beforeAll`, so truncating between tests
+  deletes the rows they are about to assert on. Rate-limit counters are the
+  exception and are cleared per test: they used to live in a per-Worker KV,
+  and one shared table otherwise starts 429-ing partway through the suite.
+- **Migrations run as a one-off, never at app startup.** Drizzle's migrator
+  does not coordinate between processes, so N replicas booting together would
+  race to apply the same DDL. `src/server/migrate.ts` uses drizzle-orm's
+  migrator rather than the drizzle-kit CLI, so it works in a production image
+  where drizzle-kit is not installed.
+- **The app cannot create its own bucket.** `minio-init` does it in compose,
+  and an operator does it in production. An app that can create a bucket can
+  create the wrong one, in the wrong region — which for Article 9 health data
+  is the failure that matters, and nobody notices until the data is already
+  there.
+- **`storage.put` takes `Blob | string`, never a `ReadableStream`.** Bun's S3
+  client does not reject a stream: it writes the literal string
+  "[object ReadableStream]" and reports success. The R2 code passed
+  `file.stream()`, so accepting one would have made silent upload corruption
+  both easy and invisible. A `File` is a `Blob`, so call sites lose nothing.
+- **The release workflow publishes an image and stops.** Where the container
+  runs is deployment infrastructure this repo does not own, so the workflow
+  documents the rollout order instead of pretending to perform it.
+- **Package manager is bun** — see the entry near the top; that one was forced
+  by a broken corepack pnpm, not chosen.
+- **The server ships BUNDLED (`bun build --target=bun`), not as source.** The
+  runtime image has no `node_modules` at all: 591 MB → 165 MB. Most of the old
+  weight was never needed to run anything — `@tabler/icons-react` alone was
+  141 MB, and it, React, TanStack and recharts are compiled into `dist/client`
+  at build time. The rest was better-auth's optional peer dependencies
+  (`drizzle-kit`, `better-sqlite3`), which `bun install --production` does NOT
+  drop.
+  The bundle resolves everything statically except two dynamic imports:
+  `async_hooks` (a Bun builtin) and `@opentelemetry/api` (optional, absent-safe).
+  Source maps are kept (`--sourcemap=linked`, ~18 MB) so a production stack
+  trace still points at TypeScript.
+  **The risk this creates:** `bun test` runs against SOURCE, so it cannot catch
+  a bundling regression. The CI image smoke test is the compensating control —
+  it signs in with bad credentials and asserts 401 rather than 500 (proving
+  better-auth's dynamically-resolved drizzle adapter survived bundling), checks
+  the rate limiter actually wrote a row, and runs the cron entrypoint. Do not
+  weaken those probes.
+- **`drizzle-orm/bun-sql` is the driver, with a deliberate fallback.** It is
+  the newest part of the stack; `postgres-js` and `node-postgres` have far more
+  production mileage. Drizzle's `pg-core` API is driver-independent, so
+  switching is a one-line change in `src/server/db/index.ts` plus the import —
+  no schema, query or test changes. Kept in mind rather than pre-empted.
+- **Connection pool sizing is deliberately unset.** `new SQL(url)` uses Bun's
+  defaults, which is right for one container. When it becomes a problem it will
+  look like `too many connections` under load or during a rolling deploy (old
+  and new pods both holding pools, briefly doubling the count) — the fix then
+  is a `DATABASE_POOL_MAX` env var wired into `createPool`.
