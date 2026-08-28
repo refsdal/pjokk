@@ -36,8 +36,10 @@ deploy on the apex with the app moving back to `app.pjokk.no`.
   with a different entrypoint. This would change if a worker image without the
   HTTP surface is ever wanted; that image would need its own composition root
   and would earn the package.
-- No frontend tests in this work (there are none today; writing them is
-  net-new work and belongs in its own effort).
+- No **new** frontend tests. Three existing test files already cover frontend
+  code and move to `apps/frontend/test/` — `growth.test.ts`,
+  `vaccine-programme.test.ts`, and the `describe("time helpers")` block at
+  `test/defects.test.ts:155-174`. Broadening frontend coverage is separate work.
 - No behaviour change in pieces 1 and 2. The 25 test files must pass
   unchanged apart from import paths.
 
@@ -434,15 +436,36 @@ substitute an in-memory `Storage`; under the composition root it builds a
 `loadEnv` to `apps/server/test/`. `landing.test.ts` follows the landing page
 and becomes a pure render test with no HTTP involved.
 
-**Open implementation risk, to resolve first:** `bunfig.toml`'s
-`preload = ["./test/setup.ts"]` is resolved relative to the working directory,
-and it is not established that a root `bun test` across workspaces resolves
-per-package preloads correctly. Verify this at the start of piece 1. Fallback:
-per-package `bunfig.toml` with the root `test` script fanning out across
-workspaces. This must be settled before the test move, not after — the failure
-mode is silent (a preload that never runs leaves the schema unapplied and every
-test fails at once, which is at least loud; a preload that runs against the
-wrong cwd is worse).
+**Resolved (measured on Bun 1.4.0, 2026-08-28).** `bunfig.toml` is read from
+the working directory only: it does not merge with a parent and does not walk
+up. Measured behaviour:
+
+| Invocation | Result |
+|---|---|
+| Root `bunfig.toml`, `bun test` from root | Root preload runs once for the whole run and applies to **every** package's tests. Per-package `bunfig.toml` is ignored. |
+| `bun test` from inside a package | That package's own `bunfig.toml` is used, cwd is the package. |
+| `bun test` from a package with no `bunfig.toml` | No preload. It does not fall back to the root. |
+| No root `bunfig.toml`, `bun test` from root | No preload at all — tests run against an unprepared database. |
+
+A root-level preload is therefore wrong in both directions: it either applies
+the api's Postgres setup (schema application plus a `TRUNCATE` in `beforeEach`)
+to packages that have no database, or it does not run at all.
+
+**The structure is per-package `bunfig.toml` with the root `test` script
+fanning out:** `bun run --filter '*' test`. Verified to give each package its
+own cwd and its own preload, and to exit non-zero when any package fails, so
+CI stays honest. Note that `--filter` runs packages **concurrently** — safe
+here only because `apps/api` is the sole package that touches Postgres. A
+second database-touching package would need serialising, since `resetDb()`
+truncates every table.
+
+### Distribution of the existing test files
+
+| Destination | Files |
+|---|---|
+| `apps/api/test/` | 22 test files + `rig.ts`, `helpers.ts`, `memory-storage.ts`, `setup.ts`. Needs `bunfig.toml` with the preload and a live Postgres. |
+| `apps/frontend/test/` | `growth.test.ts`, `vaccine-programme.test.ts`, and the time-helper block split out of `defects.test.ts`. No preload, no database. |
+| `apps/server/test/` | `config.test.ts` — but only once `loadEnv` moves in PR #16. It stays in `apps/api/test/` for PR #15. |
 
 ## Build and image
 
@@ -490,13 +513,30 @@ revertable:
 
 | PR | Piece | Character |
 |---|---|---|
-| #15 | Workspace move | Mechanical. `git mv` + import rewrites + tsconfig/bunfig/Dockerfile paths. No logic changes. |
+| #15 | Workspace move | Mechanical. `git mv` + import rewrites + tsconfig/bunfig/Dockerfile paths. No logic changes except the one forced deviation below. |
 | #16 | Composition root | Design. `createApi(deps)`, `createDeps(env)`, ports, `infrastructure` entry + lint rule, `WeakMap` deleted, `AppType` assertion test. Includes the `Bun.cron` swap and the `scheduled.ts` → `jobs/` split, since both follow `Services` → `Deps`. |
 | #17 | Landing + hostname split | Risky — the only piece that can break production. |
 | #18 | `--compile` / distroless | After the spike below. |
 
 Each PR gets its own implementation plan, written when it starts rather than
 all four up front — #16's plan depends on what #15's move actually turns up.
+
+**PR #15 is an intermediate state, not the tree above.** To keep it a pure
+move, three files stay in `apps/api` and relocate in #16 when `Deps` gives them
+somewhere to go: `config.ts` (which `rig.ts` needs, and `apps/api` must not
+depend on `apps/server`), `cron.ts`, and `services.ts`. `apps/server` in #15
+contains only the three true process entrypoints — `main.ts`, `cron-cli.ts`,
+`migrate.ts`. For the same reason `apps/api` ships a wildcard
+`"exports": { "./*": "./src/*.ts" }` in #15; the two-entry public/infrastructure
+split is designed in #16 rather than guessed at twice.
+
+**One forced deviation from "no logic changes":** `migrate.ts` resolves
+`migrationsFolder: "./migrations"` relative to the *working directory*. That
+path is correct inside the image (`WORKDIR /app`) but breaks from the repo root
+once `migrations/` moves under `apps/api/`. It becomes
+`process.env.MIGRATIONS_DIR ?? "./migrations"`, with the root `migrate` script
+setting `MIGRATIONS_DIR=apps/api/migrations`. The image leaves it unset and is
+unaffected.
 
 The `--compile` spike runs during #16's review and must answer, with evidence
 rather than assertion:
