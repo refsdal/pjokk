@@ -320,6 +320,38 @@ already own.
 `Services`. It stays in `apps/server` beside the CLI: api owns what a job does,
 server owns when it runs.
 
+### Deployment modes
+
+The three modes a Kubernetes rollout needs are already expressible with the
+existing entrypoints and the `SCHEDULER` flag. The restructure carries this
+forward unchanged; it is recorded here so the move does not quietly break it.
+
+| Mode | Workload | Command | `SCHEDULER` |
+|---|---|---|---|
+| Web only, N replicas | Deployment | `bun main.js` (default CMD) | `0` |
+| Cron only | CronJob | `bun cron-cli.js nightly` / `frequent` | unset |
+| All-in-one | Deployment, 1 replica | `bun main.js` | `1` |
+
+Three properties make this safe, all of them verified in the current code and
+all of them worth preserving deliberately:
+
+- **`SCHEDULER` defaults to `"0"`** (`config.ts:72`, via `z.enum(["0","1"]).default("0")`).
+  The unsafe configuration — N replicas each firing every job — requires an
+  explicit opt-in. A default of `1` would make a routine scale-to-2 send every
+  reminder twice, so the direction of this default is load-bearing.
+- **`cron-cli.ts` exits with a status**: `0` on success, `1` on job failure, `2`
+  on bad usage, so a failed backup surfaces as a failed CronJob rather than a
+  log line nobody reads.
+- **The explicit `process.exit(0)` is not redundant.** Bun keeps the process
+  alive while the SQL pool holds open handles — the same trap that requires
+  `db.$client.end()` in the test suite's `afterAll`. Without the explicit exit,
+  a cron-only pod would run the job successfully and then hang until its
+  `activeDeadlineSeconds`. Do not "tidy" it away during the move.
+
+The CronJob should additionally set `concurrencyPolicy: Forbid`. The
+in-process path gets its no-overlap guarantee from `Bun.cron`; the CronJob path
+has no equivalent unless Kubernetes is told.
+
 ## `apps/frontend` — the SPA
 
 Straight move of `src/web` plus `index.html` and `vite.config.ts`. Three
