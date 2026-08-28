@@ -1,0 +1,409 @@
+# Bun workspaces, ports & interfaces, landing split — Design
+
+**Date:** 2026-08-28
+**Status:** Approved for implementation planning
+**Change:** Move the repository from a single `src/` tree to Bun workspaces
+(`apps/*` + `packages/*`), introduce an explicit composition root so the API
+layer never wires itself, and split the landing page out into its own static
+deploy on the apex with the app moving back to `app.pjokk.no`.
+
+## Goals
+
+- **One deployable, explicitly composed.** `apps/api` is a library that
+  receives its collaborators; `apps/server` is the only place that constructs
+  them. No DI container — a plain `Deps` object passed to `createApi(deps)`.
+- **Tests that are cheap to write.** Substituting a collaborator becomes
+  passing a different object, not memoizing a `WeakMap` keyed on an env.
+- **Boundaries the build enforces.** Package `exports` plus a lint rule, so
+  bypassing injection is a build error rather than something a reviewer has to
+  notice.
+- **Room for a mobile shell** without restructuring again — it consumes
+  `@pjokk/api`'s `AppType` exactly as the SPA does.
+
+## Non-goals
+
+- No DI container, no decorators, no service locator.
+- No `packages/ui` — the landing site ships zero JavaScript, so there are no
+  components for it to share with the SPA.
+- No `packages/config` — a root `tsconfig.base.json` and the existing
+  `biome.json` cover this without a package.
+- No `apps/mobile` placeholder. It gets created when something goes in it.
+- No frontend tests in this work (there are none today; writing them is
+  net-new work and belongs in its own effort).
+- No behaviour change in pieces 1 and 2. The 25 test files must pass
+  unchanged apart from import paths.
+
+## Decisions taken during brainstorming
+
+Two of these reverse earlier decisions recorded in CLAUDE.md. They were made
+deliberately, with the consequences enumerated, and the consequences are
+carried through this document.
+
+| Decision | Rationale |
+|---|---|
+| `apps/api`, not `packages/api` | "apps = deployables" does not survive contact with this repo: `apps/frontend` is not independently deployable either — its build output is served by the container. The consistent model here is **apps/ = product surfaces, packages/ = shared support**. |
+| Adapters live inside `apps/api`, not in `apps/server` | The property that buys testability is that api never constructs at module scope and never reads `process.env` — not where the adapter file sits. Keeping the Drizzle layer next to the schema also keeps `scoped.ts` covered by the real-Postgres suite, as CLAUDE.md requires. |
+| Landing becomes its own static deploy | **Reverses the 2026-08-27 apex consolidation.** Accepted after the trade-offs were laid out. |
+| App returns to `app.pjokk.no`; apex serves landing only | DNS-only split, no reverse proxy, no path-routing contract with deployment infra. |
+| `/privacy` and `/terms` move to the landing site | They are legal statements that must be readable without an account and without JavaScript. Moving them off the app host also lets the app host be unconditionally `Disallow: /`. |
+| `--compile` / distroless deferred to a spike | Answerable, but not by assertion — see piece 4. |
+| `now: () => Date` added to `Deps` | Slightly beyond a pure restructure, but this is the natural moment, and it is what makes the reminder and cron tests deterministic instead of clock-dependent. |
+
+### Consequences of the hostname split that are *not* costs
+
+- `trustedOrigins` stays at **one** entry. The landing site makes no API
+  calls — its call to action is a plain link to `https://app.pjokk.no` — so
+  the apex never needs to be a trusted origin, and no CORS configuration is
+  introduced.
+- No shared cookie domain. Session cookies remain scoped to the app host.
+- `INDEXABLE` is **deleted** from the server's environment. An app host
+  entirely behind auth is unconditionally `Disallow: /`; the landing build
+  owns its own indexability.
+
+## Target tree
+
+```
+pjokk/
+├── package.json              workspaces: ["apps/*", "packages/*"]
+├── bun.lock  bunfig.toml  biome.json
+├── tsconfig.base.json
+├── drizzle.config.ts         → apps/api/src/db/schema.ts, apps/api/migrations
+├── docker-compose.yml  docker-compose.test.yml
+├── .dockerignore             MUST include **/node_modules
+├── scripts/                  seed · import-sprout-track · check-i18n · next-version
+│
+├── apps/
+│   ├── api/                  @pjokk/api       — Hono app as a library
+│   ├── server/               @pjokk/server    — the deployable, composition root
+│   ├── frontend/             @pjokk/frontend  — the SPA
+│   └── landing/              @pjokk/landing   — static site, separate deploy
+│
+└── packages/
+    └── shared/               @pjokk/shared    — zod contracts, domain types
+```
+
+## `apps/api` — the library
+
+```
+apps/api/
+├── package.json
+│     exports:
+│       "."               → ./src/app.ts          (see re-export note below)
+│       "./infrastructure" → ./src/infrastructure/index.ts
+├── migrations/                 moved from repo root; lives with the schema
+├── src/
+│   ├── app.ts                  createApi(deps: Deps); export type AppType
+│   │                           re-exports Deps, the ports and Db, so the
+│   │                           public entry is self-contained
+│   ├── deps.ts                 type Deps
+│   ├── ports.ts                Storage · RateLimitStore · Auth · PushSender · PeerAddress
+│   ├── context.ts              AppEnv / FamEnv
+│   ├── lib.ts                  createApp, jsonContent, isUniqueViolation, serialisers
+│   ├── entitlements.ts  billing.ts  scheduled.ts
+│   ├── db/
+│   │     index.ts              type Db            ← type only, no construction
+│   │     schema.ts  auth-schema.ts  scoped.ts
+│   ├── routes/                 unchanged
+│   ├── middleware/             unchanged
+│   └── infrastructure/
+│         index.ts              re-exports the factories below
+│         db.ts                 createDb
+│         storage.ts            createStorage      (S3-compatible)
+│         auth.ts               createAuth         (better-auth + plugins)
+│         stripe.ts             createStripe       (nullable — see CLAUDE.md)
+│         rate-limit.ts         createRateLimitStore
+│         push.ts               createPushSender
+└── test/                       25 integration tests + 4 support files, real Postgres
+```
+
+The **type** `Db` lives in `src/db/index.ts`, not in `infrastructure/`. `Deps`
+references it and `Deps` is exported from the public entry, so putting the type
+behind the restricted entry would force every consumer of `Deps` to import from
+`./infrastructure` — defeating the split. Types are safe to expose; only the
+*factories* are restricted.
+
+### The `Deps` contract
+
+```ts
+// apps/api/src/deps.ts
+export type Deps = {
+  db: Db
+  auth: Auth
+  storage: Storage
+  rateLimit: RateLimitStore
+  push: PushSender
+  peerAddress: (req: Request) => string | null
+  now: () => Date
+  appUrl: string
+  vapidPublicKey: string
+  stripePriceLifetime: string | null
+  trustedProxyHops: number
+}
+```
+
+Six collaborators and four plain configuration values. The configuration list
+is short because an audit of `c.env` across the current server code found only
+seven reads — `APP_URL` (7), `INDEXABLE` (3), `VAPID_PUBLIC_KEY`,
+`TRUSTED_PROXY_HOPS`, `STRIPE_PRICE_PREMIUM_LIFETIME`, `OPEN_SIGNUP` — and
+`INDEXABLE` and `OPEN_SIGNUP` both leave with the landing page.
+
+`peerAddress` is a port rather than a value because the Bun server handle does
+not exist until `Bun.serve()` returns. `apps/server` supplies a closure over
+its own mutable reference, which removes `PeerAddressSource` from api's public
+surface and removes the `Bindings`-must-be-one-long-lived-object hazard
+documented in `src/server/context.ts`.
+
+### The Db type
+
+```ts
+// apps/api/src/db/index.ts — type only, importable by routes
+import type { SQL } from "bun"
+import type { BunSQLDatabase } from "drizzle-orm/bun-sql"
+import type * as schema from "./schema"
+
+export type Db = BunSQLDatabase<typeof schema> & { $client: SQL }
+```
+
+```ts
+// apps/api/src/infrastructure/db.ts — construction, server-only
+import { SQL } from "bun"
+import { drizzle } from "drizzle-orm/bun-sql"
+import * as schema from "../db/schema"
+import type { Db } from "../db"
+
+export const createDb = (url: string): Db =>
+  drizzle({ client: new SQL(url), schema })
+```
+
+The `& { $client: SQL }` is **required**, not decorative. `drizzle()` is
+declared as returning `BunSQLDatabase<TSchema> & { $client: TClient }`, so the
+bare class annotation drops `$client` — and `test/setup.ts` calls
+`db.$client.end()` in `afterAll` because Bun keeps the process alive while the
+pool holds handles.
+
+Collapsing `createPool` + `createDb` into a single url-taking factory is
+intentional. The seam existed only because there was no composition root; now
+that `apps/server` is the single place that constructs, it earns nothing.
+
+### Enforcing the boundary
+
+Adapters sharing a package with routes means nothing structurally prevents a
+future route from importing `createDb` and bypassing injection — the same
+class of mistake as bypassing the family scope. Two guards:
+
+1. `apps/api/package.json` exports `.` and `./infrastructure` as separate
+   entries. Only `apps/server` imports the second.
+2. A Biome `noRestrictedImports` rule forbidding `src/routes/**` and
+   `src/middleware/**` from importing `../infrastructure/*`.
+
+### What this deletes
+
+- `servicesFor()` and its `WeakMap<Env, Services>` memoization.
+- The `inject` middleware in `index.ts` that copies services onto `c.var` per
+  request.
+- `Bindings` as a carrier of anything. Deps are captured in `createApi`'s
+  closure; `AppEnv["Bindings"]` collapses to `{}`.
+
+## `apps/server` — the composition root
+
+```
+apps/server/
+├── src/
+│   ├── env.ts        zod schema, parsed at boot   (was src/server/config.ts)
+│   ├── deps.ts       createDeps(env: Env): Deps
+│   ├── index.ts      Bun.serve · static SPA · SPA fallback · security headers
+│   │                 · robots.txt · SIGTERM drain
+│   ├── cron.ts       startScheduler(deps) — the setInterval loop
+│   ├── cron-cli.ts   one-shot `bun cron-cli.js <nightly|frequent>`
+│   └── migrate.ts    one-off migration job
+├── test/             env parsing (was test/config.test.ts)
+└── Dockerfile        build context is the repo root
+```
+
+Changes to `env.ts` beyond the move:
+
+- Add `SITE_URL` (`https://pjokk.no`) alongside `APP_URL`
+  (`https://app.pjokk.no`).
+- **Remove `INDEXABLE`.** `index.ts` serves a fixed
+  `User-agent: *\nDisallow: /` and drops the `/sitemap.xml` route entirely.
+
+`index.ts` keeps the ordering the current `main.ts` establishes — app routes,
+then static assets, then the SPA fallback, with `/api/*` excluded from the
+fallback so a typo'd endpoint returns JSON 404 rather than `index.html` with a
+200.
+
+## `apps/frontend` — the SPA
+
+Straight move of `src/web` plus `index.html` and `vite.config.ts`. Three
+changes:
+
+- `@/*` stays as a Vite + tsconfig alias scoped inside the package;
+  `@shared/*` becomes a real workspace import of `@pjokk/shared`.
+- `lib/api.ts` imports `type { AppType } from "@pjokk/api"` instead of
+  `"../../server/index"`.
+- The legal routes are removed: `router.tsx:111-124` and `:188`, and the two
+  rows at `screens/settings/index.tsx:96,102` become external links to
+  `https://pjokk.no/privacy` and `/terms`. `screens/legal/` is deleted.
+
+The dev proxy in `vite.config.ts` keeps pointing at `localhost:3000` — local
+development still runs both halves same-origin, so the hostname split is a
+deployment property, not a development one.
+
+## `apps/landing` — static site, separate deploy
+
+A Bun build script emitting a complete static site:
+
+```
+apps/landing/
+├── build.ts            emits dist/
+├── src/
+│   ├── copy.ts         en + nb strings (moved from src/server/landing/copy.ts)
+│   ├── styles.ts       inline CSS tokens (moved)
+│   └── pages/
+│         landing.ts    render(lang): string   (moved from page.ts)
+│         privacy.ts    prose from src/web/screens/legal/privacy.tsx
+│         terms.ts      prose from src/web/screens/legal/terms.tsx
+├── scripts/gen-og.mjs  moved from repo-root scripts/
+└── test/               pure render tests (was test/landing.test.ts)
+```
+
+Output:
+
+```
+dist/  index.html            nb/index.html
+       privacy/index.html    nb/privacy/index.html
+       terms/index.html      nb/terms/index.html
+       robots.txt  sitemap.xml  og.png  icon.svg
+```
+
+Language is resolved at **build time**, one document per language, with
+`<link rel="alternate" hreflang>` between them. The `?lang=` → `pjokk_lang`
+cookie → `Accept-Language` negotiation is deleted along with the session-cookie
+CTA check: the call to action becomes an unconditional link to the app host.
+
+`sitemap.xml` lists the six documents and is emitted unconditionally — the
+landing site is always the public one. The `OPEN_SIGNUP` environment flip that
+used to change the CTA becomes a landing build flag.
+
+### Data residency
+
+The landing site stores no personal data and no Article 9 data — it is static
+marketing copy plus legal text. CLAUDE.md's EU-residency mandate constrains
+Postgres, the object store and their backups, none of which the landing host
+touches. An EU host is still preferable for access-log hygiene, but it is not
+the same obligation and must not be described as one.
+
+The privacy policy remains a legal statement that must track where the
+container is actually deployed. Moving it to `apps/landing/src/pages/privacy.ts`
+changes the file, not the rule.
+
+## `packages/shared`
+
+`src/shared/schemas.ts` moves unchanged as `@pjokk/shared`. It is imported by
+`apps/api` (17 route files plus `db/schema.ts`), `apps/frontend` (36 files) and
+the root `scripts/`. It must stay browser-safe: zod and plain types only, no
+Bun or Node imports.
+
+## Tests
+
+The 25 test files and 4 support files in `test/` move to `apps/api/test/`,
+minus the two noted below. `rig.ts` gets shorter, not
+longer — it currently reaches through `servicesFor(env, { storage })` to
+substitute an in-memory `Storage`; under the composition root it builds a
+`Deps` object directly and hands it to `createApi`. `config.test.ts` follows
+`loadEnv` to `apps/server/test/`. `landing.test.ts` follows the landing page
+and becomes a pure render test with no HTTP involved.
+
+**Open implementation risk, to resolve first:** `bunfig.toml`'s
+`preload = ["./test/setup.ts"]` is resolved relative to the working directory,
+and it is not established that a root `bun test` across workspaces resolves
+per-package preloads correctly. Verify this at the start of piece 1. Fallback:
+per-package `bunfig.toml` with the root `test` script fanning out across
+workspaces. This must be settled before the test move, not after — the failure
+mode is silent (a preload that never runs leaves the schema unapplied and every
+test fails at once, which is at least loud; a preload that runs against the
+wrong cwd is worse).
+
+## Build and image
+
+Piece 1 keeps the current two-stage build: `vite build` for the SPA,
+`bun build --target=bun` for the three server entrypoints, and a runtime stage
+with no `node_modules` at all. The Dockerfile moves to `apps/server/Dockerfile`
+with the repo root as build context, since a workspace install needs the root
+`package.json` and `bun.lock`.
+
+`migrations/` moves under `apps/api/` but is still copied into the image as
+data — `migrate.js` reads the SQL at run time, so it is not part of any bundle.
+
+The landing site is a separate CI artifact and is **not** copied into the
+container.
+
+## Risks
+
+**`AppType` inference is the highest risk in the whole change.**
+`src/server/index.ts` already carries a comment recording that middleware
+registered with `.use()` in statement form collapses the accumulated route
+types the RPC client derives from the `.route()` chain. Moving that chain
+inside `createApi(deps)` and re-deriving `export type AppType =
+ReturnType<typeof createApi>` is exactly the shape most likely to silently
+degrade to `any` — and it would take the frontend's end-to-end type safety with
+it without failing a single test.
+
+Mitigation: land piece 2 with a type-level assertion test that pins a known
+route's inferred request and response types, so a widening fails the build.
+
+**Secondary risks**
+
+- The move touches all 134 source files. Keeping piece 1 to `git mv` plus
+  mechanical import rewrites — no logic edits — is what keeps it reviewable and
+  keeps `git log --follow` working.
+- `drizzle.config.ts` and the root `scripts/` both reach into the moved schema;
+  their paths must be updated in the same commit as the move.
+- Piece 3 changes external configuration this repo does not own. See the
+  checklist below.
+
+## Delivery plan
+
+Land PR #14 (the Docker/Postgres port) on `main` first, so the restructure is
+diffed against a stable base. Then one PR per piece, each independently
+revertable:
+
+| PR | Piece | Character |
+|---|---|---|
+| #15 | Workspace move | Mechanical. `git mv` + import rewrites + tsconfig/bunfig/Dockerfile paths. No logic changes. |
+| #16 | Composition root | Design. `createApi(deps)`, `createDeps(env)`, ports, `infrastructure` entry + lint rule, `WeakMap` deleted, `AppType` assertion test. |
+| #17 | Landing + hostname split | Risky — the only piece that can break production. |
+| #18 | `--compile` / distroless | After the spike below. |
+
+Each PR gets its own implementation plan, written when it starts rather than
+all four up front — #16's plan depends on what #15's move actually turns up.
+
+The `--compile` spike runs during #16's review and must answer, with evidence
+rather than assertion:
+
+- Does the standalone binary link against glibc or musl, and which distroless
+  base actually runs it?
+- Does `--asset` correctly embed `migrations/*.sql` and `dist/client`, and are
+  they readable at the paths the code expects?
+- One binary with a subcommand dispatcher, or three binaries? The image
+  currently gets three entrypoints from one build (`main.js`, `cron-cli.js`,
+  `migrate.js`), and a Kubernetes CronJob depends on running the deployed image.
+- What is the actual size delta? The Bun runtime alone is ~80 MB against a
+  current image of ~165 MB, so the win is real but not dramatic — worth
+  measuring before committing to it.
+
+## Out-of-repo checklist for PR #17
+
+These are not code changes and cannot be made from this repository. All must be
+done before #17 merges, or sign-in and billing break:
+
+- [ ] DNS: `app.pjokk.no` → the container; `pjokk.no` → the static host.
+- [ ] Google OAuth: add `https://app.pjokk.no/api/auth/callback/google` as an
+      authorised redirect URI.
+- [ ] Stripe: webhook endpoint URL → app host.
+- [ ] Stripe: checkout success and cancel URLs → app host.
+- [ ] Stripe: Customer Portal return URL → app host.
+- [ ] Deploy environment: set `SITE_URL`, update `APP_URL`, remove `INDEXABLE`.
+- [ ] Verify the installed PWA on the old origin. Production is a closed alpha
+      with a single account, so the blast radius is one device, but the
+      `start_url` moves hosts and the old service worker will not follow it.
