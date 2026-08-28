@@ -112,7 +112,7 @@ const en: LandingCopy = {
     "Pjokk is run from Norway by Refsdal Holding AS. Every database, file and backup is pinned to Cloudflare's EU jurisdiction — not a location preference, an actual guarantee. Nothing is sold, and this page carries no third-party trackers.",
   storyTitle: "Built by parents, for parents",
   storyBody: [
-    "When Nora arrived we were as unsure as everyone else. Was she eating enough? Was it normal to pee this much? Had she taken less today than yesterday — and would we even notice if she had?",
+    "When our daughter arrived we were as unsure as everyone else. Was she eating enough? Was it normal to pee this much? Had she taken less today than yesterday — and would we even notice if she had?",
     "So we built what we needed ourselves: somewhere to write down what happens, that answers the moment you open the app. We use Pjokk every day with our own daughter, and now we're sharing it with other parents.",
   ],
   storySignature: "— Anders, Oslo",
@@ -180,7 +180,7 @@ const nb: LandingCopy = {
     "Pjokk drives fra Norge av Refsdal Holding AS. Hver database, fil og sikkerhetskopi er låst til Cloudflares EU-jurisdiksjon — ikke en preferanse, men en garanti. Ingenting selges videre, og denne siden har ingen sporing fra tredjepart.",
   storyTitle: "Laget av foreldre, for foreldre",
   storyBody: [
-    "Da vi fikk Nora, var vi like usikre som alle andre. Spiste hun nok? Var det normalt at hun tisset så mye? Hadde hun fått i seg mindre i dag enn i går — og ville vi i det hele tatt merket det?",
+    "Da vi fikk vår datter, var vi like usikre som alle andre. Spiste hun nok? Var det normalt at hun tisset så mye? Hadde hun fått i seg mindre i dag enn i går — og ville vi i det hele tatt merket det?",
     "Så vi bygde det vi selv manglet: et sted å notere det som skjer, som svarer med én gang du åpner appen. Vi bruker Pjokk hver dag med vår egen datter, og nå deler vi det med andre foreldre.",
   ],
   storySignature: "— Anders, Oslo",
