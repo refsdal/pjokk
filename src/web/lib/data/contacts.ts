@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Contact, CreateContact, UpdateContact } from "@shared/schemas";
+import type { Contact, CreateContact, UpdateContact } from "@pjokk/shared";
 import { api, unwrap } from "../api";
 
 export function useContacts() {

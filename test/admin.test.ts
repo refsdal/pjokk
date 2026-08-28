@@ -11,7 +11,7 @@ import {
   setPlan,
   signIn,
 } from "./helpers";
-import type { AdminFamilySchema } from "../src/shared/schemas";
+import type { AdminFamilySchema } from "@pjokk/shared";
 import type { z } from "@hono/zod-openapi";
 
 type AdminFamily = z.infer<typeof AdminFamilySchema>;

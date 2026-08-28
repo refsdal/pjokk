@@ -3,7 +3,7 @@ import { schema } from "../src/server/db";
 import { isUniqueViolation } from "../src/server/lib";
 import { formatRelative, toLocalDateInput } from "../src/web/lib/time";
 import { api, db, rig, setPlan } from "./helpers";
-import type { Timeline } from "../src/shared/schemas";
+import type { Timeline } from "@pjokk/shared";
 
 // Regression tests for the 2026-08-25 review findings.
 

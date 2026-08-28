@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { ErrorSchema, SleepLocationSchema } from "@shared/schemas";
+import { ErrorSchema, SleepLocationSchema } from "@pjokk/shared";
 import type { Context } from "hono";
 import type { FamEnv } from "../context";
 import { createApp, jsonContent } from "../lib";

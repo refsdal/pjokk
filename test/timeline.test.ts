@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { api, rig } from "./helpers";
-import type { Timeline } from "../src/shared/schemas";
+import type { Timeline } from "@pjokk/shared";
 
 async function seedDay(a: Awaited<ReturnType<typeof rig>>, now: number) {
   const H = 3600_000;

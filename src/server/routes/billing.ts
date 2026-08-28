@@ -1,5 +1,5 @@
 import { createRoute } from "@hono/zod-openapi";
-import { CheckoutUrlSchema, ErrorSchema } from "@shared/schemas";
+import { CheckoutUrlSchema, ErrorSchema } from "@pjokk/shared";
 import type { FamEnv } from "../context";
 import { createApp, jsonContent } from "../lib";
 import { createStripe } from "../stripe";

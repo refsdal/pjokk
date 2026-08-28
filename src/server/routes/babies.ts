@@ -6,7 +6,7 @@ import {
   MemberSchema,
   FamilySchema,
   UpdateBabySchema,
-} from "@shared/schemas";
+} from "@pjokk/shared";
 import type { FamEnv } from "../context";
 import { canUse } from "../entitlements";
 import { createApp, jsonContent, serBaby } from "../lib";

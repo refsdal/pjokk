@@ -8,7 +8,7 @@ import type {
   CalendarEvent,
   CreateCalendarEvent,
   UpdateCalendarEvent,
-} from "@shared/schemas";
+} from "@pjokk/shared";
 import { api, ApiError, unwrap } from "../api";
 import { t } from "../i18n";
 import { toast } from "../toast";

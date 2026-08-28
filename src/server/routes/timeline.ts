@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { ErrorSchema, TimelineSchema, timelineFilters } from "@shared/schemas";
+import { ErrorSchema, TimelineSchema, timelineFilters } from "@pjokk/shared";
 import type { FamEnv } from "../context";
 import {
   createApp,

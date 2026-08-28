@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { FeedLog } from "@shared/schemas";
+import type { FeedLog } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet } from "@/components/Sheet";

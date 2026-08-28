@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { PlayLog, PlayType } from "@shared/schemas";
+import type { PlayLog, PlayType } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet } from "@/components/Sheet";

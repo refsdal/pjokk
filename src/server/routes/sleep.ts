@@ -6,7 +6,7 @@ import {
   SummarySchema,
   UpdateSleepSchema,
   WakeSchema,
-} from "@shared/schemas";
+} from "@pjokk/shared";
 import type { FamEnv } from "../context";
 import {
   createApp,

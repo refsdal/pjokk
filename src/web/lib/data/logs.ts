@@ -1,5 +1,5 @@
 import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
-import type { DiaperLog, FeedLog, SleepLog, Summary } from "@shared/schemas";
+import type { DiaperLog, FeedLog, SleepLog, Summary } from "@pjokk/shared";
 import { api, unwrap } from "../api";
 import { t } from "../i18n";
 import { toast } from "../toast";

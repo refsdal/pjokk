@@ -4,7 +4,7 @@ import {
   CreateContactSchema,
   ErrorSchema,
   UpdateContactSchema,
-} from "@shared/schemas";
+} from "@pjokk/shared";
 import type { Context } from "hono";
 import type { FamEnv } from "../context";
 import { canUse } from "../entitlements";

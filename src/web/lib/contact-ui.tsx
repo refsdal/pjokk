@@ -11,7 +11,7 @@ import {
   IconUsers,
   type TablerIcon,
 } from "@tabler/icons-react";
-import type { ContactIcon } from "@shared/schemas";
+import type { ContactIcon } from "@pjokk/shared";
 
 // Icon key → Tabler glyph. `role` carries the meaning; the icon is only
 // there so a contact is recognizable at a glance in the list.

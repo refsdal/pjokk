@@ -1,6 +1,6 @@
 import { IconMoon, type Icon as TablerIcon } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
-import type { PlayLog, SleepLog } from "@shared/schemas";
+import type { PlayLog, SleepLog } from "@pjokk/shared";
 import { Button } from "@/components/ui/button";
 import { useStopPlay, useWakeSleep } from "@/lib/data";
 import { t } from "@/lib/i18n";

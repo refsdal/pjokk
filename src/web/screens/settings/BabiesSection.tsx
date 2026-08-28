@@ -1,6 +1,6 @@
 import { IconLock, IconPlus } from "@tabler/icons-react";
 import { useState } from "react";
-import type { Baby } from "@shared/schemas";
+import type { Baby } from "@pjokk/shared";
 import { BabySheet } from "@/components/sheets/BabySheet";
 import { Card } from "@/components/ui/card";
 import { useBabies, usePremium } from "@/lib/data";

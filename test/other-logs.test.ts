@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { api, rig, setPlan } from "./helpers";
-import type { Timeline } from "../src/shared/schemas";
+import type { Timeline } from "@pjokk/shared";
 
 // The six Phase 3 types share one generic CRUD + route factory. Medicine is
 // exercised deeply; the rest get a create/read pass through the same code

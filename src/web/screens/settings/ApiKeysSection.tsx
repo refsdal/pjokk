@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import type { ApiKey, ApiKeyCreated } from "@shared/schemas";
+import type { ApiKey, ApiKeyCreated } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";

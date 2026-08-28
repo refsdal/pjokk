@@ -4,7 +4,7 @@ import {
   IconWalk,
   type Icon as TablerIcon,
 } from "@tabler/icons-react";
-import type { PlayType } from "@shared/schemas";
+import type { PlayType } from "@pjokk/shared";
 
 // Play reuses existing category tints rather than introducing a colour —
 // icons and badges only, never backgrounds (CLAUDE.md §7).

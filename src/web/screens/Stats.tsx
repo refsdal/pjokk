@@ -17,7 +17,7 @@ import {
   IconRuler,
 } from "@tabler/icons-react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import type { Baby } from "@shared/schemas";
+import type { Baby } from "@pjokk/shared";
 import { ErrorState } from "@/components/QueryStates";
 import { ChipGroup } from "@/components/Chips";
 import { Card } from "@/components/ui/card";

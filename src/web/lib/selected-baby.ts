@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { Baby } from "@shared/schemas";
+import type { Baby } from "@pjokk/shared";
 import { useBabies } from "./data";
 
 // Which baby the app is showing (Home/Timeline/Stats). A tiny external

@@ -6,7 +6,7 @@ import {
   IconVaccine,
   type Icon as TablerIcon,
 } from "@tabler/icons-react";
-import type { CalendarCategory } from "@shared/schemas";
+import type { CalendarCategory } from "@pjokk/shared";
 
 // Category tints reuse the existing per-category theme tokens (CLAUDE.md §7:
 // tints on icons and badges only, never backgrounds) — no new colors.

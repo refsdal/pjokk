@@ -7,7 +7,7 @@ import {
   InviteSchema,
   RedeemResultSchema,
   RedeemSchema,
-} from "@shared/schemas";
+} from "@pjokk/shared";
 import type { AppEnv, FamEnv } from "../context";
 import { schema } from "../db";
 import { createApp, iso, isoOrNull, jsonContent } from "../lib";

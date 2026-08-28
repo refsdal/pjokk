@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { SleepLocation } from "@shared/schemas";
+import type { SleepLocation } from "@pjokk/shared";
 import { api, unwrap } from "../api";
 
 export function useSleepLocations() {

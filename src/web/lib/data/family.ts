@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { Baby, Family, Invite, Member } from "@shared/schemas";
+import type { Baby, Family, Invite, Member } from "@pjokk/shared";
 import { api, unwrap } from "../api";
 
 export function useFamily() {

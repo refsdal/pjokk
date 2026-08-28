@@ -1,5 +1,5 @@
 import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
-import type { MeasurementType, MedicineUnit } from "@shared/schemas";
+import type { MeasurementType, MedicineUnit } from "@pjokk/shared";
 import { api, ApiError, unwrap } from "../api";
 import { t } from "../i18n";
 import { toast } from "../toast";

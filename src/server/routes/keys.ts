@@ -4,7 +4,7 @@ import {
   ApiKeySchema,
   CreateApiKeySchema,
   ErrorSchema,
-} from "@shared/schemas";
+} from "@pjokk/shared";
 import type { FamEnv } from "../context";
 import type { schema } from "../db";
 import { canUse } from "../entitlements";

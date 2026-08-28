@@ -1,7 +1,7 @@
 import { IconMail, IconPhone, IconWorld } from "@tabler/icons-react";
 import { useState } from "react";
-import type { Contact, ContactIcon } from "@shared/schemas";
-import { contactIcons } from "@shared/schemas";
+import type { Contact, ContactIcon } from "@pjokk/shared";
+import { contactIcons } from "@pjokk/shared";
 import { MultiChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet } from "@/components/Sheet";

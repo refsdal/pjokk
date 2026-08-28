@@ -6,7 +6,7 @@ import {
   IconPlus,
 } from "@tabler/icons-react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import type { CalendarEvent } from "@shared/schemas";
+import type { CalendarEvent } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
 import { ErrorState } from "@/components/QueryStates";
 import { Button } from "@/components/ui/button";

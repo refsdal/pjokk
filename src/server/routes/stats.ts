@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { ErrorSchema, StatsSchema } from "@shared/schemas";
+import { ErrorSchema, StatsSchema } from "@pjokk/shared";
 import type { FamEnv } from "../context";
 import { canUse } from "../entitlements";
 import { createApp, iso, isoOrNull, jsonContent } from "../lib";

@@ -7,7 +7,7 @@ import {
   type Icon as TablerIcon,
 } from "@tabler/icons-react";
 import { useState } from "react";
-import type { TimelineEntry, TimelineFilter } from "@shared/schemas";
+import type { TimelineEntry, TimelineFilter } from "@pjokk/shared";
 import { DiaperSheet } from "@/components/sheets/DiaperSheet";
 import { FeedSheet } from "@/components/sheets/FeedSheet";
 import {

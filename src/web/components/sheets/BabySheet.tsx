@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import type { Baby } from "@shared/schemas";
+import type { Baby } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet } from "@/components/Sheet";

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { CalendarCategory, CalendarEvent } from "@shared/schemas";
+import type { CalendarCategory, CalendarEvent } from "@pjokk/shared";
 import { ChipGroup, MultiChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet } from "@/components/Sheet";

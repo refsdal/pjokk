@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import type { Stats, Timeline, TimelineFilter } from "@shared/schemas";
+import type { Stats, Timeline, TimelineFilter } from "@pjokk/shared";
 import { api, unwrap } from "../api";
 
 // Read-only aggregate views: the merged timeline and the stats window.

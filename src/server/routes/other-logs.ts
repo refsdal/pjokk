@@ -19,7 +19,7 @@ import {
   UpdateMilestoneSchema,
   UpdateNoteSchema,
   UpdatePumpSchema,
-} from "@shared/schemas";
+} from "@pjokk/shared";
 import type { FamEnv } from "../context";
 import type { FamilyScope } from "../db/scoped";
 import type { LogCrud } from "../db/scoped";

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { VaccineDismissal, VaccineLog } from "@shared/schemas";
+import type { VaccineDismissal, VaccineLog } from "@pjokk/shared";
 import { API_BASE, api, unwrap } from "../api";
 import { invalidateLogs } from "./keys";
 

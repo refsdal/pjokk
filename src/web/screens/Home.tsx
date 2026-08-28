@@ -6,7 +6,7 @@ import {
   IconPlus,
 } from "@tabler/icons-react";
 import { useState } from "react";
-import type { PlayType } from "@shared/schemas";
+import type { PlayType } from "@pjokk/shared";
 import { useNavigate } from "@tanstack/react-router";
 import {
   ActivePlayBanner,

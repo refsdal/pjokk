@@ -6,7 +6,7 @@ import {
   UpdateVaccineSchema,
   VaccineDismissalSchema,
   VaccineLogSchema,
-} from "@shared/schemas";
+} from "@pjokk/shared";
 import type { FamEnv } from "../context";
 import type { VaccineRow } from "../db/scoped";
 import { canUse } from "../entitlements";

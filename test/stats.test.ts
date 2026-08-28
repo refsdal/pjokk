@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { api, rig, setPlan } from "./helpers";
-import type { Stats } from "../src/shared/schemas";
+import type { Stats } from "@pjokk/shared";
 
 const H = 3600_000;
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { VaccineLog } from "../src/shared/schemas";
+import type { VaccineLog } from "@pjokk/shared";
 import {
   buildSchedule,
   infoUrlForName,

@@ -1,6 +1,6 @@
 import { IconLock, IconPhone, IconPlus } from "@tabler/icons-react";
 import { useState } from "react";
-import type { Contact } from "@shared/schemas";
+import type { Contact } from "@pjokk/shared";
 import { ContactSheet } from "@/components/sheets/ContactSheet";
 import { Card } from "@/components/ui/card";
 import { contactIconFor } from "@/lib/contact-ui";

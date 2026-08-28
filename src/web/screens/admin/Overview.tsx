@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { z } from "@hono/zod-openapi";
-import type { AdminStatsSchema } from "@shared/schemas";
+import type { AdminStatsSchema } from "@pjokk/shared";
 import { Card } from "@/components/ui/card";
 import { api, unwrap } from "@/lib/api";
 

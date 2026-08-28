@@ -5,7 +5,7 @@ import {
   PlayLogSchema,
   StopPlaySchema,
   UpdatePlaySchema,
-} from "@shared/schemas";
+} from "@pjokk/shared";
 import type { FamEnv } from "../context";
 import { canUse } from "../entitlements";
 import { createApp, isUniqueViolation, jsonContent, serSleep } from "../lib";

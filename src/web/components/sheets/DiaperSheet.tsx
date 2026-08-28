@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { DiaperLog } from "@shared/schemas";
+import type { DiaperLog } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet } from "@/components/Sheet";

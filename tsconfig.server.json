@@ -18,9 +18,6 @@
       "bun"
     ],
     "paths": {
-      "@shared/*": [
-        "./src/shared/*"
-      ],
       "@/*": [
         "./src/web/*"
       ]
@@ -29,7 +26,6 @@
   },
   "include": [
     "src/server",
-    "src/shared",
     "test",
     "worker-configuration.d.ts",
     "vitest.config.ts"

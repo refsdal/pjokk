@@ -4,7 +4,7 @@ import {
   ErrorSchema,
   FeedLogSchema,
   UpdateFeedSchema,
-} from "@shared/schemas";
+} from "@pjokk/shared";
 import type { FamEnv } from "../context";
 import { createApp, jsonContent, serFeed } from "../lib";
 

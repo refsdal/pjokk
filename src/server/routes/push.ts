@@ -6,7 +6,7 @@ import {
   PushTestResultSchema,
   SubscribeSchema,
   UnsubscribeSchema,
-} from "@shared/schemas";
+} from "@pjokk/shared";
 import type { FamEnv } from "../context";
 import { schema } from "../db";
 import { createApp, jsonContent } from "../lib";

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { z } from "@hono/zod-openapi";
-import type { AdminFamilySchema } from "@shared/schemas";
+import type { AdminFamilySchema } from "@pjokk/shared";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Card } from "@/components/ui/card";
 import { api, unwrap } from "@/lib/api";

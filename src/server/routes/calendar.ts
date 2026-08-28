@@ -4,7 +4,7 @@ import {
   CreateCalendarEventSchema,
   ErrorSchema,
   UpdateCalendarEventSchema,
-} from "@shared/schemas";
+} from "@pjokk/shared";
 import type { Context } from "hono";
 import type { FamEnv } from "../context";
 import type { CalendarEventRow } from "../db/scoped";

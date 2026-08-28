@@ -1,4 +1,4 @@
-import type { VaccineLog } from "@shared/schemas";
+import type { VaccineLog } from "@pjokk/shared";
 import programme from "@/data/no-vaccine-programme.json";
 
 // The bundled Norwegian programme is a REFERENCE OVERLAY, never a

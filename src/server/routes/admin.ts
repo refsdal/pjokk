@@ -7,7 +7,7 @@ import {
   AuditEntrySchema,
   AuditNoteSchema,
   ErrorSchema,
-} from "@shared/schemas";
+} from "@pjokk/shared";
 import type { AppEnv } from "../context";
 import { schema } from "../db";
 import { createApp, iso, isoOrNull, jsonContent } from "../lib";

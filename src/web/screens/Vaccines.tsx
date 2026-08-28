@@ -7,7 +7,7 @@ import {
 } from "@tabler/icons-react";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import type { VaccineLog } from "@shared/schemas";
+import type { VaccineLog } from "@pjokk/shared";
 import { BabySwitcher } from "@/components/BabySwitcher";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { VaccineSheet } from "@/components/sheets/VaccineSheet";

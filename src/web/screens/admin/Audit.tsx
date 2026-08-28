@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { z } from "@hono/zod-openapi";
-import type { AuditEntrySchema } from "@shared/schemas";
+import type { AuditEntrySchema } from "@pjokk/shared";
 import { Card } from "@/components/ui/card";
 import { api, unwrap } from "@/lib/api";
 import { formatRelative } from "@/lib/time";

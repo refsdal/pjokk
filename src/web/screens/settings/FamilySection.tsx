@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
-import type { Invite, Member } from "@shared/schemas";
+import type { Invite, Member } from "@pjokk/shared";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet } from "@/components/Sheet";
 import { Button } from "@/components/ui/button";

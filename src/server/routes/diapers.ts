@@ -4,7 +4,7 @@ import {
   DiaperLogSchema,
   ErrorSchema,
   UpdateDiaperSchema,
-} from "@shared/schemas";
+} from "@pjokk/shared";
 import type { FamEnv } from "../context";
 import { createApp, jsonContent, serDiaper } from "../lib";
 

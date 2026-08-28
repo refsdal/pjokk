@@ -5,7 +5,7 @@ import {
   IconTrash,
 } from "@tabler/icons-react";
 import { useState } from "react";
-import type { VaccineLog } from "@shared/schemas";
+import type { VaccineLog } from "@pjokk/shared";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet } from "@/components/Sheet";
 import { ChipGroup } from "@/components/Chips";

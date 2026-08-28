@@ -16,7 +16,7 @@ import type {
   MedicineUnit,
   PlayType,
   TimelineEntry,
-} from "@shared/schemas";
+} from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet } from "@/components/Sheet";
