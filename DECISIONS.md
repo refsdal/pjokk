@@ -5,8 +5,25 @@ choices, noted so they can be revisited deliberately.
 
 - **Work happens on `main`.** Zero-commit greenfield repo whose sole purpose is
   this build; branching would be ceremony.
-- **Package manager: pnpm.** (Environment note: npm is not installed on this
-  machine; pnpm is invoked via a corepack-downloaded binary.)
+- **Package manager: bun** (was pnpm). Forced and then confirmed: the
+  corepack-downloaded pnpm binary began crashing on every invocation
+  (`ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING` under Node 22.22.1), so no
+  dependency could be added at all. Bun was already becoming the runtime, so
+  one tool now covers runtime, installs and tests, and the corepack dependency
+  that broke is gone. `bun.lock` is committed; images build with
+  `bun install --frozen-lockfile`.
+- **Five packages are pinned to exact versions** — `hono`, `better-auth`,
+  `@better-auth/passkey`, `@better-auth/stripe`, `stripe`. Re-resolving the
+  lockfile during the Docker port drifted them within their existing `^`
+  ranges, and hono 4.13.5 tightened `HonoRequest` enough to produce 31 type
+  errors across the route tree (it entangles `@hono/zod-openapi`'s parameter
+  inference too). Upgrading those is real work and does not belong inside an
+  architectural port. Unpin deliberately, as its own change.
+- **`overrides: { "@better-auth/core": "1.7.1" }`.** better-auth's sibling
+  adapter packages declare their own `^1.7.x` on core and resolved to 1.7.2
+  under bun's hoisting, where pnpm's strict layout had hidden the conflict.
+  Two copies of core means two nominally-distinct `BetterAuthOptions` types
+  and `drizzleAdapter` stops being assignable. Collapse it to one.
 - **TanStack Router in code-based mode** (no file-based route generation) —
   fewer moving parts, no codegen watcher, same type safety at this scale.
 - **shadcn/ui components are hand-vendored**, not pulled via the CLI registry
