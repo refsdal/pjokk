@@ -6,7 +6,7 @@ import {
   infoUrlForSlot,
   offProgramme,
   vaccineProgramme,
-} from "../../../src/web/lib/vaccine-programme";
+} from "../src/lib/vaccine-programme";
 
 const entry = (over: Partial<VaccineLog>): VaccineLog => ({
   id: "v1",
