@@ -770,6 +770,59 @@ export type AppEnv = {
 
 `FamEnv` keeps its existing shape with the same `Bindings` change.
 
+- [ ] **Step 4b: Stop three routes constructing their own clients**
+
+Task 2's import guard blocked the barrel specifier `../infrastructure` but not
+sub-paths, and three routes reach past it. Two of them are constructing a
+client **per request**, which is the exact cost CLAUDE.md says this refactor
+removes:
+
+- `apps/api/src/routes/billing.ts:4,33` — `createStripe(c.env.STRIPE_SECRET_KEY)`
+  inside the handler
+- `apps/api/src/routes/admin.ts:16,206` — the same
+- `apps/api/src/routes/push.ts:12` — `createPushSender`, which duplicates the
+  sender `Deps` already carries
+
+Add a 14th field to `Deps` in `apps/api/src/deps.ts`:
+
+```ts
+  /** Null when billing is not configured — the SDK throws from its
+   *  constructor on an empty key, so a self-hosted instance without Stripe
+   *  legitimately has none. Built once at startup, not per request. */
+  stripe: Stripe | null;
+```
+
+with `import type Stripe from "stripe";` at the top. Then:
+- `billing.ts` and `admin.ts` use `c.var.deps.stripe`, keeping their existing
+  null checks exactly as they are, and drop the `createStripe` imports.
+- `push.ts` uses `c.var.deps.push.toUser(...)` and drops its import.
+
+Now the guard can actually close. Widen the `biome.json` rule to name the
+sub-paths too, since nothing legitimate imports them any more:
+
+```json
+            "paths": {
+              "../infrastructure": "Routes and middleware receive their collaborators through Deps. Importing an adapter directly bypasses injection — the same class of mistake as bypassing the family scope.",
+              "../infrastructure/db": "Use deps.db.",
+              "../infrastructure/auth": "Use deps.auth.",
+              "../infrastructure/storage": "Use deps.storage.",
+              "../infrastructure/rate-limit": "Use deps.rateLimit.",
+              "../infrastructure/push": "Use deps.push.",
+              "../infrastructure/stripe": "Use deps.stripe."
+            }
+```
+
+Verify the widened rule bites on a sub-path, not just the barrel:
+
+```bash
+printf 'import { createStripe } from "../infrastructure/stripe";\n' >> apps/api/src/routes/feeds.ts
+bun run check 2>&1 | grep -i 'restricted' | head -3
+git checkout apps/api/src/routes/feeds.ts
+```
+
+Expected: check FAILS. If it passes, the guard still is not enforcing the
+boundary — report that rather than moving on.
+
 - [ ] **Step 5: Update the middleware that read `c.env`**
 
 `middleware/rate-limit.ts` reads `c.env.server?.requestIP(...)` and
@@ -820,6 +873,12 @@ export const deps: Deps = {
   storage,                       // the in-memory one
   rateLimit: createRateLimitStore(db),
   push: createPushSender(db, vapidConfig),
+  // A client, not null: the rig sets STRIPE_SECRET_KEY: "sk_test_fake"
+  // today, so createStripe() currently returns one and the billing routes
+  // take their client-present branch. Passing null here would silently flip
+  // every billing test onto the "not configured" path — a behaviour change
+  // wearing the costume of a simplification.
+  stripe: createStripe("sk_test_fake"),
   peerAddress: () => null,       // no listening server in tests
   now: () => new Date(),
   appUrl: "http://localhost",
@@ -1004,6 +1063,9 @@ export function createDeps(
       publicKey: env.VAPID_PUBLIC_KEY,
       privateKey: env.VAPID_PRIVATE_KEY,
     }),
+    // The SAME client the auth plugin got — built once, shared. Two routes
+    // used to call createStripe() per request before Task 3.
+    stripe: stripeClient,
     peerAddress: (request) =>
       serverRef.current?.requestIP(request)?.address ?? null,
     now: () => new Date(),
