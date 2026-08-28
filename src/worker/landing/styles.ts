@@ -496,6 +496,30 @@ h1 {
   max-width: 46em;
 }
 
+/* ---------- founder story ---------- */
+
+/* Deliberately plainer than .band directly above it: two heavy tinted
+   blocks in a row would fight, and this one should read as someone
+   talking rather than as another feature panel. */
+.story {
+  padding-block: 0 80px;
+}
+.story h2 {
+  margin-bottom: 16px;
+}
+.story p {
+  margin: 0 0 1em;
+  max-width: 34em;
+  color: var(--ink-soft);
+  text-wrap: pretty;
+}
+.story .signature {
+  margin: 24px 0 0;
+  color: var(--muted);
+  font-size: .92rem;
+  font-weight: 700;
+}
+
 /* ---------- footer ---------- */
 
 .site-footer {
