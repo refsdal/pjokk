@@ -1,6 +1,6 @@
 // Inline stylesheet for the public landing page.
 //
-// The colour tokens are copied from src/web/styles.css on purpose. The landing
+// The colour tokens are copied from apps/frontend/src/styles.css on purpose. The landing
 // page is served by the Worker as a standalone document and never loads the
 // app's Tailwind build, so it cannot share them. That duplication is the price
 // of a marketing page that costs a stranger one request and no JavaScript;

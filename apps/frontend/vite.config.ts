@@ -5,13 +5,13 @@ import { VitePWA } from "vite-plugin-pwa";
 import path from "node:path";
 
 // Builds the SPA only. The server is not bundled: Bun runs the TypeScript in
-// src/server directly, so there is no build step for it and no
+// apps/api and apps/server directly, so there is no build step for it and no
 // @cloudflare/vite-plugin to stitch the two halves together.
 //
 // robots.txt, sitemap.xml and the security headers used to be emitted here,
 // keyed on CLOUDFLARE_ENV — which is why production and test needed separate
 // builds of the same commit. They are served by the app now (see
-// src/server/index.ts and src/server/main.ts), so this output is
+// apps/api/src/index.ts and apps/server/src/main.ts), so this output is
 // environment-independent and one image can be promoted between them.
 export default defineConfig({
   build: {

@@ -2,7 +2,7 @@ import { loadEnv } from "@pjokk/api/config";
 import { isJob, JOBS, runJob } from "@pjokk/api/cron";
 import { servicesFor } from "@pjokk/api/services";
 
-// One-shot cron entrypoint: `bun run src/server/cron-cli.ts <job>`.
+// One-shot cron entrypoint: `bun run apps/server/src/cron-cli.ts <job>`.
 //
 // This is what a Kubernetes CronJob invokes. It runs the job once, then
 // exits with a status the scheduler can act on — a failed backup should show

@@ -15,7 +15,7 @@
     "cron": "bun apps/server/src/cron-cli.ts",
     "check": "biome check . && node scripts/check-i18n.mjs && bun run typecheck",
     "test": "bun run --filter '*' test",
-    "typecheck": "bun run --filter '*' typecheck",
+    "typecheck": "bun run --filter '*' typecheck && tsc -p tsconfig.tools.json --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "lint": "biome check .",
