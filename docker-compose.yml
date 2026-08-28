@@ -70,7 +70,7 @@ services:
   # to apply the same DDL.
   migrate:
     build: .
-    command: ["bun", "src/server/migrate.ts"]
+    command: ["bun", "migrate.js"]
     restart: "no"
     depends_on:
       db:
@@ -108,8 +108,9 @@ services:
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-pjokkdevsecret}
 
       # One container, no orchestrator to run CronJobs — so the scheduler runs
-      # in-process. Leave this OFF under Kubernetes and drive `bun run cron`
-      # from a CronJob instead, or every replica fires every reminder.
+      # in-process. Leave this OFF under Kubernetes and drive
+      # `bun cron-cli.js <job>` from a CronJob instead, or every replica fires
+      # every reminder.
       SCHEDULER: "1"
 
       # A local stack is not on the public internet and must not be indexed.

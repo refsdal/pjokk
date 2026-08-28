@@ -99,10 +99,11 @@ puzzling 500.
 The image runs anywhere a container does. Two rules:
 
 1. **Run migrations as a one-off before the new image serves traffic**
-   (`bun src/server/migrate.ts` — a Job, an initContainer, or the compose
-   `migrate` service). Never at app startup: replicas would race.
-2. **Under Kubernetes, leave `SCHEDULER=0`** and drive `bun run cron nightly`
-   and `bun run cron frequent` from CronJobs. The in-process scheduler is for
+   (`bun migrate.js` inside the image — a Job, an initContainer, or the
+   compose `migrate` service). Never at app startup: replicas would race.
+2. **Under Kubernetes, leave `SCHEDULER=0`** and drive `bun cron-cli.js
+   nightly` and `bun cron-cli.js frequent` from CronJobs. The in-process
+   scheduler is for
    single-container deployments; with N replicas it fires every reminder N
    times.
 

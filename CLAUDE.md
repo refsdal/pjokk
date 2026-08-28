@@ -46,8 +46,8 @@ app. Test environment: **test.pjokk.no**.
   for the RPC client. ONE route tree (no separate "RPC for us / OpenAPI for
   others"). Serve interactive docs with Scalar at `/api/docs`.
 - Drizzle ORM + Postgres (`drizzle-orm/bun-sql`, Bun's native client).
-  Migrations via drizzle-kit generate → `bun src/server/migrate.ts`, run as a
-  ONE-OFF job. Never at app startup: drizzle's migrator does not coordinate
+  Migrations via drizzle-kit generate → `bun run migrate` from source, or
+  `bun migrate.js` in the image. Run as a ONE-OFF job. Never at app startup: drizzle's migrator does not coordinate
   between processes, so replicas would race to apply the same DDL.
 - Any S3-compatible store for files (MinIO in compose; S3/R2/Ceph in
   production). Never a public bucket — stream through an authed Hono route
@@ -56,7 +56,7 @@ app. Test environment: **test.pjokk.no**.
   silently writes the string "[object ReadableStream]" if handed one.
 - A `rate_limit` Postgres table for rate-limiting counters.
 - Scheduled work (reminders, nightly backup) runs via `bun run cron
-  <nightly|frequent>`. Under Kubernetes drive it from CronJobs and leave
+  <nightly|frequent>` from source, `bun cron-cli.js <job>` in the image. Under Kubernetes drive it from CronJobs and leave
   `SCHEDULER=0`; the in-process scheduler is for single-container deployments
   only, because with N replicas it fires every job N times.
 - Configuration is environment variables, parsed and validated with zod at

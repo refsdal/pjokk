@@ -768,3 +768,30 @@ been true since Phase 3; the vaccine feature only made it obvious.
   documents the rollout order instead of pretending to perform it.
 - **Package manager is bun** — see the entry near the top; that one was forced
   by a broken corepack pnpm, not chosen.
+- **The server ships BUNDLED (`bun build --target=bun`), not as source.** The
+  runtime image has no `node_modules` at all: 591 MB → 165 MB. Most of the old
+  weight was never needed to run anything — `@tabler/icons-react` alone was
+  141 MB, and it, React, TanStack and recharts are compiled into `dist/client`
+  at build time. The rest was better-auth's optional peer dependencies
+  (`drizzle-kit`, `better-sqlite3`), which `bun install --production` does NOT
+  drop.
+  The bundle resolves everything statically except two dynamic imports:
+  `async_hooks` (a Bun builtin) and `@opentelemetry/api` (optional, absent-safe).
+  Source maps are kept (`--sourcemap=linked`, ~18 MB) so a production stack
+  trace still points at TypeScript.
+  **The risk this creates:** `bun test` runs against SOURCE, so it cannot catch
+  a bundling regression. The CI image smoke test is the compensating control —
+  it signs in with bad credentials and asserts 401 rather than 500 (proving
+  better-auth's dynamically-resolved drizzle adapter survived bundling), checks
+  the rate limiter actually wrote a row, and runs the cron entrypoint. Do not
+  weaken those probes.
+- **`drizzle-orm/bun-sql` is the driver, with a deliberate fallback.** It is
+  the newest part of the stack; `postgres-js` and `node-postgres` have far more
+  production mileage. Drizzle's `pg-core` API is driver-independent, so
+  switching is a one-line change in `src/server/db/index.ts` plus the import —
+  no schema, query or test changes. Kept in mind rather than pre-empted.
+- **Connection pool sizing is deliberately unset.** `new SQL(url)` uses Bun's
+  defaults, which is right for one container. When it becomes a problem it will
+  look like `too many connections` under load or during a rolling deploy (old
+  and new pods both holding pools, briefly doubling the count) — the fix then
+  is a `DATABASE_POOL_MAX` env var wired into `createPool`.

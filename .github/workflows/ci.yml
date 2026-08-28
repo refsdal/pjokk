@@ -95,7 +95,7 @@ jobs:
 
           # Migrations must apply from the image itself.
           docker run --rm --network pjokk-ci "${env_args[@]}" pjokk:ci \
-            bun src/server/migrate.ts
+            bun migrate.js
 
           docker run -d --name app --network pjokk-ci -p 3000:3000 \
             "${env_args[@]}" pjokk:ci
@@ -110,6 +110,32 @@ jobs:
           curl -fsS http://localhost:3000/readyz | grep -q '"ok":true'
           curl -fsS http://localhost:3000/ | grep -qi '<title>Pjokk'
           curl -fsS http://localhost:3000/robots.txt | grep -q 'Disallow: /'
+
+          # The server is BUNDLED (bun build), and `bun test` runs against
+          # source — so these two probes are the only thing standing between a
+          # bundling regression and production. They deliberately need no
+          # fixtures.
+          #
+          # A sign-in with unknown credentials must answer 401. Reaching that
+          # answer means better-auth loaded, its drizzle adapter resolved, and
+          # a query ran against Postgres — the code path most at risk from a
+          # bundler, since better-auth resolves adapters dynamically. A broken
+          # bundle gives 500 here, not 401.
+          status=$(curl -s -o /dev/null -w '%{http_code}' \
+            -X POST http://localhost:3000/api/auth/sign-in/email \
+            -H 'content-type: application/json' -H 'origin: http://localhost:3000' \
+            -d '{"email":"nobody@example.invalid","password":"wrong-password"}')
+          test "$status" = "401" || { echo "sign-in probe returned $status, expected 401"; exit 1; }
+
+          # That request also had to WRITE: the rate limiter increments a
+          # Postgres row per attempt. A non-empty table proves the write path
+          # works end to end in the bundle.
+          docker exec pg psql -U pjokk -d pjokk -tAc \
+            'SELECT count(*) FROM rate_limit' | grep -qvx '0'
+
+          # And the cron entrypoint has to run from the same image.
+          docker run --rm --network pjokk-ci "${env_args[@]}" pjokk:ci \
+            bun cron-cli.js frequent
 
       - name: Container logs on failure
         if: failure()

@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1
 
-# Pjokk — one image, two roles: the web server (default) and the cron jobs
-# (`bun run cron <job>`). Both share the same code and configuration, so a
-# Kubernetes CronJob runs exactly the image that is already deployed.
+# Pjokk — one image, three entrypoints: the web server (default), the cron
+# jobs (`bun cron-cli.js <job>`) and the migrator (`bun migrate.js`). They
+# share the same build and configuration, so a Kubernetes CronJob or Job runs
+# exactly the image that is already deployed.
 
 # ---------- deps ----------
 # Separate stage so a lockfile-only change is the sole thing that busts the
@@ -13,31 +14,31 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 
 # ---------- build ----------
-# Builds the SPA. The server is NOT bundled: Bun executes the TypeScript in
-# src/server directly, so there is nothing to compile for it.
+# Two outputs: the SPA (vite → dist/client) and the server bundled to plain
+# JavaScript (bun build → dist/server).
 FROM deps AS build
 WORKDIR /app
 COPY . .
 RUN bun run build
 
 # ---------- runtime ----------
+# No dependency install and no node_modules AT ALL: everything the server
+# imports is inlined into the bundles above. That is what takes the image from
+# ~590 MB to ~165 MB — most of the old weight was frontend libraries
+# (@tabler/icons-react alone was 141 MB) that only ever mattered at build time
+# because they are compiled into dist/client, plus better-auth's optional peer
+# dependencies (drizzle-kit, better-sqlite3) which `--production` does not drop.
 FROM oven/bun:1.4-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Reinstalled without devDependencies: vite, biome, drizzle-kit and the
-# TypeScript compiler have no business in a production image.
-COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --production
-
-# The server sources (run directly), the built SPA, and the migrations that
-# `bun run migrate` applies as a one-off job.
-COPY src ./src
+# main.js / cron-cli.js / migrate.js, with their linked source maps so a stack
+# trace still points at real files rather than into a 4 MB bundle.
+COPY --from=build /app/dist/server ./
 COPY --from=build /app/dist/client ./dist/client
+# migrate.js reads these at run time; they are data, not code, so they are not
+# part of the bundle.
 COPY migrations ./migrations
-# Bun resolves the "@shared/*" import alias from tsconfig.json at runtime, so
-# the server does not start without it.
-COPY tsconfig.json ./
 
 # The base image ships a non-root `bun` user; running as root in a container
 # that serves the public internet buys nothing.
@@ -50,4 +51,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD bun -e "const r = await fetch('http://127.0.0.1:' + (process.env.PORT ?? 3000) + '/healthz'); process.exit(r.ok ? 0 : 1)"
 
-CMD ["bun", "src/server/main.ts"]
+CMD ["bun", "main.js"]
