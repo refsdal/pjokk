@@ -377,6 +377,19 @@ Each adapter currently imports `Env` from `../config` (which moves to
 `apps/server` in Task 4, so this import must go). Replace each with a narrow
 config object declared in the adapter's own file.
 
+**First, restore a sentence Task 1 lost.** `ports.ts`'s `Storage.put` comment
+is missing one sentence that the original in `storage.ts` has — my Task 1
+snippet dropped it, and deleting the original here would lose it for good. In
+`apps/api/src/ports.ts`, the `put` doc comment should read `... with no error.
+The old R2 code passed \`file.stream()\`, so accepting a stream here would make
+that mistake both easy and invisible. A File IS a Blob, ...`. It records why
+the narrow signature exists, which is exactly the kind of note this codebase
+keeps deliberately.
+
+**Second, collapse the duplicate `PushPayload`.** It is declared in both
+`ports.ts:32` and `push.ts:12` (verified identical). The `ports.ts` one is
+canonical; `infrastructure/push.ts` imports it rather than redeclaring.
+
 `infrastructure/storage.ts` — change only the signature and the `Env` import;
 the body of `createStorage` is unchanged. Delete its local `Storage` and
 `StoredObject` type declarations (they live in `ports.ts` now) and import them
