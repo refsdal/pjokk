@@ -28,6 +28,14 @@ deploy on the apex with the app moving back to `app.pjokk.no`.
 - No `packages/config` — a root `tsconfig.base.json` and the existing
   `biome.json` cover this without a package.
 - No `apps/mobile` placeholder. It gets created when something goes in it.
+- No `apps/workers`. The scheduled jobs are use cases over the same `Deps` and
+  the same family-scoped queries as the routes, and they are covered by tests
+  that live in the api suite. A separate package would import deeply from
+  `@pjokk/api` — moving files without decoupling anything — and the workers are
+  not a separate deploy target, since a Kubernetes CronJob runs the same image
+  with a different entrypoint. This would change if a worker image without the
+  HTTP surface is ever wanted; that image would need its own composition root
+  and would earn the package.
 - No frontend tests in this work (there are none today; writing them is
   net-new work and belongs in its own effort).
 - No behaviour change in pieces 1 and 2. The 25 test files must pass
@@ -48,6 +56,8 @@ carried through this document.
 | `/privacy` and `/terms` move to the landing site | They are legal statements that must be readable without an account and without JavaScript. Moving them off the app host also lets the app host be unconditionally `Disallow: /`. |
 | `--compile` / distroless deferred to a spike | Answerable, but not by assertion — see piece 4. |
 | `now: () => Date` added to `Deps` | Slightly beyond a pure restructure, but this is the natural moment, and it is what makes the reminder and cron tests deterministic instead of clock-dependent. |
+| In-process scheduling moves to `Bun.cron` | Retires the hand-rolled 15-minute tick. See "Scheduling" below. |
+| `scheduled.ts` splits into `apps/api/src/jobs/` | 337 lines doing four unrelated things; the move is the moment to split them. |
 
 ### Consequences of the hostname split that are *not* costs
 
@@ -99,7 +109,10 @@ apps/api/
 │   ├── ports.ts                Storage · RateLimitStore · Auth · PushSender · PeerAddress
 │   ├── context.ts              AppEnv / FamEnv
 │   ├── lib.ts                  createApp, jsonContent, isUniqueViolation, serialisers
-│   ├── entitlements.ts  billing.ts  scheduled.ts
+│   ├── entitlements.ts  billing.ts
+│   ├── jobs/                   backup.ts · reminders.ts · calendar-reminders.ts
+│   │                           · plans.ts   (was scheduled.ts, 337 lines)
+│   │                           bodies only — each takes Deps, nothing schedules
 │   ├── db/
 │   │     index.ts              type Db            ← type only, no construction
 │   │     schema.ts  auth-schema.ts  scoped.ts
@@ -213,7 +226,7 @@ apps/server/
 │   ├── deps.ts       createDeps(env: Env): Deps
 │   ├── index.ts      Bun.serve · static SPA · SPA fallback · security headers
 │   │                 · robots.txt · SIGTERM drain
-│   ├── cron.ts       startScheduler(deps) — the setInterval loop
+│   ├── cron.ts       SCHEDULES · runJob(job, deps) · startScheduler(deps)
 │   ├── cron-cli.ts   one-shot `bun cron-cli.js <nightly|frequent>`
 │   └── migrate.ts    one-off migration job
 ├── test/             env parsing (was test/config.test.ts)
@@ -231,6 +244,81 @@ Changes to `env.ts` beyond the move:
 then static assets, then the SPA fallback, with `/api/*` excluded from the
 fallback so a typo'd endpoint returns JSON 404 rather than `index.html` with a
 200.
+
+### Scheduling
+
+The hand-rolled 15-minute tick in `src/server/cron.ts` is replaced by
+`Bun.cron`, which is a builtin as of Bun 1.4 (verified present in the installed
+`bun-types@1.4.0` and at runtime). This retires the reasoning recorded in that
+file — *"no cron parser, because a dependency to express them would earn its
+keep only if there were more"* — since there is no longer a dependency to
+justify.
+
+```ts
+// apps/server/src/cron.ts
+export const SCHEDULES = {
+  nightly: "15 3 * * *",
+  frequent: "*/15 * * * *",
+} as const
+
+export function startScheduler(deps: Deps): () => void {
+  const jobs = (Object.keys(SCHEDULES) as Job[]).map((job) =>
+    Bun.cron(
+      SCHEDULES[job],
+      async () => {
+        // Kept INSIDE the callback deliberately — see error semantics below.
+        try {
+          await runJob(job, deps)
+        } catch (error) {
+          console.error(`cron: ${job} failed`, error)
+        }
+      },
+      { tz: "UTC" },
+    ),
+  )
+  return () => {
+    for (const job of jobs) job.stop()
+  }
+}
+```
+
+**What this fixes.** The current scheduler runs the nightly job on whichever
+15-minute tick first lands past 03:15, latched by a day string — so its actual
+fire time depends on when the process started. `Bun.cron` fires at 03:15.
+It also gives a no-overlap guarantee: the next fire is computed only after the
+callback settles, whereas `setInterval` will start a second nightly run
+concurrently if the first takes longer than 15 minutes. The nightly job reads
+every table and writes a snapshot to object storage, so that is a real latent
+bug, not a hypothetical one.
+
+**`tz: "UTC"` is mandatory, not decoration.** The default is the system zone.
+`Bun.cron.parse("15 3 * * *", ...)` resolves to `03:15Z` under `UTC` and
+`01:15Z` under `Europe/Oslo`. The image does not set `TZ`, so it is UTC by
+accident rather than by contract, and the 30-day backup retention window is a
+privacy-policy commitment stated in UTC.
+
+**Error semantics invert, and the naive migration is worse than today.**
+`Bun.cron` matches `setTimeout`: a rejected promise emits `unhandledRejection`,
+and with no listener the process exits with code 1. The job does reschedule
+itself after an error, so the correct adaptation is to keep the existing
+try/catch inside the callback rather than register a process-wide handler.
+Dropping it would turn one transient database blip into a pod restart loop.
+
+**The `SCHEDULER=0` rule is unchanged.** `Bun.cron` in-process fires once per
+replica exactly as `setInterval` did. CLAUDE.md's rule — drive scheduling from
+Kubernetes CronJobs and leave the in-process scheduler for single-container
+deployments — stands verbatim. `SCHEDULES` becomes the shared source of truth
+for both paths.
+
+**The OS-level overload is rejected.** `Bun.cron(path, { title })` registers
+with crontab/launchd, spawns a fresh process per fire (so there is no shared
+connection pool), and requires a cron daemon inside the image — which conflicts
+with the distroless target in piece 4 and duplicates what Kubernetes CronJobs
+already own.
+
+`runJob(job, deps)` keeps its current shape, taking `Deps` where it took
+`Services`. It stays in `apps/server` beside the CLI: api owns what a job does,
+server owns when it runs.
 
 ## `apps/frontend` — the SPA
 
@@ -371,7 +459,7 @@ revertable:
 | PR | Piece | Character |
 |---|---|---|
 | #15 | Workspace move | Mechanical. `git mv` + import rewrites + tsconfig/bunfig/Dockerfile paths. No logic changes. |
-| #16 | Composition root | Design. `createApi(deps)`, `createDeps(env)`, ports, `infrastructure` entry + lint rule, `WeakMap` deleted, `AppType` assertion test. |
+| #16 | Composition root | Design. `createApi(deps)`, `createDeps(env)`, ports, `infrastructure` entry + lint rule, `WeakMap` deleted, `AppType` assertion test. Includes the `Bun.cron` swap and the `scheduled.ts` → `jobs/` split, since both follow `Services` → `Deps`. |
 | #17 | Landing + hostname split | Risky — the only piece that can break production. |
 | #18 | `--compile` / distroless | After the spike below. |
 
