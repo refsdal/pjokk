@@ -17,6 +17,11 @@ import type { Env } from "./config";
 export function createStripe(env: Env): Stripe | null {
   if (!env.STRIPE_SECRET_KEY) return null;
   return new Stripe(env.STRIPE_SECRET_KEY, {
+    // Pinned together with the SDK (22.5.0 in package.json). The SDK pins the
+    // API version it is built against, so upgrading stripe forces this to
+    // 2026-08-26.dahlia — a behavioural change against live billing that the
+    // test suite cannot catch, because it runs with fake keys. Bump both
+    // together, with the test-mode pass in SMOKE-TEST.md section 8.
     apiVersion: "2026-07-29.dahlia",
     httpClient: Stripe.createFetchHttpClient(),
   });

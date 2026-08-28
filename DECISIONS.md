@@ -12,18 +12,20 @@ choices, noted so they can be revisited deliberately.
   one tool now covers runtime, installs and tests, and the corepack dependency
   that broke is gone. `bun.lock` is committed; images build with
   `bun install --frozen-lockfile`.
-- **Five packages are pinned to exact versions** — `hono`, `better-auth`,
-  `@better-auth/passkey`, `@better-auth/stripe`, `stripe`. Re-resolving the
-  lockfile during the Docker port drifted them within their existing `^`
-  ranges, and hono 4.13.5 tightened `HonoRequest` enough to produce 31 type
-  errors across the route tree (it entangles `@hono/zod-openapi`'s parameter
-  inference too). Upgrading those is real work and does not belong inside an
-  architectural port. Unpin deliberately, as its own change.
-- **`overrides: { "@better-auth/core": "1.7.1" }`.** better-auth's sibling
-  adapter packages declare their own `^1.7.x` on core and resolved to 1.7.2
-  under bun's hoisting, where pnpm's strict layout had hidden the conflict.
-  Two copies of core means two nominally-distinct `BetterAuthOptions` types
-  and `drizzleAdapter` stops being assignable. Collapse it to one.
+- **`stripe` is pinned to 22.5.0; everything else is unpinned again.** The
+  temporary pins on hono and better-auth (added mid-port, when hono 4.13.5
+  appeared to cause 31 type errors) turned out to be unnecessary: almost all of
+  those errors came from `lib.ts` constraining on the ambient Cloudflare `Env`,
+  which the port removed. hono 4.13.5 + better-auth 1.7.2 typecheck clean and
+  pass all 200 tests. The `@better-auth/core` override went with them — it
+  existed to resolve a version MISMATCH (better-auth pinned at 1.7.1 while its
+  sibling adapters resolved 1.7.2), and with everything at 1.7.2 there is
+  nothing to collapse.
+  Stripe stays pinned because the SDK pins the Stripe **API version**: 22.6.0
+  requires `2026-08-26.dahlia` instead of `2026-07-29.dahlia`. That is a
+  behavioural change on the money path, and the billing tests run with fake
+  keys (`sk_test_fake`), so nothing in CI can validate it. Bump it as its own
+  change, together with the test-mode pass in SMOKE-TEST.md section 8.
 - **TanStack Router in code-based mode** (no file-based route generation) —
   fewer moving parts, no codegen watcher, same type safety at this scale.
 - **shadcn/ui components are hand-vendored**, not pulled via the CLI registry
