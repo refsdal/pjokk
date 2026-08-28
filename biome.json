@@ -7,6 +7,7 @@
       "scripts/**",
       "*.ts",
       "!apps/frontend/src/data",
+      "!apps/api/migrations/meta",
       "!scripts/import-sprout-track.mjs"
     ]
   },

@@ -68,8 +68,12 @@
           "name": "admin_audit_admin_id_user_id_fk",
           "tableFrom": "admin_audit",
           "tableTo": "user",
-          "columnsFrom": ["admin_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "admin_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -175,8 +179,12 @@
           "name": "api_key_family_id_organization_id_fk",
           "tableFrom": "api_key",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -184,8 +192,12 @@
           "name": "api_key_created_by_user_id_fk",
           "tableFrom": "api_key",
           "tableTo": "user",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -195,7 +207,9 @@
         "api_key_key_hash_unique": {
           "name": "api_key_key_hash_unique",
           "nullsNotDistinct": false,
-          "columns": ["key_hash"]
+          "columns": [
+            "key_hash"
+          ]
         }
       },
       "policies": {},
@@ -266,8 +280,12 @@
           "name": "baby_family_id_organization_id_fk",
           "tableFrom": "baby",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -354,8 +372,12 @@
           "name": "bath_log_family_id_organization_id_fk",
           "tableFrom": "bath_log",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -363,8 +385,12 @@
           "name": "bath_log_baby_id_baby_id_fk",
           "tableFrom": "bath_log",
           "tableTo": "baby",
-          "columnsFrom": ["baby_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "baby_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -372,8 +398,12 @@
           "name": "bath_log_caretaker_id_user_id_fk",
           "tableFrom": "bath_log",
           "tableTo": "user",
-          "columnsFrom": ["caretaker_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "caretaker_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -407,8 +437,12 @@
           "name": "calendar_assignee_event_id_calendar_event_id_fk",
           "tableFrom": "calendar_assignee",
           "tableTo": "calendar_event",
-          "columnsFrom": ["event_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "event_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -416,8 +450,12 @@
           "name": "calendar_assignee_user_id_user_id_fk",
           "tableFrom": "calendar_assignee",
           "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -425,7 +463,10 @@
       "compositePrimaryKeys": {
         "calendar_assignee_event_id_user_id_pk": {
           "name": "calendar_assignee_event_id_user_id_pk",
-          "columns": ["event_id", "user_id"]
+          "columns": [
+            "event_id",
+            "user_id"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -547,8 +588,12 @@
           "name": "calendar_event_family_id_organization_id_fk",
           "tableFrom": "calendar_event",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -556,8 +601,12 @@
           "name": "calendar_event_created_by_user_id_fk",
           "tableFrom": "calendar_event",
           "tableTo": "user",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -591,8 +640,12 @@
           "name": "calendar_event_baby_event_id_calendar_event_id_fk",
           "tableFrom": "calendar_event_baby",
           "tableTo": "calendar_event",
-          "columnsFrom": ["event_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "event_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -600,8 +653,12 @@
           "name": "calendar_event_baby_baby_id_baby_id_fk",
           "tableFrom": "calendar_event_baby",
           "tableTo": "baby",
-          "columnsFrom": ["baby_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "baby_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -609,7 +666,10 @@
       "compositePrimaryKeys": {
         "calendar_event_baby_event_id_baby_id_pk": {
           "name": "calendar_event_baby_event_id_baby_id_pk",
-          "columns": ["event_id", "baby_id"]
+          "columns": [
+            "event_id",
+            "baby_id"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -705,8 +765,12 @@
           "name": "contact_family_id_organization_id_fk",
           "tableFrom": "contact",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -740,8 +804,12 @@
           "name": "contact_baby_contact_id_contact_id_fk",
           "tableFrom": "contact_baby",
           "tableTo": "contact",
-          "columnsFrom": ["contact_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "contact_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -749,8 +817,12 @@
           "name": "contact_baby_baby_id_baby_id_fk",
           "tableFrom": "contact_baby",
           "tableTo": "baby",
-          "columnsFrom": ["baby_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "baby_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -758,7 +830,10 @@
       "compositePrimaryKeys": {
         "contact_baby_contact_id_baby_id_pk": {
           "name": "contact_baby_contact_id_baby_id_pk",
-          "columns": ["contact_id", "baby_id"]
+          "columns": [
+            "contact_id",
+            "baby_id"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -863,8 +938,12 @@
           "name": "diaper_log_family_id_organization_id_fk",
           "tableFrom": "diaper_log",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -872,8 +951,12 @@
           "name": "diaper_log_baby_id_baby_id_fk",
           "tableFrom": "diaper_log",
           "tableTo": "baby",
-          "columnsFrom": ["baby_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "baby_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -881,8 +964,12 @@
           "name": "diaper_log_caretaker_id_user_id_fk",
           "tableFrom": "diaper_log",
           "tableTo": "user",
-          "columnsFrom": ["caretaker_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "caretaker_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -976,8 +1063,12 @@
           "name": "family_invite_family_id_organization_id_fk",
           "tableFrom": "family_invite",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -985,8 +1076,12 @@
           "name": "family_invite_created_by_user_id_fk",
           "tableFrom": "family_invite",
           "tableTo": "user",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1124,8 +1219,12 @@
           "name": "feed_log_family_id_organization_id_fk",
           "tableFrom": "feed_log",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1133,8 +1232,12 @@
           "name": "feed_log_baby_id_baby_id_fk",
           "tableFrom": "feed_log",
           "tableTo": "baby",
-          "columnsFrom": ["baby_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "baby_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1142,8 +1245,12 @@
           "name": "feed_log_caretaker_id_user_id_fk",
           "tableFrom": "feed_log",
           "tableTo": "user",
-          "columnsFrom": ["caretaker_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "caretaker_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1242,8 +1349,12 @@
           "name": "measurement_log_family_id_organization_id_fk",
           "tableFrom": "measurement_log",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1251,8 +1362,12 @@
           "name": "measurement_log_baby_id_baby_id_fk",
           "tableFrom": "measurement_log",
           "tableTo": "baby",
-          "columnsFrom": ["baby_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "baby_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1260,8 +1375,12 @@
           "name": "measurement_log_caretaker_id_user_id_fk",
           "tableFrom": "measurement_log",
           "tableTo": "user",
-          "columnsFrom": ["caretaker_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "caretaker_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1366,8 +1485,12 @@
           "name": "medicine_log_family_id_organization_id_fk",
           "tableFrom": "medicine_log",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1375,8 +1498,12 @@
           "name": "medicine_log_baby_id_baby_id_fk",
           "tableFrom": "medicine_log",
           "tableTo": "baby",
-          "columnsFrom": ["baby_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "baby_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1384,8 +1511,12 @@
           "name": "medicine_log_caretaker_id_user_id_fk",
           "tableFrom": "medicine_log",
           "tableTo": "user",
-          "columnsFrom": ["caretaker_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "caretaker_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1478,8 +1609,12 @@
           "name": "milestone_log_family_id_organization_id_fk",
           "tableFrom": "milestone_log",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1487,8 +1622,12 @@
           "name": "milestone_log_baby_id_baby_id_fk",
           "tableFrom": "milestone_log",
           "tableTo": "baby",
-          "columnsFrom": ["baby_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "baby_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1496,8 +1635,12 @@
           "name": "milestone_log_caretaker_id_user_id_fk",
           "tableFrom": "milestone_log",
           "tableTo": "user",
-          "columnsFrom": ["caretaker_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "caretaker_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1590,8 +1733,12 @@
           "name": "note_log_family_id_organization_id_fk",
           "tableFrom": "note_log",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1599,8 +1746,12 @@
           "name": "note_log_baby_id_baby_id_fk",
           "tableFrom": "note_log",
           "tableTo": "baby",
-          "columnsFrom": ["baby_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "baby_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1608,8 +1759,12 @@
           "name": "note_log_caretaker_id_user_id_fk",
           "tableFrom": "note_log",
           "tableTo": "user",
-          "columnsFrom": ["caretaker_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "caretaker_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1739,8 +1894,12 @@
           "name": "play_log_family_id_organization_id_fk",
           "tableFrom": "play_log",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1748,8 +1907,12 @@
           "name": "play_log_baby_id_baby_id_fk",
           "tableFrom": "play_log",
           "tableTo": "baby",
-          "columnsFrom": ["baby_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "baby_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1757,8 +1920,12 @@
           "name": "play_log_caretaker_id_user_id_fk",
           "tableFrom": "play_log",
           "tableTo": "user",
-          "columnsFrom": ["caretaker_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "caretaker_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1863,8 +2030,12 @@
           "name": "pump_log_family_id_organization_id_fk",
           "tableFrom": "pump_log",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1872,8 +2043,12 @@
           "name": "pump_log_baby_id_baby_id_fk",
           "tableFrom": "pump_log",
           "tableTo": "baby",
-          "columnsFrom": ["baby_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "baby_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1881,8 +2056,12 @@
           "name": "pump_log_caretaker_id_user_id_fk",
           "tableFrom": "pump_log",
           "tableTo": "user",
-          "columnsFrom": ["caretaker_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "caretaker_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1929,8 +2108,12 @@
           "name": "push_pref_user_id_user_id_fk",
           "tableFrom": "push_pref",
           "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1938,8 +2121,12 @@
           "name": "push_pref_family_id_organization_id_fk",
           "tableFrom": "push_pref",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1947,7 +2134,10 @@
       "compositePrimaryKeys": {
         "push_pref_user_id_family_id_pk": {
           "name": "push_pref_user_id_family_id_pk",
-          "columns": ["user_id", "family_id"]
+          "columns": [
+            "user_id",
+            "family_id"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -2025,8 +2215,12 @@
           "name": "push_subscription_family_id_organization_id_fk",
           "tableFrom": "push_subscription",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2034,8 +2228,12 @@
           "name": "push_subscription_user_id_user_id_fk",
           "tableFrom": "push_subscription",
           "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2045,7 +2243,9 @@
         "push_subscription_endpoint_unique": {
           "name": "push_subscription_endpoint_unique",
           "nullsNotDistinct": false,
-          "columns": ["endpoint"]
+          "columns": [
+            "endpoint"
+          ]
         }
       },
       "policies": {},
@@ -2152,8 +2352,12 @@
           "name": "sleep_location_family_id_organization_id_fk",
           "tableFrom": "sleep_location",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2283,8 +2487,12 @@
           "name": "sleep_log_family_id_organization_id_fk",
           "tableFrom": "sleep_log",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2292,8 +2500,12 @@
           "name": "sleep_log_baby_id_baby_id_fk",
           "tableFrom": "sleep_log",
           "tableTo": "baby",
-          "columnsFrom": ["baby_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "baby_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2301,8 +2513,12 @@
           "name": "sleep_log_caretaker_id_user_id_fk",
           "tableFrom": "sleep_log",
           "tableTo": "user",
-          "columnsFrom": ["caretaker_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "caretaker_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2398,8 +2614,12 @@
           "name": "vaccine_dismissal_family_id_organization_id_fk",
           "tableFrom": "vaccine_dismissal",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2407,8 +2627,12 @@
           "name": "vaccine_dismissal_baby_id_baby_id_fk",
           "tableFrom": "vaccine_dismissal",
           "tableTo": "baby",
-          "columnsFrom": ["baby_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "baby_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2416,8 +2640,12 @@
           "name": "vaccine_dismissal_dismissed_by_user_id_fk",
           "tableFrom": "vaccine_dismissal",
           "tableTo": "user",
-          "columnsFrom": ["dismissed_by"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "dismissed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2525,8 +2753,12 @@
           "name": "vaccine_document_family_id_organization_id_fk",
           "tableFrom": "vaccine_document",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2534,8 +2766,12 @@
           "name": "vaccine_document_vaccine_log_id_vaccine_log_id_fk",
           "tableFrom": "vaccine_document",
           "tableTo": "vaccine_log",
-          "columnsFrom": ["vaccine_log_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "vaccine_log_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2543,8 +2779,12 @@
           "name": "vaccine_document_uploaded_by_user_id_fk",
           "tableFrom": "vaccine_document",
           "tableTo": "user",
-          "columnsFrom": ["uploaded_by"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "uploaded_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2664,8 +2904,12 @@
           "name": "vaccine_log_family_id_organization_id_fk",
           "tableFrom": "vaccine_log",
           "tableTo": "organization",
-          "columnsFrom": ["family_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "family_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2673,8 +2917,12 @@
           "name": "vaccine_log_baby_id_baby_id_fk",
           "tableFrom": "vaccine_log",
           "tableTo": "baby",
-          "columnsFrom": ["baby_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "baby_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2682,8 +2930,12 @@
           "name": "vaccine_log_caretaker_id_user_id_fk",
           "tableFrom": "vaccine_log",
           "tableTo": "user",
-          "columnsFrom": ["caretaker_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "caretaker_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2827,8 +3079,12 @@
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
           "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2931,8 +3187,12 @@
           "name": "invitation_organization_id_organization_id_fk",
           "tableFrom": "invitation",
           "tableTo": "organization",
-          "columnsFrom": ["organization_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2940,8 +3200,12 @@
           "name": "invitation_inviter_id_user_id_fk",
           "tableFrom": "invitation",
           "tableTo": "user",
-          "columnsFrom": ["inviter_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "inviter_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3025,8 +3289,12 @@
           "name": "member_organization_id_organization_id_fk",
           "tableFrom": "member",
           "tableTo": "organization",
-          "columnsFrom": ["organization_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3034,8 +3302,12 @@
           "name": "member_user_id_user_id_fk",
           "tableFrom": "member",
           "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3123,7 +3395,9 @@
         "organization_slug_unique": {
           "name": "organization_slug_unique",
           "nullsNotDistinct": false,
-          "columns": ["slug"]
+          "columns": [
+            "slug"
+          ]
         }
       },
       "policies": {},
@@ -3238,8 +3512,12 @@
           "name": "passkey_user_id_user_id_fk",
           "tableFrom": "passkey",
           "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3338,8 +3616,12 @@
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
           "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3349,7 +3631,9 @@
         "session_token_unique": {
           "name": "session_token_unique",
           "nullsNotDistinct": false,
-          "columns": ["token"]
+          "columns": [
+            "token"
+          ]
         }
       },
       "policies": {},
@@ -3589,7 +3873,9 @@
         "user_email_unique": {
           "name": "user_email_unique",
           "nullsNotDistinct": false,
-          "columns": ["email"]
+          "columns": [
+            "email"
+          ]
         }
       },
       "policies": {},
