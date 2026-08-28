@@ -1,5 +1,6 @@
 import { SQL } from "bun";
 import { drizzle } from "drizzle-orm/bun-sql";
+import type { BunSQLDatabase } from "drizzle-orm/bun-sql";
 import * as schema from "./schema";
 
 // Postgres through Bun's native SQL client.
@@ -20,5 +21,13 @@ export function createDb(client: SQL) {
   return drizzle({ client, schema });
 }
 
-export type Db = ReturnType<typeof createDb>;
+/**
+ * `& { $client: SQL }` is required, not decorative: drizzle() is declared as
+ * returning `BunSQLDatabase<TSchema> & { $client: TClient }`, so the bare
+ * class annotation drops $client — and the test suite calls db.$client.end()
+ * in afterAll, because Bun keeps the process alive while the pool holds
+ * handles.
+ */
+export type Db = BunSQLDatabase<typeof schema> & { $client: SQL };
+
 export { schema };
