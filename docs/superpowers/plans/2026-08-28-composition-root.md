@@ -220,24 +220,29 @@ export type Deps = {
 };
 ```
 
-- [ ] **Step 4: Make `apps/api/src/db/index.ts` type-only**
+- [ ] **Step 4: Give `apps/api/src/db/index.ts` an explicit `Db` type**
 
-Replace the whole file. `createPool` and `createDb` move to
-`infrastructure/db.ts` in Task 2 — this task only stops `db/index.ts` from
-being the place they live. `schema` stays re-exported here because 18 files
-import it from `./db`.
+**Keep `createPool` and `createDb` exactly where they are.** They move to
+`infrastructure/db.ts` in Task 2, together with the two call sites that would
+otherwise break — `apps/api/src/services.ts:5,49` and
+`apps/server/src/migrate.ts:3,17,26` import them at *runtime*, so removing them
+here turns the whole `@pjokk/api` suite red (23 files, `SyntaxError: Export
+named 'createDb' not found`). This task must stay green.
+
+The only change is the `Db` type itself, from an inferred `ReturnType` to an
+explicit annotation. That is worth doing on its own: an explicit type keeps the
+emitted `.d.ts` stable across the package boundary instead of re-inferring a
+large type at every consumer.
+
+Change only this line:
 
 ```ts
-import type { SQL } from "bun";
-import type { BunSQLDatabase } from "drizzle-orm/bun-sql";
-import * as schema from "./schema";
+export type Db = ReturnType<typeof createDb>;
+```
 
-// The database TYPE, and nothing that builds one.
-//
-// Construction lives in ../infrastructure/db.ts, behind a package entry that
-// only apps/server imports. Routes need the type; nothing under routes/ or
-// middleware/ has any business opening a connection.
+to:
 
+```ts
 /**
  * `& { $client: SQL }` is required, not decorative: drizzle() is declared as
  * returning `BunSQLDatabase<TSchema> & { $client: TClient }`, so the bare
@@ -246,8 +251,31 @@ import * as schema from "./schema";
  * handles.
  */
 export type Db = BunSQLDatabase<typeof schema> & { $client: SQL };
+```
 
-export { schema };
+adding the two type imports it needs:
+
+```ts
+import type { SQL } from "bun";
+import type { BunSQLDatabase } from "drizzle-orm/bun-sql";
+```
+
+Note `SQL` is already imported as a value in this file for `createPool`; add
+the type imports without duplicating that.
+
+- [ ] **Step 4b: Stop biome tripping over agent worktrees**
+
+`biome check .` fails with "Found a nested root configuration" whenever a git
+worktree exists under `.claude/worktrees/` — which happens routinely, since
+that is where isolated agent workspaces are created. It is not related to this
+task's changes, but it breaks this task's own gate.
+
+Add `"!.claude"` to `files.includes` in `biome.json`:
+
+```json
+      "!apps/api/migrations/meta",
+      "!.claude",
+      "!scripts/import-sprout-track.mjs"
 ```
 
 - [ ] **Step 5: Verify the suite is untouched**
@@ -257,24 +285,24 @@ bun run test 2>&1 | tail -6
 bun run check
 ```
 
-Expected: still `179 pass` / `21 pass`, check green. This task added two files
-and narrowed one; if anything failed, it is because something imported
-`createDb`/`createPool` from `./db` — Task 2 moves those, so note the call
-sites and continue rather than adding them back.
-
-If `bun run check` reports unused-import or missing-export errors pointing at
-`createPool`/`createDb`, that is expected and Task 2 resolves it. Record which
-files in your report. If the **tests** fail, stop and report.
+Expected: `179 pass` / `21 pass` and check green — **both, unconditionally**.
+This task is purely additive apart from one type annotation, so anything red is
+a real problem: stop and report rather than continuing.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add apps/api/src/ports.ts apps/api/src/deps.ts apps/api/src/db/index.ts
+git add apps/api/src/ports.ts apps/api/src/deps.ts apps/api/src/db/index.ts biome.json
 git commit -m "refactor(api): declare the ports and the Deps contract
 
 ports.ts holds the interfaces apps/api depends on; deps.ts holds the one
-object apps/server passes to it. db/index.ts keeps the Db type and drops
-construction, which moves behind the infrastructure entry.
+object apps/server passes to it. db/index.ts's Db becomes an explicit
+annotation rather than an inferred ReturnType, which keeps the emitted .d.ts
+stable across the package boundary. Construction stays put until Task 2 has
+somewhere to move it to.
+
+biome also learns to ignore .claude, where agent worktrees live — a nested
+biome.json there fails `biome check .` for reasons unrelated to the tree.
 
 PushSender is narrower than the pushToUser() it replaces: the db and the
 VAPID pair are closed over, so no call site carries infrastructure just to
@@ -321,10 +349,14 @@ git mv apps/api/src/push.ts             apps/api/src/infrastructure/push.ts
 
 - [ ] **Step 2: Create `apps/api/src/infrastructure/db.ts`**
 
-This is the construction half of what `db/index.ts` used to hold. The old file
-had `createPool` and `createDb` separately, with a comment saying the split
-existed so tests could share a pool across suites. Collapse them: there is a
-composition root now, so exactly one caller builds the pool.
+This is the construction half of what `db/index.ts` holds today. Task 1
+deliberately left `createPool` and `createDb` there because two files import
+them at runtime; **this task moves them and fixes those call sites in the same
+step, so nothing is red in between.**
+
+The old file had `createPool` and `createDb` separately, with a comment saying
+the split existed so tests could share a pool across suites. Collapse them:
+there is a composition root now, so exactly one caller builds the pool.
 
 ```ts
 import { SQL } from "bun";
@@ -523,10 +555,25 @@ does not fire is worse than none.
 
 - [ ] **Step 7: Update the importers of the moved files**
 
-`services.ts`, `index.ts`, `scheduled.ts`, `routes/push.ts`, `routes/vaccines.ts`
-and `context.ts` import from the old paths. Point them at the new locations
-for now (`./infrastructure/...`); Tasks 3-5 remove most of these imports
-entirely. Run this to find them all:
+**Delete `createPool` and `createDb` from `apps/api/src/db/index.ts` now** (it
+becomes type-only: `export type Db` plus the `schema` re-export), and fix the
+two runtime call sites in the same commit — these are the ones that made Task 1
+red when it tried to remove them early:
+
+- `apps/api/src/services.ts:5` — import `createDb` from `./infrastructure`
+  instead of `./db`; line 49 becomes `overrides.db ?? createDb(env.DATABASE_URL)`
+  (the `createPool` wrapper is gone).
+- `apps/server/src/migrate.ts:3` — import `createDb` from
+  `@pjokk/api/infrastructure`; delete the `const pool = createPool(...)` line
+  at 17 and change line 26 to `await migrate(createDb(env.DATABASE_URL), { migrationsFolder })`.
+  **Keep the `await pool.end()` calls working** — hold the db in a local
+  (`const db = createDb(env.DATABASE_URL)`) and call `db.$client.end()` where
+  `pool.end()` was, or the migration Job hangs after succeeding.
+
+`index.ts`, `scheduled.ts`, `routes/push.ts`, `routes/vaccines.ts` and
+`context.ts` import the other moved files. Point them at the new locations
+(`./infrastructure/...`); Tasks 3-5 remove most of these imports entirely. Run
+this to find them all:
 
 ```bash
 grep -rn 'from "\./storage"\|from "\./rate-limit-store"\|from "\./stripe"\|from "\./auth"\|from "\./push"\|from "\.\./storage"\|from "\.\./auth"\|from "\.\./push"' apps/api/src apps/api/test
@@ -1002,9 +1049,11 @@ serverRef.current = server;
 `runJob`. **Keep `process.exit(0)`** — Bun stays alive while the SQL pool
 holds handles, so without it a cron-only pod succeeds and then hangs.
 
-`migrate.ts`: replace `createDb(createPool(env.DATABASE_URL))` with
-`createDb(env.DATABASE_URL)`, importing from `@pjokk/api/infrastructure`.
-Keep the `MIGRATIONS_DIR` handling exactly as it is.
+`migrate.ts`: **already done in Task 2** — it had to move with `createPool`'s
+deletion. Verify it still reads
+`createDb(env.DATABASE_URL)` from `@pjokk/api/infrastructure`, that
+`MIGRATIONS_DIR` handling is untouched, and that the pool is still closed on
+both the success and failure paths (`db.$client.end()`); make no further change.
 
 - [ ] **Step 6: Point `rig.ts` at nothing in `apps/server`**
 
