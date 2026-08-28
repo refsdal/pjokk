@@ -5,19 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
+    "dev:server": "bun --watch src/server/main.ts",
     "build": "vite build",
+    "start": "bun src/server/main.ts",
+    "cron": "bun src/server/cron-cli.ts",
     "check": "biome check . && node scripts/check-i18n.mjs && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
-    "test": "vitest run",
+    "test": "bun test",
     "db:generate": "drizzle-kit generate",
-    "db:migrate:local": "wrangler d1 migrations apply pjokk-eu --local",
-    "db:migrate:remote": "wrangler d1 migrations apply pjokk-eu --remote",
-    "db:migrate:test": "wrangler d1 migrations apply pjokk-test-eu --env test --remote",
-    "deploy": "vite build && wrangler deploy -c dist/pjokk/wrangler.json",
-    "deploy:test": "CLOUDFLARE_ENV=test vite build && wrangler deploy -c dist/pjokk/wrangler.json",
-    "seed:local": "node scripts/seed.mjs && wrangler d1 execute pjokk-eu --local --command \"CREATE TABLE IF NOT EXISTS _local_dev_only (x INTEGER)\" && wrangler d1 execute pjokk-eu --local --file .seed.sql",
-    "cf-typegen": "wrangler types",
+    "db:migrate": "drizzle-kit migrate",
     "lint": "biome check .",
-    "lint:fix": "biome check --write ."
+    "lint:fix": "biome check --write .",
+    "migrate": "bun src/server/migrate.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "1.7.1",
@@ -51,9 +49,6 @@
   "devDependencies": {
     "@better-auth/cli": "^1.4.21",
     "@biomejs/biome": "^2.5.10",
-    "@cloudflare/vite-plugin": "^1.53.1",
-    "@cloudflare/vitest-pool-workers": "^0.22.0",
-    "@cloudflare/workers-types": "^5.20260823.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/bun": "^1.4.0",
     "@types/node": "^26.2.0",
@@ -66,14 +61,11 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.2.2",
-    "vite-plugin-pwa": "^1.3.0",
-    "vitest": "^4.1.11",
-    "wrangler": "^4.125.0"
+    "vite-plugin-pwa": "^1.3.0"
   },
   "trustedDependencies": [
     "@biomejs/biome",
-    "esbuild",
-    "workerd"
+    "esbuild"
   ],
   "overrides": {
     "@better-auth/core": "1.7.1"

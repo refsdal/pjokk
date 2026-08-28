@@ -33,7 +33,10 @@ const delivered: string[] = [];
 const realFetch = globalThis.fetch;
 
 beforeAll(() => {
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = (async (
+    input: Parameters<typeof fetch>[0],
+    init?: RequestInit,
+  ) => {
     const url =
       typeof input === "string"
         ? input

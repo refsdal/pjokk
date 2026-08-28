@@ -9,3 +9,4 @@ dev.db*
 .seed.sql
 .idea/
 .import.sql
+.env

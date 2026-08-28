@@ -1,13 +1,14 @@
 import type { Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
+import type { Bindings } from "../context";
 import { isLandingLang, LANDING_COPY, type LandingLang } from "./copy";
 import { renderLandingPage } from "./page";
 
 // GET / — the public landing page.
 //
-// Reaching this handler at all requires "/" in the assets `run_worker_first`
-// list in wrangler.jsonc: without it, non-API requests are served straight
-// from the asset store and the Worker never sees them.
+// Registered before the static-file handler in main.ts, which is what keeps
+// "/" from being answered by the SPA's index.html. On Workers that precedence
+// came from naming "/" in the assets `run_worker_first` list.
 
 export const LANG_COOKIE = "pjokk_lang";
 
@@ -62,7 +63,7 @@ export function hasSessionCookie(cookieHeader: string | null): boolean {
     );
 }
 
-export function landing(c: Context<{ Bindings: Env }>): Response {
+export function landing(c: Context<{ Bindings: Bindings }>): Response {
   const requested = c.req.query("lang");
   const lang = resolveLang(
     requested,
