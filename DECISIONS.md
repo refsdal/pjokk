@@ -649,8 +649,8 @@ been true since Phase 3; the vaccine feature only made it obvious.
   components.** Reusing `StatusCard`/`LogButton` would have dragged the app
   bundle onto the landing page; screenshots would go stale and need
   re-shooting in light and dark. The cost is a small duplicated colour-token
-  block in `src/server/landing/styles.ts` — keep it in step with
-  `src/web/styles.css`.
+  block in `apps/api/src/landing/styles.ts` — keep it in step with
+  `apps/frontend/src/styles.css`.
 - **Language is negotiated server-side**: `?lang=` → `pjokk_lang` cookie →
   `Accept-Language` → English. Nothing flashes in the wrong language and no
   JavaScript is needed to switch. Marketing prose lives in whole per-language
@@ -797,3 +797,32 @@ been true since Phase 3; the vaccine feature only made it obvious.
   look like `too many connections` under load or during a rolling deploy (old
   and new pods both holding pools, briefly doubling the count) — the fix then
   is a `DATABASE_POOL_MAX` env var wired into `createPool`.
+
+## Bun workspaces move (2026-08-28)
+
+- **Root `bunfig.toml` keeps `[install] linker = "hoisted"`.** Bun 1.4
+  defaults to the isolated linker the moment a `workspaces` field exists, and
+  every third-party dependency (hono, drizzle-orm, better-auth, stripe,
+  web-push, react, …) is declared ONLY in the root manifest — none of the
+  four packages lists them for itself. Under the isolated default, `apps/api`,
+  `apps/server` and `apps/frontend` would each get a node_modules containing
+  nothing but the workspace packages they depend on, and every third-party
+  import would break. "hoisted" keeps the flat layout that makes the root
+  manifest's dependencies visible everywhere.
+- **`bunfig.toml` is resolved from the working directory only.** It does not
+  merge with a parent config and does not walk up the tree looking for one —
+  the file in `apps/api/` is the WHOLE config Bun sees when it runs there,
+  independent of whatever the root `bunfig.toml` says. That is why the test
+  preload (`test/setup.ts`) lives in `apps/api/bunfig.toml` rather than the
+  root, and why the root `test` script cannot just say `bun test` — it fans
+  out per package with `bun run --filter '*' test` so each package's own
+  `bunfig.toml` is in effect when its tests run.
+- **`bun test` from the repo root is wrong; `bun run test` is correct.** The
+  root `bunfig.toml` has no `[test]` section (see above), so running `bun
+  test` at the root never preloads `apps/api/test/setup.ts` and the schema is
+  never applied — tests fail or pass for the wrong reasons depending on what
+  state the database happened to be in already. `bun run test` invokes the
+  root `test` script, which fans out to each package's own `test` script
+  under its own `bunfig.toml`. Verified directly: `bun test
+  ./apps/api/test/backup.test.ts` from the root gave 3 pass / 1 fail; the
+  same file from inside `apps/api` gave 4 pass / 0 fail.

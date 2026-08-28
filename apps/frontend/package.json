@@ -1,0 +1,16 @@
+{
+  "name": "@pjokk/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@pjokk/api": "workspace:*",
+    "@pjokk/shared": "workspace:*"
+  },
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "test": "bun test",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

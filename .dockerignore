@@ -1,12 +1,12 @@
 # Reinstalled inside the image; copying the host's tree would both bloat the
 # build context and risk shipping platform-specific binaries.
-node_modules
+**/node_modules
 dist
 
 .git
 .github
 docs
-test
+**/test
 *.md
 
 # Local secrets must never reach an image layer.

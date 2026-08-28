@@ -5,8 +5,8 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-const ROOT = "src/web";
-const DICT_FILE = "src/web/lib/i18n.ts";
+const ROOT = "apps/frontend/src";
+const DICT_FILE = "apps/frontend/src/lib/i18n.ts";
 
 // Keys intentionally without translation (identical in both languages or
 // composed dynamically from translated parts).

@@ -50,7 +50,7 @@ onwards, and the API under `/api`.
 | Auth | better-auth — Google + email/passkey, Organizations plugin (an organization *is* a family), invite-code redeem as the only signup door |
 | Frontend | Vite + React, TanStack Router/Query, Tailwind + shadcn-style components, vaul bottom sheets |
 | Offline | TanStack Query persisted to IndexedDB + paused-mutation queue; Workbox PWA with update toast |
-| Tests | `bun test` against a real Postgres — tenancy, invite redeem, and sleep-session logic run against the database they ship on |
+| Tests | `bun run test` against a real Postgres — tenancy, invite redeem, and sleep-session logic run against the database they ship on |
 
 Every domain table carries a `familyId`, and all data access flows through
 family-scoped query helpers behind a tenancy middleware — cross-family access
@@ -84,8 +84,8 @@ bun run dev                                       # SPA on :5173, proxying /api
 Sign in locally with `anders@pjokk.local` / `pjokk-dev`.
 
 ```sh
-bun test                # against the Postgres from docker-compose.test.yml
-bun run check           # lint + typecheck (web and server)
+bun run test            # against the Postgres from docker-compose.test.yml
+bun run check           # lint + typecheck (shared, api, server, frontend)
 bun run build           # build the SPA
 ```
 
@@ -140,11 +140,12 @@ does not exist.
 ## Repository layout
 
 ```
-src/shared/    zod schemas — the single source of truth for API shapes
-src/server/    Hono API, better-auth factory, tenancy middleware, Drizzle schema
-src/web/       React SPA (screens, log sheets, offline plumbing)
-migrations/    Postgres migrations (drizzle-kit)
-test/          bun tests, run against a real Postgres
+packages/shared/  @pjokk/shared   zod schemas — the single source of truth for API shapes
+apps/api/          @pjokk/api      Hono API, better-auth factory, tenancy middleware, Drizzle schema
+  ├─ migrations/                   Postgres migrations (drizzle-kit)
+  └─ test/                         bun tests, run against a real Postgres
+apps/server/        @pjokk/server   entrypoints only: main.ts, cron-cli.ts, migrate.ts
+apps/frontend/      @pjokk/frontend React SPA (screens, log sheets, offline plumbing) + its tests
 ```
 
 `CLAUDE.md` is the project constitution (product principles, stack decisions,

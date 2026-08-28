@@ -1,6 +1,6 @@
 // Used ONLY by `better-auth generate` to emit the drizzle schema for the
 // auth tables. The real runtime instance is built once at startup in
-// src/server/auth.ts (see services.ts).
+// apps/api/src/auth.ts (see services.ts).
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization, bearer } from "better-auth/plugins";

@@ -204,7 +204,7 @@ exists. Invites expire after 72 h; run this when none is live.
 
 ## Verified automatically
 
-- **200 tests across 25 files** (`bun test`), run against a real Postgres:
+- **200 tests across 26 files** (`bun run test`), run against a real Postgres:
   landing page (language negotiation, CTA state, CSP, indexability), tenancy
   isolation (cross-family reads/writes impossible, stale session claims
   re-verified), invite lifecycle (transactional redeem with `SELECT … FOR

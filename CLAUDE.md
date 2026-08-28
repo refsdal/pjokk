@@ -51,7 +51,7 @@ app. Test environment: **test.pjokk.no**.
   between processes, so replicas would race to apply the same DDL.
 - Any S3-compatible store for files (MinIO in compose; S3/R2/Ceph in
   production). Never a public bucket — stream through an authed Hono route
-  (`/api/files/:id`). Access it ONLY through `src/server/storage.ts`, whose
+  (`/api/files/:id`). Access it ONLY through `apps/api/src/storage.ts`, whose
   `put` takes `Blob | string` and NOT a ReadableStream: Bun's S3 client
   silently writes the string "[object ReadableStream]" if handed one.
 - A `rate_limit` Postgres table for rate-limiting counters.
@@ -60,7 +60,7 @@ app. Test environment: **test.pjokk.no**.
   `SCHEDULER=0`; the in-process scheduler is for single-container deployments
   only, because with N replicas it fires every job N times.
 - Configuration is environment variables, parsed and validated with zod at
-  startup (`src/server/config.ts`). Add new settings there, never by reading
+  startup (`apps/api/src/config.ts`). Add new settings there, never by reading
   `process.env` at a call site.
 
 **EU data residency is mandatory**
@@ -80,7 +80,7 @@ app. Test environment: **test.pjokk.no**.
   the address. The original reason (KV was globally replicated and could not
   be pinned) no longer applies now that counters live in the same EU database,
   but there is still no reason to start recording addresses. Keep it that way.
-- The privacy policy (`src/web/screens/legal/privacy.tsx`) names the
+- The privacy policy (`apps/frontend/src/screens/legal/privacy.tsx`) names the
   processors and promises EU storage. **It must be kept in step with where the
   container is actually deployed** — it is a legal statement, not decoration.
 
@@ -101,7 +101,7 @@ app. Test environment: **test.pjokk.no**.
   rate-limited (codes are credentials). Flow: open `https://pjokk.no/join/CODE`
   (also rendered as QR) → social sign-in → validate code → addMember → land on
   family home.
-- The better-auth instance is built ONCE at startup (`src/server/services.ts`)
+- The better-auth instance is built ONCE at startup (`apps/api/src/services.ts`)
   and handed to requests through Hono context. It used to be per-request
   because D1 bindings only existed inside the handler — which meant every
   request rebuilt a Stripe client and the whole plugin chain. Do not
@@ -355,7 +355,7 @@ sheet pattern — build the pattern well once.
 - Keep bundle size honest (Workers limits; Drizzle not Prisma partly for this).
 - Category color tokens defined once in the Tailwind theme; used by home grid,
   timeline, charts.
-- Tests: `bun test`, run against a REAL Postgres (`docker compose -f
+- Tests: `bun run test`, run against a REAL Postgres (`docker compose -f
   docker-compose.test.yml up -d`) — the database is the thing most likely to
   differ, so faking it defeats the purpose. Object storage is substituted with
   an in-memory `Storage`. Prioritize the tenancy middleware, invite redeem
