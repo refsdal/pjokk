@@ -314,6 +314,14 @@ import { createDb, createPool } from "@pjokk/api/db";
 The wildcard export is deliberate and temporary — PR #16 replaces it with a
 two-entry public/infrastructure split.
 
+`"./db"` needs its own entry because `src/db` is a **directory**: the wildcard
+`"./*": "./src/*.ts"` maps `@pjokk/api/db` to `./src/db.ts`, which does not
+exist, and the failure is invisible to `bun run test` (nothing in `apps/server`
+has tests) — it surfaces only at `bun run build:server`. `db` is the only
+directory `apps/server` imports across the package boundary; `landing`,
+`middleware` and `routes` are reached by relative paths from inside `apps/api`,
+so they need no entry.
+
 ```json
 {
   "name": "@pjokk/api",
@@ -322,6 +330,7 @@ two-entry public/infrastructure split.
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./db": "./src/db/index.ts",
     "./*": "./src/*.ts"
   },
   "dependencies": {
@@ -453,12 +462,17 @@ resolves the migration file from `import.meta.url`, which already points inside
 ```bash
 bun install
 bun run test 2>&1 | tail -8
+bun run build:server 2>&1 | tail -6
 ```
 
-Expected: `200 pass`, `0 fail`, reported under `@pjokk/api test:`. Note this is
-`bun run test`, not `bun test` — see Global Constraints. If you typed `bun test`
-you will see a wall of failures about missing tables; that is the missing
-preload, not a broken move.
+Expected: `200 pass`, `0 fail`, reported under `@pjokk/api test:`; then three
+bundles written to `dist/server`. Note the test command is `bun run test`, not
+`bun test` — see Global Constraints. If you typed `bun test` you will see a wall
+of failures about missing tables; that is the missing preload, not a broken move.
+
+**`build:server` is not optional here.** `apps/server` has no tests, so the
+suite cannot see whether its cross-package imports resolve at all. The bundler
+is the only gate in this task that exercises the `@pjokk/api` export map.
 
 - [ ] **Step 11: Commit**
 
