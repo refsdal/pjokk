@@ -6,8 +6,8 @@ import { defineConfig } from "drizzle-kit";
 // hand-translated migration chain would only be fiction.
 export default defineConfig({
   dialect: "postgresql",
-  schema: "./src/server/db/schema.ts",
-  out: "./migrations",
+  schema: "./apps/api/src/db/schema.ts",
+  out: "./apps/api/migrations",
   dbCredentials: {
     url: process.env.DATABASE_URL ?? "postgres://localhost:5432/pjokk",
   },

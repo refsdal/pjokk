@@ -8,8 +8,3 @@
 # "hoisted" restores the flat node_modules layout this repo already used
 # before workspaces existed, which links all workspace packages by name.
 linker = "hoisted"
-
-[test]
-# Applies the schema once and empties the database before each test, the way
-# @cloudflare/vitest-pool-workers' applyD1Migrations setup file used to.
-preload = ["./test/setup.ts"]

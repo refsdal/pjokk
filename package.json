@@ -9,20 +9,21 @@
   ],
   "scripts": {
     "dev": "vite dev",
-    "dev:server": "bun --watch src/server/main.ts",
+    "dev:server": "bun --watch apps/server/src/main.ts",
     "build": "bun run build:client && bun run build:server",
-    "start": "bun src/server/main.ts",
-    "cron": "bun src/server/cron-cli.ts",
+    "start": "bun apps/server/src/main.ts",
+    "cron": "bun apps/server/src/cron-cli.ts",
     "check": "biome check . && node scripts/check-i18n.mjs && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
-    "test": "bun test",
+    "test": "bun run --filter '*' test",
+    "typecheck": "bun run --filter '*' typecheck",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "migrate": "bun src/server/migrate.ts",
+    "migrate": "MIGRATIONS_DIR=apps/api/migrations bun apps/server/src/migrate.ts",
     "seed": "bun scripts/seed.mjs",
     "build:client": "vite build",
-    "build:server": "bun build src/server/main.ts src/server/cron-cli.ts src/server/migrate.ts --target=bun --outdir=dist/server --sourcemap=linked"
+    "build:server": "bun build apps/server/src/main.ts apps/server/src/cron-cli.ts apps/server/src/migrate.ts --target=bun --outdir=dist/server --sourcemap=linked"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.7.2",
