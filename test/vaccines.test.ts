@@ -12,7 +12,6 @@ import {
   storage,
 } from "./helpers";
 import { beforeAll, describe, expect, it } from "bun:test";
-import { schema } from "../src/server/db";
 import { familyScope } from "../src/server/db/scoped";
 
 const BASE = "http://localhost";
