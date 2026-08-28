@@ -11,6 +11,13 @@
 FROM oven/bun:1.4-alpine AS deps
 WORKDIR /app
 COPY package.json bun.lock ./
+# Every workspace manifest, and ONLY the manifests: this stage exists so that
+# editing source never reinstalls, and copying whole packages here would
+# reintroduce exactly the cache busting it avoids.
+COPY apps/api/package.json ./apps/api/
+COPY apps/server/package.json ./apps/server/
+COPY apps/frontend/package.json ./apps/frontend/
+COPY packages/shared/package.json ./packages/shared/
 RUN bun install --frozen-lockfile
 
 # ---------- build ----------
@@ -38,7 +45,7 @@ COPY --from=build /app/dist/server ./
 COPY --from=build /app/dist/client ./dist/client
 # migrate.js reads these at run time; they are data, not code, so they are not
 # part of the bundle.
-COPY migrations ./migrations
+COPY apps/api/migrations ./migrations
 
 # The base image ships a non-root `bun` user; running as root in a container
 # that serves the public internet buys nothing.

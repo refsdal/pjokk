@@ -1,9 +1,6 @@
 import { env, SELF } from "./helpers";
 import { afterEach, describe, expect, it } from "bun:test";
-import {
-  fromAcceptLanguage,
-  hasSessionCookie,
-} from "../src/landing/index";
+import { fromAcceptLanguage, hasSessionCookie } from "../src/landing/index";
 
 // The landing page is the one non-/api path the Worker owns. Everything it
 // decides — language, call to action, indexability — is decided server-side

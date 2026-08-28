@@ -27,9 +27,7 @@ self.addEventListener("notificationclick", (event) => {
         for (const client of windows) {
           if ("focus" in client) return client.focus();
         }
-        return self.clients.openWindow(
-          event.notification.data?.url || "/home",
-        );
+        return self.clients.openWindow(event.notification.data?.url || "/home");
       }),
   );
 });

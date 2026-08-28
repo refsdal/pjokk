@@ -13,7 +13,7 @@
     "build": "bun run build:client && bun run build:server",
     "start": "bun apps/server/src/main.ts",
     "cron": "bun apps/server/src/cron-cli.ts",
-    "check": "biome check . && node scripts/check-i18n.mjs && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "check": "biome check . && node scripts/check-i18n.mjs && bun run typecheck",
     "test": "bun run --filter '*' test",
     "typecheck": "bun run --filter '*' typecheck",
     "db:generate": "drizzle-kit generate",

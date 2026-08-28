@@ -16,8 +16,14 @@ import { createDb, createPool } from "@pjokk/api/db";
 const env = loadEnv(process.env);
 const pool = createPool(env.DATABASE_URL);
 
+// Resolved against the working directory. Inside the image that is /app, where
+// the Dockerfile copies the SQL to ./migrations, so the default is correct
+// there and the variable is left unset. From a source checkout the folder is
+// under apps/api, which is what the root `migrate` script passes.
+const migrationsFolder = process.env.MIGRATIONS_DIR ?? "./migrations";
+
 try {
-  await migrate(createDb(pool), { migrationsFolder: "./migrations" });
+  await migrate(createDb(pool), { migrationsFolder });
   console.log("migrations applied");
   await pool.end();
   process.exit(0);

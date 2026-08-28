@@ -2,13 +2,11 @@
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "files": {
     "includes": [
-      "src/**",
+      "apps/**",
       "packages/**",
-      "test/**",
       "scripts/**",
       "*.ts",
-      "!worker-configuration.d.ts",
-      "!src/web/data",
+      "!apps/frontend/src/data",
       "!scripts/import-sprout-track.mjs"
     ]
   },
