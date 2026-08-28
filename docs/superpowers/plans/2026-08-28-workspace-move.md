@@ -500,6 +500,14 @@ Phase: workspace move (PR #15)"
 
 ### Task 3: `apps/frontend`
 
+> **Tasks 3 and 4 must land together, as one reviewable unit with two commits.**
+> Three test files in `apps/api/test` import `src/web` (`growth.test.ts:2`,
+> `vaccine-programme.test.ts:9`, `defects.test.ts:4`). Task 3 moves `src/web`
+> out from under them and Task 4 is what repairs them, so stopping between the
+> two leaves the suite red. Do Task 3's steps, commit, then Task 4's steps,
+> commit, and run `bun run test` once at the end of Task 4 — that is the gate
+> for both. Task 3's own gate is `bun run build:client` only.
+
 **Files:**
 - Move: `src/web/**` → `apps/frontend/src/`
 - Move: `index.html`, `vite.config.ts` → `apps/frontend/`
@@ -655,8 +663,17 @@ Phase: workspace move (PR #15)"
 
 ### Task 4: Relocate the frontend tests
 
+> **Continues Task 3 in the same dispatch — see the note there.** The suite is
+> expected to be RED when you start this task: Task 3 moved `src/web` out from
+> under three test files that import it. Repairing that is this task's job.
+
 Three test files exercise frontend code and cannot stay in `apps/api` — that
 package must not depend on `@pjokk/frontend`.
+
+Note that Task 2 left those imports as `../../../src/web/lib/...` (a transient
+bridge to the repo root). After Task 3 the correct target is
+`apps/frontend/src/lib/...`, which for a test file inside `apps/frontend/test/`
+is simply `../src/lib/...`.
 
 **Files:**
 - Move: `apps/api/test/growth.test.ts` → `apps/frontend/test/growth.test.ts`
@@ -674,7 +691,7 @@ package must not depend on `@pjokk/frontend`.
 mkdir -p apps/frontend/test
 git mv apps/api/test/growth.test.ts apps/frontend/test/growth.test.ts
 git mv apps/api/test/vaccine-programme.test.ts apps/frontend/test/vaccine-programme.test.ts
-sed -i 's#"\.\./src/web/lib/#"../src/lib/#g' apps/frontend/test/*.ts
+sed -i 's#"\.\./\.\./\.\./src/web/lib/#"../src/lib/#g' apps/frontend/test/*.ts
 grep -rn 'src/web' apps/frontend/test/ || echo "clean"
 ```
 
@@ -720,8 +737,11 @@ Delete lines 155-174 of `apps/api/test/defects.test.ts` (the whole
 `describe("time helpers", …)` block) and delete its now-unused import on line 4:
 
 ```ts
-import { formatRelative, toLocalDateInput } from "../src/web/lib/time";
+import { formatRelative, toLocalDateInput } from "../../../src/web/lib/time";
 ```
+
+(Task 2 rewrote this import to reach the repo root; that is the form on disk.
+Confirm against the file rather than trusting either spelling.)
 
 - [ ] **Step 4: Run both suites**
 
