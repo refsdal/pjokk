@@ -17,6 +17,7 @@ const lifetimeCheckout = createRoute({
   responses: {
     200: jsonContent(CheckoutUrlSchema, "Checkout session created"),
     409: jsonContent(ErrorSchema, "Family already has Premium"),
+    503: jsonContent(ErrorSchema, "Billing is not configured on this instance"),
   },
 });
 
@@ -30,6 +31,14 @@ export const billingApp = createApp<FamEnv>().openapi(
       );
     }
     const stripe = createStripe(c.env);
+    if (!stripe) {
+      // Self-hosted instances run without billing configured; the route
+      // exists but cannot do anything, so say that rather than 500.
+      return c.json(
+        { error: "Billing is not configured", code: "BILLING_DISABLED" },
+        503,
+      );
+    }
     const stripeCustomerId = await c.var.fam.stripeCustomerId();
     const session = await stripe.checkout.sessions.create({
       mode: "payment",

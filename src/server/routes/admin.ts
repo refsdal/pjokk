@@ -199,12 +199,18 @@ export const adminApp = createApp<AppEnv>()
       })
       .from(schema.subscription)
       .where(eq(schema.subscription.referenceId, id));
+    // Null when billing is unconfigured. A family with no Stripe
+    // subscriptions is then simply deleted; one WITH stale subscription rows
+    // has them dropped locally below, which is the best that can be done
+    // without credentials — and far better than refusing the delete.
     const stripeClient = createStripe(c.env);
-    for (const s of subs) {
-      if (s.stripeSubscriptionId) {
-        await stripeClient.subscriptions
-          .cancel(s.stripeSubscriptionId)
-          .catch(() => {});
+    if (stripeClient) {
+      for (const s of subs) {
+        if (s.stripeSubscriptionId) {
+          await stripeClient.subscriptions
+            .cancel(s.stripeSubscriptionId)
+            .catch(() => {});
+        }
       }
     }
     await db

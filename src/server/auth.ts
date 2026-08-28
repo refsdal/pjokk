@@ -20,84 +20,12 @@ export function createAuth(env: Env, db: Db) {
   const url = new URL(env.APP_URL);
   const stripeClient = createStripe(env);
 
-  return betterAuth({
-    baseURL: env.APP_URL,
-    secret: env.BETTER_AUTH_SECRET,
-    // Exactly one origin. The app now lives on the apex and workers.dev is
-    // switched off, so any second trusted origin would only widen the surface
-    // that can complete a sign-in.
-    trustedOrigins: [env.APP_URL],
-    database: drizzleAdapter(db, { provider: "pg", schema }),
-    // Open signup is DISABLED (closed alpha). Accounts are only created via
-    // the invite redeem flow: /join/CODE calls social sign-in with
-    // requestSignUp, everything else refuses new users.
-    emailAndPassword: {
-      enabled: true,
-      disableSignUp: true,
-    },
-    socialProviders: {
-      google: {
-        clientId: env.GOOGLE_CLIENT_ID,
-        clientSecret: env.GOOGLE_CLIENT_SECRET,
-        // OPEN_SIGNUP=1 is the founder-bootstrap escape hatch: flip it on for
-        // the very first account (no invite exists yet), then back off.
-        disableImplicitSignUp: String(env.OPEN_SIGNUP) !== "1",
-      },
-    },
-    databaseHooks: {
-      session: {
-        create: {
-          // New sessions land in the user's first family automatically.
-          before: async (session) => {
-            const membership = await db
-              .select({ organizationId: schema.member.organizationId })
-              .from(schema.member)
-              .where(eq(schema.member.userId, session.userId))
-              .limit(1);
-            return {
-              data: {
-                ...session,
-                activeOrganizationId: membership[0]?.organizationId ?? null,
-              },
-            };
-          },
-        },
-      },
-    },
-    plugins: [
-      // An organization IS a family. Parents are admins. Anyone WITHOUT a
-      // family may found one (self-serve onboarding through the Welcome
-      // flow); existing members go through invites, and sysadmins may always
-      // create. Accounts themselves remain invite-gated (OPEN_SIGNUP /
-      // invite links), so this stays closed to strangers.
-      organization({
-        creatorRole: "admin",
-        allowUserToCreateOrganization: async (user) => {
-          if ((user as { role?: string | null }).role === "admin") return true;
-          const membership = await db
-            .select({ id: schema.member.id })
-            .from(schema.member)
-            .where(eq(schema.member.userId, user.id))
-            .limit(1);
-          return membership.length === 0;
-        },
-      }),
-      passkey({
-        rpID: url.hostname,
-        rpName: "Pjokk",
-        origin: env.APP_URL,
-      }),
-      // Cookies for web, bearer tokens for a future Capacitor shell.
-      bearer(),
-      // System-admin tooling (user.role === "admin"): list/ban users, revoke
-      // sessions, set passwords, impersonate. Family roles are unrelated.
-      admin(),
-      // Billing (Phase 9): org-level subscriptions AND org-level Stripe
-      // customers — the family owns both the entitlement and the customer.
-      // organization.plan is the denormalized gate the app reads; these
-      // hooks are the only writers besides the lifetime webhook + sysadmin
-      // override.
-      stripe({
+  // Billing is optional: without Stripe keys the plugin is not registered
+  // at all, so the /api/auth billing routes are absent rather than present
+  // and failing on every call. createStripe returns null in that case —
+  // the SDK throws from its constructor on an empty key.
+  const billingPlugin = stripeClient
+    ? stripe({
         stripeClient,
         stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET,
         organization: { enabled: true },
@@ -190,7 +118,87 @@ export function createAuth(env: Env, db: Db) {
             await grantLifetime(db, session.metadata.familyId);
           }
         },
+      })
+    : null;
+
+  return betterAuth({
+    baseURL: env.APP_URL,
+    secret: env.BETTER_AUTH_SECRET,
+    // Exactly one origin. The app now lives on the apex and workers.dev is
+    // switched off, so any second trusted origin would only widen the surface
+    // that can complete a sign-in.
+    trustedOrigins: [env.APP_URL],
+    database: drizzleAdapter(db, { provider: "pg", schema }),
+    // Open signup is DISABLED (closed alpha). Accounts are only created via
+    // the invite redeem flow: /join/CODE calls social sign-in with
+    // requestSignUp, everything else refuses new users.
+    emailAndPassword: {
+      enabled: true,
+      disableSignUp: true,
+    },
+    socialProviders: {
+      google: {
+        clientId: env.GOOGLE_CLIENT_ID,
+        clientSecret: env.GOOGLE_CLIENT_SECRET,
+        // OPEN_SIGNUP=1 is the founder-bootstrap escape hatch: flip it on for
+        // the very first account (no invite exists yet), then back off.
+        disableImplicitSignUp: String(env.OPEN_SIGNUP) !== "1",
+      },
+    },
+    databaseHooks: {
+      session: {
+        create: {
+          // New sessions land in the user's first family automatically.
+          before: async (session) => {
+            const membership = await db
+              .select({ organizationId: schema.member.organizationId })
+              .from(schema.member)
+              .where(eq(schema.member.userId, session.userId))
+              .limit(1);
+            return {
+              data: {
+                ...session,
+                activeOrganizationId: membership[0]?.organizationId ?? null,
+              },
+            };
+          },
+        },
+      },
+    },
+    plugins: [
+      // An organization IS a family. Parents are admins. Anyone WITHOUT a
+      // family may found one (self-serve onboarding through the Welcome
+      // flow); existing members go through invites, and sysadmins may always
+      // create. Accounts themselves remain invite-gated (OPEN_SIGNUP /
+      // invite links), so this stays closed to strangers.
+      organization({
+        creatorRole: "admin",
+        allowUserToCreateOrganization: async (user) => {
+          if ((user as { role?: string | null }).role === "admin") return true;
+          const membership = await db
+            .select({ id: schema.member.id })
+            .from(schema.member)
+            .where(eq(schema.member.userId, user.id))
+            .limit(1);
+          return membership.length === 0;
+        },
       }),
+      passkey({
+        rpID: url.hostname,
+        rpName: "Pjokk",
+        origin: env.APP_URL,
+      }),
+      // Cookies for web, bearer tokens for a future Capacitor shell.
+      bearer(),
+      // System-admin tooling (user.role === "admin"): list/ban users, revoke
+      // sessions, set passwords, impersonate. Family roles are unrelated.
+      admin(),
+      // Billing (Phase 9): org-level subscriptions AND org-level Stripe
+      // customers — the family owns both the entitlement and the customer.
+      // organization.plan is the denormalized gate the app reads; these
+      // hooks are the only writers besides the lifetime webhook + sysadmin
+      // override.
+      ...(billingPlugin ? [billingPlugin] : []),
     ],
   });
 }
