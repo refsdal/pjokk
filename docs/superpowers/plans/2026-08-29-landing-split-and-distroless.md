@@ -503,6 +503,44 @@ Phase: landing split (PR #17)"
 - Copy: the shared static assets into the landing build
 - Modify: `.github/workflows/ci.yml`
 
+- [ ] **Step 0a: Fix the dead `?lang=` links**
+
+Task 1 left these deliberately, because the old Hono route was still serving `/`
+and its test asserted the exact strings. Task 3 has now deleted that route, so
+they must be corrected — on a static site `/?lang=nb` serves the **English**
+document, so the language switcher and both `hreflang` alternates are currently
+broken. Find them:
+
+```bash
+grep -rn 'lang=' apps/landing/src/page.ts
+```
+
+The correct targets are the document paths: `/` for English and `/nb/` for
+Norwegian, and the same for the legal pages (`/privacy` and `/nb/privacy`).
+Verify afterwards that no `?lang=` remains in the built output:
+
+```bash
+bun run --filter @pjokk/landing build
+grep -rn '?lang=' apps/landing/dist/ || echo "clean"
+```
+
+- [ ] **Step 0b: Correct the data-residency claim — needs the user's wording**
+
+`apps/landing/src/copy.ts` states, in both languages, that every database, file
+and backup is *"pinned to Cloudflare's EU jurisdiction — not a location
+preference, an actual guarantee."* That is **no longer true**. CLAUDE.md records
+that the jurisdiction-flag mechanism went away with the Cloudflare runtime and
+EU residency is now a deployment-time property that "is easier to get wrong and
+nothing will warn you."
+
+So the public page names a processor that is not used and asserts a stronger
+guarantee than the architecture delivers, about Article 9 health data.
+
+**Do not invent replacement wording.** Report the exact current strings (both
+languages) and stop for the user to supply the correction — this is a public
+claim about where a child's health data lives, and it is theirs to word. If they
+have already supplied wording, apply it verbatim.
+
 - [ ] **Step 1: Emit `robots.txt` and `sitemap.xml`**
 
 Add to `build.ts`. The sitemap lists all six documents with hreflang
