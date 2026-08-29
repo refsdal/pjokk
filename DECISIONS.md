@@ -826,3 +826,50 @@ been true since Phase 3; the vaccine feature only made it obvious.
   under its own `bunfig.toml`. Verified directly: `bun test
   ./apps/api/test/backup.test.ts` from the root gave 3 pass / 1 fail; the
   same file from inside `apps/api` gave 4 pass / 0 fail.
+
+## Composition root (2026-08-28, PR #16)
+
+- **No DI container.** `Deps` is a plain 14-field object, built once by
+  `createDeps(env)` and passed straight into `createApi(deps)`. A container
+  would buy indirection (registration, resolution, lifetime scopes) that this
+  app never needs: there is exactly one composition root, exactly one
+  long-lived instance of each collaborator, and no runtime configuration of
+  which implementation to wire in. A plain object is also what makes the
+  ports (`apps/api/src/ports.ts`) legible as a contract instead of a
+  container's registration side-effects.
+- **Adapters live in `apps/api`, not `apps/server`.** The obvious "ports and
+  adapters" split would put the concrete Drizzle/S3/Stripe implementations in
+  the composition root and only interfaces in the library. That would pull
+  the Drizzle query layer out from under `bun run test`'s real-Postgres
+  suite, which is exactly the coverage this codebase relies on for the
+  dialect traps documented above (bigint counts, `real` precision, unique
+  violation codes). Keeping `apps/api/src/infrastructure/` inside the tested
+  package and exposing it only through the `@pjokk/api/infrastructure`
+  package entry gets both: `apps/server` still only ever sees the `Deps`
+  interface, and the adapters stay exercised by the suite that catches these
+  bugs.
+- **The boundary is enforced by a package entry plus a lint rule, not by
+  convention.** `apps/server` cannot `import` past the `@pjokk/api/infrastructure`
+  entry point even if it tried (no other subpath is exported), and a biome
+  `noRestrictedImports` rule stops `apps/api`'s own routes and middleware from
+  reaching into `../infrastructure` directly instead of going through `Deps`.
+  Two independent mechanisms because either one alone degrades silently: a
+  convention with no enforcement is a comment nobody re-reads six months
+  later.
+- **`AppType` is guarded by a compile-time assertion, not just inferred.**
+  `createApi` must have no explicit return type annotation — an annotation
+  would erase the accumulated Hono route types and silently untype the RPC
+  client the frontend imports. But that failure mode is invisible to every
+  runtime test: the app still boots and answers requests correctly with an
+  untyped client, so nothing in `bun run test` would ever catch a regression.
+  `apps/api/test/app-type.test.ts` exists purely to fail `tsc`, not to run
+  anything, the one place in the suite where a compile error IS the test.
+- **`git log --follow` does not connect `apps/api/src/app.ts` to its
+  `index.ts` history at git's default rename-similarity threshold (50%).**
+  Wrapping the whole file body in `createApi(deps) { ... }` changed enough of
+  the file that git's default diff heuristic doesn't see it as a rename, so
+  `--follow` dead-ends at this PR's commit. `git log --follow -M20% --
+  apps/api/src/app.ts` walks back through the file's full history (verified:
+  1 commit at the default threshold vs. 25 with `-M20%`, back through the
+  Phase 1 route tree). Anyone doing `git blame` archaeology on the route tree
+  needs the lower threshold.

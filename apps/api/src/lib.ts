@@ -3,7 +3,10 @@ import type { z } from "@hono/zod-openapi";
 
 // Nothing arrives through Hono's env any more (see context.ts), so every
 // AppEnv/FamEnv carries an empty Bindings — this is just the shape
-// createApp's generic parameter needs to see.
+// createApp's generic parameter needs to see. The bound used to read
+// `Bindings: Env` back when Workers bindings (D1, R2, KV, …) flowed through
+// Hono's env; now that everything arrives via Deps on c.var instead, the
+// bound shrank to match Bindings' own collapse to an empty object.
 export function createApp<E extends { Bindings: Record<string, never> }>() {
   return new OpenAPIHono<E>({
     defaultHook: (result, c) => {

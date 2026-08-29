@@ -42,6 +42,11 @@ export function createApi(deps: Deps) {
   const app = createApp<AppEnv>();
 
   // Hands each request the collaborators the process built once at startup.
+  // Registered on "/*", not "/api/*": the landing, robots.txt, sitemap.xml,
+  // /healthz and /readyz routes below all read `deps` from this function's
+  // closure, not from `c.var`, so the wider match is not load-bearing for
+  // them — it exists only so every /api/* handler downstream can rely on
+  // c.var being populated without re-deriving that per route.
   app.use("/*", async (c, next) => {
     c.set("deps", deps);
     c.set("db", deps.db);

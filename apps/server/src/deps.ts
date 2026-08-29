@@ -10,8 +10,12 @@ import type { Deps } from "@pjokk/api/deps";
 import type { Env } from "./env";
 
 /**
- * Builds every collaborator the API needs. The ONLY place in the codebase
- * that constructs one.
+ * Builds every collaborator the API needs. The ONLY place that assembles the
+ * full `Deps` object `createApi` runs on. The one deliberate exception is
+ * `migrate.ts`, which calls `createDb` on its own: the migrator needs just
+ * the database, runs as a one-off job outside the request path, and building
+ * a whole `Deps` (auth, storage, push, Stripe, …) for it would be dead
+ * weight in an image that has no server listening.
  *
  * `peerAddress` is a closure over a mutable reference because Bun's server
  * handle does not exist until Bun.serve() has returned, and the rate limiter

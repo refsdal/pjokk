@@ -51,17 +51,31 @@ app. Test environment: **test.pjokk.no**.
   between processes, so replicas would race to apply the same DDL.
 - Any S3-compatible store for files (MinIO in compose; S3/R2/Ceph in
   production). Never a public bucket — stream through an authed Hono route
-  (`/api/files/:id`). Access it ONLY through `apps/api/src/storage.ts`, whose
-  `put` takes `Blob | string` and NOT a ReadableStream: Bun's S3 client
-  silently writes the string "[object ReadableStream]" if handed one.
+  (`/api/files/:id`). Access it ONLY through
+  `apps/api/src/infrastructure/storage.ts`, whose `put` takes `Blob | string`
+  and NOT a ReadableStream: Bun's S3 client silently writes the string
+  "[object ReadableStream]" if handed one.
 - A `rate_limit` Postgres table for rate-limiting counters.
 - Scheduled work (reminders, nightly backup) runs via `bun run cron
-  <nightly|frequent>` from source, `bun cron-cli.js <job>` in the image. Under Kubernetes drive it from CronJobs and leave
-  `SCHEDULER=0`; the in-process scheduler is for single-container deployments
-  only, because with N replicas it fires every job N times.
+  <nightly|frequent>` from source, `bun cron-cli.js <job>` in the image. The
+  in-process scheduler (`apps/server/src/cron.ts`, opt-in via `SCHEDULER=1`)
+  uses Bun's builtin `Bun.cron` with `tz: "UTC"` explicit (the image sets no
+  `TZ`, and the 30-day backup retention window is a privacy-policy commitment
+  stated in UTC). Under Kubernetes drive it from CronJobs and leave
+  `SCHEDULER=0` on every replica; the in-process scheduler is for
+  single-container deployments only, because with N replicas it fires every
+  job N times.
 - Configuration is environment variables, parsed and validated with zod at
-  startup (`apps/api/src/config.ts`). Add new settings there, never by reading
+  startup (`apps/server/src/env.ts`). Add new settings there, never by reading
   `process.env` at a call site.
+- `apps/api` never constructs a dependency at module scope and never reads
+  `process.env`; it is a library that receives its collaborators through a
+  plain `Deps` object (`apps/api/src/deps.ts`) passed to `createApi(deps)`.
+  `apps/server` is the sole composition root: it builds `Deps`
+  (`apps/server/src/deps.ts`) from validated config and hands it to
+  `createApi`, to `bun run cron`, and to the in-process scheduler. This keeps
+  the API testable without a container and, in principle, portable to a
+  different host process.
 
 **EU data residency is mandatory**
 - The app stores GDPR Article 9 health data about children. Every stateful
@@ -101,8 +115,8 @@ app. Test environment: **test.pjokk.no**.
   rate-limited (codes are credentials). Flow: open `https://pjokk.no/join/CODE`
   (also rendered as QR) → social sign-in → validate code → addMember → land on
   family home.
-- The better-auth instance is built ONCE at startup (`apps/api/src/services.ts`)
-  and handed to requests through Hono context. It used to be per-request
+- The better-auth instance is built ONCE at startup (`apps/server/src/deps.ts`,
+  inside `createDeps`) and handed to requests through Hono context. It used to be per-request
   because D1 bindings only existed inside the handler — which meant every
   request rebuilt a Stripe client and the whole plugin chain. Do not
   reintroduce that.
