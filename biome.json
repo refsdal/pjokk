@@ -8,6 +8,7 @@
       "*.ts",
       "!apps/frontend/src/data",
       "!apps/api/migrations/meta",
+      "!apps/landing/dist",
       "!.claude",
       "!scripts/import-sprout-track.mjs"
     ]

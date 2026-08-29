@@ -55,6 +55,7 @@
       "name": "@pjokk/api",
       "version": "0.1.0",
       "dependencies": {
+        "@pjokk/landing": "workspace:*",
         "@pjokk/shared": "workspace:*",
       },
     },
@@ -65,6 +66,10 @@
         "@pjokk/api": "workspace:*",
         "@pjokk/shared": "workspace:*",
       },
+    },
+    "apps/landing": {
+      "name": "@pjokk/landing",
+      "version": "0.1.0",
     },
     "apps/server": {
       "name": "@pjokk/server",
@@ -465,6 +470,8 @@
     "@pjokk/api": ["@pjokk/api@workspace:apps/api"],
 
     "@pjokk/frontend": ["@pjokk/frontend@workspace:apps/frontend"],
+
+    "@pjokk/landing": ["@pjokk/landing@workspace:apps/landing"],
 
     "@pjokk/server": ["@pjokk/server@workspace:apps/server"],
 

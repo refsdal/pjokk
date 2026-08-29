@@ -1,8 +1,12 @@
 import type { Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import type { AppEnv } from "../context";
-import { isLandingLang, LANDING_COPY, type LandingLang } from "./copy";
-import { renderLandingPage } from "./page";
+import {
+  isLandingLang,
+  LANDING_COPY,
+  type LandingLang,
+} from "@pjokk/landing/src/copy";
+import { renderLandingPage } from "@pjokk/landing/src/page";
 
 // GET / — the public landing page.
 //
