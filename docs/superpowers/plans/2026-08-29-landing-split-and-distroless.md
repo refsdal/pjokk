@@ -237,6 +237,23 @@ Phase: landing split (PR #17)"
 
 ### Task 2: prerender the legal pages
 
+> **Tasks 2 and 3 must land together, as one dispatch with two commits.** The
+> legal components live in `apps/frontend` and are consumed by the SPA's
+> routes. Task 2 makes `apps/landing` render them and Task 3 deletes the SPA
+> routes and moves the files — so stopping in between leaves either a
+> cross-package import that Task 3 immediately rewrites, or a broken SPA. Do
+> Task 2's steps, commit, then Task 3's, commit, and run the full suite once
+> at the end of Task 3.
+>
+> **Because they land together, prefer moving over exporting.** Task 2's
+> `exports`-field step below exists only to make the two tasks separable; since
+> they are not, `git mv` the three legal files into `apps/landing/src/legal/`
+> as part of this combined unit and import them relatively. That avoids adding
+> an `exports` field to `apps/frontend` that Task 3 would remove one commit
+> later. `LegalPage` (which needs hooks and the router) is dropped in the move;
+> only the language bodies and the presentational helpers `H`, `List` and
+> `ControllerCard` come across.
+
 The legal prose must not be retyped: it is a statement about GDPR Article 9
 data and the diff must prove the text is unchanged.
 
@@ -500,13 +517,17 @@ await write(
 );
 ```
 
-For the sitemap, read the version the container used to serve so the format
-carries over:
+For the sitemap, recover the version the container used to serve so the format
+carries over. Do not use `HEAD~1` — by the time you run this, the route has
+been gone for several commits. Find the last commit that still had it:
 
 ```bash
-git log --oneline -5 -- apps/api/src/app.ts
-git show HEAD~1:apps/api/src/app.ts | grep -A20 'sitemap'
+SITEMAP_REV=$(git log --format=%H -S'sitemap.xml' -1 -- apps/api/src/app.ts)
+git show "$SITEMAP_REV:apps/api/src/app.ts" | grep -B2 -A20 'urlset'
 ```
+
+It listed `/`, `/privacy` and `/terms` with `hreflang` alternates on the root.
+The landing version lists all six documents.
 
 - [ ] **Step 2: Move the OG generator and the shared assets**
 
