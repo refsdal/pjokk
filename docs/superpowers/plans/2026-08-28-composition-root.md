@@ -20,8 +20,11 @@ better-auth, Biome 2, TypeScript 7.
 
 ## Global Constraints
 
-- **No behaviour change.** Every one of the 200 tests must still pass. This is
-  a wiring refactor: no route's request or response shape changes.
+- **No behaviour change.** No existing test may be lost or altered. This is a
+  wiring refactor: no route's request or response shape changes. The suite
+  starts at 200 (179 `@pjokk/api` + 21 `@pjokk/frontend`) and grows to 201 in
+  Task 3, which adds one compile-time `AppType` assertion; from Task 4 the
+  split is 167 / 13 / 21 as `config.test.ts` moves packages.
 - **`apps/api` must never construct a dependency at module scope and never
   read `process.env`.** That invariant — not the location of any file — is
   what the PR buys. A single `process.env` read inside `apps/api/src` is a
@@ -998,7 +1001,7 @@ there is no preload to declare and the file would be empty.
 currently running as part of `@pjokk/api`'s 179; it holds 13 cases. Moving the
 file without adding the script means `bun run --filter` skips the package,
 those 13 stop running, and the exit code is still 0. After this task the split
-should be **166 `@pjokk/api` + 13 `@pjokk/server` + 21 `@pjokk/frontend` = 200**.
+should be **167 `@pjokk/api` + 13 `@pjokk/server` + 21 `@pjokk/frontend` = 201**.
 Check the per-package output lines, not the status.
 
 - [ ] **Step 3: Write `apps/server/src/deps.ts`**
@@ -1149,9 +1152,9 @@ bun run check
 bun run build
 ```
 
-Expected, now that `config.test.ts` has moved packages: **166 `@pjokk/api` +
-13 `@pjokk/server` + 21 `@pjokk/frontend` = 200**, with all three package lines
-present in the output. Check and build green. A total of 187 with a zero exit
+Expected, now that `config.test.ts` has moved packages: **167 `@pjokk/api` +
+13 `@pjokk/server` + 21 `@pjokk/frontend` = 201**, with all three package lines
+present in the output. Check and build green. A total of 188 with a zero exit
 code means you moved the test file but did not add the `test` script in Step 2.
 
 - [ ] **Step 8: Commit**
@@ -1293,7 +1296,7 @@ console.log("nightly  ->", Bun.cron.parse("15 3 * * *", n, {tz:"UTC"}));
 console.log("frequent ->", Bun.cron.parse("*/15 * * * *", n, {tz:"UTC"}));'
 ```
 
-Expected: **166 / 13 / 21 = 200**, all three package lines present, and the two
+Expected: **167 / 13 / 21 = 201**, all three package lines present, and the two
 schedules resolving to `2026-08-28T03:15:00.000Z` and `2026-08-28T02:15:00.000Z`.
 
 - [ ] **Step 5: Commit**
@@ -1350,8 +1353,8 @@ rm -rf node_modules && bun install --frozen-lockfile
 bun run check && bun run test 2>&1 | tail -8 && bun run build 2>&1 | tail -3
 ```
 
-Expected: check green; **166 `@pjokk/api` + 13 `@pjokk/server` + 21
-`@pjokk/frontend` = 200**, all three lines present; build green.
+Expected: check green; **167 `@pjokk/api` + 13 `@pjokk/server` + 21
+`@pjokk/frontend` = 201**, all three lines present; build green.
 
 - [ ] **Step 4: The container gate**
 
