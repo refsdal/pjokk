@@ -1,8 +1,10 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { z } from "@hono/zod-openapi";
-import type { Env } from "./config";
 
-export function createApp<E extends { Bindings: Env }>() {
+// Nothing arrives through Hono's env any more (see context.ts), so every
+// AppEnv/FamEnv carries an empty Bindings — this is just the shape
+// createApp's generic parameter needs to see.
+export function createApp<E extends { Bindings: Record<string, never> }>() {
   return new OpenAPIHono<E>({
     defaultHook: (result, c) => {
       if (!result.success) {

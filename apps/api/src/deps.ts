@@ -1,3 +1,4 @@
+import type Stripe from "stripe";
 import type { Auth } from "./infrastructure/auth";
 import type { Db } from "./db";
 import type {
@@ -24,6 +25,10 @@ export type Deps = {
   push: PushSender;
   peerAddress: PeerAddress;
   now: Clock;
+  /** Null when billing is not configured — the SDK throws from its
+   *  constructor on an empty key, so a self-hosted instance without Stripe
+   *  legitimately has none. Built once at startup, not per request. */
+  stripe: Stripe | null;
 
   /** Public origin. Used for OAuth callbacks, absolute links in push
    *  payloads, and the sitemap. */

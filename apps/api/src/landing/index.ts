@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
-import type { Bindings } from "../context";
+import type { AppEnv } from "../context";
 import { isLandingLang, LANDING_COPY, type LandingLang } from "./copy";
 import { renderLandingPage } from "./page";
 
@@ -63,7 +63,7 @@ export function hasSessionCookie(cookieHeader: string | null): boolean {
     );
 }
 
-export function landing(c: Context<{ Bindings: Bindings }>): Response {
+export function landing(c: Context<AppEnv>): Response {
   const requested = c.req.query("lang");
   const lang = resolveLang(
     requested,
@@ -73,7 +73,7 @@ export function landing(c: Context<{ Bindings: Bindings }>): Response {
   const copy = LANDING_COPY[lang];
 
   const signedIn = hasSessionCookie(c.req.header("cookie") ?? null);
-  const openSignup = String(c.env.OPEN_SIGNUP) === "1";
+  const openSignup = c.var.deps.openSignup;
   const cta = signedIn
     ? { label: copy.ctaOpenApp, href: "/home" }
     : {
@@ -81,10 +81,10 @@ export function landing(c: Context<{ Bindings: Bindings }>): Response {
         href: "/login",
       };
 
-  const origin = new URL(c.env.APP_URL).origin;
+  const origin = new URL(c.var.deps.appUrl).origin;
   // Anything that is not production must stay out of search results even if
   // robots.txt is ignored.
-  const noindex = String(c.env.INDEXABLE) !== "1";
+  const noindex = !c.var.deps.indexable;
 
   const html = renderLandingPage({ lang, cta, origin, noindex });
 

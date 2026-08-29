@@ -1,5 +1,6 @@
-import { env, SELF } from "./helpers";
-import { afterEach, describe, expect, it } from "bun:test";
+import { deps, SELF } from "./helpers";
+import { describe, expect, it } from "bun:test";
+import { createApi } from "../src/app";
 import { fromAcceptLanguage, hasSessionCookie } from "../src/landing/index";
 
 // The landing page is the one non-/api path the Worker owns. Everything it
@@ -9,19 +10,20 @@ import { fromAcceptLanguage, hasSessionCookie } from "../src/landing/index";
 const get = (path = "/", headers: Record<string, string> = {}) =>
   SELF.fetch(`http://localhost${path}`, { headers, redirect: "manual" });
 
-// `wrangler types` narrows each var to the literal it holds in config, so
-// flipping one for a test needs a widened view of the same bindings object.
-const vars = env as unknown as { OPEN_SIGNUP: string; INDEXABLE: string };
+// createApi() closes openSignup/indexable over as plain booleans rather than
+// reading them per-request from a mutable bindings object, so a test that
+// needs a non-default value builds a second app with different Deps instead
+// of flipping a shared one.
+const getWith = (
+  overrides: Partial<Pick<typeof deps, "openSignup" | "indexable">>,
+  path = "/",
+  headers: Record<string, string> = {},
+) =>
+  createApi({ ...deps, ...overrides }).fetch(
+    new Request(`http://localhost${path}`, { headers, redirect: "manual" }),
+  );
 
 describe("landing page", () => {
-  const originalIndexable = vars.INDEXABLE;
-  const originalOpenSignup = vars.OPEN_SIGNUP;
-
-  afterEach(() => {
-    vars.INDEXABLE = originalIndexable;
-    vars.OPEN_SIGNUP = originalOpenSignup;
-  });
-
   it("serves an HTML document at /", async () => {
     const res = await get();
     expect(res.status).toBe(200);
@@ -111,7 +113,7 @@ describe("landing page", () => {
       const html = await (await get()).text();
       // Scrapers do not resolve relative paths — this must be absolute.
       expect(html).toContain(
-        `<meta property="og:image" content="${env.APP_URL}/og.png">`,
+        `<meta property="og:image" content="${deps.appUrl}/og.png">`,
       );
       expect(html).toContain('content="summary_large_image"');
     });
@@ -125,16 +127,14 @@ describe("landing page", () => {
 
   describe("call to action", () => {
     it("sends a stranger to sign in", async () => {
-      vars.OPEN_SIGNUP = "0";
-      const html = await (await get()).text();
+      const html = await (await getWith({ openSignup: false })).text();
       expect(html).toContain('href="/login"');
       expect(html).toContain("Sign in");
       expect(html).not.toContain("Open app");
     });
 
     it("invites a stranger to start when signup is open", async () => {
-      vars.OPEN_SIGNUP = "1";
-      const html = await (await get()).text();
+      const html = await (await getWith({ openSignup: true })).text();
       expect(html).toContain("Get started");
       expect(html).toContain('href="/login"');
     });
@@ -163,20 +163,18 @@ describe("landing page", () => {
 
   describe("indexability", () => {
     it("keeps non-production hosts out of search results", async () => {
-      vars.INDEXABLE = "0";
-      const res = await get();
+      const res = await getWith({ indexable: false });
       expect(res.headers.get("x-robots-tag")).toContain("noindex");
       expect(await res.text()).toContain('name="robots"');
     });
 
     it("lets production be indexed", async () => {
-      vars.INDEXABLE = "1";
-      const res = await get();
+      const res = await getWith({ indexable: true });
       expect(res.headers.get("x-robots-tag")).toBeNull();
       const html = await res.text();
       expect(html).not.toContain('name="robots"');
-      // Canonical comes from APP_URL, so an alias host cannot fork the page.
-      expect(html).toContain(`<link rel="canonical" href="${env.APP_URL}/">`);
+      // Canonical comes from appUrl, so an alias host cannot fork the page.
+      expect(html).toContain(`<link rel="canonical" href="${deps.appUrl}/">`);
     });
   });
 });

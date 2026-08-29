@@ -1,7 +1,6 @@
 import { createRoute } from "@hono/zod-openapi";
 import { CheckoutUrlSchema, ErrorSchema } from "@pjokk/shared";
 import type { FamEnv } from "../context";
-import { createStripe } from "../infrastructure/stripe";
 import { createApp, jsonContent } from "../lib";
 
 // The lifetime plan is a one-time payment, which the better-auth stripe
@@ -30,7 +29,7 @@ export const billingApp = createApp<FamEnv>().openapi(
         409,
       );
     }
-    const stripe = createStripe(c.env.STRIPE_SECRET_KEY);
+    const stripe = c.var.deps.stripe;
     if (!stripe) {
       // Self-hosted instances run without billing configured; the route
       // exists but cannot do anything, so say that rather than 500.
@@ -42,15 +41,15 @@ export const billingApp = createApp<FamEnv>().openapi(
     const stripeCustomerId = await c.var.fam.stripeCustomerId();
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      line_items: [{ price: c.env.STRIPE_PRICE_PREMIUM_LIFETIME, quantity: 1 }],
+      line_items: [{ price: c.var.deps.stripePriceLifetime, quantity: 1 }],
       client_reference_id: c.var.familyId,
       metadata: { kind: "lifetime", familyId: c.var.familyId },
       ...(stripeCustomerId
         ? { customer: stripeCustomerId }
         : { customer_email: c.var.sessionData.user.email }),
       automatic_tax: { enabled: true },
-      success_url: `${c.env.APP_URL}/settings?billing=success`,
-      cancel_url: `${c.env.APP_URL}/settings?billing=canceled`,
+      success_url: `${c.var.deps.appUrl}/settings?billing=success`,
+      cancel_url: `${c.var.deps.appUrl}/settings?billing=canceled`,
     });
     if (!session.url) {
       return c.json(

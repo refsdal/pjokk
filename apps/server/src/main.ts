@@ -1,21 +1,85 @@
 import { serveStatic } from "hono/bun";
+import { createApi } from "@pjokk/api";
 import { disabledSubsystems, loadEnv } from "@pjokk/api/config";
-import type { Bindings } from "@pjokk/api/context";
 import { startScheduler } from "@pjokk/api/cron";
-import { app } from "@pjokk/api";
-import { servicesFor } from "@pjokk/api/services";
+import type { Deps } from "@pjokk/api/deps";
+import {
+  createAuth,
+  createDb,
+  createPushSender,
+  createRateLimitStore,
+  createStorage,
+  createStripe,
+} from "@pjokk/api/infrastructure";
+import type { PeerAddress } from "@pjokk/api/ports";
 
-// The container entrypoint. index.ts owns the API and the landing page —
-// everything testable without a filesystem — and this file adds the parts
-// that only make sense in a running process: static assets, the SPA
-// fallback, the listener, and optionally the in-process scheduler.
+// The container entrypoint — the composition root. index.ts (now app.ts)
+// owns the API and the landing page — everything testable without a
+// filesystem — and this file builds the collaborators ONCE, hands them to
+// createApi() as one Deps object, then adds the parts that only make sense
+// in a running process: static assets, the SPA fallback, the listener, and
+// optionally the in-process scheduler.
 
 const env = loadEnv(process.env);
 
-// ONE object for the whole process. servicesFor() memoizes on its identity,
-// so rebuilding it per request would rebuild the connection pool every time.
-// `server` is filled in below, once Bun.serve has returned a handle.
-const bindings: Bindings = { ...env };
+const db = createDb(env.DATABASE_URL);
+
+// Billing is optional: without Stripe keys createStripe() returns null, so
+// the better-auth stripe plugin is not registered and the billing/admin
+// routes take their "not configured" branch. Built once and shared between
+// both, exactly like every other collaborator here.
+const stripeClient = createStripe(env.STRIPE_SECRET_KEY);
+
+// Only Bun's server handle knows the peer address, and it does not exist
+// until Bun.serve() has returned below — so this starts undefined and the
+// closure reads whatever it is by the time a request actually arrives.
+let serverHandle:
+  | { requestIP(request: Request): { address: string } | null }
+  | undefined;
+const peerAddress: PeerAddress = (request) =>
+  serverHandle?.requestIP(request)?.address ?? null;
+
+const deps: Deps = {
+  db,
+  auth: createAuth(
+    {
+      appUrl: env.APP_URL,
+      secret: env.BETTER_AUTH_SECRET,
+      googleClientId: env.GOOGLE_CLIENT_ID,
+      googleClientSecret: env.GOOGLE_CLIENT_SECRET,
+      stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET,
+      stripePriceMonthly: env.STRIPE_PRICE_PREMIUM_MONTHLY,
+      stripePriceYearly: env.STRIPE_PRICE_PREMIUM_YEARLY,
+      openSignup: env.OPEN_SIGNUP === "1",
+    },
+    db,
+    stripeClient,
+  ),
+  storage: createStorage({
+    bucket: env.S3_BUCKET,
+    endpoint: env.S3_ENDPOINT,
+    accessKeyId: env.S3_ACCESS_KEY_ID,
+    secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+    region: env.S3_REGION,
+  }),
+  rateLimit: createRateLimitStore(db),
+  push: createPushSender(db, {
+    appUrl: env.APP_URL,
+    publicKey: env.VAPID_PUBLIC_KEY,
+    privateKey: env.VAPID_PRIVATE_KEY,
+  }),
+  stripe: stripeClient,
+  peerAddress,
+  now: () => new Date(),
+  appUrl: env.APP_URL,
+  vapidPublicKey: env.VAPID_PUBLIC_KEY,
+  stripePriceLifetime: env.STRIPE_PRICE_PREMIUM_LIFETIME,
+  trustedProxyHops: env.TRUSTED_PROXY_HOPS,
+  openSignup: env.OPEN_SIGNUP === "1",
+  indexable: env.INDEXABLE === "1",
+};
+
+const app = createApi(deps);
 
 // Security headers for everything served from disk. On Cloudflare these came
 // from a generated `_headers` file that only the asset store understood; off
@@ -51,20 +115,18 @@ app.get("/api/*", (c) =>
 );
 app.get("*", serveStatic({ path: `${env.STATIC_DIR}/index.html` }));
 
-const services = servicesFor(bindings);
-
 const server = Bun.serve({
   port: env.PORT,
   // Hostname 0.0.0.0 so the port is reachable from outside the container;
   // Bun's default binds loopback only, which in Docker looks like a server
   // that started fine and refuses every connection.
   hostname: "0.0.0.0",
-  fetch: (request) => app.fetch(request, bindings),
+  fetch: (request) => app.fetch(request),
 });
 
-// Now that the handle exists, hand it to the same object the app already
-// holds — this is how the rate limiter reads the peer address.
-bindings.server = server;
+// Now that the handle exists, hand it to the closure above — this is how the
+// rate limiter reads the peer address.
+serverHandle = server;
 
 const off = disabledSubsystems(env);
 console.log(`pjokk listening on http://0.0.0.0:${env.PORT}`);
@@ -75,7 +137,7 @@ if (off.length > 0) console.log(`  disabled:  ${off.join(", ")}`);
 let stopScheduler: (() => void) | undefined;
 if (env.SCHEDULER === "1") {
   console.log("  scheduler: in-process (single-container mode)");
-  stopScheduler = startScheduler(services);
+  stopScheduler = startScheduler(deps);
 }
 
 // Kubernetes sends SIGTERM and then waits before SIGKILL; draining in that

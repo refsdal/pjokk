@@ -14,8 +14,7 @@ import {
   sql,
 } from "drizzle-orm";
 import { schema } from "./db";
-import { createPushSender } from "./infrastructure";
-import type { Services } from "./services";
+import type { Deps } from "./deps";
 import { TOMBSTONE_ID } from "./db/tombstone";
 import { PREMIUM_STATUSES, applySubscriptionStatus } from "./billing";
 
@@ -23,8 +22,8 @@ import { PREMIUM_STATUSES, applySubscriptionStatus } from "./billing";
 // no membership and can't create one — sweep them after a week. Sysadmins
 // and anyone with a membership are never touched; FK-protected users (e.g.
 // with historical logs) are skipped.
-export async function purgeOrphanUsers(services: Services, now = Date.now()) {
-  const { db } = services;
+export async function purgeOrphanUsers(deps: Deps, now = Date.now()) {
+  const { db } = deps;
   const cutoff = new Date(now - 7 * 24 * 3600_000);
   const orphans = await db
     .select({ id: schema.user.id, email: schema.user.email })
@@ -62,13 +61,8 @@ export async function purgeOrphanUsers(services: Services, now = Date.now()) {
 // Feed reminders: one nudge per gap. A caretaker with feedReminderHours=N
 // gets a push when the family hasn't logged a feed for N hours — once, until
 // a new feed starts a new gap (lastRemindedAt < lastFeed gates re-sending).
-export async function runReminders(services: Services, now = Date.now()) {
-  const { db, env } = services;
-  const push = createPushSender(db, {
-    appUrl: env.APP_URL,
-    publicKey: env.VAPID_PUBLIC_KEY,
-    privateKey: env.VAPID_PRIVATE_KEY,
-  });
+export async function runReminders(deps: Deps, now = Date.now()) {
+  const { db, push } = deps;
   const prefs = await db
     .select()
     .from(schema.pushPref)
@@ -126,16 +120,8 @@ export const clockFmt = new Intl.DateTimeFormat("nb-NO", {
   timeZone: "Europe/Oslo",
 });
 
-export async function runCalendarReminders(
-  services: Services,
-  now = Date.now(),
-) {
-  const { db, env } = services;
-  const push = createPushSender(db, {
-    appUrl: env.APP_URL,
-    publicKey: env.VAPID_PUBLIC_KEY,
-    privateKey: env.VAPID_PRIVATE_KEY,
-  });
+export async function runCalendarReminders(deps: Deps, now = Date.now()) {
+  const { db, push } = deps;
   const pending = and(
     isNotNull(schema.calendarEvent.remindMinutesBefore),
     isNull(schema.calendarEvent.remindedAt),
@@ -260,8 +246,8 @@ const BACKUP_TABLES = [
 // that mismatch and repairs it — one-directional only (free -> premium),
 // never a downgrade, so it can never race a subscription webhook the wrong
 // way: at worst it repeats work applySubscriptionStatus already did.
-export async function reconcilePlans(services: Services) {
-  const { db } = services;
+export async function reconcilePlans(deps: Deps) {
+  const { db } = deps;
   const stuck = await db
     .select({
       id: schema.organization.id,
@@ -289,8 +275,8 @@ export async function reconcilePlans(services: Services) {
   return flipped;
 }
 
-export async function runBackup(services: Services, now = new Date()) {
-  const { db, storage } = services;
+export async function runBackup(deps: Deps, now = new Date()) {
+  const { db, storage } = deps;
   const dump: Record<string, unknown[]> = {};
   for (const table of BACKUP_TABLES) {
     // BACKUP_TABLES is a hard-coded list in this file, never user input, so
@@ -326,13 +312,13 @@ export const BACKUP_RETENTION_DAYS = 30;
 
 /** Deletes backup snapshots older than the retention window. Returns the
  *  keys removed, so the cron can log a count. */
-export async function pruneBackups(services: Services, now = new Date()) {
+export async function pruneBackups(deps: Deps, now = new Date()) {
   const cutoff = new Date(
     now.getTime() - BACKUP_RETENTION_DAYS * 24 * 3600_000,
   );
   // Pagination now happens inside storage.list(); the cursor loop that used
   // to live here was R2 API detail leaking into a retention policy.
-  const objects = await services.storage.list("backups/");
+  const objects = await deps.storage.list("backups/");
   const stale = objects.filter((o) => {
     // Prefer the date in the key (stable, and what names the snapshot); fall
     // back to the object's upload time for anything unexpected.
@@ -341,7 +327,7 @@ export async function pruneBackups(services: Services, now = new Date()) {
     return stamp.getTime() < cutoff.getTime();
   });
   if (stale.length > 0) {
-    await services.storage.delete(stale.map((o) => o.key));
+    await deps.storage.delete(stale.map((o) => o.key));
   }
   return stale.map((o) => o.key);
 }

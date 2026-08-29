@@ -6,7 +6,7 @@ import {
   runCalendarReminders,
   runReminders,
 } from "./scheduled";
-import type { Services } from "./services";
+import type { Deps } from "./deps";
 
 // The scheduled work that Cloudflare's cron triggers used to drive.
 //
@@ -28,29 +28,29 @@ export function isJob(value: string): value is Job {
   return (JOBS as readonly string[]).includes(value);
 }
 
-export async function runJob(job: Job, services: Services): Promise<void> {
+export async function runJob(job: Job, deps: Deps): Promise<void> {
   if (job === "nightly") {
-    const key = await runBackup(services);
+    const key = await runBackup(deps);
     console.log(`cron: backup written to ${key}`);
-    const pruned = await pruneBackups(services);
+    const pruned = await pruneBackups(deps);
     if (pruned.length > 0) {
       console.log(`cron: pruned ${pruned.length} expired backup(s)`);
     }
-    const purged = await purgeOrphanUsers(services);
+    const purged = await purgeOrphanUsers(deps);
     if (purged > 0) console.log(`cron: purged ${purged} orphan account(s)`);
-    const reconciled = await reconcilePlans(services);
+    const reconciled = await reconcilePlans(deps);
     if (reconciled > 0) {
       console.log(`cron: reconciled ${reconciled} family plan(s) to premium`);
     }
     // KV expired rate-limit entries by itself; the Postgres table does not.
-    const swept = await services.rateLimit.sweep();
+    const swept = await deps.rateLimit.sweep();
     if (swept > 0) console.log(`cron: swept ${swept} rate-limit counter(s)`);
     return;
   }
 
-  const sent = await runReminders(services);
+  const sent = await runReminders(deps);
   if (sent > 0) console.log(`cron: ${sent} reminder(s) sent`);
-  const calendarSent = await runCalendarReminders(services);
+  const calendarSent = await runCalendarReminders(deps);
   if (calendarSent > 0) {
     console.log(`cron: ${calendarSent} calendar reminder(s) sent`);
   }
@@ -68,11 +68,11 @@ const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
  *
  * Returns a stop function so tests and shutdown can clear the timer.
  */
-export function startScheduler(services: Services): () => void {
+export function startScheduler(deps: Deps): () => void {
   let lastNightlyRun = "";
   const tick = async () => {
     try {
-      await runJob("frequent", services);
+      await runJob("frequent", deps);
       const now = new Date();
       const day = now.toISOString().slice(0, 10);
       const past0315 =
@@ -80,7 +80,7 @@ export function startScheduler(services: Services): () => void {
         (now.getUTCHours() === 3 && now.getUTCMinutes() >= 15);
       if (past0315 && lastNightlyRun !== day) {
         lastNightlyRun = day;
-        await runJob("nightly", services);
+        await runJob("nightly", deps);
       }
     } catch (error) {
       // A failed tick must never kill the timer, or one transient database

@@ -5,7 +5,7 @@ import { SELF, services } from "./rig";
 
 // Re-exported so the test files keep importing their whole rig from one
 // place, exactly as they did from cloudflare:test.
-export { env, resetDb, services, SELF, storage } from "./rig";
+export { deps, resetDb, services, SELF, storage } from "./rig";
 
 export const db = () => services.db;
 
