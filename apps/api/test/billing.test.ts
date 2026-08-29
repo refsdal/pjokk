@@ -6,16 +6,16 @@ import {
   createFamily,
   createUser,
   db,
+  deps,
   planOf,
   rig,
-  services,
   setPlan,
   signIn,
 } from "./helpers";
 import { describe, expect, it } from "bun:test";
 import { canUse } from "../src/entitlements";
 import { applySubscriptionStatus, grantLifetime } from "../src/billing";
-import { reconcilePlans } from "../src/scheduled";
+import { reconcilePlans } from "../src/jobs/plans";
 import { schema } from "../src/db";
 
 describe("canUse", () => {
@@ -84,7 +84,7 @@ describe("nightly plan reconciliation", () => {
       });
     expect(await planOf(fam.id)).toBe("free");
 
-    const flipped = await reconcilePlans(services);
+    const flipped = await reconcilePlans(deps);
     expect(flipped).toBeGreaterThan(0);
     expect(await planOf(fam.id)).toBe("premium");
   });
@@ -101,7 +101,7 @@ describe("nightly plan reconciliation", () => {
         status: "active",
       });
 
-    await reconcilePlans(services);
+    await reconcilePlans(deps);
     expect(await planOf(fam.id)).toBe("lifetime");
   });
 });

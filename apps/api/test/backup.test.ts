@@ -1,10 +1,10 @@
-import { api, rig, services, storage } from "./helpers";
+import { api, deps, rig, storage } from "./helpers";
 import { describe, expect, it } from "bun:test";
 import {
   BACKUP_RETENTION_DAYS,
   pruneBackups,
   runBackup,
-} from "../src/scheduled";
+} from "../src/jobs/backup";
 
 describe("nightly backup", () => {
   it("writes a dated JSON snapshot of every table to object storage", async () => {
@@ -25,7 +25,7 @@ describe("nightly backup", () => {
       body: { name: "Hammock" },
     });
 
-    const key = await runBackup(services, new Date("2026-08-24T03:15:00Z"));
+    const key = await runBackup(deps, new Date("2026-08-24T03:15:00Z"));
     expect(key).toBe("backups/2026-08-24.json");
 
     const raw = await storage.read(key);
@@ -63,7 +63,7 @@ describe("backup retention", () => {
     const ancient = "backups/2020-01-01.json";
     for (const k of [fresh, edge, stale, ancient]) await put(k);
 
-    const removed = await pruneBackups(services, now);
+    const removed = await pruneBackups(deps, now);
 
     expect(removed.sort()).toEqual([ancient, stale].sort());
     const left = await listKeys();
@@ -80,7 +80,7 @@ describe("backup retention", () => {
     await storage.put("vaccine-docs/fam_x/some-file", "not a backup");
     await put("backups/2019-05-05.json");
 
-    const removed = await pruneBackups(services, now);
+    const removed = await pruneBackups(deps, now);
 
     expect(removed).toEqual(["backups/2019-05-05.json"]);
     expect(await storage.read("vaccine-docs/fam_x/some-file")).not.toBeNull();
@@ -89,6 +89,6 @@ describe("backup retention", () => {
   it("is a no-op when every snapshot is recent", async () => {
     const now = new Date("2026-08-27T03:15:00Z");
     await put("backups/2026-08-26.json");
-    expect(await pruneBackups(services, now)).toEqual([]);
+    expect(await pruneBackups(deps, now)).toEqual([]);
   });
 });

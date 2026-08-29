@@ -1,4 +1,4 @@
-import { isJob, JOBS, runJob } from "@pjokk/api/cron";
+import { isJob, JOBS, runJob } from "./cron";
 import { loadEnv } from "./env";
 import { createDeps } from "./deps";
 

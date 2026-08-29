@@ -1,12 +1,8 @@
-import {
-  pruneBackups,
-  purgeOrphanUsers,
-  reconcilePlans,
-  runBackup,
-  runCalendarReminders,
-  runReminders,
-} from "./scheduled";
-import type { Deps } from "./deps";
+import { pruneBackups, runBackup } from "@pjokk/api/jobs/backup";
+import { runCalendarReminders } from "@pjokk/api/jobs/calendar-reminders";
+import { purgeOrphanUsers, reconcilePlans } from "@pjokk/api/jobs/plans";
+import { runReminders } from "@pjokk/api/jobs/reminders";
+import type { Deps } from "@pjokk/api/deps";
 
 // The scheduled work that Cloudflare's cron triggers used to drive.
 //
@@ -56,38 +52,51 @@ export async function runJob(job: Job, deps: Deps): Promise<void> {
   }
 }
 
-const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
+export const SCHEDULES = {
+  nightly: "15 3 * * *",
+  frequent: "*/15 * * * *",
+} as const;
 
 /**
  * In-process scheduler for single-container deployments (SCHEDULER=1).
  *
- * Deliberately simple: a 15-minute tick for the frequent job, and the nightly
- * job when the tick first lands at or after 03:15 UTC on a new day. No cron
- * parser, because there are exactly two schedules and a dependency to express
- * them would earn its keep only if there were more.
+ * Bun.cron is a builtin as of Bun 1.4, which retires this file's previous
+ * hand-rolled 15-minute tick — and with it two real defects: the nightly job
+ * fired at whichever tick first landed past 03:15 (so its actual time
+ * depended on when the process started), and setInterval would start a
+ * second nightly run if the first outlived the interval, which matters for a
+ * job that reads every table and writes a snapshot to object storage.
  *
- * Returns a stop function so tests and shutdown can clear the timer.
+ * tz is UTC explicitly. The default is the system zone, and the image does
+ * not set TZ — so it is UTC by accident, not by contract, while the 30-day
+ * backup retention window is a privacy-policy commitment stated in UTC.
+ * "15 3 * * *" resolves to 03:15Z under UTC and 01:15Z under Europe/Oslo.
+ *
+ * The try/catch is load-bearing. Bun.cron matches setTimeout's error
+ * semantics: a rejected promise emits unhandledRejection and, with no
+ * listener, exits the process with code 1. The job reschedules itself after
+ * an error, so catching here turns a transient database blip into a logged
+ * line instead of a pod restart loop.
+ *
+ * NOTE: this fires once per replica, exactly as setInterval did. With more
+ * than one replica, drive the jobs from Kubernetes CronJobs and leave
+ * SCHEDULER=0.
  */
 export function startScheduler(deps: Deps): () => void {
-  let lastNightlyRun = "";
-  const tick = async () => {
-    try {
-      await runJob("frequent", deps);
-      const now = new Date();
-      const day = now.toISOString().slice(0, 10);
-      const past0315 =
-        now.getUTCHours() > 3 ||
-        (now.getUTCHours() === 3 && now.getUTCMinutes() >= 15);
-      if (past0315 && lastNightlyRun !== day) {
-        lastNightlyRun = day;
-        await runJob("nightly", deps);
-      }
-    } catch (error) {
-      // A failed tick must never kill the timer, or one transient database
-      // blip would silently end all scheduled work until the next restart.
-      console.error("cron: tick failed", error);
-    }
+  const jobs = (Object.keys(SCHEDULES) as Job[]).map((job) =>
+    Bun.cron(
+      SCHEDULES[job],
+      async () => {
+        try {
+          await runJob(job, deps);
+        } catch (error) {
+          console.error(`cron: ${job} failed`, error);
+        }
+      },
+      { tz: "UTC" },
+    ),
+  );
+  return () => {
+    for (const job of jobs) job.stop();
   };
-  const timer = setInterval(tick, FIFTEEN_MINUTES_MS);
-  return () => clearInterval(timer);
 }

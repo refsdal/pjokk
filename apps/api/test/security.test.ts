@@ -1,8 +1,8 @@
-import { SELF, api, createUser, db, rig, services, signIn } from "./helpers";
+import { SELF, api, createUser, db, deps, rig, signIn } from "./helpers";
 import { describe, expect, it } from "bun:test";
 import { eq } from "drizzle-orm";
 import { schema } from "../src/db";
-import { purgeOrphanUsers } from "../src/scheduled";
+import { purgeOrphanUsers } from "../src/jobs/plans";
 
 describe("security hardening", () => {
   it("rate-limits password sign-in attempts (H1)", async () => {
@@ -68,7 +68,7 @@ describe("security hardening", () => {
       .set({ createdAt: old })
       .where(eq(schema.user.id, memberUser.id));
 
-    const purged = await purgeOrphanUsers(services);
+    const purged = await purgeOrphanUsers(deps);
     expect(purged).toBeGreaterThanOrEqual(1);
 
     const remaining = (

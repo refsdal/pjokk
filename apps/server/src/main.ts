@@ -1,6 +1,6 @@
 import { serveStatic } from "hono/bun";
 import { createApi } from "@pjokk/api";
-import { startScheduler } from "@pjokk/api/cron";
+import { startScheduler } from "./cron";
 import { disabledSubsystems, loadEnv } from "./env";
 import { createDeps, type PeerAddressSource } from "./deps";
 
