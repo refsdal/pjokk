@@ -1,17 +1,8 @@
 import { serveStatic } from "hono/bun";
 import { createApi } from "@pjokk/api";
-import { disabledSubsystems, loadEnv } from "@pjokk/api/config";
 import { startScheduler } from "@pjokk/api/cron";
-import type { Deps } from "@pjokk/api/deps";
-import {
-  createAuth,
-  createDb,
-  createPushSender,
-  createRateLimitStore,
-  createStorage,
-  createStripe,
-} from "@pjokk/api/infrastructure";
-import type { PeerAddress } from "@pjokk/api/ports";
+import { disabledSubsystems, loadEnv } from "./env";
+import { createDeps, type PeerAddressSource } from "./deps";
 
 // The container entrypoint — the composition root. index.ts (now app.ts)
 // owns the API and the landing page — everything testable without a
@@ -22,63 +13,14 @@ import type { PeerAddress } from "@pjokk/api/ports";
 
 const env = loadEnv(process.env);
 
-const db = createDb(env.DATABASE_URL);
-
-// Billing is optional: without Stripe keys createStripe() returns null, so
-// the better-auth stripe plugin is not registered and the billing/admin
-// routes take their "not configured" branch. Built once and shared between
-// both, exactly like every other collaborator here.
-const stripeClient = createStripe(env.STRIPE_SECRET_KEY);
-
-// Only Bun's server handle knows the peer address, and it does not exist
-// until Bun.serve() has returned below — so this starts undefined and the
-// closure reads whatever it is by the time a request actually arrives.
-let serverHandle:
-  | { requestIP(request: Request): { address: string } | null }
-  | undefined;
-const peerAddress: PeerAddress = (request) =>
-  serverHandle?.requestIP(request)?.address ?? null;
-
-const deps: Deps = {
-  db,
-  auth: createAuth(
-    {
-      appUrl: env.APP_URL,
-      secret: env.BETTER_AUTH_SECRET,
-      googleClientId: env.GOOGLE_CLIENT_ID,
-      googleClientSecret: env.GOOGLE_CLIENT_SECRET,
-      stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET,
-      stripePriceMonthly: env.STRIPE_PRICE_PREMIUM_MONTHLY,
-      stripePriceYearly: env.STRIPE_PRICE_PREMIUM_YEARLY,
-      openSignup: env.OPEN_SIGNUP === "1",
-    },
-    db,
-    stripeClient,
-  ),
-  storage: createStorage({
-    bucket: env.S3_BUCKET,
-    endpoint: env.S3_ENDPOINT,
-    accessKeyId: env.S3_ACCESS_KEY_ID,
-    secretAccessKey: env.S3_SECRET_ACCESS_KEY,
-    region: env.S3_REGION,
-  }),
-  rateLimit: createRateLimitStore(db),
-  push: createPushSender(db, {
-    appUrl: env.APP_URL,
-    publicKey: env.VAPID_PUBLIC_KEY,
-    privateKey: env.VAPID_PRIVATE_KEY,
-  }),
-  stripe: stripeClient,
-  peerAddress,
-  now: () => new Date(),
-  appUrl: env.APP_URL,
-  vapidPublicKey: env.VAPID_PUBLIC_KEY,
-  stripePriceLifetime: env.STRIPE_PRICE_PREMIUM_LIFETIME,
-  trustedProxyHops: env.TRUSTED_PROXY_HOPS,
-  openSignup: env.OPEN_SIGNUP === "1",
-  indexable: env.INDEXABLE === "1",
+// Filled in immediately after Bun.serve returns; the rate limiter reads the
+// peer address through it. A ref rather than a rebuilt Deps because Deps is
+// captured in createApi's closure and cannot be swapped afterwards.
+const serverRef: { current: PeerAddressSource | undefined } = {
+  current: undefined,
 };
 
+const deps = createDeps(env, serverRef);
 const app = createApi(deps);
 
 // Security headers for everything served from disk. On Cloudflare these came
@@ -126,7 +68,7 @@ const server = Bun.serve({
 
 // Now that the handle exists, hand it to the closure above — this is how the
 // rate limiter reads the peer address.
-serverHandle = server;
+serverRef.current = server;
 
 const off = disabledSubsystems(env);
 console.log(`pjokk listening on http://0.0.0.0:${env.PORT}`);

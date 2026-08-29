@@ -1,6 +1,6 @@
 import { migrate } from "drizzle-orm/bun-sql/migrator";
-import { loadEnv } from "@pjokk/api/config";
 import { createDb } from "@pjokk/api/infrastructure";
+import { loadEnv } from "./env";
 
 // Applies pending migrations, then exits.
 //

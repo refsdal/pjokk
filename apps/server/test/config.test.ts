@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { disabledSubsystems, type Env, loadEnv } from "../src/config";
+import { disabledSubsystems, type Env, loadEnv } from "../src/env";
 
 // The minimum that must be present for the process to serve anything.
 const MINIMAL = {

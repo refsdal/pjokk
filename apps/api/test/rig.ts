@@ -1,7 +1,6 @@
 import webpush from "web-push";
 import { sql } from "drizzle-orm";
 import { createApi } from "../src/app";
-import { loadEnv } from "../src/config";
 import type { Deps } from "../src/deps";
 import {
   createAuth,
@@ -18,6 +17,10 @@ import { createMemoryStorage } from "./memory-storage";
 // D1/KV/R2 bindings) and `SELF` (a fetch into the Worker). Those came from
 // the runtime; here they are built explicitly, which is a fair trade for
 // being able to read what the tests actually depend on.
+//
+// This states Deps literally rather than parsing it from an Env object: this
+// package must not depend on apps/server, and Deps — not Env — is the actual
+// contract apps/api depends on.
 
 const vapid = webpush.generateVAPIDKeys();
 
@@ -26,38 +29,16 @@ const DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
   "postgres://pjokk:pjokk@127.0.0.1:55432/pjokk_test";
 
-// loadEnv still parses the handful of values Deps is built from below. It
-// moves to apps/server in a later task, once apps/api no longer needs it at
-// all — Deps, not Env, is the contract this package depends on.
-const env = loadEnv({
-  DATABASE_URL,
-  APP_URL: "http://localhost",
-  BETTER_AUTH_SECRET: "test-secret-please-ignore",
-  S3_BUCKET: "test-bucket",
-  S3_ENDPOINT: "http://127.0.0.1:1",
-  S3_ACCESS_KEY_ID: "test",
-  S3_SECRET_ACCESS_KEY: "test",
-  GOOGLE_CLIENT_ID: "test",
-  GOOGLE_CLIENT_SECRET: "test",
-  VAPID_PUBLIC_KEY: vapid.publicKey,
-  VAPID_PRIVATE_KEY: vapid.privateKey,
-  STRIPE_SECRET_KEY: "sk_test_fake",
-  STRIPE_WEBHOOK_SECRET: "whsec_test_fake",
-  STRIPE_PRICE_PREMIUM_MONTHLY: "price_test_monthly",
-  STRIPE_PRICE_PREMIUM_YEARLY: "price_test_yearly",
-  STRIPE_PRICE_PREMIUM_LIFETIME: "price_test_lifetime",
-});
+const db = createDb(DATABASE_URL);
 
-const db = createDb(env.DATABASE_URL);
-
-// In-memory object storage — the S3_* values above point nowhere on purpose,
-// so a test that bypassed this and reached for the network would fail loudly
+// In-memory object storage — no S3 config is passed anywhere in this rig, so
+// a test that bypassed this and reached for the network would fail loudly
 // rather than quietly talking to a real bucket.
 export const storage = createMemoryStorage();
 
 // Built once and shared between better-auth's stripe plugin and deps.stripe,
 // exactly as production shares one Deps object between every consumer. A
-// client, not null: STRIPE_SECRET_KEY above is "sk_test_fake", so
+// client, not null: the secret below is "sk_test_fake", so
 // createStripe() returns one and both the plugin and the billing/admin
 // routes take their client-present branch. Passing null to either would
 // silently flip tests onto the "not configured" path — a behaviour change
@@ -68,14 +49,14 @@ export const deps: Deps = {
   db,
   auth: createAuth(
     {
-      appUrl: env.APP_URL,
-      secret: env.BETTER_AUTH_SECRET,
-      googleClientId: env.GOOGLE_CLIENT_ID,
-      googleClientSecret: env.GOOGLE_CLIENT_SECRET,
-      stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET,
-      stripePriceMonthly: env.STRIPE_PRICE_PREMIUM_MONTHLY,
-      stripePriceYearly: env.STRIPE_PRICE_PREMIUM_YEARLY,
-      openSignup: env.OPEN_SIGNUP === "1",
+      appUrl: "http://localhost",
+      secret: "test-secret-please-ignore",
+      googleClientId: "test",
+      googleClientSecret: "test",
+      stripeWebhookSecret: "whsec_test_fake",
+      stripePriceMonthly: "price_test_monthly",
+      stripePriceYearly: "price_test_yearly",
+      openSignup: false,
     },
     db,
     stripeClient,
@@ -83,7 +64,7 @@ export const deps: Deps = {
   storage,
   rateLimit: createRateLimitStore(db),
   push: createPushSender(db, {
-    appUrl: env.APP_URL,
+    appUrl: "http://localhost",
     publicKey: vapid.publicKey,
     privateKey: vapid.privateKey,
   }),
