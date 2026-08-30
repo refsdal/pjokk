@@ -23,7 +23,7 @@
     "migrate": "MIGRATIONS_DIR=apps/api/migrations bun apps/server/src/migrate.ts",
     "seed": "bun scripts/seed.mjs",
     "build:client": "bun run --filter @pjokk/frontend build",
-    "build:server": "bun build apps/server/src/main.ts apps/server/src/cron-cli.ts apps/server/src/migrate.ts --target=bun --outdir=dist/server --sourcemap=linked",
+    "build:server": "bun build apps/server/src/dispatch.ts --compile --sourcemap=linked --outfile dist/compiled/dispatch",
     "build:landing": "bun run --filter @pjokk/landing build"
   },
   "dependencies": {
