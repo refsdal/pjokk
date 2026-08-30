@@ -15,6 +15,8 @@ const nb: Record<string, string> = {
   Settings: "Innstillinger",
   "A new version is ready": "En ny versjon er klar",
   Update: "Oppdater",
+  "Page not found": "Fant ikke siden",
+  "Back to Pjokk": "Tilbake til Pjokk",
 
   // Home
   "Last feed": "Siste måltid",

@@ -2,12 +2,15 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  Link,
   lazyRouteComponent,
   Outlet,
+  redirect,
 } from "@tanstack/react-router";
 import { Toaster } from "@/components/Toaster";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { AppearanceProvider } from "@/lib/appearance";
+import { t } from "@/lib/i18n";
 import { HomeScreen } from "@/screens/Home";
 import { JoinScreen } from "@/screens/Join";
 import { LoginScreen } from "@/screens/Login";
@@ -33,9 +36,9 @@ const appRoute = createRoute({
   component: AppShell,
 });
 
-// "/" belongs to the Worker-rendered landing page, so the app's own home
-// screen lives at /home. Nothing in the SPA may route to "/": links back to
-// the landing page must be plain anchors that leave the SPA.
+// The app's home screen lives at /home, not "/" — the tab bar, the
+// active-session banner, and every internal link assume that path. "/"
+// itself is handled separately, below (rootIndexRoute): it redirects here.
 const homeRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/home",
@@ -105,6 +108,23 @@ const welcomeRoute = createRoute({
   component: WelcomeScreen,
 });
 
+// app.pjokk.no/ is the app's front door now that the landing page has moved
+// to the apex (see CLAUDE.md, "everything lives on the apex" for the split).
+// A top-level route, parented at rootRoute rather than appRoute: nesting it
+// under appRoute would collide with the admin console's own "/" index route
+// (adminOverviewRoute, parented at adminRoute) and would inherit the authed
+// shell this redirect exists to route around. /home sits under that shell,
+// which itself sends a signed-out visitor on to /login (see AppShell in
+// screens/shell.tsx), so redirecting straight to /home is correct in both
+// states.
+const rootIndexRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/",
+  beforeLoad: () => {
+    throw redirect({ to: "/home" });
+  },
+});
+
 // Operator console — its own layout with a bottom tab bar per concern.
 // Lazy chunks; role-guarded in the shell.
 const adminRoute = createRoute({
@@ -152,7 +172,11 @@ const adminAuditRoute = createRoute({
   ),
 });
 
-const routeTree = rootRoute.addChildren([
+// Exported for apps/frontend/test/router.test.ts, which finds rootIndexRoute
+// by id and calls its beforeLoad directly to pin the "/" redirect — this
+// suite has no DOM, and TanStack Router's client load path needs one.
+export const routeTree = rootRoute.addChildren([
+  rootIndexRoute,
   appRoute.addChildren([
     homeRoute,
     timelineRoute,
@@ -172,7 +196,24 @@ const routeTree = rootRoute.addChildren([
   ]),
 ]);
 
-export const router = createRouter({ routeTree });
+// Anything that matches no route at all (a stale link, a typo). Minimal on
+// purpose — this is a fallback, not a screen — but it must not be TanStack's
+// bare default, which names no way back into the app.
+function NotFoundScreen() {
+  return (
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-3 px-6 text-center">
+      <p className="text-sm text-muted">{t("Page not found")}</p>
+      <Link to="/home" className="text-sm font-semibold text-accent">
+        {t("Back to Pjokk")}
+      </Link>
+    </div>
+  );
+}
+
+export const router = createRouter({
+  routeTree,
+  defaultNotFoundComponent: NotFoundScreen,
+});
 
 declare module "@tanstack/react-router" {
   interface Register {
