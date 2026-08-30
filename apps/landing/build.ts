@@ -19,7 +19,10 @@ const LEGAL_TITLES: Record<LegalDoc, Record<LandingLang, string>> = {
 const SITE_URL = process.env.SITE_URL ?? "https://pjokk.no";
 const APP_URL = process.env.APP_URL ?? "https://app.pjokk.no";
 const OPEN_SIGNUP = process.env.OPEN_SIGNUP === "1";
-const INDEXABLE = process.env.INDEXABLE !== "0";
+// Fail-safe default: unset means noindex, matching the container's zod
+// schema default of "0" that this replaced. A deploy that forgets to set
+// this variable must publish `noindex`, not `Allow: /`.
+const INDEXABLE = process.env.INDEXABLE === "1";
 
 const OUT = new URL("./dist/", import.meta.url);
 const PUBLIC = new URL("./public/", import.meta.url);

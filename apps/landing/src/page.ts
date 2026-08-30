@@ -1,4 +1,5 @@
-import { type LandingLang, LANDING_COPY } from "./copy";
+import { LANDING_COPY, type LandingLang } from "./copy";
+import { UPDATED_EN, UPDATED_NB } from "./legal/layout";
 import { LANDING_CSS } from "./styles";
 
 // The public front door. A single self-contained document: inline CSS, no
@@ -77,6 +78,10 @@ export function renderLegalPage({
   // wrong-content bug as a dead ?lang= link, just without the query string.
   const homeHref = lang === "nb" ? "/nb/" : "/";
   const legalPrefix = lang === "nb" ? "/nb" : "";
+  const updated =
+    lang === "nb"
+      ? `Sist oppdatert ${UPDATED_NB}`
+      : `Last updated ${UPDATED_EN}`;
 
   return `<!doctype html>
 <html lang="${c.htmlLang}">
@@ -109,6 +114,7 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
 
 <main id="main" class="wrap legal">
   <h1>${esc(title)}</h1>
+  <p class="legal-updated">${esc(updated)}</p>
   ${body}
 </main>
 

@@ -197,6 +197,33 @@ describe("renderLegalPage", () => {
     expect(nb).not.toContain('<a href="/terms">Vilkår</a>');
   });
 
+  // Regression coverage: the SPA shell this replaced rendered a "Last
+  // updated" / "Sist oppdatert" date under the title, but the constants
+  // (UPDATED_EN / UPDATED_NB) went unreferenced when renderLegalPage was
+  // written, so a GDPR Article 9 privacy policy silently lost its version
+  // date. See legal/layout.tsx for the constants themselves.
+  it("renders the last-updated date under the title, in the page's own language", () => {
+    const en = renderLegalPage({
+      lang: "en",
+      title: "Privacy",
+      body: "<p>body</p>",
+      path: "/privacy",
+      origin: SITE_URL,
+      noindex: false,
+    });
+    expect(en).toContain("Last updated 27 August 2026");
+
+    const nb = renderLegalPage({
+      lang: "nb",
+      title: "Personvern",
+      body: "<p>innhold</p>",
+      path: "/privacy",
+      origin: SITE_URL,
+      noindex: false,
+    });
+    expect(nb).toContain("Sist oppdatert 27. august 2026");
+  });
+
   it("gives each language its own canonical URL", () => {
     const en = renderLegalPage({
       lang: "en",

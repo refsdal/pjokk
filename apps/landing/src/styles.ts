@@ -549,6 +549,11 @@ h1 {
   margin: 0 0 1em;
   color: var(--ink-soft);
 }
+.legal-updated {
+  margin: 0 0 24px;
+  font-size: .88rem;
+  color: var(--muted);
+}
 .legal ul {
   margin: 0 0 1em;
   padding-left: 1.25em;
