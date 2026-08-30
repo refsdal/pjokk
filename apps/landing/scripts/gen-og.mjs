@@ -1,6 +1,9 @@
-// Renders public/og.png — the 1200x630 link-preview card for pjokk.no.
+// Renders apps/landing/public/og.png — the 1200x630 link-preview card for
+// pjokk.no. The landing site is its own deploy with its own asset directory
+// (apps/frontend/public/ keeps the SPA's copy), so this writes here, not
+// there.
 //
-//   node scripts/gen-og.mjs
+//   node apps/landing/scripts/gen-og.mjs
 //
 // Hand-rolled rather than pulled from an image library on purpose: the card
 // is the app icon on the brand background, which is two circles and a

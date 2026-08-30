@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Pjokk</title>
+  <rect width="512" height="512" rx="115" fill="#faf9f7"/>
+  <path d="M330 116a150 150 0 1 0 66 180 118 118 0 0 1-66-180z" fill="#e88d67"/>
+  <circle cx="352" cy="152" r="18" fill="#8b7bd8"/>
+</svg>

@@ -69,6 +69,9 @@ export function renderLegalPage({
   const c = LANDING_COPY[lang];
   const other: LandingLang = lang === "en" ? "nb" : "en";
   const canonicalPath = lang === "nb" ? `/nb${path}` : path;
+  // Document paths, not ?lang= query strings: on a static host the language
+  // is which file you fetch, not a param the (nonexistent) server reads.
+  const otherPath = other === "nb" ? `/nb${path}` : path;
 
   return `<!doctype html>
 <html lang="${c.htmlLang}">
@@ -78,8 +81,8 @@ export function renderLegalPage({
 <title>${esc(title)} — Pjokk</title>
 ${noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
 <link rel="canonical" href="${origin}${canonicalPath}">
-<link rel="alternate" hreflang="en" href="${origin}${path}?lang=en">
-<link rel="alternate" hreflang="nb" href="${origin}${path}?lang=nb">
+<link rel="alternate" hreflang="en" href="${origin}${path}">
+<link rel="alternate" hreflang="nb" href="${origin}/nb${path}">
 <meta name="theme-color" content="#faf9f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#171512" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
@@ -95,7 +98,7 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
       <img src="/icon.svg" alt="" width="34" height="34">
       Pjokk
     </a>
-    <a class="lang" href="${path}?lang=${other}" hreflang="${other}" rel="alternate">${esc(c.otherLang)}</a>
+    <a class="lang" href="${otherPath}" hreflang="${other}" rel="alternate">${esc(c.otherLang)}</a>
   </div>
 </header>
 
@@ -125,6 +128,8 @@ export function renderLandingPage({
   const c = LANDING_COPY[lang];
   const d = c.demo;
   const other: LandingLang = lang === "en" ? "nb" : "en";
+  // Document paths, not ?lang= query strings — see renderLegalPage.
+  const otherPath = other === "nb" ? "/nb/" : "/";
 
   const pointIcons = [icons.eye, icons.bolt, icons.users];
 
@@ -137,15 +142,15 @@ export function renderLandingPage({
 <meta name="description" content="${esc(c.description)}">
 ${noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
 <link rel="canonical" href="${origin}/">
-<link rel="alternate" hreflang="en" href="${origin}/?lang=en">
-<link rel="alternate" hreflang="nb" href="${origin}/?lang=nb">
+<link rel="alternate" hreflang="en" href="${origin}/">
+<link rel="alternate" hreflang="nb" href="${origin}/nb/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Pjokk">
 <meta property="og:title" content="${esc(c.title)}">
 <meta property="og:description" content="${esc(c.description)}">
 <meta property="og:url" content="${origin}/">
 <meta property="og:locale" content="${lang === "nb" ? "nb_NO" : "en_GB"}">
-<!-- Regenerate with: node scripts/gen-og.mjs -->
+<!-- Regenerate with: node apps/landing/scripts/gen-og.mjs -->
 <meta property="og:image" content="${origin}/og.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
@@ -167,7 +172,7 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
       <img src="/icon.svg" alt="" width="34" height="34">
       Pjokk
     </a>
-    <a class="lang" href="/?lang=${other}" hreflang="${other}" rel="alternate">${esc(c.otherLang)}</a>
+    <a class="lang" href="${otherPath}" hreflang="${other}" rel="alternate">${esc(c.otherLang)}</a>
     <a class="btn btn--sm" href="${cta.href}">${esc(cta.label)}</a>
   </div>
 </header>

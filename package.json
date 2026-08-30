@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "bun run --filter @pjokk/frontend dev",
     "dev:server": "bun --watch apps/server/src/main.ts",
-    "build": "bun run build:client && bun run build:server",
+    "build": "bun run build:client && bun run build:server && bun run build:landing",
     "start": "bun apps/server/src/main.ts",
     "cron": "bun apps/server/src/cron-cli.ts",
     "check": "biome check . && node scripts/check-i18n.mjs && bun run typecheck",
@@ -23,7 +23,8 @@
     "migrate": "MIGRATIONS_DIR=apps/api/migrations bun apps/server/src/migrate.ts",
     "seed": "bun scripts/seed.mjs",
     "build:client": "bun run --filter @pjokk/frontend build",
-    "build:server": "bun build apps/server/src/main.ts apps/server/src/cron-cli.ts apps/server/src/migrate.ts --target=bun --outdir=dist/server --sourcemap=linked"
+    "build:server": "bun build apps/server/src/main.ts apps/server/src/cron-cli.ts apps/server/src/migrate.ts --target=bun --outdir=dist/server --sourcemap=linked",
+    "build:landing": "bun run --filter @pjokk/landing build"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.7.2",
