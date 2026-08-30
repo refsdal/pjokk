@@ -13,7 +13,6 @@ import { schema } from "../db";
 import { createApp, iso, isoOrNull, jsonContent } from "../lib";
 import { ensureTombstone, TOMBSTONE_ID } from "../db/tombstone";
 import { audit } from "../middleware/sysadmin";
-import { createStripe } from "../stripe";
 
 // System-admin endpoints (all behind requireSysadmin, wired in index.ts).
 // User-level support ops (ban, sessions, passwords, impersonation) come from
@@ -203,7 +202,7 @@ export const adminApp = createApp<AppEnv>()
     // subscriptions is then simply deleted; one WITH stale subscription rows
     // has them dropped locally below, which is the best that can be done
     // without credentials — and far better than refusing the delete.
-    const stripeClient = createStripe(c.env);
+    const stripeClient = c.var.deps.stripe;
     if (stripeClient) {
       for (const s of subs) {
         if (s.stripeSubscriptionId) {

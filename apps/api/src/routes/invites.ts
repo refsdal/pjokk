@@ -79,12 +79,12 @@ export const invitesAdminApp = createApp<FamEnv>()
       maxUses: body.maxUses,
       createdBy: c.var.sessionData.user.id,
     });
-    return c.json(serInvite(invite, c.env.APP_URL), 201);
+    return c.json(serInvite(invite, c.var.deps.appUrl), 201);
   })
   .openapi(listInvites, async (c) => {
     const invites = await c.var.fam.listInvites();
     return c.json(
-      invites.map((i) => serInvite(i, c.env.APP_URL)),
+      invites.map((i) => serInvite(i, c.var.deps.appUrl)),
       200,
     );
   })

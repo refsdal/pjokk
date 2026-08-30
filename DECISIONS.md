@@ -826,3 +826,176 @@ been true since Phase 3; the vaccine feature only made it obvious.
   under its own `bunfig.toml`. Verified directly: `bun test
   ./apps/api/test/backup.test.ts` from the root gave 3 pass / 1 fail; the
   same file from inside `apps/api` gave 4 pass / 0 fail.
+
+## Composition root (2026-08-28, PR #16)
+
+- **No DI container.** `Deps` is a plain 12-field object, built once by
+  `createDeps(env)` and passed straight into `createApi(deps)`. A container
+  would buy indirection (registration, resolution, lifetime scopes) that this
+  app never needs: there is exactly one composition root, exactly one
+  long-lived instance of each collaborator, and no runtime configuration of
+  which implementation to wire in. A plain object is also what makes the
+  ports (`apps/api/src/ports.ts`) legible as a contract instead of a
+  container's registration side-effects.
+- **Adapters live in `apps/api`, not `apps/server`.** The obvious "ports and
+  adapters" split would put the concrete Drizzle/S3/Stripe implementations in
+  the composition root and only interfaces in the library. That would pull
+  the Drizzle query layer out from under `bun run test`'s real-Postgres
+  suite, which is exactly the coverage this codebase relies on for the
+  dialect traps documented above (bigint counts, `real` precision, unique
+  violation codes). Keeping `apps/api/src/infrastructure/` inside the tested
+  package and exposing it only through the `@pjokk/api/infrastructure`
+  package entry gets both: `apps/server` still only ever sees the `Deps`
+  interface, and the adapters stay exercised by the suite that catches these
+  bugs.
+- **The boundary is enforced by a package entry plus a lint rule, not by
+  convention.** `apps/server` cannot `import` past the `@pjokk/api/infrastructure`
+  entry point even if it tried (no other subpath is exported), and a biome
+  `noRestrictedImports` rule stops `apps/api`'s own routes and middleware from
+  reaching into `../infrastructure` directly instead of going through `Deps`.
+  Two independent mechanisms because either one alone degrades silently: a
+  convention with no enforcement is a comment nobody re-reads six months
+  later.
+- **`AppType` is guarded by a compile-time assertion, not just inferred.**
+  `createApi` must have no explicit return type annotation — an annotation
+  would erase the accumulated Hono route types and silently untype the RPC
+  client the frontend imports. But that failure mode is invisible to every
+  runtime test: the app still boots and answers requests correctly with an
+  untyped client, so nothing in `bun run test` would ever catch a regression.
+  `apps/api/test/app-type.test.ts` exists purely to fail `tsc`, not to run
+  anything, the one place in the suite where a compile error IS the test.
+- **`git log --follow` does not connect `apps/api/src/app.ts` to its
+  `index.ts` history at git's default rename-similarity threshold (50%).**
+  Wrapping the whole file body in `createApi(deps) { ... }` changed enough of
+  the file that git's default diff heuristic doesn't see it as a rename, so
+  `--follow` dead-ends at this PR's commit. `git log --follow -M20% --
+  apps/api/src/app.ts` walks back through the file's full history (verified:
+  1 commit at the default threshold vs. 25 with `-M20%`, back through the
+  Phase 1 route tree). Anyone doing `git blame` archaeology on the route tree
+  needs the lower threshold.
+
+## Landing split (2026-08-30, PR #17)
+
+**Supersedes "Landing page + apex domain (2026-08-27)" above.** That entry
+described the Cloudflare Worker era: the Worker rendered `/` itself, language
+was negotiated per request, and `app.pjokk.no` was retired outright once the
+app moved to the apex. All three are now false, in the direction this PR
+moved things, not back toward the old design — kept below rather than
+edited, per this file's append-only convention.
+
+- **The apex and the app are two separate deploys again, but for a different
+  reason than the pre-2026-08-27 Cloudflare split.** `pjokk.no` is a static
+  site (`apps/landing`) with no server and no JavaScript, built once and
+  published wherever static files are served. `app.pjokk.no` is the
+  container — the SPA and the API — and `/` there IS the app now (the
+  signed-in home screen is still `/home`). This is not `app.pjokk.no` being
+  "un-retired" so much as the apex giving up trying to be both a container
+  route and a public document at once: a static host cannot run the Worker
+  code path the old design needed for `/`, so the app needed its own host
+  back regardless.
+- **Language is chosen at BUILD time, not negotiated per request.** With no
+  server left in front of the apex, there is nothing to read a cookie or
+  `Accept-Language` and decide — `apps/landing/build.ts` emits two complete
+  documents per page (`/`, `/nb/`, `/privacy`, `/nb/privacy`, …), each with
+  the other's `hreflang` alternate, and a crawler or a browser gets whichever
+  URL it requested. The in-app Settings/Login/Join links now pick between
+  them client-side using `getLanguage()` (`apps/frontend/src/lib/site.ts`),
+  the same source of truth the old in-app `LegalPage` used.
+- **The legal bodies are prerendered from their original React components,
+  not rewritten as templates or copied by hand.** `apps/landing/src/legal/`
+  holds the git-mv'd JSX (`privacy.tsx`, `terms.tsx`, the shared `H`/`List`/
+  `ControllerCard` helpers, and the `UPDATED_EN`/`UPDATED_NB` constants);
+  `legal.tsx`'s `renderLegalBody` calls `renderToStaticMarkup` and
+  `page.ts`'s `renderLegalPage` wraps the result in the apex's own shell. A
+  first pass of that shell rendered the title and body but dropped the "Last
+  updated" line the old SPA shell used to show under it — the constants sat
+  unreferenced and neither published document carried a date. Fixed before
+  this shipped: `renderLegalPage` now renders `Last updated {UPDATED_EN}` /
+  `Sist oppdatert {UPDATED_NB}` under the title, with a regression test
+  (`apps/landing/test/render.test.ts`) asserting both languages contain it —
+  a GDPR Article 9 privacy policy silently losing its version date is exactly
+  the kind of thing that must fail a test, not a review.
+- **`INDEXABLE` moved from the container's validated env (`apps/server/src/
+  env.ts`) to a plain `process.env` read in `apps/landing/build.ts`.** The
+  container has nothing to index any more — it is entirely behind auth — so
+  its `robots.txt` and `X-Robots-Tag` are unconditional now, and `INDEXABLE`
+  only controls the landing build's `noindex` meta, `robots.txt` and whether
+  `sitemap.xml` is written at all. Its fail-safe direction had to be
+  preserved across that move and initially wasn't: the container's schema
+  defaulted unset to `"0"` (noindex), but the first landing build read
+  `!== "0"` (defaulting unset to *indexable*) — inverted, so a `test.pjokk.no`
+  landing deploy that forgot to set the variable would have published
+  `Allow: /` and a sitemap, the exact outcome the flag exists to prevent.
+  Fixed to `=== "1"` before this shipped.
+- **`SITE_URL` is a real setting now, not a documented-but-unread one.** It
+  was added to `apps/server/src/env.ts` when `APP_URL` and `SITE_URL` first
+  diverged, but nothing read it except a startup log line — every self-hosted
+  instance's Login/Settings/Join screens linked at `https://pjokk.no`
+  regardless, which means every self-hoster's app would have advertised
+  Refsdal Holding AS's privacy policy as its own. Fixed by exposing it to the
+  SPA at build time as `__SITE_URL__` (a Vite `define`, not
+  `import.meta.env.VITE_*`, since it comes from the same env var the
+  container validates) and building the legal links from it plus
+  `getLanguage()` in `apps/frontend/src/lib/site.ts`.
+- **The service worker no longer denylists `/` from the navigate fallback.**
+  That entry existed so a registered SW would not swallow the
+  Worker-rendered landing page; with `/` now the app's own entry point on
+  `app.pjokk.no`, denylisting it would send root navigations to the network
+  and break offline use at the app's own root — the opposite of the PWA's
+  stated purpose. `apps/frontend/vite.config.ts`'s `navigateFallbackDenylist`
+  is down to `[/^\/api\//]`.
+- **`apps/landing/dist` is not deployed by anything yet.** CI uploads it as a
+  build artifact so a maintainer can grab a commit-pinned copy, but getting
+  it onto the apex (and setting `SITE_URL`/`APP_URL`/`OPEN_SIGNUP`/
+  `INDEXABLE` correctly for that build) is still a manual step — see
+  README.md's "The landing site" section and SMOKE-TEST.md section 9.
+- **The Dockerfile builds `build:client` + `build:server`, not the umbrella
+  `build` script.** The umbrella script now also runs `build:landing`, and
+  the container has no use for the marketing site — a landing-only render
+  failure has no business failing the image build.
+- The duplicated colour-token block the 2026-08-27 entry above locates at
+  `apps/api/src/landing/styles.ts` moved with the rest of the landing code to
+  `apps/landing/src/styles.ts`; keep it in step with
+  `apps/frontend/src/styles.css` as that entry says.
+
+## Distroless (2026-08-30, PR #18)
+
+- **`gcr.io/distroless/base-debian12:nonroot` was chosen for attack surface,
+  not size.** A spike measured both images on the same host: the previous
+  Alpine image is ~118 MB real uncompressed / 47.1 MB compressed; the
+  distroless single-binary image is ~113 MB / 46.8 MB. That is a small,
+  incidental win, not the reason for the change. The reason is that the
+  runtime image now has no shell, no package manager and no `node_modules` —
+  there is nothing in it an attacker who gets code execution can use to
+  install a tool, read a script, or pivot, and nothing for a scanner to flag
+  as a stale package. `HEALTHCHECK` had to become a dispatcher subcommand
+  (`/app/dispatch healthcheck`) for exactly this reason: there is no shell
+  left to run the old `bun -e "fetch(...)"` one-liner.
+- **`docker images` over-reports size on this host by roughly the size of the
+  compressed image itself.** This host's containerd-snapshotter backend keeps
+  both the unpacked snapshot and the compressed blob on disk and
+  `docker images` sums something closer to both, so it reports each image
+  here as roughly 47 MB heavier than it actually is. `docker export | wc -c`
+  (or `docker save`) is ground truth — it reads the actual layer content, not
+  the snapshotter's bookkeeping. Anyone comparing image sizes on a
+  containerd-snapshotter host needs to use one of those, not `docker images`,
+  or every comparison looks like the images grew by the same fixed offset.
+- **`dispatch.ts` selects its mode with static imports, not a dynamic
+  `import()` per branch.** `bun build --compile` bundles a dynamically
+  imported branch as a lazily-initialised chunk, which breaks
+  module-initialisation ordering inside the compiled binary: it crashed with
+  "tsyringe requires a reflect polyfill" at startup. tsyringe arrives
+  transitively via better-auth's passkey support through `@peculiar/x509`,
+  and its decorators need `reflect-metadata` to have already run by the time
+  any module that uses them is evaluated — an ordering a dynamic import does
+  not guarantee inside a compiled binary. Verified during the spike; the fix
+  is `import { runCron } from "./cron-cli"` etc. at the top of the file for
+  all four modes, unconditionally, with the branch only choosing which
+  already-initialised function to call.
+- **`createDeps` is not the only place that constructs a `Deps`-adjacent
+  object from scratch.** `apps/server/src/migrate.ts` calls `createDb`
+  directly rather than going through `createDeps`/`createApi` — the migrator
+  needs only the database, runs as a one-off outside the request path, and
+  building a whole `Deps` (auth, storage, push, Stripe, …) for it would be
+  dead weight in an image that has no server listening. `apps/server/src/deps.ts`'s
+  docstring documents this exception inline.

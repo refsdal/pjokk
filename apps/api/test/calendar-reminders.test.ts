@@ -3,8 +3,8 @@ import {
   api,
   createUser,
   db,
+  deps,
   rig,
-  services,
   setPlan,
   signIn,
 } from "./helpers";
@@ -18,7 +18,7 @@ import {
 } from "bun:test";
 import { eq } from "drizzle-orm";
 import { schema } from "../src/db";
-import { clockFmt, runCalendarReminders } from "../src/scheduled";
+import { clockFmt, runCalendarReminders } from "../src/jobs/calendar-reminders";
 
 const SUB_KEYS = {
   p256dh:
@@ -98,12 +98,12 @@ describe("calendar reminders", () => {
     });
 
     // Inside the lead window: one push per member, then silence.
-    expect(await runCalendarReminders(services, now)).toBe(2);
+    expect(await runCalendarReminders(deps, now)).toBe(2);
     expect(delivered.sort()).toEqual([
       `${PUSH_ORIGIN}/cal/admin`,
       `${PUSH_ORIGIN}/cal/other`,
     ]);
-    expect(await runCalendarReminders(services, now + 15 * 60_000)).toBe(0);
+    expect(await runCalendarReminders(deps, now + 15 * 60_000)).toBe(0);
   });
 
   it("targets only assignees when set", async () => {
@@ -122,7 +122,7 @@ describe("calendar reminders", () => {
       remindMinutesBefore: 60,
       assigneeUserIds: [other.id],
     });
-    expect(await runCalendarReminders(services, now)).toBe(1);
+    expect(await runCalendarReminders(deps, now)).toBe(1);
     expect(delivered).toEqual([`${PUSH_ORIGIN}/cal2/other`]);
   });
 
@@ -143,7 +143,7 @@ describe("calendar reminders", () => {
       remindMinutesBefore: 60,
     });
     // Simulate downtime: the sweep first runs 2h after the past event started.
-    expect(await runCalendarReminders(services, now + 3 * HOUR)).toBe(0);
+    expect(await runCalendarReminders(deps, now + 3 * HOUR)).toBe(0);
     expect(delivered).toHaveLength(0);
 
     const rows = await db()
@@ -161,8 +161,9 @@ describe("calendar reminders", () => {
     // The pushed body itself isn't observable through the fetch stub above —
     // web-push encrypts the JSON payload (aes128gcm) before the HTTP call,
     // so the stub only ever sees ciphertext bytes. clockFmt is exported from
-    // scheduled.ts specifically so this regression (a 14:00 CEST appointment
-    // rendering as "12:00") can be asserted directly at the unit level.
+    // calendar-reminders.ts specifically so this regression (a 14:00 CEST
+    // appointment rendering as "12:00") can be asserted directly at the unit
+    // level.
     // 2026-08-25T12:00:00Z is during CEST (UTC+2) → 14:00 Oslo-local.
     expect(clockFmt.format(new Date("2026-08-25T12:00:00Z"))).toBe("14:00");
     // Winter (CET, UTC+1) sanity check too.
@@ -179,6 +180,6 @@ describe("calendar reminders", () => {
       startTime: new Date(now + 30 * 60_000).toISOString(),
       remindMinutesBefore: 60,
     });
-    expect(await runCalendarReminders(services, now)).toBe(1);
+    expect(await runCalendarReminders(deps, now)).toBe(1);
   });
 });

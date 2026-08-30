@@ -1,8 +1,8 @@
-import { SELF, api, createUser, db, rig, services, signIn } from "./helpers";
+import { SELF, api, createUser, db, deps, rig, signIn } from "./helpers";
 import { describe, expect, it } from "bun:test";
 import { eq } from "drizzle-orm";
 import { schema } from "../src/db";
-import { purgeOrphanUsers } from "../src/scheduled";
+import { purgeOrphanUsers } from "../src/jobs/plans";
 
 describe("security hardening", () => {
   it("rate-limits password sign-in attempts (H1)", async () => {
@@ -68,7 +68,7 @@ describe("security hardening", () => {
       .set({ createdAt: old })
       .where(eq(schema.user.id, memberUser.id));
 
-    const purged = await purgeOrphanUsers(services);
+    const purged = await purgeOrphanUsers(deps);
     expect(purged).toBeGreaterThanOrEqual(1);
 
     const remaining = (
@@ -85,6 +85,17 @@ describe("security hardening", () => {
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
     expect(res.headers.get("x-frame-options")).toBe("DENY");
     expect(res.headers.get("strict-transport-security")).toContain("max-age");
+  });
+
+  // Moved from the deleted apps/api/test/landing.test.ts (PR #17): the app
+  // host stopped serving the public site, so every other case in that file
+  // tested a route or a language-selection helper that no longer exists.
+  // robots.txt is the one thing that survives, now unconditional.
+  it("serves an unconditional Disallow at /robots.txt", async () => {
+    const res = await SELF.fetch("http://localhost/robots.txt");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/plain");
+    expect(await res.text()).toBe("User-agent: *\nDisallow: /\n");
   });
 });
 

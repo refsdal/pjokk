@@ -10,7 +10,6 @@ import {
 import type { FamEnv } from "../context";
 import { schema } from "../db";
 import { createApp, jsonContent } from "../lib";
-import { pushToUser } from "../push";
 
 const okSchema = z.object({ ok: z.literal(true) });
 
@@ -108,7 +107,7 @@ const test = createRoute({
 
 export const pushApp = createApp<FamEnv>()
   .openapi(config, (c) => {
-    return c.json({ publicKey: c.env.VAPID_PUBLIC_KEY }, 200);
+    return c.json({ publicKey: c.var.deps.vapidPublicKey }, 200);
   })
   .openapi(subscribe, async (c) => {
     const body = c.req.valid("json");
@@ -192,7 +191,7 @@ export const pushApp = createApp<FamEnv>()
     return c.json({ feedReminderHours: body.feedReminderHours }, 200);
   })
   .openapi(test, async (c) => {
-    const sent = await pushToUser(c.var.db, c.env, c.var.sessionData.user.id, {
+    const sent = await c.var.deps.push.toUser(c.var.sessionData.user.id, {
       title: "Pjokk",
       body: "Push works on this device ✅",
       url: "/home",

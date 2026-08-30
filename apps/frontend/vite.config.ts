@@ -8,12 +8,22 @@ import path from "node:path";
 // apps/api and apps/server directly, so there is no build step for it and no
 // @cloudflare/vite-plugin to stitch the two halves together.
 //
-// robots.txt, sitemap.xml and the security headers used to be emitted here,
-// keyed on CLOUDFLARE_ENV — which is why production and test needed separate
-// builds of the same commit. They are served by the app now (see
-// apps/api/src/index.ts and apps/server/src/main.ts), so this output is
-// environment-independent and one image can be promoted between them.
+// robots.txt and the security headers used to be emitted here, keyed on
+// CLOUDFLARE_ENV — which is why production and test needed separate builds
+// of the same commit. robots.txt and the security headers are served by the
+// app now (see apps/api/src/app.ts and apps/server/src/main.ts), so this
+// output is environment-independent and one image can be promoted between
+// them. sitemap.xml no longer lives here at all: the app host is entirely
+// behind auth and has nothing to index, so the sitemap moved with the rest
+// of the public site to apps/landing.
 export default defineConfig({
+  // The public apex the SPA links its legal pages to (see lib/site.ts). A
+  // plain define, not import.meta.env.VITE_*, because it comes from the same
+  // SITE_URL variable the server validates (apps/server/src/env.ts) and is
+  // baked into the client bundle at build time, not read at runtime.
+  define: {
+    __SITE_URL__: JSON.stringify(process.env.SITE_URL ?? "https://pjokk.no"),
+  },
   build: {
     // Where main.ts serves static files from (STATIC_DIR).
     outDir: "../../dist/client",
@@ -29,7 +39,6 @@ export default defineConfig({
       "/healthz": "http://localhost:3000",
       "/readyz": "http://localhost:3000",
       "/robots.txt": "http://localhost:3000",
-      "/sitemap.xml": "http://localhost:3000",
     },
   },
   plugins: [
@@ -68,11 +77,12 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,svg,woff2}"],
         // Push + notification-click handlers live beside the generated SW.
         importScripts: ["push-sw.js"],
-        // The SPA shell must never swallow API/auth routes — nor "/", which
-        // the server renders as the landing page. Without that second entry a
-        // registered service worker would answer the root from the precached
-        // app shell and the landing page would never be seen again.
-        navigateFallbackDenylist: [/^\/api\//, /^\/$/],
+        // The SPA shell must never swallow API/auth routes. "/" used to be
+        // denylisted too, back when the server rendered a landing page there
+        // — but on app.pjokk.no "/" IS the app, so denylisting it would send
+        // root navigations to the network and break offline use at the
+        // app's own entry point, defeating the point of precaching the shell.
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             // Never cache auth; NetworkFirst for other API GETs so the

@@ -1,4 +1,4 @@
-import { api, db, rig, services } from "./helpers";
+import { api, db, deps, rig } from "./helpers";
 import {
   afterAll,
   beforeAll,
@@ -9,7 +9,7 @@ import {
 } from "bun:test";
 import { eq } from "drizzle-orm";
 import { schema } from "../src/db";
-import { runReminders } from "../src/scheduled";
+import { runReminders } from "../src/jobs/reminders";
 
 // A plausible browser subscription (P-256 public key + auth secret).
 const SUB_KEYS = {
@@ -184,22 +184,22 @@ describe("web push", () => {
 
     // Last feed 2h ago: below the 3h threshold — nothing sent.
     await feedAt(2 * 3600_000);
-    expect(await runReminders(services, now)).toBe(0);
+    expect(await runReminders(deps, now)).toBe(0);
     expect(delivered).toHaveLength(0);
 
     // 4h later the gap exceeds 3h: exactly one push.
     const later = now + 4 * 3600_000;
-    expect(await runReminders(services, later)).toBe(1);
+    expect(await runReminders(deps, later)).toBe(1);
     expect(delivered).toHaveLength(1);
 
     // Same gap, next cron run: already reminded — silent.
-    expect(await runReminders(services, later + 15 * 60_000)).toBe(0);
+    expect(await runReminders(deps, later + 15 * 60_000)).toBe(0);
     expect(delivered).toHaveLength(1);
 
     // A new feed starts a new gap; once IT exceeds 3h, remind again.
     await feedAt(-(4.2 * 3600_000)); // logged at now+4.2h
     const evenLater = now + 8 * 3600_000;
-    expect(await runReminders(services, evenLater)).toBe(1);
+    expect(await runReminders(deps, evenLater)).toBe(1);
     expect(delivered).toHaveLength(2);
   });
 });

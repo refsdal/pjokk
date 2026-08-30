@@ -53,8 +53,8 @@ export function rateLimit(opts: {
             // The peer address, which only the Bun server handle knows.
             // Absent (in tests, or before the server is listening) callers
             // share the "unknown" bucket — safe, just coarse.
-            c.env.server?.requestIP(c.req.raw)?.address ?? null,
-            c.env.TRUSTED_PROXY_HOPS,
+            c.var.deps.peerAddress(c.req.raw),
+            c.var.deps.trustedProxyHops,
           );
     // Hashed, never the address itself. KV forced this — it was globally
     // replicated with no jurisdiction option — and the counters now live in

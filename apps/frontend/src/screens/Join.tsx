@@ -1,11 +1,12 @@
-import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useState } from "react";
 import { ErrorState } from "@/components/QueryStates";
 import { Button } from "@/components/ui/button";
 import { api, unwrap } from "@/lib/api";
 import { authClient, signIn, useSession } from "@/lib/auth-client";
 import { t } from "@/lib/i18n";
+import { legalUrl } from "@/lib/site";
 import { toast } from "@/lib/toast";
 
 interface InviteInfo {
@@ -119,16 +120,18 @@ export function JoinScreen() {
           )}
 
           {/* Shown at the moment of consent, not buried in Settings: joining
-              a family means recording a child's health information. */}
+              a family means recording a child's health information.
+              Plain anchors, not <Link>: these pages left the SPA in the
+              landing split (PR #17) and now live on the public apex. */}
           <p className="text-xs leading-relaxed text-muted">
             {t("By joining you accept our")}{" "}
-            <Link to="/terms" className="font-semibold text-accent">
+            <a href={legalUrl("terms")} className="font-semibold text-accent">
               {t("Terms")}
-            </Link>{" "}
+            </a>{" "}
             {t("and")}{" "}
-            <Link to="/privacy" className="font-semibold text-accent">
+            <a href={legalUrl("privacy")} className="font-semibold text-accent">
               {t("Privacy policy")}
-            </Link>
+            </a>
             {t(
               ", including that Pjokk stores health information about your child.",
             )}

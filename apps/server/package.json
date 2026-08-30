@@ -8,6 +8,7 @@
     "@pjokk/shared": "workspace:*"
   },
   "scripts": {
+    "test": "bun test",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   }
 }

@@ -8,6 +8,8 @@
       "*.ts",
       "!apps/frontend/src/data",
       "!apps/api/migrations/meta",
+      "!apps/landing/dist",
+      "!.claude",
       "!scripts/import-sprout-track.mjs"
     ]
   },
@@ -26,7 +28,30 @@
     "rules": {
       "preset": "recommended",
       "style": {
-        "noNonNullAssertion": "off"
+        "noNonNullAssertion": "off",
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": {
+              "../infrastructure": "Routes and middleware receive their collaborators through Deps. Importing an adapter directly bypasses injection — the same class of mistake as bypassing the family scope.",
+              "../infrastructure/index": "Routes and middleware receive their collaborators through Deps. Importing an adapter directly bypasses injection.",
+              "../../infrastructure": "Routes and middleware receive their collaborators through Deps. Importing an adapter directly bypasses injection.",
+              "../../infrastructure/index": "Routes and middleware receive their collaborators through Deps. Importing an adapter directly bypasses injection.",
+              "../infrastructure/db": "Use deps.db.",
+              "../infrastructure/auth": "Use deps.auth.",
+              "../infrastructure/storage": "Use deps.storage.",
+              "../infrastructure/rate-limit": "Use deps.rateLimit.",
+              "../infrastructure/push": "Use deps.push.",
+              "../infrastructure/stripe": "Use deps.stripe.",
+              "../../infrastructure/db": "Use deps.db.",
+              "../../infrastructure/auth": "Use deps.auth.",
+              "../../infrastructure/storage": "Use deps.storage.",
+              "../../infrastructure/rate-limit": "Use deps.rateLimit.",
+              "../../infrastructure/push": "Use deps.push.",
+              "../../infrastructure/stripe": "Use deps.stripe."
+            }
+          }
+        }
       },
       "correctness": {
         "useExhaustiveDependencies": "warn"
@@ -39,5 +64,30 @@
         "organizeImports": "off"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["apps/api/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@pjokk/api/infrastructure": "Routes and middleware receive their collaborators through Deps. Importing an adapter directly bypasses injection.",
+                  "@pjokk/api/infrastructure/db": "Use deps.db.",
+                  "@pjokk/api/infrastructure/auth": "Use deps.auth.",
+                  "@pjokk/api/infrastructure/storage": "Use deps.storage.",
+                  "@pjokk/api/infrastructure/rate-limit": "Use deps.rateLimit.",
+                  "@pjokk/api/infrastructure/push": "Use deps.push.",
+                  "@pjokk/api/infrastructure/stripe": "Use deps.stripe."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

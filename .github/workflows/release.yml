@@ -17,8 +17,8 @@ name: Release
 # container runs is deployment infrastructure this repo does not own. Rolling
 # out means, in order:
 #
-#   1. `bun migrate.js` as a one-off (Job / initContainer / compose `migrate`
-#      service). Before the new image serves traffic: migrations are
+#   1. `/app/dispatch migrate` as a one-off (Job / initContainer / compose
+#      `migrate` service). Before the new image serves traffic: migrations are
 #      append-only, so old code running briefly against a newer schema is
 #      safe, whereas new code against an older schema is not.
 #   2. Point the deployment at the new tag and let the rollout proceed.
@@ -120,7 +120,9 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://pjokk.no
+      # The artifact this job publishes is the container image, which serves
+      # the app — not the static landing site on the apex.
+      url: https://app.pjokk.no
     permissions:
       contents: write   # creating the git tag
       packages: write

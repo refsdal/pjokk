@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
+    ".": "./src/app.ts",
     "./db": "./src/db/index.ts",
+    "./infrastructure": "./src/infrastructure/index.ts",
     "./*": "./src/*.ts"
   },
   "dependencies": {
