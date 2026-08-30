@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="public/icon.svg" alt="Pjokk" width="96" height="96" />
+  <img src="apps/landing/public/icon.svg" alt="Pjokk" width="96" height="96" />
 
   # Pjokk
 
@@ -37,18 +37,160 @@ It is a from-scratch replacement for
 mobile-first and shipped as a single container — one image, a Postgres, and
 somewhere to put files.
 
+## Quick start
+
+Nothing to clone, nothing to build:
+
+```sh
+curl -O https://raw.githubusercontent.com/refsdal/pjokk/main/docker-compose.selfhost.yml
+
+BETTER_AUTH_SECRET=$(openssl rand -base64 32) \
+S3_SECRET_ACCESS_KEY=$(openssl rand -base64 24) \
+  docker compose -f docker-compose.selfhost.yml up -d
+```
+
+That brings up Postgres, MinIO for files, applies the migrations as a one-off
+job, and starts the app on <http://localhost:3000>.
+
+To create the first account, start it once with `OPEN_SIGNUP=1`, sign in, then
+set it back to `0` — after that, accounts exist only through invite codes.
+Put those two secrets in a `.env` file next to the compose file so they survive
+a restart; **if `BETTER_AUTH_SECRET` changes, every existing session is
+invalidated.**
+
+Already running Postgres and an S3 bucket? Skip the compose file entirely:
+
+```sh
+docker run -d --name pjokk -p 3000:3000 \
+  -e DATABASE_URL='postgres://user:pass@host:5432/pjokk' \
+  -e APP_URL='https://pjokk.example.com' \
+  -e BETTER_AUTH_SECRET='...' \
+  -e S3_BUCKET='pjokk-files' \
+  -e S3_ENDPOINT='https://s3.eu-north-1.amazonaws.com' \
+  -e S3_ACCESS_KEY_ID='...' -e S3_SECRET_ACCESS_KEY='...' \
+  -e SCHEDULER=1 \
+  ghcr.io/refsdal/pjokk:latest
+```
+
+Run `docker run --rm ... ghcr.io/refsdal/pjokk:latest migrate` first — see
+[Upgrading](#upgrading).
+
+## Self-hosting
+
+The image is `ghcr.io/refsdal/pjokk` — `:latest`, `:<version>`, or
+`:sha-<sha>` to pin exactly. It runs anywhere a container does, as one process
+serving both the SPA and the API.
+
+### Configuration
+
+Environment variables only, validated at startup — a bad value stops the
+process with a message naming the problem rather than surfacing later as a
+puzzling 500. **Seven are required:**
+
+| Variable | What it is |
+|---|---|
+| `DATABASE_URL` | libpq connection string, e.g. `postgres://pjokk:pw@db:5432/pjokk` |
+| `APP_URL` | The public origin people type. better-auth signs cookies and builds OAuth callbacks from it, so a wrong value breaks sign-in in ways that look like anything except a configuration error |
+| `BETTER_AUTH_SECRET` | `openssl rand -base64 32`. Changing it invalidates every session |
+| `S3_BUCKET` | Bucket for vaccine documents and the nightly backups |
+| `S3_ENDPOINT` | Full endpoint URL. Required rather than inferred from a region — guessing is how data ends up in the wrong jurisdiction |
+| `S3_ACCESS_KEY_ID` | |
+| `S3_SECRET_ACCESS_KEY` | |
+
+The ones you will most likely also want:
+
+| Variable | Default | Effect |
+|---|---|---|
+| `SCHEDULER` | `0` | `1` runs reminders, the nightly backup and its prune in-process. **Leave at `0` under Kubernetes** — see below |
+| `TRUSTED_PROXY_HOPS` | `0` | Number of proxies in front. At `0` the rate limiter ignores `X-Forwarded-For`, because it is caller-supplied and trusting it blindly lets anyone mint a fresh bucket per request |
+| `OPEN_SIGNUP` | `0` | The founder-bootstrap escape hatch. `1` allows account creation without an invite |
+| `PORT` | `3000` | |
+
+`GOOGLE_*` enables Google sign-in, `VAPID_*` enables web push, `STRIPE_*`
+enables billing. Absent means the feature is simply off — the app logs which
+subsystems are disabled at startup rather than failing.
+[`.env.example`](.env.example) documents every variable.
+
+### Scheduled work
+
+Reminders, the nightly backup and the 30-day backup prune run on two
+schedules: `frequent` every 15 minutes, `nightly` at 03:15 UTC.
+
+**One container:** set `SCHEDULER=1` and the process runs them itself.
+
+**Kubernetes or several replicas:** leave `SCHEDULER=0` and drive them from
+CronJobs against the same image, or every replica fires every reminder:
+
+```sh
+/app/dispatch cron frequent     # */15 * * * *
+/app/dispatch cron nightly      # 15 3 * * *
+```
+
+Set `concurrencyPolicy: Forbid` — the in-process scheduler will not overlap a
+run with itself, but Kubernetes has no such guarantee unless told.
+
+### Upgrading
+
+**Run migrations as a one-off before the new image serves traffic.** Never at
+startup: replicas would race to apply the same DDL.
+
+```sh
+docker run --rm -e DATABASE_URL=... [other required vars] \
+  ghcr.io/refsdal/pjokk:<new-version> migrate
+```
+
+Under Kubernetes that is a Job or an initContainer; with the compose file it is
+the `migrate` service, which already runs before the app starts.
+
+### Backups
+
+With the scheduler running, the app writes a JSON snapshot of every table to
+`backups/YYYY-MM-DD.json` in your bucket each night, and prunes snapshots older
+than **30 days** — the window the privacy policy commits to for a deletion to
+take full effect.
+
+A row dump rather than `pg_dump`, so the image needs no Postgres client binary,
+and the result stays portable across whatever runs the database.
+
+Two things to know before you rely on it:
+
+- **Restores are manual.** There is no restore command. The snapshot is
+  `{ exportedAt, tables: { <table>: [rows...] } }` — readable, and insertable
+  in foreign-key order, but you are writing that script yourself.
+- **Password hashes are excluded** from the `account` table on purpose. A
+  restore therefore loses email/password logins; Google and passkey users are
+  unaffected. That is the deliberate trade — a snapshot in object storage
+  should not be a credential database.
+
+If that is not enough for you, take an ordinary `pg_dump` of the same database
+on your own schedule. The two are complementary.
+
+### Behind a proxy
+
+`APP_URL` must be the address people actually type, including `https://`.
+Set `TRUSTED_PROXY_HOPS` to the number of proxies in front. `/healthz` is
+liveness (it touches nothing, so a slow query cannot turn into a restart loop);
+`/readyz` additionally checks Postgres and is what a readiness probe wants.
+
+### Where your data lives
+
+Every stateful part — Postgres, the object store, and any backup of either —
+holds health information about a child. If that matters to you legally, note
+that region selection is now a **deployment-time** choice: pick the region when
+you provision the database and the bucket, and check the backup target too. The
+nightly snapshot contains every table, so a bucket in the wrong place undoes
+the arrangement.
+
 ## How it's built
 
-Two deploys. The container is one Bun process serving the SPA (app.pjokk.no,
-`/` onwards) and the API under `/api` — it is entirely behind auth and has
-nothing public to say. The marketing page and the legal documents (privacy,
-terms) are a separate static site, `apps/landing`, published to the apex
-(pjokk.no) with no server and no JavaScript of its own; the app links out to
-it, and it links back with the sign-in/get-started call to action.
+Two deploys. The container is one Bun process serving the SPA and the API under
+`/api` — entirely behind auth, with nothing public to say. The marketing page
+and the legal documents are a separate static site, `apps/landing`, published
+to the apex with no server and no JavaScript of its own.
 
 | Layer | Choice |
 |---|---|
-| Runtime | Bun in a container (one process: static assets + API) |
+| Runtime | Bun, compiled to a single binary on a distroless base — no shell, no package manager, no `node_modules` in the runtime image |
 | API | Hono + `@hono/zod-openapi` — zod schemas drive validation, OpenAPI (Scalar at `/api/docs`), and the typed RPC client |
 | Data | Drizzle ORM + Postgres; any S3-compatible store for files (MinIO in the compose stack) |
 | Auth | better-auth — Google + email/passkey, Organizations plugin (an organization *is* a family), invite-code redeem as the only signup door |
@@ -60,21 +202,12 @@ Every domain table carries a `familyId`, and all data access flows through
 family-scoped query helpers behind a tenancy middleware — cross-family access
 is structurally impossible, and tested to stay that way.
 
-## Running it
+`apps/api` is a library that receives its collaborators: `apps/server` builds a
+`Deps` object once at startup and hands it to `createApi(deps)`. Nothing in the
+API constructs a database connection or reads `process.env`, which is what
+makes the test suite cheap to write.
 
-The whole stack — app, Postgres, MinIO — in one command:
-
-```sh
-cp .env.example .env          # set BETTER_AUTH_SECRET (openssl rand -base64 32)
-docker compose up             # http://localhost:3000
-```
-
-Migrations are applied by a one-off `migrate` service before the app starts,
-and the bucket is created by `minio-init`. To create the first account, set
-`OPEN_SIGNUP=1`, sign in once, then set it back to `0` — after that, accounts
-only exist through invite codes.
-
-### Development
+## Development
 
 ```sh
 bun install
@@ -89,31 +222,14 @@ Sign in locally with `anders@pjokk.local` / `pjokk-dev`.
 
 ```sh
 bun run test            # against the Postgres from docker-compose.test.yml
-bun run check           # lint + typecheck (shared, api, server, frontend)
-bun run build           # build the SPA
+bun run check           # lint + typecheck (every package)
+bun run build           # SPA, server binary, and the landing site
 ```
 
-Configuration is environment variables only — see `.env.example`, which
-documents every one. It is validated at startup, so a bad value stops the
-process with a message naming the problem rather than surfacing later as a
-puzzling 500.
-
-### Deploying
-
-The image runs anywhere a container does. Two rules:
-
-1. **Run migrations as a one-off before the new image serves traffic**
-   (`/app/dispatch migrate` inside the image — a Job, an initContainer, or
-   the compose `migrate` service). Never at app startup: replicas would race.
-2. **Under Kubernetes, leave `SCHEDULER=0`** and drive `/app/dispatch cron
-   nightly` and `/app/dispatch cron frequent` from CronJobs. The in-process
-   scheduler is for
-   single-container deployments; with N replicas it fires every reminder N
-   times.
-
-Behind a reverse proxy, set `TRUSTED_PROXY_HOPS` to the number of proxies in
-front, or the rate limiter cannot tell clients apart. `/healthz` is liveness,
-`/readyz` additionally checks Postgres.
+`docker-compose.yml` builds from source and is the contributor's stack;
+`docker-compose.selfhost.yml` pulls the published image and is the
+self-hoster's. They are deliberately separate so a self-hoster never needs the
+repository.
 
 ### Versioning and images
 
@@ -137,38 +253,39 @@ ghcr.io/refsdal/pjokk:branch-<branch>
 ```
 
 The **Release** workflow (manual dispatch, `dry_run` on by default) builds,
-pushes `:<version>`, `:latest` and `:sha-<sha>`, then creates the git tag —
-in that order, so a failed push never leaves a tag pointing at an image that
-does not exist.
+pushes `:<version>`, `:latest` and `:sha-<sha>`, then creates the git tag — in
+that order, so a failed push never leaves a tag pointing at an image that does
+not exist.
 
 ## Repository layout
 
 ```
-packages/shared/  @pjokk/shared   zod schemas — the single source of truth for API shapes
-apps/api/          @pjokk/api      Hono API, better-auth factory, tenancy middleware, Drizzle schema
-  ├─ migrations/                   Postgres migrations (drizzle-kit)
-  └─ test/                         bun tests, run against a real Postgres
-apps/server/        @pjokk/server   the composition root: builds Deps once and dispatches to
+packages/shared/   @pjokk/shared    zod schemas — the single source of truth for API shapes
+apps/api/          @pjokk/api       Hono API, tenancy middleware, Drizzle schema, jobs
+  ├─ infrastructure/                the adapters: db, storage, auth, stripe, push, rate limit
+  ├─ migrations/                    Postgres migrations (drizzle-kit)
+  └─ test/                          bun tests, run against a real Postgres
+apps/server/       @pjokk/server    the composition root: builds Deps once and dispatches to
                                     the web server, cron, migrate or healthcheck mode
-apps/frontend/      @pjokk/frontend React SPA (screens, log sheets, offline plumbing) + its tests
-apps/landing/       @pjokk/landing  static marketing + legal site for the apex — see below
+apps/frontend/     @pjokk/frontend  React SPA (screens, log sheets, offline plumbing) + tests
+apps/landing/      @pjokk/landing   static marketing + legal site for the apex — see below
 ```
 
 ### The landing site (apps/landing)
 
-Separate from the container, and not built or published by it — the
-Dockerfile deliberately runs only `build:client` + `build:server`, so a
-landing-only render failure never fails the image build (see DECISIONS.md,
-"Landing split"). Build the landing site with:
+Separate from the container, and not built or published by it — the Dockerfile
+deliberately runs only `build:client` + `build:server`, so a landing-only
+render failure never fails the image build (see DECISIONS.md, "Landing split").
+Build it with:
 
 ```sh
 SITE_URL=https://pjokk.no APP_URL=https://app.pjokk.no OPEN_SIGNUP=0 INDEXABLE=1 \
-  bun run build:landing        # or: bun run --filter @pjokk/landing build
+  bun run build:landing
 ```
 
-Output lands in `apps/landing/dist/` — a plain static tree (HTML, CSS, an
-icon, an OG image, `robots.txt`, `sitemap.xml`) to upload to whatever serves
-the apex. Four environment variables, all optional (defaults shown):
+Output lands in `apps/landing/dist/` — a plain static tree (HTML, CSS, an icon,
+an OG image, `robots.txt`, `sitemap.xml`) to upload to whatever serves the
+apex. Four environment variables, all optional (defaults shown):
 
 | Var | Default | Effect |
 |---|---|---|
@@ -177,9 +294,11 @@ the apex. Four environment variables, all optional (defaults shown):
 | `OPEN_SIGNUP` | off (`0`) | CTA copy: "Get started" vs "Sign in" |
 | `INDEXABLE` | off (fail-safe: only `"1"` turns it on) | `noindex` meta + `robots.txt` + whether `sitemap.xml` is written at all — leave unset on every host except the production apex |
 
-CI uploads `apps/landing/dist` as a build artifact (see `.github/workflows/ci.yml`)
-so a maintainer can download and publish it without a local build, but nothing
-deploys it automatically yet — publishing to the apex is still a manual step.
+CI uploads `apps/landing/dist` as a build artifact (see
+`.github/workflows/ci.yml`) so a maintainer can download and publish it without
+a local build, but nothing deploys it automatically yet.
+
+---
 
 `CLAUDE.md` is the project constitution (product principles, stack decisions,
 roadmap). `DECISIONS.md` logs the boring choices made along the way.

@@ -1,0 +1,144 @@
+# Pjokk, self-hosted, from the published image:
+#
+#   BETTER_AUTH_SECRET=$(openssl rand -base64 32) \
+#     docker compose -f docker-compose.selfhost.yml up -d
+#
+# Nothing to clone and nothing to build — this pulls ghcr.io/refsdal/pjokk.
+# Contributors want docker-compose.yml instead, which builds from source; the
+# two files are deliberately separate so a self-hoster never needs the repo.
+#
+# What runs: Postgres for the data, MinIO for files (vaccine documents and the
+# nightly backups), a one-off migration job, and the app with its in-process
+# scheduler — a single container has no orchestrator to drive cron for it.
+#
+# Already have Postgres and an S3 bucket? Skip this file: run the image
+# directly and point DATABASE_URL and the four S3_* variables at them. See the
+# README's "Self-hosting" section.
+
+name: pjokk
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pjokk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pjokk}
+      POSTGRES_DB: pjokk
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      # -d as well as -U: without the database name pg_isready reports ready
+      # while the init scripts are still creating it, and the migration job
+      # then fails on a database that does not exist yet.
+      test: ["CMD-SHELL", "pg_isready -U pjokk -d pjokk"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio:
+    image: quay.io/minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-pjokkfiles}
+      MINIO_ROOT_PASSWORD: "${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY — this is a real credential, not a dev default}"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Creates the bucket, then exits. MinIO has no "create bucket on boot"
+  # setting, and the app deliberately does not create buckets itself: an app
+  # that can create a bucket can also create the wrong one, in the wrong
+  # region, and nobody notices until the data is somewhere unintended.
+  minio-init:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+      mc alias set local http://minio:9000
+      '${S3_ACCESS_KEY_ID:-pjokkfiles}' '${S3_SECRET_ACCESS_KEY:?}' &&
+      mc mb --ignore-existing local/${S3_BUCKET:-pjokk-files} &&
+      echo 'bucket ready'
+      "
+
+  # Applies pending migrations, then exits. A separate one-off rather than
+  # something the app does at startup: drizzle's migrator does not coordinate
+  # between processes, so scaling the app to two replicas would have them race
+  # to apply the same DDL. This is also the upgrade step — see the README.
+  migrate:
+    image: ghcr.io/refsdal/pjokk:${PJOKK_TAG:-latest}
+    command: ["migrate"]
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://pjokk:${POSTGRES_PASSWORD:-pjokk}@db:5432/pjokk
+      # The configuration is validated as a whole even for a migration, so the
+      # required keys must be present here too.
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?generate one with: openssl rand -base64 32}"
+      S3_BUCKET: ${S3_BUCKET:-pjokk-files}
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-pjokkfiles}
+      S3_SECRET_ACCESS_KEY: "${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY — this is a real credential, not a dev default}"
+
+  app:
+    image: ghcr.io/refsdal/pjokk:${PJOKK_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgres://pjokk:${POSTGRES_PASSWORD:-pjokk}@db:5432/pjokk
+
+      # The public origin people type. Behind a reverse proxy with TLS this is
+      # your https:// address, not localhost — better-auth signs cookies and
+      # builds OAuth callbacks from it, so a wrong value breaks sign-in in ways
+      # that look like anything except a configuration error.
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?generate one with: openssl rand -base64 32}"
+
+      S3_BUCKET: ${S3_BUCKET:-pjokk-files}
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-pjokkfiles}
+      S3_SECRET_ACCESS_KEY: "${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY — this is a real credential, not a dev default}"
+
+      # One container, no orchestrator to run CronJobs — so reminders, the
+      # nightly backup and its 30-day prune run in-process. Leave this OFF
+      # under Kubernetes and drive `dispatch cron <job>` from CronJobs instead,
+      # or every replica fires every reminder.
+      SCHEDULER: "1"
+
+      # The only door to a first account. Set to 1, sign in once, set it back
+      # to 0 — after that, accounts exist only through invite codes.
+      OPEN_SIGNUP: ${OPEN_SIGNUP:-0}
+
+      # Behind a reverse proxy, set this to the number of proxies in front —
+      # otherwise the rate limiter ignores X-Forwarded-For (by design, since it
+      # is caller-supplied) and buckets every client together.
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-0}
+
+      # Optional subsystems. Absent means the feature is simply off, and the
+      # app logs which ones at startup rather than failing.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+
+volumes:
+  db-data:
+  minio-data:
