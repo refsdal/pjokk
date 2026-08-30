@@ -226,11 +226,17 @@ apps/server/
 ├── src/
 │   ├── env.ts        zod schema, parsed at boot   (was src/server/config.ts)
 │   ├── deps.ts       createDeps(env: Env): Deps
-│   ├── index.ts      Bun.serve · static SPA · SPA fallback · security headers
-│   │                 · robots.txt · SIGTERM drain
+│   ├── main.ts       runServer(): Bun.serve · static SPA · SPA fallback
+│   │                 · security headers · robots.txt · SIGTERM drain
 │   ├── cron.ts       SCHEDULES · runJob(job, deps) · startScheduler(deps)
-│   ├── cron-cli.ts   one-shot `bun cron-cli.js <nightly|frequent>`
-│   └── migrate.ts    one-off migration job
+│   ├── cron-cli.ts   runCron(job): one-shot job runner
+│   ├── migrate.ts    runMigrate(): one-off migration job
+│   └── dispatch.ts   the compiled binary's entrypoint — one process, four
+│                      modes (`/app/dispatch`, `cron <job>`, `migrate`,
+│                      `healthcheck`), routing to the exported functions
+│                      above via STATIC imports (a dynamic import breaks
+│                      module-initialisation order inside a `--compile`
+│                      binary — see DECISIONS.md)
 ├── test/             env parsing (was test/config.test.ts)
 └── Dockerfile        build context is the repo root
 ```
@@ -330,9 +336,9 @@ forward unchanged; it is recorded here so the move does not quietly break it.
 
 | Mode | Workload | Command | `SCHEDULER` |
 |---|---|---|---|
-| Web only, N replicas | Deployment | `bun main.js` (default CMD) | `0` |
-| Cron only | CronJob | `bun cron-cli.js nightly` / `frequent` | unset |
-| All-in-one | Deployment, 1 replica | `bun main.js` | `1` |
+| Web only, N replicas | Deployment | `/app/dispatch` (default ENTRYPOINT) | `0` |
+| Cron only | CronJob | `/app/dispatch cron nightly` / `frequent` | unset |
+| All-in-one | Deployment, 1 replica | `/app/dispatch` | `1` |
 
 Three properties make this safe, all of them verified in the current code and
 all of them worth preserving deliberately:
@@ -469,18 +475,23 @@ truncates every table.
 
 ## Build and image
 
-Piece 1 keeps the current two-stage build: `vite build` for the SPA,
-`bun build --target=bun` for the three server entrypoints, and a runtime stage
-with no `node_modules` at all. The Dockerfile **stays at the repo root**. It
-needs the root as its build context regardless, because a workspace install
-needs the root `package.json` and `bun.lock` plus every member's manifest — and
-nothing references it by path: CI and `docker-compose.yml` both rely on the
-default root location, so moving it under `apps/server/` would mean adding
-explicit `-f` flags in several places and buy nothing. (An earlier draft of
-this spec said it moves; PR #15 did not move it, deliberately.)
+Piece 1 keeps the current two-stage build: `vite build` for the SPA and a
+build stage for the server. (PR #18, "distroless", later replaced the
+server's three-bundle `bun build --target=bun` output with a single
+`dispatch.ts` compiled via `bun build --compile`, and swapped the runtime
+base from Alpine to `gcr.io/distroless/base-debian12:nonroot` — see
+DECISIONS.md. Neither change moved the Dockerfile or the build context.) The
+Dockerfile **stays at the repo root**. It needs the root as its build context
+regardless, because a workspace install needs the root `package.json` and
+`bun.lock` plus every member's manifest — and nothing references it by path:
+CI and `docker-compose.yml` both rely on the default root location, so moving
+it under `apps/server/` would mean adding explicit `-f` flags in several
+places and buy nothing. (An earlier draft of this spec said it moves; PR #15
+did not move it, deliberately.)
 
 `migrations/` moves under `apps/api/` but is still copied into the image as
-data — `migrate.js` reads the SQL at run time, so it is not part of any bundle.
+data — the migrator reads the SQL at run time, so it is not part of the
+compiled binary.
 
 The landing site is a separate CI artifact and is **not** copied into the
 container.
@@ -542,19 +553,27 @@ once `migrations/` moves under `apps/api/`. It becomes
 setting `MIGRATIONS_DIR=apps/api/migrations`. The image leaves it unset and is
 unaffected.
 
-The `--compile` spike runs during #16's review and must answer, with evidence
-rather than assertion:
+The `--compile` spike ran during #16's review and answered these, with
+evidence rather than assertion (resolved in PR #18, "distroless" — see
+DECISIONS.md):
 
-- Does the standalone binary link against glibc or musl, and which distroless
-  base actually runs it?
-- Does `--asset` correctly embed `migrations/*.sql` and `dist/client`, and are
-  they readable at the paths the code expects?
-- One binary with a subcommand dispatcher, or three binaries? The image
-  currently gets three entrypoints from one build (`main.js`, `cron-cli.js`,
-  `migrate.js`), and a Kubernetes CronJob depends on running the deployed image.
-- What is the actual size delta? The Bun runtime alone is ~80 MB against a
-  current image of ~165 MB, so the win is real but not dramatic — worth
-  measuring before committing to it.
+- **glibc, not musl.** The binary is compiled inside a Debian-based `oven/bun`
+  image and runs on `gcr.io/distroless/base-debian12:nonroot`; an
+  Alpine-built binary would not link against that base's glibc.
+- **No `--asset` embedding.** `migrations/*.sql` and `dist/client` are copied
+  into the image as plain files alongside the binary, not embedded in it —
+  the migrator and the static-file server both read them from disk at their
+  existing relative paths, unchanged.
+- **One binary with a subcommand dispatcher** (`dispatch.ts`), not three.
+  Static imports only: a dynamic `import()` per branch gets bundled as a
+  lazily-initialised chunk, which broke module-initialisation order inside
+  the compiled binary and crashed on tsyringe's reflect-metadata polyfill
+  (tsyringe arrives via better-auth's passkey support through
+  `@peculiar/x509`).
+- **The size delta was real but small, and was not the point.** Measured
+  ~113 MB against the previous ~118 MB. The reason for the change is the
+  absence of a shell, a package manager and `node_modules` in the runtime
+  image, i.e. attack surface — not size.
 
 ## Out-of-repo checklist for PR #17
 

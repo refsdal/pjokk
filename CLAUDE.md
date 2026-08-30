@@ -47,7 +47,7 @@ app. Test environment: **test.pjokk.no**.
   others"). Serve interactive docs with Scalar at `/api/docs`.
 - Drizzle ORM + Postgres (`drizzle-orm/bun-sql`, Bun's native client).
   Migrations via drizzle-kit generate → `bun run migrate` from source, or
-  `bun migrate.js` in the image. Run as a ONE-OFF job. Never at app startup: drizzle's migrator does not coordinate
+  `/app/dispatch migrate` in the image. Run as a ONE-OFF job. Never at app startup: drizzle's migrator does not coordinate
   between processes, so replicas would race to apply the same DDL.
 - Any S3-compatible store for files (MinIO in compose; S3/R2/Ceph in
   production). Never a public bucket — stream through an authed Hono route
@@ -57,7 +57,7 @@ app. Test environment: **test.pjokk.no**.
   "[object ReadableStream]" if handed one.
 - A `rate_limit` Postgres table for rate-limiting counters.
 - Scheduled work (reminders, nightly backup) runs via `bun run cron
-  <nightly|frequent>` from source, `bun cron-cli.js <job>` in the image. The
+  <nightly|frequent>` from source, `/app/dispatch cron <job>` in the image. The
   in-process scheduler (`apps/server/src/cron.ts`, opt-in via `SCHEDULER=1`)
   uses Bun's builtin `Bun.cron` with `tz: "UTC"` explicit (the image sets no
   `TZ`, and the 30-day backup retention window is a privacy-policy commitment

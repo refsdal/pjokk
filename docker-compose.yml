@@ -70,7 +70,7 @@ services:
   # to apply the same DDL.
   migrate:
     build: .
-    command: ["bun", "migrate.js"]
+    command: ["migrate"]
     restart: "no"
     depends_on:
       db:
@@ -109,12 +109,10 @@ services:
 
       # One container, no orchestrator to run CronJobs — so the scheduler runs
       # in-process. Leave this OFF under Kubernetes and drive
-      # `bun cron-cli.js <job>` from a CronJob instead, or every replica fires
+      # `dispatch cron <job>` from a CronJob instead, or every replica fires
       # every reminder.
       SCHEDULER: "1"
 
-      # A local stack is not on the public internet and must not be indexed.
-      INDEXABLE: ${INDEXABLE:-0}
       OPEN_SIGNUP: ${OPEN_SIGNUP:-0}
 
       # Behind a reverse proxy, set this to the number of proxies in front —

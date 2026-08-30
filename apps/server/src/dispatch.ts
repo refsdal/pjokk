@@ -20,6 +20,10 @@ if (mode === "cron") {
 } else if (mode === "healthcheck") {
   // distroless has no shell, so Docker's HEALTHCHECK runs this instead of
   // the old `bun -e "fetch(...)"` one-liner.
+  //
+  // Reads process.env.PORT directly rather than through loadEnv() on
+  // purpose: a liveness probe should not fail just because DATABASE_URL or
+  // the S3 vars are unset or wrong — those belong to /readyz, not here.
   const port = process.env.PORT ?? "3000";
   const res = await fetch(`http://127.0.0.1:${port}/healthz`).catch(() => null);
   process.exit(res?.ok ? 0 : 1);

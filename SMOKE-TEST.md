@@ -37,7 +37,7 @@ email/password.
 Apply migrations as a one-off **before** the app serves traffic:
 
 ```sh
-bun migrate.js                  # inside the image; or the compose `migrate` service
+/app/dispatch migrate           # inside the image; or the compose `migrate` service
 ```
 
 ## 1. Founder account (bootstrap)
@@ -94,14 +94,14 @@ bun migrate.js                  # inside the image; or the compose `migrate` ser
     the gap; you get at most one nudge per gap.
 
     Reminders need the scheduler to be running — either `SCHEDULER=1` on a
-    single container, or a CronJob invoking `bun cron-cli.js frequent`. If
+    single container, or a CronJob invoking `/app/dispatch cron frequent`. If
     nothing runs it, no reminder ever fires and the app looks broken in a way
     the logs will not explain.
 18. Backups: after the nightly job, `backups/YYYY-MM-DD.json` appears in the
     bucket. Force one to check the wiring without waiting:
 
     ```sh
-    bun cron-cli.js nightly      # in the image (bun run cron from source)
+    /app/dispatch cron nightly   # in the image (bun run cron from source)
     ```
 
 ## 6. PWA + polish
@@ -126,7 +126,7 @@ bun migrate.js                  # inside the image; or the compose `migrate` ser
     invite redeem degrades to a shared-fate 429. Verify by signing in wrongly
     21 times from one IP and confirming a second IP is unaffected.
 26. **Under Kubernetes, `SCHEDULER` must be 0** and the two jobs driven by
-    CronJobs (`bun cron-cli.js nightly` at 03:15 UTC, `bun cron-cli.js
+    CronJobs (`/app/dispatch cron nightly` at 03:15 UTC, `/app/dispatch cron
     frequent` every 15 min). With N replicas the in-process scheduler fires every
     reminder N times.
 

@@ -873,3 +873,45 @@ been true since Phase 3; the vaccine feature only made it obvious.
   1 commit at the default threshold vs. 25 with `-M20%`, back through the
   Phase 1 route tree). Anyone doing `git blame` archaeology on the route tree
   needs the lower threshold.
+
+## Distroless (2026-08-30, PR #18)
+
+- **`gcr.io/distroless/base-debian12:nonroot` was chosen for attack surface,
+  not size.** A spike measured both images on the same host: the previous
+  Alpine image is ~118 MB real uncompressed / 47.1 MB compressed; the
+  distroless single-binary image is ~113 MB / 46.8 MB. That is a small,
+  incidental win, not the reason for the change. The reason is that the
+  runtime image now has no shell, no package manager and no `node_modules` —
+  there is nothing in it an attacker who gets code execution can use to
+  install a tool, read a script, or pivot, and nothing for a scanner to flag
+  as a stale package. `HEALTHCHECK` had to become a dispatcher subcommand
+  (`/app/dispatch healthcheck`) for exactly this reason: there is no shell
+  left to run the old `bun -e "fetch(...)"` one-liner.
+- **`docker images` over-reports size on this host by roughly the size of the
+  compressed image itself.** This host's containerd-snapshotter backend keeps
+  both the unpacked snapshot and the compressed blob on disk and
+  `docker images` sums something closer to both, so it reports each image
+  here as roughly 47 MB heavier than it actually is. `docker export | wc -c`
+  (or `docker save`) is ground truth — it reads the actual layer content, not
+  the snapshotter's bookkeeping. Anyone comparing image sizes on a
+  containerd-snapshotter host needs to use one of those, not `docker images`,
+  or every comparison looks like the images grew by the same fixed offset.
+- **`dispatch.ts` selects its mode with static imports, not a dynamic
+  `import()` per branch.** `bun build --compile` bundles a dynamically
+  imported branch as a lazily-initialised chunk, which breaks
+  module-initialisation ordering inside the compiled binary: it crashed with
+  "tsyringe requires a reflect polyfill" at startup. tsyringe arrives
+  transitively via better-auth's passkey support through `@peculiar/x509`,
+  and its decorators need `reflect-metadata` to have already run by the time
+  any module that uses them is evaluated — an ordering a dynamic import does
+  not guarantee inside a compiled binary. Verified during the spike; the fix
+  is `import { runCron } from "./cron-cli"` etc. at the top of the file for
+  all four modes, unconditionally, with the branch only choosing which
+  already-initialised function to call.
+- **`createDeps` is not the only place that constructs a `Deps`-adjacent
+  object from scratch.** `apps/server/src/migrate.ts` calls `createDb`
+  directly rather than going through `createDeps`/`createApi` — the migrator
+  needs only the database, runs as a one-off outside the request path, and
+  building a whole `Deps` (auth, storage, push, Stripe, …) for it would be
+  dead weight in an image that has no server listening. `apps/server/src/deps.ts`'s
+  docstring documents this exception inline.

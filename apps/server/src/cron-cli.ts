@@ -2,7 +2,8 @@ import { isJob, JOBS, runJob } from "./cron";
 import { loadEnv } from "./env";
 import { createDeps } from "./deps";
 
-// One-shot cron entrypoint: `bun run apps/server/src/cron-cli.ts <job>`.
+// One-shot cron job runner, invoked via the `dispatch.ts` binary:
+// `/app/dispatch cron <job>` in the image, `bun run cron <job>` from source.
 //
 // This is what a Kubernetes CronJob invokes. It runs the job once, then
 // exits with a status the scheduler can act on — a failed backup should show
