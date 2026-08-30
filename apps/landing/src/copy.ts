@@ -109,7 +109,7 @@ const en: LandingCopy = {
   ],
   privacyTitle: "Your child's data stays in Europe",
   privacyBody:
-    "Pjokk is run from Norway by Refsdal Holding AS. Every database, file and backup is pinned to Cloudflare's EU jurisdiction — not a location preference, an actual guarantee. Nothing is sold, and this page carries no third-party trackers.",
+    "Pjokk is run from Norway by Refsdal Holding AS. Every database, file and backup lives in the EU. Nothing is sold, and this page carries no third-party trackers.",
   storyTitle: "Built by parents, for parents",
   storyBody: [
     "When our daughter arrived we were as unsure as everyone else. Was she eating enough? Was it normal to pee this much? Had she taken less today than yesterday — and would we even notice if she had?",
@@ -177,7 +177,7 @@ const nb: LandingCopy = {
   ],
   privacyTitle: "Barnets data blir værende i Europa",
   privacyBody:
-    "Pjokk drives fra Norge av Refsdal Holding AS. Hver database, fil og sikkerhetskopi er låst til Cloudflares EU-jurisdiksjon — ikke en preferanse, men en garanti. Ingenting selges videre, og denne siden har ingen sporing fra tredjepart.",
+    "Pjokk drives fra Norge av Refsdal Holding AS. Hver database, fil og sikkerhetskopi ligger i EU. Ingenting selges videre, og denne siden har ingen sporing fra tredjepart.",
   storyTitle: "Laget av foreldre, for foreldre",
   storyBody: [
     "Da datteren vår ble født, var vi like usikre som alle andre. Spiste hun nok? Var det normalt at hun tisset så mye? Hadde hun fått i seg mindre i dag enn i går — og ville vi i det hele tatt merket det?",
