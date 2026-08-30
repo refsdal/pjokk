@@ -778,13 +778,54 @@ ENTRYPOINT ["/app/dispatch"]
 `:nonroot` already runs as uid 65532, so there is no `USER` line and no
 `adduser` — the base image provides it.
 
-- [ ] **Step 2: Update every command that invoked the old entrypoints**
+- [ ] **Step 2a: Fix the four root scripts that are now silent no-ops**
 
-The three commands change shape. Find every caller:
+Task 5 turned each entrypoint's module body into an exported function, so
+running the file no longer *does* anything. Four scripts in the root
+`package.json` still invoke them directly and now exit successfully having
+done nothing:
+
+```json
+    "dev:server": "bun --watch apps/server/src/dispatch.ts",
+    "start": "bun apps/server/src/dispatch.ts",
+    "cron": "bun apps/server/src/dispatch.ts cron",
+    "migrate": "MIGRATIONS_DIR=apps/api/migrations bun apps/server/src/dispatch.ts migrate",
+```
+
+Verify each actually runs afterwards — a script that exits 0 without working is
+exactly the failure mode being fixed:
 
 ```bash
-grep -rn 'main\.js\|cron-cli\.js\|migrate\.js' . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist
+bun run migrate 2>&1 | tail -3     # must reach the database, not exit silently
+bun run cron 2>&1 | tail -3        # must print the usage error and exit 2
 ```
+
+- [ ] **Step 2b: Update every command that invoked the old entrypoints**
+
+The three commands change shape. **Two greps, not one** — the first finds the
+built bundle names, the second finds callers that reference the TypeScript
+sources. The `.js` grep alone misses the root scripts entirely, which is how
+Step 2a's breakage went unnoticed:
+
+```bash
+grep -rn 'main\.js\|cron-cli\.js\|migrate\.js' . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist --exclude-dir=.superpowers
+grep -rn 'apps/server/src/\(main\|cron-cli\|migrate\)\.ts' . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist --exclude-dir=.superpowers
+```
+
+Files that must be updated: `Dockerfile`, `docker-compose.yml`,
+`.github/workflows/ci.yml`, `.github/workflows/release.yml`, `README.md`,
+`CLAUDE.md`, `SMOKE-TEST.md`, and
+`docs/superpowers/specs/2026-08-28-workspace-restructure-design.md`.
+
+Files that also match but must **not** be changed — they are dated records of
+what was true when written, the same convention `DECISIONS.md` follows:
+`docs/superpowers/plans/2026-08-28-workspace-move.md`,
+`docs/superpowers/plans/2026-08-28-composition-root.md`, and this plan itself
+apart from these instructions.
+
+Also remove `docker-compose.yml`'s now-inert `INDEXABLE` variable: the app host
+no longer has an indexability switch, and leaving it there misinforms anyone
+reading that file to learn the deployment contract.
 
 `bun main.js` → the default `ENTRYPOINT`; `bun cron-cli.js <job>` →
 `["/app/dispatch", "cron", "<job>"]`; `bun migrate.js` →
