@@ -72,6 +72,11 @@ export function renderLegalPage({
   // Document paths, not ?lang= query strings: on a static host the language
   // is which file you fetch, not a param the (nonexistent) server reads.
   const otherPath = other === "nb" ? `/nb${path}` : path;
+  // Every link on the page must stay inside the current language's document
+  // tree — a Norwegian page linking to an English document is the same
+  // wrong-content bug as a dead ?lang= link, just without the query string.
+  const homeHref = lang === "nb" ? "/nb/" : "/";
+  const legalPrefix = lang === "nb" ? "/nb" : "";
 
   return `<!doctype html>
 <html lang="${c.htmlLang}">
@@ -94,7 +99,7 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
 
 <header class="site-header">
   <div class="wrap">
-    <a class="brand" href="/">
+    <a class="brand" href="${homeHref}">
       <img src="/icon.svg" alt="" width="34" height="34">
       Pjokk
     </a>
@@ -110,8 +115,8 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
 <footer class="site-footer">
   <div class="wrap">
     <span>&copy; 2026 Refsdal Holding AS</span>
-    <a href="/privacy">${esc(c.footerPrivacy)}</a>
-    <a href="/terms">${esc(c.footerTerms)}</a>
+    <a href="${legalPrefix}/privacy">${esc(c.footerPrivacy)}</a>
+    <a href="${legalPrefix}/terms">${esc(c.footerTerms)}</a>
     <a class="spacer" href="mailto:personvern@pjokk.no">personvern@pjokk.no</a>
   </div>
 </footer>
@@ -130,6 +135,10 @@ export function renderLandingPage({
   const other: LandingLang = lang === "en" ? "nb" : "en";
   // Document paths, not ?lang= query strings — see renderLegalPage.
   const otherPath = other === "nb" ? "/nb/" : "/";
+  // Same rule as renderLegalPage: every link stays inside the current
+  // language's document tree.
+  const homeHref = lang === "nb" ? "/nb/" : "/";
+  const legalPrefix = lang === "nb" ? "/nb" : "";
 
   const pointIcons = [icons.eye, icons.bolt, icons.users];
 
@@ -141,14 +150,14 @@ export function renderLandingPage({
 <title>${esc(c.title)}</title>
 <meta name="description" content="${esc(c.description)}">
 ${noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
-<link rel="canonical" href="${origin}/">
+<link rel="canonical" href="${origin}${homeHref}">
 <link rel="alternate" hreflang="en" href="${origin}/">
 <link rel="alternate" hreflang="nb" href="${origin}/nb/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Pjokk">
 <meta property="og:title" content="${esc(c.title)}">
 <meta property="og:description" content="${esc(c.description)}">
-<meta property="og:url" content="${origin}/">
+<meta property="og:url" content="${origin}${homeHref}">
 <meta property="og:locale" content="${lang === "nb" ? "nb_NO" : "en_GB"}">
 <!-- Regenerate with: node apps/landing/scripts/gen-og.mjs -->
 <meta property="og:image" content="${origin}/og.png">
@@ -168,7 +177,7 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
 
 <header class="site-header">
   <div class="wrap">
-    <a class="brand" href="/">
+    <a class="brand" href="${homeHref}">
       <img src="/icon.svg" alt="" width="34" height="34">
       Pjokk
     </a>
@@ -274,8 +283,8 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
 <footer class="site-footer">
   <div class="wrap">
     <span>&copy; 2026 Refsdal Holding AS</span>
-    <a href="/privacy">${esc(c.footerPrivacy)}</a>
-    <a href="/terms">${esc(c.footerTerms)}</a>
+    <a href="${legalPrefix}/privacy">${esc(c.footerPrivacy)}</a>
+    <a href="${legalPrefix}/terms">${esc(c.footerTerms)}</a>
     <a class="spacer" href="mailto:personvern@pjokk.no">personvern@pjokk.no</a>
   </div>
 </footer>
