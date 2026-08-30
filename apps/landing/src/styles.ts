@@ -520,6 +520,60 @@ h1 {
   font-weight: 700;
 }
 
+/* ---------- legal pages ---------- */
+
+/* The bodies here are prerendered from the SPA's own React components
+   (renderToStaticMarkup — see legal.tsx), so they still carry the Tailwind
+   utility class names those components were written with (text-sm, text-ink,
+   list-disc, …). This package has no Tailwind build, so those class names are
+   inert; style by element instead, scoped to .legal so nothing here leaks
+   into the marketing page above. */
+
+.legal {
+  max-width: 640px;
+  padding-block: 40px 96px;
+}
+.legal h1 {
+  margin: 0 0 4px;
+  font-size: clamp(1.7rem, 5vw, 2.2rem);
+  font-weight: 800;
+  letter-spacing: -.02em;
+}
+.legal h2 {
+  margin: 28px 0 8px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: -.01em;
+}
+.legal p {
+  margin: 0 0 1em;
+  color: var(--ink-soft);
+}
+.legal ul {
+  margin: 0 0 1em;
+  padding-left: 1.25em;
+  color: var(--ink-soft);
+}
+.legal ul li {
+  margin-bottom: .4em;
+}
+/* ControllerCard's own utility classes, reproduced as plain rules. */
+.legal .text-sm {
+  font-size: .88rem;
+}
+.legal .text-muted {
+  color: var(--muted);
+}
+.legal .font-semibold {
+  font-weight: 700;
+}
+.legal .text-accent {
+  color: var(--accent);
+}
+.legal a {
+  text-decoration: underline;
+}
+
 /* ---------- footer ---------- */
 
 .site-footer {

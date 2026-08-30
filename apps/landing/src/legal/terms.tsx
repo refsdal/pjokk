@@ -1,22 +1,6 @@
-import {
-  ADDRESS_EN,
-  ADDRESS_NB,
-  COMPANY,
-  H,
-  type Lang,
-  LegalPage,
-  ORG_NR,
-} from "./layout";
+import { ADDRESS_EN, ADDRESS_NB, COMPANY, H, ORG_NR } from "./layout";
 
-export function TermsScreen() {
-  return (
-    <LegalPage titles={{ en: "Terms", nb: "Vilkår" }}>
-      {(lang: Lang) => (lang === "nb" ? <Nb /> : <En />)}
-    </LegalPage>
-  );
-}
-
-function En() {
+export function En() {
   return (
     <>
       <p>
@@ -122,7 +106,7 @@ function En() {
   );
 }
 
-function Nb() {
+export function Nb() {
   return (
     <>
       <p>

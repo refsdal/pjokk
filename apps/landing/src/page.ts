@@ -39,6 +39,83 @@ function esc(s: string): string {
     .replaceAll('"', "&quot;");
 }
 
+export interface LegalPageOptions {
+  lang: LandingLang;
+  /** "Privacy" / "Personvern", "Terms" / "Vilkår" — supplied by the caller
+   *  rather than hardcoded here, since page.ts has no notion of "documents". */
+  title: string;
+  /** Prerendered body markup — see legal.tsx's renderLegalBody. */
+  body: string;
+  /** Path without a language prefix, e.g. "/privacy". Used for canonical +
+   *  hreflang; the Norwegian document lives at "/nb" + path. */
+  path: string;
+  /** Absolute origin, for canonical + hreflang URLs. */
+  origin: string;
+  /** True on anything that is not the production host. */
+  noindex: boolean;
+}
+
+/** Shell for the legal documents: same head/header/footer as the landing
+ *  page, a plain title + prerendered body in between. No hero, no demo, no
+ *  CTA beyond the shared header/footer links. */
+export function renderLegalPage({
+  lang,
+  title,
+  body,
+  path,
+  origin,
+  noindex,
+}: LegalPageOptions): string {
+  const c = LANDING_COPY[lang];
+  const other: LandingLang = lang === "en" ? "nb" : "en";
+  const canonicalPath = lang === "nb" ? `/nb${path}` : path;
+
+  return `<!doctype html>
+<html lang="${c.htmlLang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>${esc(title)} — Pjokk</title>
+${noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
+<link rel="canonical" href="${origin}${canonicalPath}">
+<link rel="alternate" hreflang="en" href="${origin}${path}?lang=en">
+<link rel="alternate" hreflang="nb" href="${origin}${path}?lang=nb">
+<meta name="theme-color" content="#faf9f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171512" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon.svg">
+<style>${LANDING_CSS}</style>
+</head>
+<body>
+<a class="skip" href="#main">${esc(c.skipToContent)}</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/">
+      <img src="/icon.svg" alt="" width="34" height="34">
+      Pjokk
+    </a>
+    <a class="lang" href="${path}?lang=${other}" hreflang="${other}" rel="alternate">${esc(c.otherLang)}</a>
+  </div>
+</header>
+
+<main id="main" class="wrap legal">
+  <h1>${esc(title)}</h1>
+  ${body}
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <span>&copy; 2026 Refsdal Holding AS</span>
+    <a href="/privacy">${esc(c.footerPrivacy)}</a>
+    <a href="/terms">${esc(c.footerTerms)}</a>
+    <a class="spacer" href="mailto:personvern@pjokk.no">personvern@pjokk.no</a>
+  </div>
+</footer>
+</body>
+</html>`;
+}
+
 export function renderLandingPage({
   lang,
   cta,

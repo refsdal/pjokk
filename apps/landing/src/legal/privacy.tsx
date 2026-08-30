@@ -1,22 +1,6 @@
-import {
-  COMPANY,
-  CONTACT,
-  ControllerCard,
-  H,
-  type Lang,
-  LegalPage,
-  List,
-} from "./layout";
+import { COMPANY, CONTACT, ControllerCard, H, List } from "./layout";
 
-export function PrivacyScreen() {
-  return (
-    <LegalPage titles={{ en: "Privacy", nb: "Personvern" }}>
-      {(lang: Lang) => (lang === "nb" ? <Nb /> : <En />)}
-    </LegalPage>
-  );
-}
-
-function En() {
+export function En() {
   return (
     <>
       <p>
@@ -196,7 +180,7 @@ function En() {
   );
 }
 
-function Nb() {
+export function Nb() {
   return (
     <>
       <p>
