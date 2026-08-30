@@ -72,7 +72,5 @@ export function createDeps(
     vapidPublicKey: env.VAPID_PUBLIC_KEY,
     stripePriceLifetime: env.STRIPE_PRICE_PREMIUM_LIFETIME,
     trustedProxyHops: env.TRUSTED_PROXY_HOPS,
-    openSignup: env.OPEN_SIGNUP === "1",
-    indexable: env.INDEXABLE === "1",
   };
 }

@@ -75,8 +75,6 @@ export const deps: Deps = {
   vapidPublicKey: vapid.publicKey,
   stripePriceLifetime: "price_test_lifetime",
   trustedProxyHops: 0,
-  openSignup: false,
-  indexable: false,
 };
 
 // Kept for the handful of test files that predate Deps and still say

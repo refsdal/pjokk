@@ -30,8 +30,8 @@ export type Deps = {
    *  legitimately has none. Built once at startup, not per request. */
   stripe: Stripe | null;
 
-  /** Public origin. Used for OAuth callbacks, absolute links in push
-   *  payloads, and the sitemap. */
+  /** Public origin. Used for OAuth callbacks and absolute links in push
+   *  payloads. */
   appUrl: string;
   /** Handed to the client so it can subscribe; the private half never
    *  leaves apps/server's process memory. */
@@ -40,8 +40,4 @@ export type Deps = {
   stripePriceLifetime: string;
   /** How many proxies sit in front. 0 means X-Forwarded-For is not read. */
   trustedProxyHops: number;
-  /** Landing-page switches. Both leave in PR #17 with the landing page —
-   *  they are here because that page still lives in this package. */
-  openSignup: boolean;
-  indexable: boolean;
 };

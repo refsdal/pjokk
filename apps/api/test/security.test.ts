@@ -86,6 +86,17 @@ describe("security hardening", () => {
     expect(res.headers.get("x-frame-options")).toBe("DENY");
     expect(res.headers.get("strict-transport-security")).toContain("max-age");
   });
+
+  // Moved from the deleted apps/api/test/landing.test.ts (PR #17): the app
+  // host stopped serving the public site, so every other case in that file
+  // tested a route or a language-selection helper that no longer exists.
+  // robots.txt is the one thing that survives, now unconditional.
+  it("serves an unconditional Disallow at /robots.txt", async () => {
+    const res = await SELF.fetch("http://localhost/robots.txt");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/plain");
+    expect(await res.text()).toBe("User-agent: *\nDisallow: /\n");
+  });
 });
 
 describe("safe user deletion (M5)", () => {

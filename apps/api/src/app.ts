@@ -4,7 +4,6 @@ import { createMiddleware } from "hono/factory";
 import type { AppEnv, FamEnv } from "./context";
 import type { Deps } from "./deps";
 import { createApp } from "./lib";
-import { landing } from "./landing";
 import {
   requireAdmin,
   requireFamily,
@@ -42,11 +41,11 @@ export function createApi(deps: Deps) {
   const app = createApp<AppEnv>();
 
   // Hands each request the collaborators the process built once at startup.
-  // Registered on "/*", not "/api/*": the landing, robots.txt, sitemap.xml,
-  // /healthz and /readyz routes below all read `deps` from this function's
-  // closure, not from `c.var`, so the wider match is not load-bearing for
-  // them — it exists only so every /api/* handler downstream can rely on
-  // c.var being populated without re-deriving that per route.
+  // Registered on "/*", not "/api/*": robots.txt, /healthz and /readyz below
+  // all read `deps` from this function's closure, not from `c.var`, so the
+  // wider match is not load-bearing for them — it exists only so every
+  // /api/* handler downstream can rely on c.var being populated without
+  // re-deriving that per route.
   app.use("/*", async (c, next) => {
     c.set("deps", deps);
     c.set("db", deps.db);
@@ -56,42 +55,12 @@ export function createApi(deps: Deps) {
     await next();
   });
 
-  // The public landing page. Registered first so it wins over the static-file
-  // handler that main.ts appends: on Workers this precedence came from naming
-  // "/" in the assets run_worker_first list, here it is simply route order.
-  // Not an OpenAPI route — it returns HTML, not part of the API surface.
-  app.get("/", landing);
-
-  // robots.txt and sitemap.xml. These used to be emitted at BUILD time by a
-  // vite plugin keyed on CLOUDFLARE_ENV, which is why production and test
-  // needed separately-built bundles. Serving them from the app makes INDEXABLE
-  // a runtime switch, so one image can be promoted from test to production.
+  // The app host is entirely behind auth and has nothing to index. The public
+  // site (marketing + legal pages, robots.txt, sitemap.xml) lives on the apex
+  // now, built as its own static site by apps/landing — see PR #17.
   app.get("/robots.txt", (c) => {
-    const body = deps.indexable
-      ? `User-agent: *\nAllow: /\n\nSitemap: ${new URL("/sitemap.xml", deps.appUrl)}\n`
-      : "User-agent: *\nDisallow: /\n";
     c.header("Content-Type", "text/plain; charset=utf-8");
-    return c.body(body);
-  });
-
-  app.get("/sitemap.xml", (c) => {
-    // Nothing to advertise for an environment that must stay unindexed.
-    if (!deps.indexable) return c.notFound();
-    const origin = new URL(deps.appUrl).origin;
-    // One public page; a hand-written sitemap is honest and cheaper than
-    // generating one from a route tree that is entirely behind auth.
-    c.header("Content-Type", "application/xml; charset=utf-8");
-    return c.body(`<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
-  <url>
-    <loc>${origin}/</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="${origin}/?lang=en"/>
-    <xhtml:link rel="alternate" hreflang="nb" href="${origin}/?lang=nb"/>
-  </url>
-  <url><loc>${origin}/privacy</loc></url>
-  <url><loc>${origin}/terms</loc></url>
-</urlset>
-`);
+    return c.body("User-agent: *\nDisallow: /\n");
   });
 
   // Liveness: answers as long as the process is up. Deliberately touches

@@ -92,18 +92,21 @@ export function SettingsScreen() {
 
         <SectionTitle>{t("About")}</SectionTitle>
         <Card className="divide-y divide-line p-0">
-          <Link
-            to="/privacy"
+          {/* Plain anchors, not <Link>: these pages left the SPA in the
+              landing split (PR #17) and now live on the public apex, where
+              they are prerendered and readable without an account. */}
+          <a
+            href="https://pjokk.no/privacy"
             className="block px-4 py-3 font-semibold text-ink active:bg-surface-2"
           >
             {t("Privacy policy")}
-          </Link>
-          <Link
-            to="/terms"
+          </a>
+          <a
+            href="https://pjokk.no/terms"
             className="block px-4 py-3 font-semibold text-ink active:bg-surface-2"
           >
             {t("Terms")}
-          </Link>
+          </a>
         </Card>
 
         <SectionTitle>{t("Account")}</SectionTitle>

@@ -5,11 +5,11 @@ import { disabledSubsystems, loadEnv } from "./env";
 import { createDeps, type PeerAddressSource } from "./deps";
 
 // The container entrypoint — the composition root. index.ts (now app.ts)
-// owns the API and the landing page — everything testable without a
-// filesystem — and this file builds the collaborators ONCE, hands them to
-// createApi() as one Deps object, then adds the parts that only make sense
-// in a running process: static assets, the SPA fallback, the listener, and
-// optionally the in-process scheduler.
+// owns the API — everything testable without a filesystem — and this file
+// builds the collaborators ONCE, hands them to createApi() as one Deps
+// object, then adds the parts that only make sense in a running process:
+// static assets, the SPA fallback, the listener, and optionally the
+// in-process scheduler.
 
 const env = loadEnv(process.env);
 
@@ -25,12 +25,12 @@ const app = createApi(deps);
 
 // Security headers for everything served from disk. On Cloudflare these came
 // from a generated `_headers` file that only the asset store understood; off
-// it, nothing applies them, so the SPA would ship with no CSP at all. The
-// landing page and /api/* set their own (tighter, and JSON-appropriate)
-// headers, so this deliberately does not touch them.
+// it, nothing applies them, so the SPA would ship with no CSP at all. /api/*
+// sets its own (tighter, and JSON-appropriate) headers, so this deliberately
+// does not touch them.
 app.use("/*", async (c, next) => {
   await next();
-  if (c.req.path === "/" || c.req.path.startsWith("/api/")) return;
+  if (c.req.path.startsWith("/api/")) return;
   c.header("X-Content-Type-Options", "nosniff");
   c.header("X-Frame-Options", "DENY");
   c.header("Referrer-Policy", "same-origin");
@@ -40,12 +40,14 @@ app.use("/*", async (c, next) => {
     "Content-Security-Policy",
     "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
   );
-  if (env.INDEXABLE !== "1") c.header("X-Robots-Tag", "noindex, nofollow");
+  // The app host has nothing to index — robots.txt already says so
+  // unconditionally, and this header backs it up for crawlers that ignore it.
+  c.header("X-Robots-Tag", "noindex, nofollow");
 });
 
-// Built SPA assets. Registered after every route in index.ts, so the landing
-// page, the API and the health checks all win — the ordering that
-// `run_worker_first` used to express in wrangler.jsonc.
+// Built SPA assets. Registered after every route in index.ts, so the API and
+// the health checks all win — the ordering that `run_worker_first` used to
+// express in wrangler.jsonc.
 app.use("/*", serveStatic({ root: env.STATIC_DIR }));
 
 // SPA fallback. /api is excluded explicitly: without that, a typo'd endpoint
@@ -73,7 +75,7 @@ serverRef.current = server;
 const off = disabledSubsystems(env);
 console.log(`pjokk listening on http://0.0.0.0:${env.PORT}`);
 console.log(`  app url:   ${env.APP_URL}`);
-console.log(`  indexable: ${env.INDEXABLE === "1" ? "yes" : "no"}`);
+console.log(`  site url:  ${env.SITE_URL}`);
 if (off.length > 0) console.log(`  disabled:  ${off.join(", ")}`);
 
 let stopScheduler: (() => void) | undefined;

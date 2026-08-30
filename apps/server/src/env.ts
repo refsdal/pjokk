@@ -29,6 +29,9 @@ export const EnvSchema = z.object({
    *  this, so a wrong value breaks sign-in in ways that look like anything
    *  but a config error. */
   APP_URL: z.url(),
+  /** The public site on the apex. The app links out to its legal pages, which
+   *  live there now rather than behind auth. */
+  SITE_URL: z.url().default("https://pjokk.no"),
   /** openssl rand -base64 32. Short secrets weaken every session token. */
   BETTER_AUTH_SECRET: z.string().min(16, "BETTER_AUTH_SECRET is too short"),
 
@@ -57,13 +60,11 @@ export const EnvSchema = z.object({
 
   // --- Behaviour switches ---
 
-  /** Founder-bootstrap escape hatch; see CLAUDE.md. */
+  /** Founder-bootstrap escape hatch; see CLAUDE.md. Also read by the landing
+   *  build (apps/landing/build.ts) to choose the CTA copy — the container no
+   *  longer has anything indexable to serve, but the deploy still sets this
+   *  for the static site's build step. */
   OPEN_SIGNUP: flag,
-  /** Production is the only indexable environment. Defaults to 0 so a new
-   *  deployment is never accidentally crawlable — the old build baked this in
-   *  at compile time via CLOUDFLARE_ENV, which meant prod and test needed
-   *  separate builds. It is a runtime switch now, so one image serves both. */
-  INDEXABLE: flag,
   /** Run the scheduled jobs in-process on a timer. For docker-compose, where
    *  a single container is the whole deployment. Leave at 0 under Kubernetes
    *  and drive `bun run cron <job>` from a CronJob instead: with more than one

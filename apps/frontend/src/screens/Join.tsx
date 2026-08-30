@@ -119,16 +119,24 @@ export function JoinScreen() {
           )}
 
           {/* Shown at the moment of consent, not buried in Settings: joining
-              a family means recording a child's health information. */}
+              a family means recording a child's health information.
+              Plain anchors, not <Link>: these pages left the SPA in the
+              landing split (PR #17) and now live on the public apex. */}
           <p className="text-xs leading-relaxed text-muted">
             {t("By joining you accept our")}{" "}
-            <Link to="/terms" className="font-semibold text-accent">
+            <a
+              href="https://pjokk.no/terms"
+              className="font-semibold text-accent"
+            >
               {t("Terms")}
-            </Link>{" "}
+            </a>{" "}
             {t("and")}{" "}
-            <Link to="/privacy" className="font-semibold text-accent">
+            <a
+              href="https://pjokk.no/privacy"
+              className="font-semibold text-accent"
+            >
               {t("Privacy policy")}
-            </Link>
+            </a>
             {t(
               ", including that Pjokk stores health information about your child.",
             )}

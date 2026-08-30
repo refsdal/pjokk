@@ -1,4 +1,4 @@
-import { Link, Navigate, useNavigate } from "@tanstack/react-router";
+import { Navigate, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,9 +93,11 @@ export function LoginScreen({ redirectTo = "/home" }: { redirectTo?: string }) {
         {t("Pjokk is invite-only. Ask a family admin for an invite link.")}
       </p>
 
+      {/* Plain anchors, not <Link>: these pages left the SPA in the landing
+          split (PR #17) and now live on the public apex. */}
       <p className="flex justify-center gap-4 text-xs font-semibold text-muted">
-        <Link to="/privacy">{t("Privacy policy")}</Link>
-        <Link to="/terms">{t("Terms")}</Link>
+        <a href="https://pjokk.no/privacy">{t("Privacy policy")}</a>
+        <a href="https://pjokk.no/terms">{t("Terms")}</a>
       </p>
     </div>
   );

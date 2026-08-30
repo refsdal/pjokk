@@ -40,11 +40,11 @@ describe("loadEnv", () => {
     expect(() => loadEnv(withoutBucket)).toThrow(/S3_BUCKET/);
   });
 
-  it("defaults to not indexable", () => {
-    // The old build baked this in at compile time; as a runtime switch the
-    // default must be the safe one, or a fresh deployment quietly invites
-    // crawlers into a test environment.
-    expect(loadEnv(MINIMAL).INDEXABLE).toBe("0");
+  it("defaults SITE_URL to the public apex", () => {
+    // The app links out to its legal pages, which live on the apex now
+    // rather than behind auth (PR #17) — a self-hoster who never sets this
+    // still gets a working link, not an empty href.
+    expect(loadEnv(MINIMAL).SITE_URL).toBe("https://pjokk.no");
   });
 
   it("defaults to trusting no proxies", () => {
