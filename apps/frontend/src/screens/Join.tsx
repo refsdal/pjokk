@@ -1,11 +1,12 @@
-import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useState } from "react";
 import { ErrorState } from "@/components/QueryStates";
 import { Button } from "@/components/ui/button";
 import { api, unwrap } from "@/lib/api";
 import { authClient, signIn, useSession } from "@/lib/auth-client";
 import { t } from "@/lib/i18n";
+import { legalUrl } from "@/lib/site";
 import { toast } from "@/lib/toast";
 
 interface InviteInfo {
@@ -124,17 +125,11 @@ export function JoinScreen() {
               landing split (PR #17) and now live on the public apex. */}
           <p className="text-xs leading-relaxed text-muted">
             {t("By joining you accept our")}{" "}
-            <a
-              href="https://pjokk.no/terms"
-              className="font-semibold text-accent"
-            >
+            <a href={legalUrl("terms")} className="font-semibold text-accent">
               {t("Terms")}
             </a>{" "}
             {t("and")}{" "}
-            <a
-              href="https://pjokk.no/privacy"
-              className="font-semibold text-accent"
-            >
+            <a href={legalUrl("privacy")} className="font-semibold text-accent">
               {t("Privacy policy")}
             </a>
             {t(

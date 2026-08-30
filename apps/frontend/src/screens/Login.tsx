@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { signIn, useSession } from "@/lib/auth-client";
 import { t } from "@/lib/i18n";
+import { legalUrl } from "@/lib/site";
 import { toast } from "@/lib/toast";
 
 // The provider list is a stacked column on purpose: a third button (Apple)
@@ -96,8 +97,8 @@ export function LoginScreen({ redirectTo = "/home" }: { redirectTo?: string }) {
       {/* Plain anchors, not <Link>: these pages left the SPA in the landing
           split (PR #17) and now live on the public apex. */}
       <p className="flex justify-center gap-4 text-xs font-semibold text-muted">
-        <a href="https://pjokk.no/privacy">{t("Privacy policy")}</a>
-        <a href="https://pjokk.no/terms">{t("Terms")}</a>
+        <a href={legalUrl("privacy")}>{t("Privacy policy")}</a>
+        <a href={legalUrl("terms")}>{t("Terms")}</a>
       </p>
     </div>
   );

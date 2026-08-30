@@ -5,6 +5,7 @@ import { API_BASE } from "@/lib/api";
 import { isSysadmin, signOut, useSession } from "@/lib/auth-client";
 import { useFamily, useMembers } from "@/lib/data";
 import { t } from "@/lib/i18n";
+import { legalUrl } from "@/lib/site";
 import { ApiKeysSection } from "./ApiKeysSection";
 import { AppearanceSection } from "./AppearanceSection";
 import { BabiesSection } from "./BabiesSection";
@@ -96,13 +97,13 @@ export function SettingsScreen() {
               landing split (PR #17) and now live on the public apex, where
               they are prerendered and readable without an account. */}
           <a
-            href="https://pjokk.no/privacy"
+            href={legalUrl("privacy")}
             className="block px-4 py-3 font-semibold text-ink active:bg-surface-2"
           >
             {t("Privacy policy")}
           </a>
           <a
-            href="https://pjokk.no/terms"
+            href={legalUrl("terms")}
             className="block px-4 py-3 font-semibold text-ink active:bg-surface-2"
           >
             {t("Terms")}
