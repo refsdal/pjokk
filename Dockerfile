@@ -29,10 +29,14 @@ RUN bun install --frozen-lockfile
 # ---------- build ----------
 # Two outputs: the SPA (vite → dist/client) and the server compiled to a
 # single standalone binary (bun build --compile → dist/compiled/dispatch).
+# Deliberately NOT `bun run build`, which also runs build:landing: the
+# marketing/legal static site is a separate deploy target the container has
+# no use for, and a landing-only render failure has no business failing the
+# image build.
 FROM deps AS build
 WORKDIR /app
 COPY . .
-RUN bun run build
+RUN bun run build:client && bun run build:server
 
 # ---------- runtime ----------
 # distroless, not Alpine: the runtime image has no shell, no package manager

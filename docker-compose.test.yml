@@ -1,7 +1,7 @@
 # The database the test suite runs against:
 #
 #   docker compose -f docker-compose.test.yml up -d
-#   bun test
+#   bun run test
 #
 # Kept separate from docker-compose.yml so the deployable stack does not carry
 # a published database port or a second database it never uses. Object storage

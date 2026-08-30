@@ -27,6 +27,18 @@ if (mode === "cron") {
   const port = process.env.PORT ?? "3000";
   const res = await fetch(`http://127.0.0.1:${port}/healthz`).catch(() => null);
   process.exit(res?.ok ? 0 : 1);
-} else {
+} else if (!mode) {
+  // No subcommand: start the web server. The default, and the only mode a
+  // plain `docker run` (or the container's own ENTRYPOINT with no args)
+  // exercises.
   await runServer();
+} else {
+  // An unrecognised subcommand must NOT fall through to the server: a
+  // typo'd `dispatch migrations` (extra "s") in a Kubernetes Job would
+  // otherwise silently become a pod that starts a web server and never
+  // completes, instead of failing loudly.
+  console.error(
+    `Unknown dispatch mode: "${mode}". Expected one of: cron, migrate, healthcheck, or no argument to run the server.`,
+  );
+  process.exit(2);
 }
