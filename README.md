@@ -7,7 +7,7 @@
 
   *"en liten pjokk" — a little tyke*
 
-  [pjokk.no](https://pjokk.no) · [API docs](https://pjokk.no/api/docs)
+  [pjokk.no](https://pjokk.no) · [the app](https://app.pjokk.no) · [API docs](https://app.pjokk.no/api/docs)
 </div>
 
 ---
@@ -39,8 +39,12 @@ somewhere to put files.
 
 ## How it's built
 
-One Bun process serves the public landing page at `/`, the SPA from `/home`
-onwards, and the API under `/api`.
+Two deploys. The container is one Bun process serving the SPA (app.pjokk.no,
+`/` onwards) and the API under `/api` — it is entirely behind auth and has
+nothing public to say. The marketing page and the legal documents (privacy,
+terms) are a separate static site, `apps/landing`, published to the apex
+(pjokk.no) with no server and no JavaScript of its own; the app links out to
+it, and it links back with the sign-in/get-started call to action.
 
 | Layer | Choice |
 |---|---|
@@ -144,9 +148,38 @@ packages/shared/  @pjokk/shared   zod schemas — the single source of truth for
 apps/api/          @pjokk/api      Hono API, better-auth factory, tenancy middleware, Drizzle schema
   ├─ migrations/                   Postgres migrations (drizzle-kit)
   └─ test/                         bun tests, run against a real Postgres
-apps/server/        @pjokk/server   entrypoints only: main.ts, cron-cli.ts, migrate.ts
+apps/server/        @pjokk/server   the composition root: builds Deps once and dispatches to
+                                    the web server, cron, migrate or healthcheck mode
 apps/frontend/      @pjokk/frontend React SPA (screens, log sheets, offline plumbing) + its tests
+apps/landing/       @pjokk/landing  static marketing + legal site for the apex — see below
 ```
+
+### The landing site (apps/landing)
+
+Separate from the container, and not built or published by it — the
+Dockerfile deliberately runs only `build:client` + `build:server`, so a
+landing-only render failure never fails the image build (see DECISIONS.md,
+"Landing split"). Build the landing site with:
+
+```sh
+SITE_URL=https://pjokk.no APP_URL=https://app.pjokk.no OPEN_SIGNUP=0 INDEXABLE=1 \
+  bun run build:landing        # or: bun run --filter @pjokk/landing build
+```
+
+Output lands in `apps/landing/dist/` — a plain static tree (HTML, CSS, an
+icon, an OG image, `robots.txt`, `sitemap.xml`) to upload to whatever serves
+the apex. Four environment variables, all optional (defaults shown):
+
+| Var | Default | Effect |
+|---|---|---|
+| `SITE_URL` | `https://pjokk.no` | canonical/OpenGraph URLs and hreflang alternates |
+| `APP_URL` | `https://app.pjokk.no` | where the sign-in/get-started CTA points |
+| `OPEN_SIGNUP` | off (`0`) | CTA copy: "Get started" vs "Sign in" |
+| `INDEXABLE` | off (fail-safe: only `"1"` turns it on) | `noindex` meta + `robots.txt` + whether `sitemap.xml` is written at all — leave unset on every host except the production apex |
+
+CI uploads `apps/landing/dist` as a build artifact (see `.github/workflows/ci.yml`)
+so a maintainer can download and publish it without a local build, but nothing
+deploys it automatically yet — publishing to the apex is still a manual step.
 
 `CLAUDE.md` is the project constitution (product principles, stack decisions,
 roadmap). `DECISIONS.md` logs the boring choices made along the way.

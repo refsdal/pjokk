@@ -120,7 +120,9 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://pjokk.no
+      # The artifact this job publishes is the container image, which serves
+      # the app — not the static landing site on the apex.
+      url: https://app.pjokk.no
     permissions:
       contents: write   # creating the git tag
       packages: write

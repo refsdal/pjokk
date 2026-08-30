@@ -829,7 +829,7 @@ been true since Phase 3; the vaccine feature only made it obvious.
 
 ## Composition root (2026-08-28, PR #16)
 
-- **No DI container.** `Deps` is a plain 14-field object, built once by
+- **No DI container.** `Deps` is a plain 12-field object, built once by
   `createDeps(env)` and passed straight into `createApi(deps)`. A container
   would buy indirection (registration, resolution, lifetime scopes) that this
   app never needs: there is exactly one composition root, exactly one
@@ -873,6 +873,90 @@ been true since Phase 3; the vaccine feature only made it obvious.
   1 commit at the default threshold vs. 25 with `-M20%`, back through the
   Phase 1 route tree). Anyone doing `git blame` archaeology on the route tree
   needs the lower threshold.
+
+## Landing split (2026-08-30, PR #17)
+
+**Supersedes "Landing page + apex domain (2026-08-27)" above.** That entry
+described the Cloudflare Worker era: the Worker rendered `/` itself, language
+was negotiated per request, and `app.pjokk.no` was retired outright once the
+app moved to the apex. All three are now false, in the direction this PR
+moved things, not back toward the old design — kept below rather than
+edited, per this file's append-only convention.
+
+- **The apex and the app are two separate deploys again, but for a different
+  reason than the pre-2026-08-27 Cloudflare split.** `pjokk.no` is a static
+  site (`apps/landing`) with no server and no JavaScript, built once and
+  published wherever static files are served. `app.pjokk.no` is the
+  container — the SPA and the API — and `/` there IS the app now (the
+  signed-in home screen is still `/home`). This is not `app.pjokk.no` being
+  "un-retired" so much as the apex giving up trying to be both a container
+  route and a public document at once: a static host cannot run the Worker
+  code path the old design needed for `/`, so the app needed its own host
+  back regardless.
+- **Language is chosen at BUILD time, not negotiated per request.** With no
+  server left in front of the apex, there is nothing to read a cookie or
+  `Accept-Language` and decide — `apps/landing/build.ts` emits two complete
+  documents per page (`/`, `/nb/`, `/privacy`, `/nb/privacy`, …), each with
+  the other's `hreflang` alternate, and a crawler or a browser gets whichever
+  URL it requested. The in-app Settings/Login/Join links now pick between
+  them client-side using `getLanguage()` (`apps/frontend/src/lib/site.ts`),
+  the same source of truth the old in-app `LegalPage` used.
+- **The legal bodies are prerendered from their original React components,
+  not rewritten as templates or copied by hand.** `apps/landing/src/legal/`
+  holds the git-mv'd JSX (`privacy.tsx`, `terms.tsx`, the shared `H`/`List`/
+  `ControllerCard` helpers, and the `UPDATED_EN`/`UPDATED_NB` constants);
+  `legal.tsx`'s `renderLegalBody` calls `renderToStaticMarkup` and
+  `page.ts`'s `renderLegalPage` wraps the result in the apex's own shell. A
+  first pass of that shell rendered the title and body but dropped the "Last
+  updated" line the old SPA shell used to show under it — the constants sat
+  unreferenced and neither published document carried a date. Fixed before
+  this shipped: `renderLegalPage` now renders `Last updated {UPDATED_EN}` /
+  `Sist oppdatert {UPDATED_NB}` under the title, with a regression test
+  (`apps/landing/test/render.test.ts`) asserting both languages contain it —
+  a GDPR Article 9 privacy policy silently losing its version date is exactly
+  the kind of thing that must fail a test, not a review.
+- **`INDEXABLE` moved from the container's validated env (`apps/server/src/
+  env.ts`) to a plain `process.env` read in `apps/landing/build.ts`.** The
+  container has nothing to index any more — it is entirely behind auth — so
+  its `robots.txt` and `X-Robots-Tag` are unconditional now, and `INDEXABLE`
+  only controls the landing build's `noindex` meta, `robots.txt` and whether
+  `sitemap.xml` is written at all. Its fail-safe direction had to be
+  preserved across that move and initially wasn't: the container's schema
+  defaulted unset to `"0"` (noindex), but the first landing build read
+  `!== "0"` (defaulting unset to *indexable*) — inverted, so a `test.pjokk.no`
+  landing deploy that forgot to set the variable would have published
+  `Allow: /` and a sitemap, the exact outcome the flag exists to prevent.
+  Fixed to `=== "1"` before this shipped.
+- **`SITE_URL` is a real setting now, not a documented-but-unread one.** It
+  was added to `apps/server/src/env.ts` when `APP_URL` and `SITE_URL` first
+  diverged, but nothing read it except a startup log line — every self-hosted
+  instance's Login/Settings/Join screens linked at `https://pjokk.no`
+  regardless, which means every self-hoster's app would have advertised
+  Refsdal Holding AS's privacy policy as its own. Fixed by exposing it to the
+  SPA at build time as `__SITE_URL__` (a Vite `define`, not
+  `import.meta.env.VITE_*`, since it comes from the same env var the
+  container validates) and building the legal links from it plus
+  `getLanguage()` in `apps/frontend/src/lib/site.ts`.
+- **The service worker no longer denylists `/` from the navigate fallback.**
+  That entry existed so a registered SW would not swallow the
+  Worker-rendered landing page; with `/` now the app's own entry point on
+  `app.pjokk.no`, denylisting it would send root navigations to the network
+  and break offline use at the app's own root — the opposite of the PWA's
+  stated purpose. `apps/frontend/vite.config.ts`'s `navigateFallbackDenylist`
+  is down to `[/^\/api\//]`.
+- **`apps/landing/dist` is not deployed by anything yet.** CI uploads it as a
+  build artifact so a maintainer can grab a commit-pinned copy, but getting
+  it onto the apex (and setting `SITE_URL`/`APP_URL`/`OPEN_SIGNUP`/
+  `INDEXABLE` correctly for that build) is still a manual step — see
+  README.md's "The landing site" section and SMOKE-TEST.md section 9.
+- **The Dockerfile builds `build:client` + `build:server`, not the umbrella
+  `build` script.** The umbrella script now also runs `build:landing`, and
+  the container has no use for the marketing site — a landing-only render
+  failure has no business failing the image build.
+- The duplicated colour-token block the 2026-08-27 entry above locates at
+  `apps/api/src/landing/styles.ts` moved with the rest of the landing code to
+  `apps/landing/src/styles.ts`; keep it in step with
+  `apps/frontend/src/styles.css` as that entry says.
 
 ## Distroless (2026-08-30, PR #18)
 
