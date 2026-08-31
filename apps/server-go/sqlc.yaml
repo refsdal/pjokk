@@ -1,0 +1,20 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "internal/db/queries"
+    schema: "internal/db/migrations"
+    gen:
+      go:
+        package: "gen"
+        out: "internal/db/gen"
+        sql_package: "pgx/v5"
+        emit_pointers_for_null_types: true
+        # NOT in the brief's verbatim config: the schema has both
+        # "rate_limit" (ours) and "rate_limits" (Limen's own rate limiter,
+        # per 00001_init.sql) — sqlc's default singularization maps both to
+        # the Go name "RateLimit", which fails to compile (duplicate
+        # declaration). emit_exact_table_names keeps every generated struct
+        # name matching its table name exactly (Users, Sessions, RateLimit,
+        # RateLimits, ...), which is the smallest change that resolves the
+        # collision without renaming either table.
+        emit_exact_table_names: true
