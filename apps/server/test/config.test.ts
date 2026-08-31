@@ -53,11 +53,6 @@ describe("loadEnv", () => {
     expect(loadEnv(MINIMAL).TRUSTED_PROXY_HOPS).toBe(0);
   });
 
-  it("defaults the scheduler off", () => {
-    // Safe under Kubernetes: N replicas would otherwise each fire the cron.
-    expect(loadEnv(MINIMAL).SCHEDULER).toBe("0");
-  });
-
   it("coerces numeric settings from strings", () => {
     const env = loadEnv({ ...MINIMAL, PORT: "8080", TRUSTED_PROXY_HOPS: "2" });
     expect(env.PORT).toBe(8080);

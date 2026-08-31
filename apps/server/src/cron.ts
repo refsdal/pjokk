@@ -15,7 +15,9 @@ import type { Deps } from "@pjokk/api/deps";
 // replicas, an in-process timer in each pod would send every reminder once
 // per pod. That is why these are exposed as one-shot functions a Kubernetes
 // CronJob can invoke (`bun run cron <job>`), and why the in-process
-// scheduler is opt-in via SCHEDULER=1 for single-container deployments.
+// scheduler runs only under the default single-container dispatch mode or
+// the dedicated `worker` mode — never under `server`, which is what
+// replicas run.
 
 export const JOBS = ["nightly", "frequent"] as const;
 export type Job = (typeof JOBS)[number];
@@ -58,7 +60,8 @@ export const SCHEDULES = {
 } as const;
 
 /**
- * In-process scheduler for single-container deployments (SCHEDULER=1).
+ * In-process scheduler for the default single-container dispatch mode and
+ * the dedicated `worker` mode.
  *
  * Bun.cron is a builtin as of Bun 1.4, which retires this file's previous
  * hand-rolled 15-minute tick — and with it two real defects: the nightly job
@@ -79,8 +82,9 @@ export const SCHEDULES = {
  * line instead of a pod restart loop.
  *
  * NOTE: this fires once per replica, exactly as setInterval did. With more
- * than one replica, drive the jobs from Kubernetes CronJobs and leave
- * SCHEDULER=0.
+ * than one replica, drive the jobs from Kubernetes CronJobs (or a single
+ * dedicated `worker` replica) instead of running `server` mode with this
+ * started too.
  */
 export function startScheduler(deps: Deps): () => void {
   const jobs = (Object.keys(SCHEDULES) as Job[]).map((job) =>

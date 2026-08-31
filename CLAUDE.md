@@ -49,8 +49,18 @@ landing site has no separate test deploy).
   others"). Serve interactive docs with Scalar at `/api/docs`.
 - Drizzle ORM + Postgres (`drizzle-orm/bun-sql`, Bun's native client).
   Migrations via drizzle-kit generate → `bun run migrate` from source, or
-  `/app/dispatch migrate` in the image. Run as a ONE-OFF job. Never at app startup: drizzle's migrator does not coordinate
-  between processes, so replicas would race to apply the same DDL.
+  `/app/dispatch migrate` (alias `migrations`) in the image for an explicit
+  one-off. The **default dispatch mode also migrates**, at startup, guarded by
+  a Postgres advisory lock (`MIGRATION_LOCK_KEY`, `apps/server/src/migrate.ts`)
+  so several containers booting at once serialise instead of racing to apply
+  the same DDL — the first acquires the lock and migrates, the rest block and
+  then find nothing pending. `server` mode NEVER migrates; it is what
+  replicas run. Orchestrated deployments (Kubernetes, several `server`
+  replicas) should still prefer the explicit one-off `migrate` before a
+  rollout, ahead of any replica depending on the new schema, rather than
+  relying on whichever replica happens to boot first — the advisory lock
+  makes that one-off safe to run concurrently with a starting default-mode
+  container, it does not make it unnecessary.
 - Any S3-compatible store for files (MinIO in compose; S3/R2/Ceph in
   production). Never a public bucket — stream through an authed Hono route
   (`/api/files/:id`). Access it ONLY through
@@ -60,12 +70,14 @@ landing site has no separate test deploy).
 - A `rate_limit` Postgres table for rate-limiting counters.
 - Scheduled work (reminders, nightly backup) runs via `bun run cron
   <nightly|frequent>` from source, `/app/dispatch cron <job>` in the image. The
-  in-process scheduler (`apps/server/src/cron.ts`, opt-in via `SCHEDULER=1`)
-  uses Bun's builtin `Bun.cron` with `tz: "UTC"` explicit (the image sets no
-  `TZ`, and the 30-day backup retention window is a privacy-policy commitment
-  stated in UTC). Under Kubernetes drive it from CronJobs and leave
-  `SCHEDULER=0` on every replica; the in-process scheduler is for
-  single-container deployments only, because with N replicas it fires every
+  in-process scheduler (`apps/server/src/cron.ts`) uses Bun's builtin
+  `Bun.cron` with `tz: "UTC"` explicit (the image sets no `TZ`, and the 30-day
+  backup retention window is a privacy-policy commitment stated in UTC).
+  There is no env flag for this any more — the dispatch mode expresses it:
+  the default mode and `worker` mode both start the scheduler, `server` mode
+  never does. Under Kubernetes, scale `server` for HTTP and drive the
+  scheduled work from either CronJobs or exactly one `worker` replica — never
+  more than one thing scheduling at once, or every replica/worker fires every
   job N times.
 - Configuration is environment variables, parsed and validated with zod at
   startup (`apps/server/src/env.ts`). Add new settings there, never by reading

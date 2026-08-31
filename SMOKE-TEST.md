@@ -105,8 +105,9 @@ Apply migrations as a one-off **before** the app serves traffic:
     older than 3 h, a reminder arrives within 15 min. Logging a feed resets
     the gap; you get at most one nudge per gap.
 
-    Reminders need the scheduler to be running — either `SCHEDULER=1` on a
-    single container, or a CronJob invoking `/app/dispatch cron frequent`. If
+    Reminders need the scheduler to be running — the default single-container
+    dispatch mode and `worker` mode both start it; `server` mode does not.
+    Otherwise a CronJob invoking `/app/dispatch cron frequent` covers it. If
     nothing runs it, no reminder ever fires and the app looks broken in a way
     the logs will not explain.
 18. Backups: after the nightly job, `backups/YYYY-MM-DD.json` appears in the
@@ -137,10 +138,11 @@ Apply migrations as a one-off **before** the app serves traffic:
     and every caller shares one bucket — the brute-force brake on sign-in and
     invite redeem degrades to a shared-fate 429. Verify by signing in wrongly
     21 times from one IP and confirming a second IP is unaffected.
-26. **Under Kubernetes, `SCHEDULER` must be 0** and the two jobs driven by
-    CronJobs (`/app/dispatch cron nightly` at 03:15 UTC, `/app/dispatch cron
-    frequent` every 15 min). With N replicas the in-process scheduler fires every
-    reminder N times.
+26. **Under Kubernetes, run `server` mode for every HTTP replica** (it never
+    starts the scheduler) and drive the two jobs from CronJobs
+    (`/app/dispatch cron nightly` at 03:15 UTC, `/app/dispatch cron frequent`
+    every 15 min) or exactly one dedicated `worker` replica. Running the
+    default mode, or more than one `worker`, fires every reminder N times.
 
 ## 8. Stripe billing
 

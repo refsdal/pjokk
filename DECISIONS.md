@@ -999,3 +999,61 @@ edited, per this file's append-only convention.
   building a whole `Deps` (auth, storage, push, Stripe, …) for it would be
   dead weight in an image that has no server listening. `apps/server/src/deps.ts`'s
   docstring documents this exception inline.
+
+## Container run modes (2026-08-31)
+
+- **`SCHEDULER` is gone; the dispatch mode expresses it instead.** The env
+  flag let two things drift out of sync with each other — a replica's mode
+  (is it the one serving HTTP?) and whether it also ran the scheduler — which
+  is exactly the shape of bug that ships as "every reminder fires twice"
+  after someone copies an env block without noticing the flag. Modes make the
+  two facts one fact: `server` mode has no code path that starts the
+  scheduler at all, so a fleet of `server` replicas cannot double-fire no
+  matter how the env is templated. The new modes: no argument (default;
+  migrates, serves, schedules — a single container's whole job), `server`
+  (serves only — what replicas run), `worker` (schedules only, plus a
+  `/healthz` so its container still passes the image's HEALTHCHECK), and
+  `migrate`/`migrations` (the pre-existing one-off, now an explicit alias
+  pair since a typo'd extra "s" was exactly the kind of thing this
+  redesign's error message already guards against for other subcommands).
+- **The default mode migrates at startup, under `pg_advisory_lock`.** The
+  previous rule ("migrate.ts: run as a ONE-OFF job... never at app startup")
+  existed because drizzle's migrator takes no lock of its own — verified
+  by reading `pg-core/dialect.js`'s `migrate()`: it reads the last-applied
+  migration with a plain `session.all()` outside any transaction, then only
+  wraps the actual DDL statements in one. Nothing serialises two callers
+  racing that read. Wrapping the whole step in an advisory lock
+  (`MIGRATION_LOCK_KEY`, a fixed int64 that must never change — renumbering
+  it would silently stop two versions from contending during a rollout) makes
+  the race safe instead of removing it: N containers booting at once now
+  serialise on the lock, the first migrates, the rest block and then find
+  nothing pending. The one part worth recording carefully: `pg_advisory_lock`
+  is per-session (per physical connection), but drizzle's migrator issues
+  several independent statements through `db.session`, each of which calls
+  straight through to `client.unsafe(...)` — so a normal pooled client (the
+  `createDb` used everywhere else, including the earlier "migrate.ts calls
+  createDb directly" entry above, now superseded for this file) would be free
+  to hand the lock call, the migration, and the unlock to three different
+  physical connections, silently defeating the lock. `applyMigrations` uses a
+  DEDICATED `new SQL(url, { max: 1 })` client for the whole step instead, so
+  every borrow from the pool resolves to the same one connection. Proven in
+  `apps/server/test/migrate.test.ts`, not asserted by inspection: a second
+  connection holds the lock, `applyMigrations` is started against the same
+  key, and the test polls `pg_stat_activity` (a backend other than the lock
+  holder genuinely waiting on `pg_advisory_lock`) until it observes the
+  block — ground truth from Postgres itself rather than a fixed sleep plus a
+  hopeful assertion. A companion test drives a bad `DATABASE_URL` through
+  `applyMigrations` and asserts it rejects, not `process.exit`s, since the
+  function is now also called from the default dispatch mode, which needs to
+  fall through to a clean, logged failure rather than a silent process death
+  disguised as one.
+- **`worker` mode answers `/healthz` for one reason: the image's own
+  HEALTHCHECK doesn't know which mode it's probing.** The Dockerfile's
+  `HEALTHCHECK` runs `/app/dispatch healthcheck` unconditionally against
+  `PORT` regardless of what command the container was started with. A
+  `worker` container that only ran the scheduler and served nothing would
+  fail that probe forever and get restart-looped by whatever orchestrates
+  it, despite doing its job correctly — so `worker` mode runs a minimal
+  `Bun.serve` that answers `/healthz` with `{"ok":true}` and 404s everything
+  else, just enough to keep the existing probe meaningful without giving
+  `worker` any of the app's real routes.

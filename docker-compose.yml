@@ -4,8 +4,10 @@
 #   docker compose up
 #
 # Postgres holds the data, MinIO stands in for S3 (vaccine documents and the
-# nightly backups), and the app runs with its in-process scheduler because a
-# single container has no orchestrator to drive cron for it.
+# nightly backups), and the app runs in its default mode: it migrates itself
+# under a Postgres advisory lock at startup, then serves with its in-process
+# scheduler running — the right shape for a single container, which has no
+# orchestrator to drive migrations or cron separately.
 
 name: pjokk
 
@@ -64,28 +66,6 @@ services:
       echo 'bucket ready'
       "
 
-  # Applies pending migrations, then exits. A separate one-off rather than
-  # something the app does at startup: drizzle's migrator does not coordinate
-  # between processes, so scaling the app to two replicas would have them race
-  # to apply the same DDL.
-  migrate:
-    build: .
-    command: ["migrate"]
-    restart: "no"
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: postgres://pjokk:${POSTGRES_PASSWORD:-pjokk}@db:5432/pjokk
-      # loadEnv validates the whole configuration even for a migration, so the
-      # required keys must be present here too.
-      APP_URL: ${APP_URL:-http://localhost:3000}
-      BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env, generate one with openssl rand -base64 32}"
-      S3_BUCKET: ${S3_BUCKET:-pjokk-files}
-      S3_ENDPOINT: http://minio:9000
-      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-pjokkdev}
-      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-pjokkdevsecret}
-
   app:
     build: .
     restart: unless-stopped
@@ -93,8 +73,6 @@ services:
       db:
         condition: service_healthy
       minio-init:
-        condition: service_completed_successfully
-      migrate:
         condition: service_completed_successfully
     ports:
       - "${PORT:-3000}:3000"
@@ -106,12 +84,6 @@ services:
       S3_ENDPOINT: http://minio:9000
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-pjokkdev}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-pjokkdevsecret}
-
-      # One container, no orchestrator to run CronJobs — so the scheduler runs
-      # in-process. Leave this OFF under Kubernetes and drive
-      # `dispatch cron <job>` from a CronJob instead, or every replica fires
-      # every reminder.
-      SCHEDULER: "1"
 
       OPEN_SIGNUP: ${OPEN_SIGNUP:-0}
 

@@ -49,8 +49,10 @@ S3_SECRET_ACCESS_KEY=$(openssl rand -base64 24) \
   docker compose -f docker-compose.selfhost.yml up -d
 ```
 
-That brings up Postgres, MinIO for files, applies the migrations as a one-off
-job, and starts the app on <http://localhost:3000>.
+That brings up Postgres and MinIO for files, and starts the app on
+<http://localhost:3000> — its default mode migrates itself under a Postgres
+advisory lock before it starts serving, so there is no separate migration
+step to wait on.
 
 To create the first account, start it once with `OPEN_SIGNUP=1`, sign in, then
 set it back to `0` — after that, accounts exist only through invite codes.
@@ -68,12 +70,13 @@ docker run -d --name pjokk -p 3000:3000 \
   -e S3_BUCKET='pjokk-files' \
   -e S3_ENDPOINT='https://s3.eu-north-1.amazonaws.com' \
   -e S3_ACCESS_KEY_ID='...' -e S3_SECRET_ACCESS_KEY='...' \
-  -e SCHEDULER=1 \
   ghcr.io/refsdal/pjokk:latest
 ```
 
-Run `docker run --rm ... ghcr.io/refsdal/pjokk:latest migrate` first — see
-[Upgrading](#upgrading).
+No separate migration step needed — the default mode above applies pending
+migrations itself before it starts serving (see [Upgrading](#upgrading) for
+why a zero-downtime rollout with several instances still wants the explicit
+one-off).
 
 ## Self-hosting
 
@@ -101,7 +104,6 @@ The ones you will most likely also want:
 
 | Variable | Default | Effect |
 |---|---|---|
-| `SCHEDULER` | `0` | `1` runs reminders, the nightly backup and its prune in-process. **Leave at `0` under Kubernetes** — see below |
 | `TRUSTED_PROXY_HOPS` | `0` | Number of proxies in front. At `0` the rate limiter ignores `X-Forwarded-For`, because it is caller-supplied and trusting it blindly lets anyone mint a fresh bucket per request |
 | `OPEN_SIGNUP` | `0` | The founder-bootstrap escape hatch. `1` allows account creation without an invite |
 | `PORT` | `3000` | |
@@ -114,33 +116,59 @@ subsystems are disabled at startup rather than failing.
 ### Scheduled work
 
 Reminders, the nightly backup and the 30-day backup prune run on two
-schedules: `frequent` every 15 minutes, `nightly` at 03:15 UTC.
+schedules: `frequent` every 15 minutes, `nightly` at 03:15 UTC. Which dispatch
+mode you run decides who does this — there is no separate flag any more:
 
-**One container:** set `SCHEDULER=1` and the process runs them itself.
+| Mode | HTTP | Migrates | Scheduler |
+|---|---|---|---|
+| *(default, no argument)* | yes | yes, under an advisory lock | yes |
+| `server` | yes | no | no |
+| `worker` | `/healthz` only | no | yes |
 
-**Kubernetes or several replicas:** leave `SCHEDULER=0` and drive them from
-CronJobs against the same image, or every replica fires every reminder:
+**One container:** just run the image with no argument. It migrates itself,
+serves the app, and runs the scheduler, all in one process.
 
-```sh
-/app/dispatch cron frequent     # */15 * * * *
-/app/dispatch cron nightly      # 15 3 * * *
-```
+**Kubernetes or several replicas:** scale `server` horizontally (it never
+migrates and never schedules, so any number of them is safe), and drive the
+scheduled work one of two ways:
 
-Set `concurrencyPolicy: Forbid` — the in-process scheduler will not overlap a
-run with itself, but Kubernetes has no such guarantee unless told.
+- One dedicated `worker` replica — same image, `dispatch worker` — running
+  the scheduler and nothing else; or
+- CronJobs against the same image, if you would rather not run a persistent
+  worker process:
+
+  ```sh
+  /app/dispatch cron frequent     # */15 * * * *
+  /app/dispatch cron nightly      # 15 3 * * *
+  ```
+
+  Set `concurrencyPolicy: Forbid` on both — Kubernetes has no built-in
+  guarantee against overlapping runs unless told.
+
+Either way, run at most **one** thing that schedules — two `worker` replicas,
+or a `worker` alongside CronJobs, both fire every reminder twice.
 
 ### Upgrading
 
-**Run migrations as a one-off before the new image serves traffic.** Never at
-startup: replicas would race to apply the same DDL.
+The default mode now migrates itself safely: it takes a Postgres advisory
+lock before applying anything pending, so if you run a single `docker compose`
+instance, upgrading is just pulling the new image and restarting it — no
+separate step needed.
+
+For a zero-downtime rollout with more than one instance (Kubernetes, several
+`server` replicas), still **run migrations as an explicit one-off before the
+new image serves traffic**, so the schema change lands before any replica
+depends on it rather than racing the first replica that happens to start:
 
 ```sh
 docker run --rm -e DATABASE_URL=... [other required vars] \
   ghcr.io/refsdal/pjokk:<new-version> migrate
 ```
 
-Under Kubernetes that is a Job or an initContainer; with the compose file it is
-the `migrate` service, which already runs before the app starts.
+Under Kubernetes that is a Job or an initContainer. This is safe to run
+alongside instances that are still on the old image, and safe to run more
+than once — the advisory lock means a `migrate` one-off and a starting
+default-mode container can never race each other either.
 
 ### Backups
 
@@ -269,7 +297,7 @@ apps/api/          @pjokk/api       Hono API, tenancy middleware, Drizzle schema
   ├─ migrations/                    Postgres migrations (drizzle-kit)
   └─ test/                          bun tests, run against a real Postgres
 apps/server/       @pjokk/server    the composition root: builds Deps once and dispatches to
-                                    the web server, cron, migrate or healthcheck mode
+                                    the default, server, worker, cron, migrate or healthcheck mode
 apps/frontend/     @pjokk/frontend  React SPA (screens, log sheets, offline plumbing) + tests
 apps/landing/      @pjokk/landing   static marketing + legal site for the apex — see below
 ```

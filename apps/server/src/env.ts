@@ -65,12 +65,6 @@ export const EnvSchema = z.object({
    *  longer has anything indexable to serve, but the deploy still sets this
    *  for the static site's build step. */
   OPEN_SIGNUP: flag,
-  /** Run the scheduled jobs in-process on a timer. For docker-compose, where
-   *  a single container is the whole deployment. Leave at 0 under Kubernetes
-   *  and drive `bun run cron <job>` from a CronJob instead: with more than one
-   *  replica an in-process timer fires the job once PER POD, which would send
-   *  every reminder N times. */
-  SCHEDULER: flag,
 
   PORT: z.coerce.number().int().positive().default(3000),
   /** Directory holding the built SPA. */

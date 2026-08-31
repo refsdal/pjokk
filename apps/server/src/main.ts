@@ -11,7 +11,7 @@ import { createDeps, type PeerAddressSource } from "./deps";
 // static assets, the SPA fallback, the listener, and optionally the
 // in-process scheduler.
 
-export async function runServer() {
+export async function runServer(opts: { scheduler: boolean }) {
   const env = loadEnv(process.env);
 
   // Filled in immediately after Bun.serve returns; the rate limiter reads the
@@ -83,7 +83,7 @@ export async function runServer() {
   if (off.length > 0) console.log(`  disabled:  ${off.join(", ")}`);
 
   let stopScheduler: (() => void) | undefined;
-  if (env.SCHEDULER === "1") {
+  if (opts.scheduler) {
     console.log("  scheduler: in-process (single-container mode)");
     stopScheduler = startScheduler(deps);
   }
