@@ -7,7 +7,7 @@ import type { Deps } from "../deps";
 //
 // (A row dump rather than pg_dump on purpose: the app should not need a
 // Postgres client binary in its image to back itself up.)
-const BACKUP_TABLES = [
+export const BACKUP_TABLES = [
   "user",
   "session",
   "account",
@@ -16,6 +16,7 @@ const BACKUP_TABLES = [
   "member",
   "invitation",
   "passkey",
+  "subscription",
   "baby",
   "feed_log",
   "diaper_log",

@@ -152,6 +152,9 @@ take full effect.
 A row dump rather than `pg_dump`, so the image needs no Postgres client binary,
 and the result stays portable across whatever runs the database.
 
+The table list is checked against the live schema by a test, so "every table"
+stays true as the schema grows.
+
 Two things to know before you rely on it:
 
 - **Restores are manual.** There is no restore command. The snapshot is
