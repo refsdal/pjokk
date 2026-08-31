@@ -2,11 +2,15 @@
 // real, isolated Postgres to run against — per CLAUDE.md's "the database is
 // the thing most likely to differ, so faking it defeats the purpose" rule.
 //
-// Migrations run once per test binary (sync.Once); each individual test then
+// Every Setup probes for the migrated schema and (re)applies migrations when
+// it is missing — deliberately NOT a sync.Once: other tests in the same
+// binary (migrate_test.go) drop and rebuild the public schema, and nothing
+// in the Go toolchain guarantees which test file runs first. The probe makes
+// rig correctness independent of test ordering. Each individual test then
 // gets a clean slate via a dynamic TRUNCATE of every public table (except
 // goose_db_version) before it starts, so unrelated tests never see each
-// other's rows. Because that truncation is process-wide state, tests using
-// this rig must run serially: `go test -p 1 ./...`.
+// other's rows. Because truncation is process-wide state, tests using this
+// rig must run serially: `go test -p 1 ./...`.
 package testrig
 
 import (
@@ -32,10 +36,11 @@ func DatabaseURL() string {
 	return "postgres://pjokk:pjokk@127.0.0.1:55432/pjokk_test"
 }
 
-var (
-	migrateOnce sync.Once
-	migrateErr  error
-)
+// migrateMu serializes the probe-then-migrate step so parallel Setups can't
+// race each other into duplicate goose runs (ApplyMigrations' advisory lock
+// would serialize them anyway; the mutex just keeps the probe cheap and the
+// logs quiet).
+var migrateMu sync.Mutex
 
 // Rig bundles the shared pool and a ready-to-use Querier for a single test.
 type Rig struct {
@@ -43,24 +48,16 @@ type Rig struct {
 	Q    *gen.Queries
 }
 
-// Setup applies migrations once per test binary, truncates every domain
-// table so the test starts from an empty database, opens a pool for this
-// test, and registers cleanup to close it when the test ends.
+// Setup makes sure the schema is migrated (probing per call — see the
+// package comment for why this must not be a sync.Once), truncates every
+// domain table so the test starts from an empty database, opens a pool for
+// this test, and registers cleanup to close it when the test ends.
 func Setup(t *testing.T) *Rig {
 	t.Helper()
 
 	url := DatabaseURL()
 
-	migrateOnce.Do(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		migrateErr = db.ApplyMigrations(ctx, url)
-	})
-	if migrateErr != nil {
-		t.Fatalf("testrig: apply migrations: %v", migrateErr)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	pool, err := db.New(ctx, url)
@@ -68,6 +65,10 @@ func Setup(t *testing.T) *Rig {
 		t.Fatalf("testrig: open pool: %v", err)
 	}
 	t.Cleanup(pool.Close)
+
+	if err := ensureMigrated(ctx, url, pool); err != nil {
+		t.Fatalf("testrig: apply migrations: %v", err)
+	}
 
 	if err := truncateAll(ctx, pool); err != nil {
 		t.Fatalf("testrig: truncate: %v", err)
@@ -81,6 +82,26 @@ func Setup(t *testing.T) *Rig {
 		Pool: pool,
 		Q:    gen.New(pool),
 	}
+}
+
+// ensureMigrated probes for the migrated schema and applies migrations when
+// it is absent. The probe runs on every Setup call — cheap (one catalog
+// lookup) and, unlike a once-per-binary guard, immune to another test in the
+// same binary dropping the schema after we migrated it. `baby` stands in for
+// "the whole schema": it is created by the same single migration as every
+// other table, so it is either all there or none of it is.
+func ensureMigrated(ctx context.Context, url string, pool *pgxpool.Pool) error {
+	migrateMu.Lock()
+	defer migrateMu.Unlock()
+
+	var reg *string
+	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.baby')::text`).Scan(&reg); err != nil {
+		return fmt.Errorf("testrig: probe schema: %w", err)
+	}
+	if reg != nil {
+		return nil
+	}
+	return db.ApplyMigrations(ctx, url)
 }
 
 // truncateAll empties every table in the public schema except
