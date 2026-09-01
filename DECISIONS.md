@@ -1249,3 +1249,23 @@ also exactly what GoReleaser's `dockers` block expects, if bare-binary
 GitHub Releases ever become worth adopting it for. Releases are now
 genuinely multi-arch (the old release workflow never passed `platforms:`
 and silently published amd64-only).
+
+## 2026-09-01 — releases: svu + GoReleaser, signed and SBOM'd
+
+`scripts/next-version.mjs` is gone. svu (same author as GoReleaser) computes
+the version from Conventional Commits — `--v0` reproduces the old
+breaking-bumps-minor-while-major-is-0 rule, and the release workflow's
+`allow_major` input drops it. GoReleaser owns everything downstream of the
+tag: binary archives + checksums + SPDX SBOMs on a GitHub Release with a
+generated changelog, the multi-arch image via the same COPY-only Dockerfile
+(`dockers_v2`, BINARY_ROOT build arg), and keyless cosign signatures on the
+checksum file and the pushed manifests (GitHub OIDC — no keys to hold). The
+tag now comes BEFORE the publish (GoReleaser releases from a tag); a failed
+publish deletes it, preserving the old never-a-dangling-tag property. The
+binary artifact layout moved to dist/server/linux/<arch>/pjokk to mirror
+GoReleaser's docker build context, so one Dockerfile COPY line serves both
+the local script and GoReleaser. Chosen over keeping the bespoke script for
+the usual reason: standard tools other developers already know, and less of
+our own release plumbing to maintain. Mise gained a task runner section
+(`mise run test|check|artifacts|image|snapshot`) — tasks always run with
+the pinned toolchain.

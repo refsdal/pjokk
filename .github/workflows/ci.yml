@@ -40,7 +40,7 @@ jobs:
       # are compiled from source and CI never runs `go generate`.
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          install_args: go bun
+          install_args: "go bun aqua:goreleaser/goreleaser"
 
       # setup-go used to provide this cache (and could not find go.sum at the
       # repo root anyway); mise does not cache Go modules, so do it directly.
@@ -57,6 +57,11 @@ jobs:
 
       - name: Lint + typecheck
         run: bun run check
+
+      # The release pipeline's config is code too — a broken .goreleaser.yaml
+      # should fail here, not during a release.
+      - name: GoReleaser config check
+        run: goreleaser check
 
       - name: Tests
         run: bun run test
@@ -111,7 +116,7 @@ jobs:
 
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          install_args: go bun
+          install_args: "go bun aqua:caarlos0/svu"
 
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -124,9 +129,15 @@ jobs:
       - name: Install
         run: bun install --frozen-lockfile
 
+      # svu computes what the next release WOULD be (same rule as
+      # release.yml's default, breaking-stays-minor while major is 0) so
+      # preview tags sort below it.
       - name: Compute version
         id: version
-        run: bun scripts/next-version.mjs
+        run: |
+          tag=$(svu next --v0)
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       # Everything the image COPYs, compiled natively — the Dockerfile
       # itself is COPY-only, so the buildx assemble below takes seconds and
@@ -258,7 +269,7 @@ jobs:
             echo '```'
             echo
             echo "Also tagged \`$moving\` (moves with the branch)."
-            echo "Next release would be **${{ steps.version.outputs.tag }}** (bump: ${{ steps.version.outputs.bump || 'none' }})."
+            echo "Next release would be **${{ steps.version.outputs.tag }}**."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Container logs on failure

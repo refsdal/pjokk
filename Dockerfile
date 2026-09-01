@@ -8,7 +8,7 @@
 #
 # NOTHING COMPILES IN HERE. The binaries are built natively, outside Docker:
 #
-#   bash scripts/build-artifacts.sh   # → dist/server/pjokk-linux-{amd64,arm64}
+#   bash scripts/build-artifacts.sh   # → dist/server/linux/{amd64,arm64}/pjokk
 #
 # and this file only COPYs the one matching TARGETARCH. That keeps a
 # multi-arch `docker buildx build --platform linux/amd64,linux/arm64` down
@@ -28,8 +28,13 @@
 # also sets as USER). Pinned by digest; Dependabot bumps it.
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 
-# Automatic buildx arg: "amd64" or "arm64" per platform being assembled.
-ARG TARGETARCH
+# Automatic buildx arg: "linux/amd64" or "linux/arm64" per platform.
+ARG TARGETPLATFORM
+# Where the per-platform binaries live in the build context. The default
+# serves the scripts/build-artifacts.sh layout (dist/server/linux/<arch>/
+# pjokk); GoReleaser's dockers_v2 passes BINARY_ROOT=. because its build
+# context holds them at linux/<arch>/pjokk directly.
+ARG BINARY_ROOT=dist/server
 
 # The fs storage driver's default volume mountpoint. Pre-created OWNED BY
 # nonroot because Docker copies image-directory ownership onto a named
@@ -40,7 +45,7 @@ ARG TARGETARCH
 # exists because git cannot track an empty directory.
 COPY --chown=nonroot:nonroot docker/data-skel/ /data/
 
-COPY dist/server/pjokk-linux-${TARGETARCH} /app/pjokk
+COPY ${BINARY_ROOT}/${TARGETPLATFORM}/pjokk /app/pjokk
 
 ENV PORT=3000
 EXPOSE 3000
