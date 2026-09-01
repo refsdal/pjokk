@@ -51,13 +51,29 @@ func refused(message string) gen.Error {
 	return gen.Error{Error: message, Code: "REFUSED"}
 }
 
-// adminID is the operator behind a tierSysadmin request. RequireSysadmin
-// guarantees a session, so a missing one is a wiring bug and reported as
-// one rather than silently attributing an audit row to "".
+// adminID is who is ACCOUNTABLE for a tierSysadmin request — the human
+// whose name belongs on its audit row and whom the "not yourself" guards
+// measure against.
+//
+// During impersonation that is the operator behind the session, not the
+// account being impersonated. Reaching an admin route from an impersonated
+// session takes one sysadmin impersonating another (an ordinary target's
+// session fails RequireSysadmin), which is narrow but not impossible — and
+// a trail that blamed the impersonated admin for the operator's own actions
+// would be worse than no trail. middleware.RequireFamily's
+// `impersonated.write` entries do not cover this surface: tierSysadmin has
+// no family gate, so nothing else on these routes records the second
+// identity.
+//
+// RequireSysadmin guarantees a session, so a missing one is a wiring bug and
+// reported as one rather than silently attributing an audit row to "".
 func adminID(ctx context.Context) (string, error) {
 	session := middleware.SessionFromContext(ctx)
 	if session == nil {
 		return "", errors.New("api: admin route reached with no session (RequireSysadmin not wired?)")
+	}
+	if session.ImpersonatedBy != "" {
+		return session.ImpersonatedBy, nil
 	}
 	return session.UserID, nil
 }
@@ -119,9 +135,30 @@ func (d Deps) DeleteAdminFamily(ctx context.Context, req gen.DeleteAdminFamilyRe
 		return nil, err
 	}
 
-	middleware.Audit(ctx, d.Q, admin, "family.delete", req.Id, name)
+	// One transaction, and the audit insert is CHECKED rather than
+	// best-effort (middleware.Audit swallows its error, which is right for
+	// the impersonated-write trail and wrong here): destroying a family
+	// without a record of who did it is not an outcome worth having, so a
+	// trail failure aborts the delete instead.
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := d.Q.WithTx(tx)
 
-	if _, err := d.Q.DeleteOrganization(ctx, req.Id); err != nil {
+	if err := qtx.InsertAdminAudit(ctx, dbgen.InsertAdminAuditParams{
+		AdminID: admin,
+		Action:  "family.delete",
+		Target:  req.Id,
+		Detail:  &name,
+	}); err != nil {
+		return nil, err
+	}
+	if _, err := qtx.DeleteOrganization(ctx, req.Id); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 	return gen.DeleteAdminFamily200JSONResponse{Ok: gen.OkOkTrue}, nil
@@ -380,6 +417,14 @@ func (d Deps) ImpersonateAdminUser(ctx context.Context, req gen.ImpersonateAdmin
 	}
 	if req.Id == session.UserID {
 		return gen.ImpersonateAdminUser400JSONResponse(refused("Cannot impersonate yourself")), nil
+	}
+	// Reachable only when one sysadmin is impersonating another (an
+	// ordinary target's session fails RequireSysadmin). auth.Impersonate
+	// refuses to chain too, but with a plain error — a 500 for what is an
+	// ordinary, explainable refusal.
+	if session.ImpersonatedBy != "" {
+		return gen.ImpersonateAdminUser400JSONResponse(
+			refused("Cannot impersonate from an impersonated session")), nil
 	}
 
 	target, err := d.Q.GetAdminUser(ctx, req.Id)

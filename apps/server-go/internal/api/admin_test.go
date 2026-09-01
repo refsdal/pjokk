@@ -957,6 +957,42 @@ func TestStopImpersonatingIsReachableWithoutTheAdminRole(t *testing.T) {
 	}
 }
 
+// One sysadmin impersonating another can reach the admin console with the
+// impersonated session (an ordinary target's session would fail
+// RequireSysadmin). Two things must hold there: the audit trail names the
+// REAL operator, not the colleague whose session is being driven, and the
+// impersonation cannot be chained.
+func TestAdminActionsUnderImpersonationNameTheRealOperator(t *testing.T) {
+	a, familyID, cookie, adminID := sysadminRig(t, "Hansen")
+
+	colleagueID := a.SignUp("Second admin", "second@example.com")
+	a.AddMember(familyID, colleagueID, auth.RoleAdmin, "second@example.com")
+	makeSysadmin(t, a, colleagueID)
+	bystanderID := a.SignUp("Bystander", "bystander@example.com")
+
+	start := a.Do(http.MethodPost, "/api/admin/users/"+colleagueID+"/impersonate", cookie, nil)
+	if start.Status != http.StatusOK {
+		t.Fatalf("impersonate = %d %s", start.Status, start.Raw)
+	}
+	impersonated := sessionCookieFrom(t, start)
+
+	note := a.Do(http.MethodPost, "/api/admin/audit", impersonated, map[string]any{
+		"action": "support.note", "target": "ticket-7",
+	})
+	if note.Status != http.StatusOK {
+		t.Fatalf("audit note while impersonating = %d %s", note.Status, note.Raw)
+	}
+	if row := findAudit(t, a, "support.note"); row.AdminID != adminID {
+		t.Errorf("audit admin_id = %q, want the real operator %q (not the impersonated admin %q)",
+			row.AdminID, adminID, colleagueID)
+	}
+
+	chained := a.Do(http.MethodPost, "/api/admin/users/"+bystanderID+"/impersonate", impersonated, nil)
+	if chained.Status != http.StatusBadRequest || chained.JSON["code"] != "REFUSED" {
+		t.Errorf("chained impersonation = %d %s, want 400 REFUSED", chained.Status, chained.Raw)
+	}
+}
+
 // -----------------------------------------------------------------------
 // Schema guard
 // -----------------------------------------------------------------------
