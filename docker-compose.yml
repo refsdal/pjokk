@@ -39,6 +39,8 @@ services:
       retries: 20
 
   app:
+    # The Dockerfile is COPY-only: run `bash scripts/build-artifacts.sh`
+    # before the first `docker compose build` (and after server/SPA changes).
     build: .
     # Named so the one-off services below share the built image instead of
     # each triggering their own build of the same context.

@@ -54,13 +54,13 @@ jobs:
       releasable: ${{ steps.v.outputs.releasable }}
     steps:
       # Tags and full history are the inputs to the calculation.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          bun-version: "1.4"
+          install_args: bun
 
       - name: Compute version
         id: v
@@ -100,11 +100,20 @@ jobs:
       TEST_DATABASE_URL: postgres://pjokk:pjokk@127.0.0.1:5432/pjokk_test
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: oven-sh/setup-bun@v2
+      # Toolchain from .mise.toml — same pins as CI and local dev.
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          bun-version: "1.4"
+          install_args: go bun
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('apps/server/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-
 
       - name: Install
         run: bun install --frozen-lockfile
@@ -114,10 +123,6 @@ jobs:
 
       - name: Tests
         run: bun run test
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: apps/server/go.mod
 
       # The backend is Go and outside the bun workspace, so the two steps
       # above cover only the SPA and the landing site. Without these a
@@ -140,34 +145,56 @@ jobs:
       contents: write   # creating the git tag
       packages: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          install_args: go bun
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('apps/server/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      # Compiled natively — the Dockerfile is COPY-only, which is also what
+      # makes the multi-arch push below cost seconds instead of a second
+      # emulated build.
+      - name: Build artifacts (SPA + both server binaries)
+        run: bash scripts/build-artifacts.sh
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - name: Log in to the container registry
         if: ${{ !inputs.dry_run }}
-        uses: docker/login-action@v3
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: ${{ !inputs.dry_run }}
-          # A moving `latest` plus the immutable version and sha tags:
-          # deployments should pin one of the latter, so a rollback is naming
-          # an older tag rather than rebuilding and hoping.
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # A moving `latest` plus the immutable version and sha tags:
+      # deployments should pin one of the latter, so a rollback is naming an
+      # older tag rather than rebuilding and hoping. Both architectures in
+      # one manifest — previously the release was amd64-only.
+      - name: Build and push (multi-arch)
+        run: |
+          args=(--platform linux/amd64,linux/arm64
+            -t "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}"
+            -t "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            -t "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}")
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            docker buildx build "${args[@]}" .
+          else
+            docker buildx build "${args[@]}" --push .
+          fi
 
       # After the push, so a failed publish never leaves a tag pointing at a
       # release that does not exist in the registry.

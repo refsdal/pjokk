@@ -33,11 +33,24 @@ jobs:
       TEST_DATABASE_URL: postgres://pjokk:pjokk@127.0.0.1:5432/pjokk_test
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: oven-sh/setup-bun@v2
+      # Toolchain from .mise.toml — the same pins developers get from
+      # `mise install`. Only go and bun here: the codegen tools in that file
+      # are compiled from source and CI never runs `go generate`.
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          bun-version: "1.4"
+          install_args: go bun
+
+      # setup-go used to provide this cache (and could not find go.sum at the
+      # repo root anyway); mise does not cache Go modules, so do it directly.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('apps/server/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-
 
       - name: Install
         run: bun install --frozen-lockfile
@@ -47,10 +60,6 @@ jobs:
 
       - name: Tests
         run: bun run test
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: apps/server/go.mod
 
       # apps/server is the backend: a Go module, outside the bun workspace,
       # so the steps above never touch it. Same TEST_DATABASE_URL, same
@@ -71,7 +80,7 @@ jobs:
       # Uploading the artifact here means a maintainer can grab a built,
       # commit-pinned copy without a local build.
       - name: Upload landing site artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: landing-dist
           path: apps/landing/dist
@@ -96,19 +105,36 @@ jobs:
     steps:
       # Full history and tags: the version is computed from Conventional
       # Commits since the last v* tag, and a shallow clone has neither.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          bun-version: "1.4"
+          install_args: go bun
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('apps/server/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-
+
+      - name: Install
+        run: bun install --frozen-lockfile
 
       - name: Compute version
         id: version
         run: bun scripts/next-version.mjs
 
-      - uses: docker/setup-buildx-action@v3
+      # Everything the image COPYs, compiled natively — the Dockerfile
+      # itself is COPY-only, so the buildx assemble below takes seconds and
+      # nothing ever runs under QEMU.
+      - name: Build artifacts (SPA + both server binaries)
+        run: bash scripts/build-artifacts.sh
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       # A pull request from a fork gets a read-only GITHUB_TOKEN, so pushing
       # would fail on something unrelated to the change. Build-only there.
@@ -123,23 +149,17 @@ jobs:
 
       - name: Log in to the container registry
         if: steps.gate.outputs.push == 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Plain single-arch build for the smoke test: the artifacts are
+      # prebuilt, so this is a couple of COPYs. No layer cache needed — there
+      # is nothing worth caching any more.
       - name: Build image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          # Loaded locally so the smoke test below runs against the exact
-          # image that was pushed.
-          push: false
-          load: true
-          tags: pjokk:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        run: docker build -t pjokk:ci .
 
       - name: Smoke-test the image
         run: |
@@ -147,8 +167,13 @@ jobs:
           docker run -d --name pg --network pjokk-ci \
             -e POSTGRES_USER=pjokk -e POSTGRES_PASSWORD=pjokk -e POSTGRES_DB=pjokk \
             postgres:17-alpine
+          # -h 127.0.0.1 forces the probe over TCP. Without it pg_isready
+          # checks the Unix socket, which already accepts during initdb's
+          # socket-only first start — before the restart that opens TCP —
+          # so the migrate one-off below could race a "ready" Postgres that
+          # refused TCP connections.
           for i in $(seq 1 30); do
-            docker exec pg pg_isready -U pjokk -d pjokk && break
+            docker exec pg pg_isready -h 127.0.0.1 -U pjokk -d pjokk && break
             sleep 1
           done
 
@@ -214,17 +239,17 @@ jobs:
 
       # Only after the smoke test: an image that does not serve must never
       # reach the registry, not even as a preview.
-      - name: Push preview image
+      - name: Push preview image (multi-arch)
         if: steps.gate.outputs.push == 'true'
         run: |
           short=$(git rev-parse --short HEAD)
           branch=$(echo "${{ github.head_ref || github.ref_name }}" | tr '/' '-' | tr -cd '[:alnum:]._-')
           preview="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}-preview.${short}"
           moving="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:branch-${branch}"
-          docker tag pjokk:ci "$preview"
-          docker tag pjokk:ci "$moving"
-          docker push "$preview"
-          docker push "$moving"
+          # The same context the smoke-tested image came from; buildx just
+          # re-runs the COPYs per platform and pushes the manifest list.
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            -t "$preview" -t "$moving" --push .
           {
             echo "### Preview image"
             echo

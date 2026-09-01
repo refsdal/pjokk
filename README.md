@@ -86,10 +86,11 @@ The image is `ghcr.io/refsdal/pjokk` — `:latest`, `:<version>`, or
 runs anywhere a container does, as one process serving both the SPA and the
 API.
 
-Inside it is a single static Go binary on a `scratch` base: no shell, no libc,
-no package manager, nothing to `exec` into and nothing to patch. The SPA, the
-OpenAPI spec, the SQL migrations and the timezone database are all compiled
-into the binary, and it runs as uid 65532.
+Inside it is a single static Go binary on a distroless `static` base: no
+shell, no libc, no package manager, nothing to `exec` into — just the CA
+bundle, tzdata and the `nonroot` user (uid 65532) maintained upstream. The
+SPA, the OpenAPI spec, the SQL migrations and the timezone database are all
+compiled into the binary.
 
 ### Configuration
 
@@ -267,9 +268,12 @@ self-hosted tracker has nobody to bill.
 ## Development
 
 Two toolchains, because the app is two halves: Go builds the server, Bun
-builds the SPA and the landing site.
+builds the SPA and the landing site. You do not install either by hand —
+[mise](https://mise.jdx.dev) pins both (plus the codegen tools `go generate`
+expects) in `.mise.toml`, and CI installs from the same file.
 
 ```sh
+mise install
 bun install
 docker compose -f docker-compose.test.yml up -d   # Postgres on :55432, for tests and dev
 
@@ -303,7 +307,9 @@ After editing `openapi/pjokk.yaml`, run `go generate ./...` from `apps/server`
 (needs `oapi-codegen` v2.8.0 on `PATH`) and `bun run gen:client` from the root.
 Generated code is committed; neither CI nor the image runs a code generator.
 
-`docker-compose.yml` builds from source and is the contributor's stack;
+`docker-compose.yml` runs the locally built image and is the contributor's
+stack — run `bash scripts/build-artifacts.sh` first (the Dockerfile is
+COPY-only and expects `dist/server/pjokk-linux-<arch>` to exist);
 `docker-compose.selfhost.yml` pulls the published image and is the
 self-hoster's. They are deliberately separate so a self-hoster never needs the
 repository. Both default to `STORAGE_DRIVER=fs`; add the overlay to swap in
@@ -346,14 +352,18 @@ not exist.
 Images are multi-arch (`linux/amd64` + `linux/arm64`). Building one locally:
 
 ```sh
-docker build -t pjokk:dev .              # single arch, loads into the local store
-bash scripts/build-image.sh              # both arches, verify-only
+bash scripts/build-artifacts.sh          # SPA + both server binaries, natively
+docker build -t pjokk:dev .              # single arch, seconds — COPY-only
+bash scripts/build-image.sh              # runs both steps, assembles both arches
 TAG=ghcr.io/refsdal/pjokk:v1 PUSH=1 bash scripts/build-image.sh
 ```
 
-Neither architecture runs under QEMU — the Go toolchain cross-compiles, and
-JavaScript has no architecture — so the second one costs a link step rather
-than a second build. A multi-platform result is a manifest list, which the
+Nothing compiles inside Docker: the SPA and both server binaries are built
+natively (the SPA is embedded into the binaries via go:embed), and the
+Dockerfile — based on distroless `static` for the CA bundle, tzdata and the
+`nonroot` user — only COPYs the binary matching each platform's
+`TARGETARCH`. Neither architecture ever runs under QEMU, and the multi-arch
+assemble costs seconds. A multi-platform result is a manifest list, which the
 local image store cannot hold, which is why the two-arch build without
 `PUSH=1` verifies and discards.
 
