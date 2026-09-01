@@ -52,3 +52,16 @@ func IsUniqueViolation(err error) bool {
 	}
 	return false
 }
+
+// IsForeignKeyViolation reports whether err is a Postgres foreign-key
+// violation (SQLSTATE 23503) — same detect-by-code discipline as
+// IsUniqueViolation. internal/jobs' purgeOrphanUsers uses this to swallow a
+// delete blocked by historical data (e.g. a log row the user's account is
+// still attributed to) without treating it as a job failure.
+func IsForeignKeyViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23503"
+	}
+	return false
+}
