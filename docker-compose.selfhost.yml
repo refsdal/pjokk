@@ -75,6 +75,15 @@ services:
       APP_URL: ${APP_URL:-http://localhost:3000}
       AUTH_SECRET: "${AUTH_SECRET:?generate one with: openssl rand -base64 32}"
 
+      # The public apex the SPA links its legal pages to. This only affects
+      # the server's own boot-log view, not the running SPA: legal links are
+      # baked into the client bundle at IMAGE BUILD time (the Dockerfile's
+      # SITE_URL build arg), and this file pulls a pre-built image rather
+      # than building one — see docker-compose.yml, which builds from source
+      # and can take the build arg. Left unset here, the published image's
+      # bundle keeps whatever SITE_URL it was built with.
+      SITE_URL: ${SITE_URL:-}
+
       STORAGE_DRIVER: fs
       STORAGE_FS_PATH: /data
 

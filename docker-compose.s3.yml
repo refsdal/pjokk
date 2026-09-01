@@ -15,6 +15,13 @@
 # bucket, the database and every backup target must live in the EU.
 
 services:
+  # WARNING: MINIO_ROOT_USER/PASSWORD default to the throwaway "pjokkdev" /
+  # "pjokkdevsecret" pair below when S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY are
+  # unset — deliberately, for a copy-paste-and-go local try. This MinIO is
+  # not meant to be reachable from anywhere but the compose network (the API
+  # port has no host binding; the console is bound to 127.0.0.1 only), so
+  # never put this overlay behind a reverse proxy or expose its ports beyond
+  # localhost without setting real credentials first.
   minio:
     image: quay.io/minio/minio:latest
     restart: unless-stopped
