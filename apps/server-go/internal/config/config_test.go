@@ -380,6 +380,26 @@ func TestDisabledSubsystems_HalfConfiguredGoogleCountsAsDisabled(t *testing.T) {
 	}
 }
 
+func TestDisabledSubsystems_HalfConfiguredVAPIDCountsAsDisabled(t *testing.T) {
+	// A public key with no private key cannot sign anything; reporting web
+	// push as enabled would be a lie, same reasoning as the Google case
+	// above.
+	cfg, err := Load(clone(minimal(), map[string]string{"VAPID_PUBLIC_KEY": "vpub"}))
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	got := cfg.DisabledSubsystems()
+	found := false
+	for _, name := range got {
+		if name == "web push" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("DisabledSubsystems() = %v, want it to contain web push", got)
+	}
+}
+
 func TestFromOS_WrapsOSEnviron(t *testing.T) {
 	for k, v := range minimal() {
 		t.Setenv(k, v)
