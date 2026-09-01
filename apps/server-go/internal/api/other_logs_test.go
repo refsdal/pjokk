@@ -209,6 +209,44 @@ func TestCreateMedicineBounds(t *testing.T) {
 	}
 }
 
+// Code-review follow-up (minor): TestCreateMedicineBounds above only covers
+// medicine's own bounds; this closes the same gap for the other five kinds'
+// create-time bounds — one over-the-limit case per bounded field
+// (content/title/measurement.value/pump.amountMl/pump.durationMin) — cheap
+// since it's the same table-driven shape TestOtherKindsCRUD already uses.
+func TestOtherKindsCreateBounds(t *testing.T) {
+	cases := []struct {
+		name  string
+		base  string
+		extra map[string]any
+	}{
+		{"note content too long", "notes", map[string]any{"content": stringOfLen(2001)}},
+		{"milestone title too long", "milestones", map[string]any{"title": stringOfLen(201)}},
+		{"measurement value above range", "measurements", map[string]any{"type": "weight", "value": 201}},
+		{"pump amountMl above range", "pumps", map[string]any{"amountMl": 1001}},
+		{"pump durationMin above range", "pumps", map[string]any{"durationMin": 601}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			a := testrig.App(t)
+			familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
+			babyID := a.NewBaby(familyID, "Nora")
+
+			body := map[string]any{"babyId": babyID, "time": time.Now().UTC().Format(time.RFC3339)}
+			for k, v := range c.extra {
+				body[k] = v
+			}
+			res := a.Do(http.MethodPost, "/api/"+c.base, cookie, body)
+			if res.Status != http.StatusBadRequest {
+				t.Errorf("POST /api/%s status = %d, body %s, want 400 VALIDATION", c.base, res.Status, res.Raw)
+			}
+			if res.JSON["code"] != "VALIDATION" {
+				t.Errorf("code = %v, want VALIDATION", res.JSON["code"])
+			}
+		})
+	}
+}
+
 func TestDeleteMedicineUnknownIDIs404(t *testing.T) {
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
@@ -252,6 +290,76 @@ func TestUpdateMedicineEmptyPatchIsANoOp(t *testing.T) {
 	}
 	if res.JSON["amount"] != 2.5 || res.JSON["name"] != "Paracet" {
 		t.Errorf("after empty PATCH = %v, want unchanged", res.JSON)
+	}
+}
+
+// Code-review follow-up: PATCH's tri-state pattern (patch.go) makes `null`
+// mean "clear this column" for nullable fields, but `name` is REQUIRED and
+// NOT nullable (UpdateMedicine's OpenAPI schema carries no `nullable: true`
+// for it — see openapi/pjokk.yaml). Sending `{"name": null}` must therefore
+// be rejected by spec (kin-openapi) validation before this handler ever
+// runs, the same way an out-of-range or wrong-typed field is — a genuinely
+// clearable field's null is a normal 200 (see
+// TestMedicineFullCRUDWithNullToClearPatches), so this is the one case
+// asserting the OTHER outcome for a non-clearable field, previously
+// unverified anywhere in the suite.
+func TestUpdateMedicineRejectsNullOnRequiredField(t *testing.T) {
+	a := testrig.App(t)
+	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
+	babyID := a.NewBaby(familyID, "Nora")
+
+	created := a.Do(http.MethodPost, "/api/medicine", cookie, map[string]any{
+		"babyId": babyID,
+		"time":   time.Now().UTC().Format(time.RFC3339),
+		"name":   "Paracet",
+	})
+	id, _ := created.JSON["id"].(string)
+
+	res := a.Do(http.MethodPatch, "/api/medicine/"+id, cookie, map[string]any{"name": nil})
+	if res.Status != http.StatusBadRequest {
+		t.Fatalf("PATCH {name:null} status = %d, body %s, want 400 VALIDATION", res.Status, res.Raw)
+	}
+	if res.JSON["code"] != "VALIDATION" {
+		t.Errorf("code = %v, want VALIDATION", res.JSON["code"])
+	}
+
+	// Confirm the row itself was untouched by the rejected request.
+	list := a.DoArray(http.MethodGet, "/api/medicine", cookie, nil)
+	row := list.JSON[0].(map[string]any)
+	if row["name"] != "Paracet" {
+		t.Errorf("name after rejected null-PATCH = %v, want unchanged %q", row["name"], "Paracet")
+	}
+}
+
+// Same check as TestUpdateMedicineRejectsNullOnRequiredField, on a different
+// field TYPE shape (a required float64 rather than a required string) —
+// measurement.value is required and not nullable, so `{"value": null}` must
+// 400 rather than clear it (there is no "cleared" state for value to be in).
+func TestUpdateMeasurementRejectsNullOnRequiredField(t *testing.T) {
+	a := testrig.App(t)
+	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
+	babyID := a.NewBaby(familyID, "Nora")
+
+	created := a.Do(http.MethodPost, "/api/measurements", cookie, map[string]any{
+		"babyId": babyID,
+		"time":   time.Now().UTC().Format(time.RFC3339),
+		"type":   "weight",
+		"value":  5.2,
+	})
+	id, _ := created.JSON["id"].(string)
+
+	res := a.Do(http.MethodPatch, "/api/measurements/"+id, cookie, map[string]any{"value": nil})
+	if res.Status != http.StatusBadRequest {
+		t.Fatalf("PATCH {value:null} status = %d, body %s, want 400 VALIDATION", res.Status, res.Raw)
+	}
+	if res.JSON["code"] != "VALIDATION" {
+		t.Errorf("code = %v, want VALIDATION", res.JSON["code"])
+	}
+
+	list := a.DoArray(http.MethodGet, "/api/measurements", cookie, nil)
+	row := list.JSON[0].(map[string]any)
+	if row["value"] != 5.2 {
+		t.Errorf("value after rejected null-PATCH = %v, want unchanged 5.2", row["value"])
 	}
 }
 
