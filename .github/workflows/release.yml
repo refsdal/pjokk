@@ -191,6 +191,21 @@ jobs:
           trap 'bash scripts/restore-embed-overlay.sh' EXIT
           goreleaser release --snapshot --clean --skip=sign
 
+      # GoReleaser auto-skips signing in snapshot mode, which is exactly how
+      # a cosign flag incompatibility once reached a real release. Exercise
+      # the same sign + verify invocations against a throwaway blob so the
+      # dry run proves them too (OIDC is available here; nothing uploads).
+      - name: Cosign flags smoke
+        if: needs.version.outputs.dry == 'true'
+        run: |
+          echo smoke > /tmp/cosign-smoke.txt
+          cosign sign-blob --yes --bundle=/tmp/cosign-smoke.sigstore.json /tmp/cosign-smoke.txt
+          cosign verify-blob \
+            --bundle /tmp/cosign-smoke.sigstore.json \
+            --certificate-identity-regexp "https://github.com/${{ github.repository }}/\.github/workflows/release\.yml@.*" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            /tmp/cosign-smoke.txt
+
       # The real thing. GoReleaser releases FROM a tag, so the tag is
       # created first — and deleted again below if anything after it fails,
       # preserving the "never a tag without a release" property.
