@@ -239,6 +239,118 @@ func TestRedeemAsExistingMemberBurnsNoUse(t *testing.T) {
 	}
 }
 
+// TestRedeemConcurrentDifferentCodesNeverSurfaceA500 exercises the race
+// redeemInviteTx's own FOR UPDATE lock cannot close: the SAME user
+// redeeming TWO DIFFERENT codes for the SAME family concurrently. Each
+// code's lock only serializes against redeems of THAT code, so a redeem of
+// codeB can pass its own membership pre-check (0 members, under READ
+// COMMITTED, an uncommitted concurrent insert is invisible) and only
+// discover the conflict when its own INSERT collides with
+// idx_organization_members_org_user (00002_limen_align.sql) — which must
+// fold into the ordinary "cannot redeem" 400 rather than surface a raw 500
+// (see redeemInviteTx's db.IsUniqueViolation branch).
+//
+// A best-effort goroutine race (fire N concurrent HTTP redeems and hope
+// two land in the same microsecond window) was tried first and never
+// actually hit this window against a local Postgres — the whole
+// request/transaction round trip is fast enough that requests serialize in
+// practice more often than not, which would make the test pass whether or
+// not the fix exists (a regression it doesn't actually cover). This
+// version forces the window deterministically instead: hold open a raw,
+// UNCOMMITTED transaction that has already inserted the racer's
+// organization_members row, launch the HTTP redeem of codeB in a
+// goroutine, poll pg_stat_activity until that goroutine's own INSERT is
+// observably blocked waiting on the held row's lock (proof the race
+// window is open), and only then commit — at which point the goroutine's
+// INSERT resumes into a guaranteed 23505.
+func TestRedeemConcurrentDifferentCodesNeverSurfaceA500(t *testing.T) {
+	a := testrig.App(t)
+	ctx := context.Background()
+	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
+
+	created := a.Do(http.MethodPost, "/api/invites", cookie, map[string]any{"maxUses": 5})
+	if created.Status != http.StatusCreated {
+		t.Fatalf("create codeB: status = %d, body %s", created.Status, created.Raw)
+	}
+	codeB, _ := created.JSON["code"].(string)
+
+	racerUserID := a.SignUp("Racer", "racer@example.com")
+	racerCookie := a.SignIn("racer@example.com")
+
+	// Hold the racer's membership insert open, uncommitted — simulating a
+	// concurrent redeem of a DIFFERENT code (codeA) that reached the same
+	// INSERT first but hasn't committed yet.
+	holdTx, err := a.Rig.Pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin holding tx: %v", err)
+	}
+	defer func() { _ = holdTx.Rollback(ctx) }()
+	if _, err := holdTx.Exec(ctx,
+		`INSERT INTO "organization_members" ("organization_id", "user_id") VALUES ($1, $2)`,
+		familyID, racerUserID,
+	); err != nil {
+		t.Fatalf("hold insert: %v", err)
+	}
+
+	type redeemResult struct {
+		status int
+		body   string
+	}
+	resultCh := make(chan redeemResult, 1)
+	go func() {
+		res := a.Do(http.MethodPost, "/api/invites/redeem", racerCookie, map[string]any{"code": codeB})
+		resultCh <- redeemResult{res.Status, string(res.Raw)}
+	}()
+
+	// Wait until the goroutine's INSERT is genuinely blocked on the held
+	// row's lock before releasing it.
+	deadline := time.Now().Add(5 * time.Second)
+	blocked := false
+	for time.Now().Before(deadline) {
+		var n int
+		if err := a.Rig.Pool.QueryRow(ctx, `
+			SELECT count(*) FROM pg_stat_activity
+			WHERE wait_event_type = 'Lock' AND query ILIKE '%organization_members%'`,
+		).Scan(&n); err != nil {
+			t.Fatalf("poll pg_stat_activity: %v", err)
+		}
+		if n > 0 {
+			blocked = true
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if !blocked {
+		t.Fatal("redeem of codeB never blocked on the held membership row — the race window was not exercised")
+	}
+
+	if err := holdTx.Commit(ctx); err != nil {
+		t.Fatalf("commit holding tx: %v", err)
+	}
+
+	res := <-resultCh
+	if res.status == http.StatusInternalServerError {
+		t.Fatalf("redeem of codeB while a same-user/same-family membership insert was in flight: "+
+			"status = 500, body %s — the unique violation must be folded into 400, not surfaced raw", res.body)
+	}
+	if res.status != http.StatusBadRequest {
+		t.Errorf("redeem of codeB: status = %d, body %s, want 400 (already a member by the time this committed)",
+			res.status, res.body)
+	}
+
+	var memberCount int
+	if err := a.Rig.Pool.QueryRow(ctx, `
+		SELECT COUNT(*)::int FROM "organization_members"
+		WHERE "organization_id" = $1 AND "user_id" = $2`,
+		familyID, racerUserID,
+	).Scan(&memberCount); err != nil {
+		t.Fatalf("count membership: %v", err)
+	}
+	if memberCount != 1 {
+		t.Errorf("membership rows for the racing user = %d, want exactly 1 (no duplicate from the race)", memberCount)
+	}
+}
+
 func TestRedeemRejectsExpiredRevokedExhaustedAndUnknownCodes(t *testing.T) {
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")

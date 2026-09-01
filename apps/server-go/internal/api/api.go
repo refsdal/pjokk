@@ -339,11 +339,30 @@ var operationAuthTiers = map[string]authTier{
 	"RedeemInvite":  tierSession,
 }
 
+// tierPublicAPIAllowlist is the exhaustive set of tierPublic operations
+// permitted to live under /api/ — as opposed to Healthz/Readyz, which are
+// tierPublic too but sit at the top level, outside /api/ entirely (see
+// NewHandler's mount order). "No auth chain at all" is a much louder claim
+// for a route nested under /api/ than for a liveness probe, so
+// assertOperationAuthCoverage panics at boot if a future task's mistyped
+// tier entry (meant tierFamily or tierSession, typed tierPublic) would
+// otherwise ship an unauthenticated domain route silently. Extend this
+// alongside operationAuthTiers when a new operation genuinely needs
+// tierPublic under /api/ — and read why the existing entry needs it before
+// adding another one next to it (GetInviteInfo's own doc comment in
+// invites.go: the /join page's pre-sign-in status check).
+var tierPublicAPIAllowlist = map[string]bool{
+	"GetInviteInfo": true,
+}
+
 // assertOperationAuthCoverage panics unless operationAuthTiers has exactly
 // one entry per operationId in spec — no fewer (a new route task that forgot
 // to classify its operation) and no more (a stale entry left behind by a
-// rename). Called once, at NewHandler build time, so a wiring mistake is a
-// boot-time failure rather than a silently under-protected endpoint.
+// rename) — and, for every operation nested under /api/, panics if its tier
+// is tierPublic without an explicit tierPublicAPIAllowlist entry (see that
+// map's doc comment). Called once, at NewHandler build time, so a wiring
+// mistake is a boot-time failure rather than a silently under-protected
+// endpoint.
 func assertOperationAuthCoverage(spec *openapi3.T) {
 	seen := make(map[string]bool, len(operationAuthTiers))
 	for _, path := range spec.Paths.InMatchingOrder() {
@@ -353,9 +372,16 @@ func assertOperationAuthCoverage(spec *openapi3.T) {
 				panic(fmt.Sprintf("api: %s %s has no operationId", method, path))
 			}
 			name := strings.ToUpper(op.OperationID[:1]) + op.OperationID[1:]
-			if _, ok := operationAuthTiers[name]; !ok {
+			tier, ok := operationAuthTiers[name]
+			if !ok {
 				panic(fmt.Sprintf(
 					"api: operation %q (%s %s) has no entry in operationAuthTiers — add one (see this package's doc comment)",
+					name, method, path))
+			}
+			if tier == tierPublic && strings.HasPrefix(path, "/api/") && !tierPublicAPIAllowlist[name] {
+				panic(fmt.Sprintf(
+					"api: operation %q (%s %s) is tierPublic under /api/ but missing from tierPublicAPIAllowlist — "+
+						"either that's a mistake (this route needs a real tier) or it's deliberate and belongs in the allowlist",
 					name, method, path))
 			}
 			seen[name] = true
@@ -458,6 +484,21 @@ func authChain(d Deps) gen.StrictMiddlewareFunc {
 // RequireSession gets a chance to reject it, matching the TypeScript
 // predecessor's behaviour (Hono's route middleware runs before the
 // handler's own session check).
+//
+// One divergence from that predecessor, deliberately not chased: this
+// whole StrictMiddlewareFunc layer runs only for requests that reach the
+// strict-server dispatch, which is AFTER withSpecValidation
+// (NewHandler's outer StdHTTPServerOptions.Middlewares) has already
+// rejected anything that fails kin-openapi's request-shape check — so a
+// malformed redeem (bad JSON, code over 64 chars) never reaches
+// rateLimitChain and is not charged against invite-redeem's quota. Hono's
+// route-level middleware array runs ahead of its own zod validation, so
+// the TS predecessor charges those attempts. Not worth matching: a
+// request that never reaches the handler has no attack value against the
+// limiter's purpose (slowing invite-code guessing), only against the
+// limiter's own counter — and each endpoint's own global backstop
+// (invite-info-global 500/10min, invite-redeem-global 200/10min) already
+// covers a flood of those too.
 func rateLimitChain(d Deps) gen.StrictMiddlewareFunc {
 	inviteInfoIP := middleware.RateLimit(d.RateLimit, "invite-info", 30, 600, false, d.TrustedProxyHops)
 	inviteInfoGlobal := middleware.RateLimit(d.RateLimit, "invite-info-global", 500, 600, true, d.TrustedProxyHops)

@@ -13,6 +13,7 @@ import (
 
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
+	"github.com/refsdal/pjokk/server/internal/db"
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
 )
 
@@ -317,7 +318,7 @@ func (d Deps) RedeemInvite(ctx context.Context, req gen.RedeemInviteRequestObjec
 		}, nil
 	}
 
-	redeemed, err := d.redeemInviteTx(ctx, code, userID, now)
+	redeemed, err := d.redeemInviteTx(ctx, code, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -350,7 +351,16 @@ func (d Deps) RedeemInvite(ctx context.Context, req gen.RedeemInviteRequestObjec
 //
 // See this file's package doc comment for why the membership rows are
 // written here directly rather than through auth.Service.AddMember.
-func (d Deps) redeemInviteTx(ctx context.Context, code, userID string, now time.Time) (bool, error) {
+//
+// The re-classification below deliberately calls d.Now() itself rather
+// than reusing the caller's pre-lock timestamp: a redeem that blocks
+// waiting for GetInviteByCodeForUpdate's lock (another concurrent redeem
+// of the SAME code holding it) could otherwise accept a code that expired
+// during the wait, evaluating "expired" against a clock reading from
+// before the wait even started. The TypeScript predecessor has the
+// identical property — its in-transaction classifyInvite call reads
+// Date.now() fresh, not the outer handler's captured `now`.
+func (d Deps) redeemInviteTx(ctx context.Context, code, userID string) (bool, error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return false, err
@@ -365,7 +375,7 @@ func (d Deps) redeemInviteTx(ctx context.Context, code, userID string, now time.
 	case err != nil:
 		return false, err
 	}
-	if classifyInvite(&locked, now) != inviteValid {
+	if classifyInvite(&locked, d.Now()) != inviteValid {
 		return false, nil
 	}
 
@@ -380,11 +390,26 @@ func (d Deps) redeemInviteTx(ctx context.Context, code, userID string, now time.
 		return false, nil
 	}
 
+	// A second membership race this pre-check cannot close: the FOR
+	// UPDATE lock above only serializes redeems of THIS code, so the same
+	// user redeeming a DIFFERENT code for the SAME family concurrently
+	// can pass both codes' membership pre-checks before either INSERT
+	// runs, then collide on idx_organization_members_org_user
+	// (00002_limen_align.sql) below. Folded into the same "cannot
+	// redeem" false, rather than surfacing db.IsUniqueViolation as a raw
+	// 500 — the caller already returns the identical 400 for the
+	// ordinary already>0 race just above; an alreadyMember:true response
+	// would be equally defensible here (the user ends up a member either
+	// way), but building one needs familyName/role this function has no
+	// reason to carry, so the simpler, already-consistent "false" wins.
 	memberID, err := qtx.InsertOrganizationMember(ctx, dbgen.InsertOrganizationMemberParams{
 		OrganizationID: locked.FamilyID,
 		UserID:         userID,
 	})
 	if err != nil {
+		if db.IsUniqueViolation(err) {
+			return false, nil
+		}
 		return false, err
 	}
 
