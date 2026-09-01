@@ -259,3 +259,25 @@ func (q *Queries) IsSessionUserBanned(ctx context.Context, token string) (bool, 
 	err := row.Scan(&banned)
 	return banned, err
 }
+
+const setUserPassword = `-- name: SetUserPassword :exec
+UPDATE "users" SET "password" = $2, "updated_at" = now() WHERE "id" = $1
+`
+
+type SetUserPasswordParams struct {
+	ID       string
+	Password *string
+}
+
+// Replace an account's password hash outright (Task 21's admin reset).
+//
+// Limen's own credential plugin cannot express this: its SetPassword only
+// establishes a FIRST password (ErrPasswordAlreadySet otherwise) and its
+// UpdatePassword requires the CURRENT password, which an administrator
+// resetting a forgotten one does not have. The hash itself still comes from
+// Limen (cred.HashPassword), so the stored value is byte-compatible with
+// what its sign-in comparison expects; only the write is ours.
+func (q *Queries) SetUserPassword(ctx context.Context, arg SetUserPasswordParams) error {
+	_, err := q.db.Exec(ctx, setUserPassword, arg.ID, arg.Password)
+	return err
+}

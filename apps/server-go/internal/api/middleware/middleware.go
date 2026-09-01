@@ -87,6 +87,7 @@ type contextKey int
 const (
 	identityKey contextKey = iota
 	familyKey
+	httpKey
 )
 
 // identity is the resolved caller, session-or-key, stored once per request.
@@ -313,6 +314,51 @@ func RequireSysadmin() func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// httpPair is the raw (ResponseWriter, Request) CaptureHTTP stashes.
+type httpPair struct {
+	w http.ResponseWriter
+	r *http.Request
+}
+
+// CaptureHTTP puts the request's ResponseWriter and *http.Request into its
+// context so a generated strict-server handler — which is handed only a
+// context.Context and a decoded request object — can reach them again.
+//
+// This exists for exactly one thing: writing a SESSION COOKIE. The
+// impersonation pair (POST /api/admin/users/{id}/impersonate and POST
+// /api/admin/stop-impersonating) swaps the caller's identity, and
+// auth.Service.Impersonate/StopImpersonating do that the only way it can be
+// done — by setting a cookie on the response and reading the incoming
+// request for the address/user-agent metadata a new session records. Those
+// two signatures are auth's, not this package's, and a hand-routed pair of
+// endpoints outside the generated tree (files.go's escape hatch) would keep
+// two ordinary JSON routes out of the spec the SPA's client is generated
+// from, which costs more than one context value.
+//
+// It is mounted on the two tiers that have such an operation (tierSysadmin
+// and tierSession — see internal/api's authChain), never on the family
+// tiers. Do NOT reach for it to write a response body: the generated
+// strict-server dispatcher writes the response, and a handler that also
+// wrote to w directly would produce two.
+func CaptureHTTP() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), httpKey, httpPair{w: w, r: r})))
+		})
+	}
+}
+
+// HTTPFromContext returns the ResponseWriter and Request CaptureHTTP stashed.
+// ok is false when the operation's tier does not mount CaptureHTTP, which is
+// a wiring bug rather than a runtime condition — callers should fail loudly.
+func HTTPFromContext(ctx context.Context) (w http.ResponseWriter, r *http.Request, ok bool) {
+	pair, ok := ctx.Value(httpKey).(httpPair)
+	if !ok {
+		return nil, nil, false
+	}
+	return pair.w, pair.r, true
 }
 
 // apiKeyPrefix is the token prefix that marks a bearer as one of ours. Only

@@ -25,7 +25,7 @@ SELECT
 FROM "api_key" k
 JOIN "users" u ON u."id" = k."created_by"
 JOIN "organizations" o ON o."id" = k."family_id"
-WHERE k."key_hash" = $1 AND k."revoked_at" IS NULL
+WHERE k."key_hash" = $1 AND k."revoked_at" IS NULL AND u."banned" = false
 `
 
 type GetAPIKeyByHashRow struct {
@@ -47,6 +47,16 @@ type GetAPIKeyByHashRow struct {
 //
 // Revoked keys are filtered here rather than reported separately: a revoked
 // key must be indistinguishable from one that never existed.
+//
+// A BANNED creator's keys are filtered the same way (Task 21). A ban is
+// enforced by absence — banning revokes every session the user holds — but
+// an API key is a second, longer-lived credential that no session
+// revocation touches: without this predicate a banned user kept full
+// read/write access to their family through any pjk_ key they had already
+// minted. The TypeScript predecessor had the identical hole (its api-key
+// middleware joined the creator without looking at `banned`); this is the
+// one place it can be closed for every route at once, since the key
+// authenticates AS its creator.
 func (q *Queries) GetAPIKeyByHash(ctx context.Context, keyHash string) (GetAPIKeyByHashRow, error) {
 	row := q.db.QueryRow(ctx, getAPIKeyByHash, keyHash)
 	var i GetAPIKeyByHashRow

@@ -600,6 +600,38 @@ func TestAPIKeyAuthRejectsARevokedKey(t *testing.T) {
 	assertRejected(t, rec, p, http.StatusUnauthorized, "INVALID_KEY")
 }
 
+// A ban is enforced by absence — banning revokes every session the user
+// holds (Task 21's /api/admin/users/{id}/ban) — but an API key is a second,
+// longer-lived credential that no session revocation touches. Filtering it
+// at the authentication join is the only place that closes for every route
+// at once, since a key authenticates AS its creator.
+func TestAPIKeyAuthRejectsAKeyWhoseCreatorIsBanned(t *testing.T) {
+	f := newFixture(t)
+	userID, cookie := f.signIn("Parent", "parent@example.com")
+	familyID := f.family(userID, cookie.Value, "Hansen")
+	token := f.createAPIKey(familyID, userID, apiKeyOpts{})
+
+	// The key works before the ban.
+	before := &probe{}
+	req := httptest.NewRequest(http.MethodGet, "/api/summary", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	f.apiKeyChain(before).ServeHTTP(httptest.NewRecorder(), req)
+	if !before.called {
+		t.Fatal("the key was rejected before the ban")
+	}
+
+	f.exec(`UPDATE "users" SET "banned" = true WHERE "id" = $1`, userID)
+
+	after := &probe{}
+	banned := httptest.NewRequest(http.MethodGet, "/api/summary", nil)
+	banned.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	f.apiKeyChain(after).ServeHTTP(rec, banned)
+
+	// Indistinguishable from a key that never existed, same as a revoked one.
+	assertRejected(t, rec, after, http.StatusUnauthorized, "INVALID_KEY")
+}
+
 func TestAPIKeyAuthRejectsAnExpiredKey(t *testing.T) {
 	f := newFixture(t)
 	userID, cookie := f.signIn("Parent", "parent@example.com")

@@ -41,9 +41,10 @@
 // A route task adding new operations MUST add each new operationID to
 // operationAuthTiers with the tier its route table calls for
 // (tierFamily is the default for ordinary family-scoped CRUD; tierAdmin
-// for family-admin-only actions; tierSession for the rare route, like
-// GET /api/me, that wants a caller but not a family; tierPublic for
-// none of the above). assertOperationAuthCoverage cross-checks the tier
+// for family-admin-only actions; tierSysadmin for the /admin console,
+// which needs the system-admin role and no family at all; tierSession
+// for the rare route, like GET /api/me, that wants a caller but not a
+// family; tierPublic for none of the above). assertOperationAuthCoverage cross-checks the tier
 // map against the embedded spec at NewHandler build time and panics on
 // any mismatch in either direction — a missing entry (new spec operation,
 // no tier assigned: fails loud rather than shipping unauthenticated) or a
@@ -159,6 +160,14 @@ const (
 	// tierAdmin is tierFamily plus middleware.RequireAdmin — the
 	// family-admin-only surface (member management, deleting a baby).
 	tierAdmin
+	// tierSysadmin is the /admin console (Task 20's sibling gate, REF §A5
+	// item 4): a resolved session whose users.role is "admin" — OUR
+	// system-admin column, unrelated to the per-family admin role tierAdmin
+	// checks — and never an API key. Notably it does NOT require a family:
+	// a system admin looking at platform stats or deleting somebody else's
+	// family need not be a member of anything, so middleware.RequireFamily
+	// is deliberately absent from this chain.
+	tierSysadmin
 	// tierFamilyNoAPIKey is tierFamily plus middleware.RejectAPIKey: a
 	// caller (and family) must resolve exactly as tierFamily requires, but
 	// a pjk_ bearer is then refused anyway. This is for endpoints bound to
@@ -337,6 +346,36 @@ var operationAuthTiers = map[string]authTier{
 	"RevokeInvite":  tierAdmin,
 	"GetInviteInfo": tierPublic,
 	"RedeemInvite":  tierSession,
+
+	// The system-admin console (Task 21; REF §A1 admin.ts, including its
+	// "NEW in Go" table). Every operation is tierSysadmin — see that tier's
+	// doc comment for why it is NOT tierAdmin and why it requires no family
+	// — with one deliberate exception.
+	//
+	// StopImpersonating is tierSession, NOT tierSysadmin, and that is the
+	// whole point: while an operator is impersonating an ordinary user, the
+	// session driving the request IS the target's, whose users.role is
+	// empty. RequireSysadmin would answer 403 and trap the operator inside
+	// the impersonated session with no way back — the one endpoint that
+	// must stay reachable is the exit. Nothing is opened up by this: the
+	// handler reads the admin's identity from the session's own
+	// impersonated_by marker (written server-side at impersonation time)
+	// and refuses any session without one, so an ordinary user calling it
+	// gets 400 NOT_IMPERSONATING and nothing else. See internal/api/
+	// admin.go's StopImpersonating.
+	"GetAdminStats":           tierSysadmin,
+	"ListAdminFamilies":       tierSysadmin,
+	"DeleteAdminFamily":       tierSysadmin,
+	"ListAdminUsers":          tierSysadmin,
+	"DeleteAdminUser":         tierSysadmin,
+	"BanAdminUser":            tierSysadmin,
+	"UnbanAdminUser":          tierSysadmin,
+	"SetAdminUserPassword":    tierSysadmin,
+	"RevokeAdminUserSessions": tierSysadmin,
+	"ImpersonateAdminUser":    tierSysadmin,
+	"StopImpersonating":       tierSession,
+	"ListAdminAudit":          tierSysadmin,
+	"CreateAdminAuditNote":    tierSysadmin,
 }
 
 // tierPublicAPIAllowlist is the exhaustive set of tierPublic operations
@@ -436,7 +475,11 @@ func authChain(d Deps) gen.StrictMiddlewareFunc {
 	requireSession := middleware.RequireSession()
 	family := middleware.RequireFamily(mwDeps)
 	admin := middleware.RequireAdmin()
+	sysadmin := middleware.RequireSysadmin()
 	rejectAPIKey := middleware.RejectAPIKey()
+	// Only the two tiers carrying a cookie-writing operation get this; see
+	// middleware.CaptureHTTP's doc comment.
+	captureHTTP := middleware.CaptureHTTP()
 
 	return func(f gen.StrictHandlerFunc, operationID string) gen.StrictHandlerFunc {
 		tier, ok := operationAuthTiers[operationID]
@@ -452,11 +495,13 @@ func authChain(d Deps) gen.StrictMiddlewareFunc {
 		case tierPublic:
 			return f
 		case tierSession:
-			chain = func(h http.Handler) http.Handler { return apiKey(session(requireSession(h))) }
+			chain = func(h http.Handler) http.Handler { return apiKey(session(requireSession(captureHTTP(h)))) }
 		case tierFamily:
 			chain = func(h http.Handler) http.Handler { return apiKey(session(family(h))) }
 		case tierAdmin:
 			chain = func(h http.Handler) http.Handler { return apiKey(session(family(admin(h)))) }
+		case tierSysadmin:
+			chain = func(h http.Handler) http.Handler { return apiKey(session(sysadmin(captureHTTP(h)))) }
 		case tierFamilyNoAPIKey:
 			chain = func(h http.Handler) http.Handler { return apiKey(session(family(rejectAPIKey(h)))) }
 		default:

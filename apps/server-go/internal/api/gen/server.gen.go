@@ -19,6 +19,45 @@ import (
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListAdminAudit The 100 most recent entries in the append-only system-admin trail, newest first. System admin only.
+	// (GET /api/admin/audit)
+	ListAdminAudit(w http.ResponseWriter, r *http.Request)
+	// CreateAdminAuditNote Append an entry to the trail by hand, for an admin action performed outside these routes. System admin only.
+	// (POST /api/admin/audit)
+	CreateAdminAuditNote(w http.ResponseWriter, r *http.Request)
+	// ListAdminFamilies Every family on the platform, newest first, with member and baby counts and the timestamp of its most recent feed (null when it has never logged one). System admin only.
+	// (GET /api/admin/families)
+	ListAdminFamilies(w http.ResponseWriter, r *http.Request)
+	// DeleteAdminFamily Delete a family and ALL its data — members, babies, invites, keys and every log cascade with the organization row. Audited as `family.delete` before the delete runs. System admin only.
+	// (DELETE /api/admin/families/{id})
+	DeleteAdminFamily(w http.ResponseWriter, r *http.Request, id IdPath)
+	// GetAdminStats Platform totals for the /admin dashboard. coreLogs is feeds + diapers + sleeps; usersLast7d counts accounts created in the last seven days. System admin only.
+	// (GET /api/admin/stats)
+	GetAdminStats(w http.ResponseWriter, r *http.Request)
+	// StopImpersonating End an impersonation and restore the admin's own session cookie. Deliberately session-level, NOT system-admin-gated: while impersonating an ordinary user the current session IS that user's, so a sysadmin gate would trap the operator inside the impersonated session. A caller who is not impersonating gets 400 NOT_IMPERSONATING — which is all an ordinary user can ever reach here. Audited as `impersonation.stop` against the real admin.
+	// (POST /api/admin/stop-impersonating)
+	StopImpersonating(w http.ResponseWriter, r *http.Request)
+	// ListAdminUsers Accounts on the platform, newest first. `query` filters on name or email (case-insensitive substring). NEW in Go — replaces the better-auth admin plugin's client-side listUsers call. System admin only.
+	// (GET /api/admin/users)
+	ListAdminUsers(w http.ResponseWriter, r *http.Request, params ListAdminUsersParams)
+	// BanAdminUser Ban an account: sets banned + ban_reason AND revokes every session the user holds, so the ban is enforced by absence rather than by every reader remembering to check a flag. Their API keys stop authenticating too (GetAPIKeyByHash joins on a non-banned creator). Audited as `user.ban`. System admin only.
+	// (POST /api/admin/users/{id}/ban)
+	BanAdminUser(w http.ResponseWriter, r *http.Request, id IdPath)
+	// DeleteAdminUser Delete an account safely. Every non-cascading reference to the user (log attribution on all eleven log kinds, vaccine documents and dismissals, invites, API keys, calendar events and audit rows) is reassigned to the tombstone "Deleted user" in ONE transaction, calendar assignments are dropped, the user's API keys are revoked, and only then is the account removed (sessions, memberships and push subscriptions cascade). POST rather than DELETE, matching the TypeScript predecessor's route. Audited as `user.delete`. System admin only.
+	// (POST /api/admin/users/{id}/delete)
+	DeleteAdminUser(w http.ResponseWriter, r *http.Request, id IdPath)
+	// ImpersonateAdminUser Sign in as another user for support. Mints a session for the target carrying the admin's id in its metadata (the in-app banner reads it) and swaps the session cookie over; the admin's own session is kept, and POST /api/admin/stop-impersonating restores it. Refused for the caller's own account and for banned targets. Audited as `user.impersonate` against the REAL admin. System admin only.
+	// (POST /api/admin/users/{id}/impersonate)
+	ImpersonateAdminUser(w http.ResponseWriter, r *http.Request, id IdPath)
+	// SetAdminUserPassword Set a user's password (support flow — also establishes a first password for an account created through the invite flow with no credential). The password itself is NEVER written to the audit trail; the row records only the user id. Audited as `user.password.set`. System admin only.
+	// (POST /api/admin/users/{id}/password)
+	SetAdminUserPassword(w http.ResponseWriter, r *http.Request, id IdPath)
+	// RevokeAdminUserSessions Sign a user out everywhere. Audited as `user.sessions.revoke`. System admin only.
+	// (POST /api/admin/users/{id}/sessions/revoke)
+	RevokeAdminUserSessions(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UnbanAdminUser Lift a ban: clears banned + ban_reason. Sessions revoked by the ban stay revoked — the user signs in again. Audited as `user.unban`. System admin only.
+	// (POST /api/admin/users/{id}/unban)
+	UnbanAdminUser(w http.ResponseWriter, r *http.Request, id IdPath)
 	// ListBabies Babies in the caller's active family, oldest first.
 	// (GET /api/babies)
 	ListBabies(w http.ResponseWriter, r *http.Request)
@@ -299,6 +338,304 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListAdminAudit operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminAudit(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminAudit(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminAuditNote operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminAuditNote(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminAuditNote(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminFamilies operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminFamilies(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminFamilies(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminFamily operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminFamily(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminFamily(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminStats operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminStats(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminStats(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StopImpersonating operation middleware
+func (siw *ServerInterfaceWrapper) StopImpersonating(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StopImpersonating(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminUsers operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminUsers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminUsersParams
+
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "query", r.URL.Query(), &params.Query, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminUsers(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BanAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) BanAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BanAdminUser(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminUser(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ImpersonateAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) ImpersonateAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ImpersonateAdminUser(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetAdminUserPassword operation middleware
+func (siw *ServerInterfaceWrapper) SetAdminUserPassword(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetAdminUserPassword(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeAdminUserSessions operation middleware
+func (siw *ServerInterfaceWrapper) RevokeAdminUserSessions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeAdminUserSessions(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnbanAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) UnbanAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnbanAdminUser(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListBabies operation middleware
 func (siw *ServerInterfaceWrapper) ListBabies(w http.ResponseWriter, r *http.Request) {
@@ -2790,8 +3127,459 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/invites/{code}", wrapper.RevokeInvite)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/invites/info/{code}", wrapper.GetInviteInfo)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/invites/redeem", wrapper.RedeemInvite)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/admin/stats", wrapper.GetAdminStats)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/admin/families", wrapper.ListAdminFamilies)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/admin/families/{id}", wrapper.DeleteAdminFamily)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/admin/users", wrapper.ListAdminUsers)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/users/{id}/delete", wrapper.DeleteAdminUser)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/users/{id}/ban", wrapper.BanAdminUser)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/users/{id}/unban", wrapper.UnbanAdminUser)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/users/{id}/password", wrapper.SetAdminUserPassword)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/users/{id}/sessions/revoke", wrapper.RevokeAdminUserSessions)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/users/{id}/impersonate", wrapper.ImpersonateAdminUser)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/stop-impersonating", wrapper.StopImpersonating)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/admin/audit", wrapper.ListAdminAudit)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/audit", wrapper.CreateAdminAuditNote)
 
 	return m
+}
+
+type ListAdminAuditRequestObject struct {
+}
+
+type ListAdminAuditResponseObject interface {
+	VisitListAdminAuditResponse(w http.ResponseWriter) error
+}
+
+type ListAdminAudit200JSONResponse []AuditEntry
+
+func (response ListAdminAudit200JSONResponse) VisitListAdminAuditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAdminAuditNoteRequestObject struct {
+	Body *CreateAdminAuditNoteJSONRequestBody
+}
+
+type CreateAdminAuditNoteResponseObject interface {
+	VisitCreateAdminAuditNoteResponse(w http.ResponseWriter) error
+}
+
+type CreateAdminAuditNote200JSONResponse Ok
+
+func (response CreateAdminAuditNote200JSONResponse) VisitCreateAdminAuditNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAdminFamiliesRequestObject struct {
+}
+
+type ListAdminFamiliesResponseObject interface {
+	VisitListAdminFamiliesResponse(w http.ResponseWriter) error
+}
+
+type ListAdminFamilies200JSONResponse []AdminFamily
+
+func (response ListAdminFamilies200JSONResponse) VisitListAdminFamiliesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAdminFamilyRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteAdminFamilyResponseObject interface {
+	VisitDeleteAdminFamilyResponse(w http.ResponseWriter) error
+}
+
+type DeleteAdminFamily200JSONResponse Ok
+
+func (response DeleteAdminFamily200JSONResponse) VisitDeleteAdminFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAdminFamily404JSONResponse Error
+
+func (response DeleteAdminFamily404JSONResponse) VisitDeleteAdminFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAdminStatsRequestObject struct {
+}
+
+type GetAdminStatsResponseObject interface {
+	VisitGetAdminStatsResponse(w http.ResponseWriter) error
+}
+
+type GetAdminStats200JSONResponse AdminStats
+
+func (response GetAdminStats200JSONResponse) VisitGetAdminStatsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopImpersonatingRequestObject struct {
+}
+
+type StopImpersonatingResponseObject interface {
+	VisitStopImpersonatingResponse(w http.ResponseWriter) error
+}
+
+type StopImpersonating200JSONResponse Ok
+
+func (response StopImpersonating200JSONResponse) VisitStopImpersonatingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopImpersonating400JSONResponse Error
+
+func (response StopImpersonating400JSONResponse) VisitStopImpersonatingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAdminUsersRequestObject struct {
+	Params ListAdminUsersParams
+}
+
+type ListAdminUsersResponseObject interface {
+	VisitListAdminUsersResponse(w http.ResponseWriter) error
+}
+
+type ListAdminUsers200JSONResponse []AdminUser
+
+func (response ListAdminUsers200JSONResponse) VisitListAdminUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BanAdminUserRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *BanAdminUserJSONRequestBody
+}
+
+type BanAdminUserResponseObject interface {
+	VisitBanAdminUserResponse(w http.ResponseWriter) error
+}
+
+type BanAdminUser200JSONResponse Ok
+
+func (response BanAdminUser200JSONResponse) VisitBanAdminUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BanAdminUser400JSONResponse Error
+
+func (response BanAdminUser400JSONResponse) VisitBanAdminUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BanAdminUser404JSONResponse Error
+
+func (response BanAdminUser404JSONResponse) VisitBanAdminUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAdminUserRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteAdminUserResponseObject interface {
+	VisitDeleteAdminUserResponse(w http.ResponseWriter) error
+}
+
+type DeleteAdminUser200JSONResponse Ok
+
+func (response DeleteAdminUser200JSONResponse) VisitDeleteAdminUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAdminUser400JSONResponse Error
+
+func (response DeleteAdminUser400JSONResponse) VisitDeleteAdminUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAdminUser404JSONResponse Error
+
+func (response DeleteAdminUser404JSONResponse) VisitDeleteAdminUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImpersonateAdminUserRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type ImpersonateAdminUserResponseObject interface {
+	VisitImpersonateAdminUserResponse(w http.ResponseWriter) error
+}
+
+type ImpersonateAdminUser200JSONResponse Ok
+
+func (response ImpersonateAdminUser200JSONResponse) VisitImpersonateAdminUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImpersonateAdminUser400JSONResponse Error
+
+func (response ImpersonateAdminUser400JSONResponse) VisitImpersonateAdminUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImpersonateAdminUser404JSONResponse Error
+
+func (response ImpersonateAdminUser404JSONResponse) VisitImpersonateAdminUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetAdminUserPasswordRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *SetAdminUserPasswordJSONRequestBody
+}
+
+type SetAdminUserPasswordResponseObject interface {
+	VisitSetAdminUserPasswordResponse(w http.ResponseWriter) error
+}
+
+type SetAdminUserPassword200JSONResponse Ok
+
+func (response SetAdminUserPassword200JSONResponse) VisitSetAdminUserPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetAdminUserPassword404JSONResponse Error
+
+func (response SetAdminUserPassword404JSONResponse) VisitSetAdminUserPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeAdminUserSessionsRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type RevokeAdminUserSessionsResponseObject interface {
+	VisitRevokeAdminUserSessionsResponse(w http.ResponseWriter) error
+}
+
+type RevokeAdminUserSessions200JSONResponse Ok
+
+func (response RevokeAdminUserSessions200JSONResponse) VisitRevokeAdminUserSessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeAdminUserSessions404JSONResponse Error
+
+func (response RevokeAdminUserSessions404JSONResponse) VisitRevokeAdminUserSessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnbanAdminUserRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type UnbanAdminUserResponseObject interface {
+	VisitUnbanAdminUserResponse(w http.ResponseWriter) error
+}
+
+type UnbanAdminUser200JSONResponse Ok
+
+func (response UnbanAdminUser200JSONResponse) VisitUnbanAdminUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnbanAdminUser404JSONResponse Error
+
+func (response UnbanAdminUser404JSONResponse) VisitUnbanAdminUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type ListBabiesRequestObject struct {
@@ -5781,6 +6569,45 @@ func (response Readyz503JSONResponse) VisitReadyzResponse(w http.ResponseWriter)
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListAdminAudit The 100 most recent entries in the append-only system-admin trail, newest first. System admin only.
+	// (GET /api/admin/audit)
+	ListAdminAudit(ctx context.Context, request ListAdminAuditRequestObject) (ListAdminAuditResponseObject, error)
+	// CreateAdminAuditNote Append an entry to the trail by hand, for an admin action performed outside these routes. System admin only.
+	// (POST /api/admin/audit)
+	CreateAdminAuditNote(ctx context.Context, request CreateAdminAuditNoteRequestObject) (CreateAdminAuditNoteResponseObject, error)
+	// ListAdminFamilies Every family on the platform, newest first, with member and baby counts and the timestamp of its most recent feed (null when it has never logged one). System admin only.
+	// (GET /api/admin/families)
+	ListAdminFamilies(ctx context.Context, request ListAdminFamiliesRequestObject) (ListAdminFamiliesResponseObject, error)
+	// DeleteAdminFamily Delete a family and ALL its data — members, babies, invites, keys and every log cascade with the organization row. Audited as `family.delete` before the delete runs. System admin only.
+	// (DELETE /api/admin/families/{id})
+	DeleteAdminFamily(ctx context.Context, request DeleteAdminFamilyRequestObject) (DeleteAdminFamilyResponseObject, error)
+	// GetAdminStats Platform totals for the /admin dashboard. coreLogs is feeds + diapers + sleeps; usersLast7d counts accounts created in the last seven days. System admin only.
+	// (GET /api/admin/stats)
+	GetAdminStats(ctx context.Context, request GetAdminStatsRequestObject) (GetAdminStatsResponseObject, error)
+	// StopImpersonating End an impersonation and restore the admin's own session cookie. Deliberately session-level, NOT system-admin-gated: while impersonating an ordinary user the current session IS that user's, so a sysadmin gate would trap the operator inside the impersonated session. A caller who is not impersonating gets 400 NOT_IMPERSONATING — which is all an ordinary user can ever reach here. Audited as `impersonation.stop` against the real admin.
+	// (POST /api/admin/stop-impersonating)
+	StopImpersonating(ctx context.Context, request StopImpersonatingRequestObject) (StopImpersonatingResponseObject, error)
+	// ListAdminUsers Accounts on the platform, newest first. `query` filters on name or email (case-insensitive substring). NEW in Go — replaces the better-auth admin plugin's client-side listUsers call. System admin only.
+	// (GET /api/admin/users)
+	ListAdminUsers(ctx context.Context, request ListAdminUsersRequestObject) (ListAdminUsersResponseObject, error)
+	// BanAdminUser Ban an account: sets banned + ban_reason AND revokes every session the user holds, so the ban is enforced by absence rather than by every reader remembering to check a flag. Their API keys stop authenticating too (GetAPIKeyByHash joins on a non-banned creator). Audited as `user.ban`. System admin only.
+	// (POST /api/admin/users/{id}/ban)
+	BanAdminUser(ctx context.Context, request BanAdminUserRequestObject) (BanAdminUserResponseObject, error)
+	// DeleteAdminUser Delete an account safely. Every non-cascading reference to the user (log attribution on all eleven log kinds, vaccine documents and dismissals, invites, API keys, calendar events and audit rows) is reassigned to the tombstone "Deleted user" in ONE transaction, calendar assignments are dropped, the user's API keys are revoked, and only then is the account removed (sessions, memberships and push subscriptions cascade). POST rather than DELETE, matching the TypeScript predecessor's route. Audited as `user.delete`. System admin only.
+	// (POST /api/admin/users/{id}/delete)
+	DeleteAdminUser(ctx context.Context, request DeleteAdminUserRequestObject) (DeleteAdminUserResponseObject, error)
+	// ImpersonateAdminUser Sign in as another user for support. Mints a session for the target carrying the admin's id in its metadata (the in-app banner reads it) and swaps the session cookie over; the admin's own session is kept, and POST /api/admin/stop-impersonating restores it. Refused for the caller's own account and for banned targets. Audited as `user.impersonate` against the REAL admin. System admin only.
+	// (POST /api/admin/users/{id}/impersonate)
+	ImpersonateAdminUser(ctx context.Context, request ImpersonateAdminUserRequestObject) (ImpersonateAdminUserResponseObject, error)
+	// SetAdminUserPassword Set a user's password (support flow — also establishes a first password for an account created through the invite flow with no credential). The password itself is NEVER written to the audit trail; the row records only the user id. Audited as `user.password.set`. System admin only.
+	// (POST /api/admin/users/{id}/password)
+	SetAdminUserPassword(ctx context.Context, request SetAdminUserPasswordRequestObject) (SetAdminUserPasswordResponseObject, error)
+	// RevokeAdminUserSessions Sign a user out everywhere. Audited as `user.sessions.revoke`. System admin only.
+	// (POST /api/admin/users/{id}/sessions/revoke)
+	RevokeAdminUserSessions(ctx context.Context, request RevokeAdminUserSessionsRequestObject) (RevokeAdminUserSessionsResponseObject, error)
+	// UnbanAdminUser Lift a ban: clears banned + ban_reason. Sessions revoked by the ban stay revoked — the user signs in again. Audited as `user.unban`. System admin only.
+	// (POST /api/admin/users/{id}/unban)
+	UnbanAdminUser(ctx context.Context, request UnbanAdminUserRequestObject) (UnbanAdminUserResponseObject, error)
 	// ListBabies Babies in the caller's active family, oldest first.
 	// (GET /api/babies)
 	ListBabies(ctx context.Context, request ListBabiesRequestObject) (ListBabiesResponseObject, error)
@@ -6090,6 +6917,358 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListAdminAudit operation middleware
+func (sh *strictHandler) ListAdminAudit(w http.ResponseWriter, r *http.Request) {
+	var request ListAdminAuditRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAdminAudit(ctx, request.(ListAdminAuditRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAdminAudit")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAdminAuditResponseObject); ok {
+		if err := validResponse.VisitListAdminAuditResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateAdminAuditNote operation middleware
+func (sh *strictHandler) CreateAdminAuditNote(w http.ResponseWriter, r *http.Request) {
+	var request CreateAdminAuditNoteRequestObject
+
+	var body CreateAdminAuditNoteJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateAdminAuditNote(ctx, request.(CreateAdminAuditNoteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateAdminAuditNote")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateAdminAuditNoteResponseObject); ok {
+		if err := validResponse.VisitCreateAdminAuditNoteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAdminFamilies operation middleware
+func (sh *strictHandler) ListAdminFamilies(w http.ResponseWriter, r *http.Request) {
+	var request ListAdminFamiliesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAdminFamilies(ctx, request.(ListAdminFamiliesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAdminFamilies")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAdminFamiliesResponseObject); ok {
+		if err := validResponse.VisitListAdminFamiliesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteAdminFamily operation middleware
+func (sh *strictHandler) DeleteAdminFamily(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteAdminFamilyRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteAdminFamily(ctx, request.(DeleteAdminFamilyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteAdminFamily")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteAdminFamilyResponseObject); ok {
+		if err := validResponse.VisitDeleteAdminFamilyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAdminStats operation middleware
+func (sh *strictHandler) GetAdminStats(w http.ResponseWriter, r *http.Request) {
+	var request GetAdminStatsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAdminStats(ctx, request.(GetAdminStatsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAdminStats")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAdminStatsResponseObject); ok {
+		if err := validResponse.VisitGetAdminStatsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StopImpersonating operation middleware
+func (sh *strictHandler) StopImpersonating(w http.ResponseWriter, r *http.Request) {
+	var request StopImpersonatingRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StopImpersonating(ctx, request.(StopImpersonatingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StopImpersonating")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StopImpersonatingResponseObject); ok {
+		if err := validResponse.VisitStopImpersonatingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAdminUsers operation middleware
+func (sh *strictHandler) ListAdminUsers(w http.ResponseWriter, r *http.Request, params ListAdminUsersParams) {
+	var request ListAdminUsersRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAdminUsers(ctx, request.(ListAdminUsersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAdminUsers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAdminUsersResponseObject); ok {
+		if err := validResponse.VisitListAdminUsersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// BanAdminUser operation middleware
+func (sh *strictHandler) BanAdminUser(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request BanAdminUserRequestObject
+
+	request.Id = id
+
+	var body BanAdminUserJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.BanAdminUser(ctx, request.(BanAdminUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "BanAdminUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(BanAdminUserResponseObject); ok {
+		if err := validResponse.VisitBanAdminUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteAdminUser operation middleware
+func (sh *strictHandler) DeleteAdminUser(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteAdminUserRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteAdminUser(ctx, request.(DeleteAdminUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteAdminUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteAdminUserResponseObject); ok {
+		if err := validResponse.VisitDeleteAdminUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ImpersonateAdminUser operation middleware
+func (sh *strictHandler) ImpersonateAdminUser(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request ImpersonateAdminUserRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ImpersonateAdminUser(ctx, request.(ImpersonateAdminUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ImpersonateAdminUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ImpersonateAdminUserResponseObject); ok {
+		if err := validResponse.VisitImpersonateAdminUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetAdminUserPassword operation middleware
+func (sh *strictHandler) SetAdminUserPassword(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request SetAdminUserPasswordRequestObject
+
+	request.Id = id
+
+	var body SetAdminUserPasswordJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetAdminUserPassword(ctx, request.(SetAdminUserPasswordRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetAdminUserPassword")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetAdminUserPasswordResponseObject); ok {
+		if err := validResponse.VisitSetAdminUserPasswordResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeAdminUserSessions operation middleware
+func (sh *strictHandler) RevokeAdminUserSessions(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request RevokeAdminUserSessionsRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeAdminUserSessions(ctx, request.(RevokeAdminUserSessionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeAdminUserSessions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeAdminUserSessionsResponseObject); ok {
+		if err := validResponse.VisitRevokeAdminUserSessionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UnbanAdminUser operation middleware
+func (sh *strictHandler) UnbanAdminUser(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UnbanAdminUserRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UnbanAdminUser(ctx, request.(UnbanAdminUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnbanAdminUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UnbanAdminUserResponseObject); ok {
+		if err := validResponse.VisitUnbanAdminUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ListBabies operation middleware

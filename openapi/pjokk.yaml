@@ -2187,6 +2187,335 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  # --- System-admin console (Task 21; REF §A1 admin.ts) -------------------
+  # Every operation below runs behind RequireSysadmin (users.role ==
+  # "admin", a column of ours unrelated to the per-family admin role) and
+  # is refused outright for API-key callers — EXCEPT
+  # /api/admin/stop-impersonating, which is deliberately session-level;
+  # see its own summary.
+  /api/admin/stats:
+    get:
+      operationId: getAdminStats
+      summary: >-
+        Platform totals for the /admin dashboard. coreLogs is feeds +
+        diapers + sleeps; usersLast7d counts accounts created in the last
+        seven days. System admin only.
+      tags: [admin]
+      responses:
+        "200":
+          description: Platform totals.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+  /api/admin/families:
+    get:
+      operationId: listAdminFamilies
+      summary: >-
+        Every family on the platform, newest first, with member and baby
+        counts and the timestamp of its most recent feed (null when it has
+        never logged one). System admin only.
+      tags: [admin]
+      responses:
+        "200":
+          description: All families.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminFamily"
+  /api/admin/families/{id}:
+    delete:
+      operationId: deleteAdminFamily
+      summary: >-
+        Delete a family and ALL its data — members, babies, invites, keys
+        and every log cascade with the organization row. Audited as
+        `family.delete` before the delete runs. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No family with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users:
+    get:
+      operationId: listAdminUsers
+      summary: >-
+        Accounts on the platform, newest first. `query` filters on name or
+        email (case-insensitive substring). NEW in Go — replaces the
+        better-auth admin plugin's client-side listUsers call. System admin
+        only.
+      tags: [admin]
+      parameters:
+        - name: query
+          in: query
+          description: Case-insensitive substring match on name or email.
+          required: false
+          schema:
+            type: string
+            maxLength: 200
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Matching accounts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminUser"
+  /api/admin/users/{id}/delete:
+    post:
+      operationId: deleteAdminUser
+      summary: >-
+        Delete an account safely. Every non-cascading reference to the user
+        (log attribution on all eleven log kinds, vaccine documents and
+        dismissals, invites, API keys, calendar events and audit rows) is
+        reassigned to the tombstone "Deleted user" in ONE transaction,
+        calendar assignments are dropped, the user's API keys are revoked,
+        and only then is the account removed
+        (sessions, memberships and push subscriptions cascade). POST rather
+        than DELETE, matching the TypeScript predecessor's route. Audited
+        as `user.delete`. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "400":
+          description: Refused — the caller's own account, or the tombstone.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No user with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users/{id}/ban:
+    post:
+      operationId: banAdminUser
+      summary: >-
+        Ban an account: sets banned + ban_reason AND revokes every session
+        the user holds, so the ban is enforced by absence rather than by
+        every reader remembering to check a flag. Their API keys stop
+        authenticating too (GetAPIKeyByHash joins on a non-banned creator).
+        Audited as `user.ban`. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BanUser"
+      responses:
+        "200":
+          description: Banned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "400":
+          description: Refused — an admin may not ban their own account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No user with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users/{id}/unban:
+    post:
+      operationId: unbanAdminUser
+      summary: >-
+        Lift a ban: clears banned + ban_reason. Sessions revoked by the ban
+        stay revoked — the user signs in again. Audited as `user.unban`.
+        System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Unbanned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No user with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users/{id}/password:
+    post:
+      operationId: setAdminUserPassword
+      summary: >-
+        Set a user's password (support flow — also establishes a first
+        password for an account created through the invite flow with no
+        credential). The password itself is NEVER written to the audit
+        trail; the row records only the user id. Audited as
+        `user.password.set`. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetUserPassword"
+      responses:
+        "200":
+          description: Password set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No user with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users/{id}/sessions/revoke:
+    post:
+      operationId: revokeAdminUserSessions
+      summary: >-
+        Sign a user out everywhere. Audited as `user.sessions.revoke`.
+        System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Sessions revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No user with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users/{id}/impersonate:
+    post:
+      operationId: impersonateAdminUser
+      summary: >-
+        Sign in as another user for support. Mints a session for the target
+        carrying the admin's id in its metadata (the in-app banner reads
+        it) and swaps the session cookie over; the admin's own session is
+        kept, and POST /api/admin/stop-impersonating restores it. Refused
+        for the caller's own account and for banned targets. Audited as
+        `user.impersonate` against the REAL admin. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Impersonating — the response carries the target's session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "400":
+          description: Refused — the caller's own account, or a banned target.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No user with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/stop-impersonating:
+    post:
+      operationId: stopImpersonating
+      summary: >-
+        End an impersonation and restore the admin's own session cookie.
+        Deliberately session-level, NOT system-admin-gated: while
+        impersonating an ordinary user the current session IS that user's,
+        so a sysadmin gate would trap the operator inside the impersonated
+        session. A caller who is not impersonating gets 400
+        NOT_IMPERSONATING — which is all an ordinary user can ever reach
+        here. Audited as `impersonation.stop` against the real admin.
+      tags: [admin]
+      responses:
+        "200":
+          description: Impersonation ended — the response restores the admin's cookie.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "400":
+          description: This session is not impersonating anyone.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/audit:
+    get:
+      operationId: listAdminAudit
+      summary: >-
+        The 100 most recent entries in the append-only system-admin trail,
+        newest first. System admin only.
+      tags: [admin]
+      responses:
+        "200":
+          description: Recent admin actions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEntry"
+    post:
+      operationId: createAdminAuditNote
+      summary: >-
+        Append an entry to the trail by hand, for an admin action performed
+        outside these routes. System admin only.
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuditNote"
+      responses:
+        "200":
+          description: Recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+
 components:
   parameters:
     babyIdQuery:
@@ -4004,6 +4333,130 @@ components:
           enum: [admin, member]
         alreadyMember:
           type: boolean
+
+    # --- System-admin console (Task 21) ---------------------------------
+    AdminStats:
+      type: object
+      description: >-
+        Platform totals. Every count is a plain integer — the underlying
+        COUNT(*) is bigint and must be cast (`::int`) in SQL, or the driver
+        hands it back as a string (CLAUDE.md's Postgres notes).
+      required:
+        [families, users, babies, coreLogs, pushSubscriptions, usersLast7d]
+      properties:
+        families:
+          type: integer
+        users:
+          type: integer
+          description: >-
+            Every row in `users`, the "Deleted user" tombstone included —
+            the TypeScript predecessor counted it the same way once it had
+            been created.
+        babies:
+          type: integer
+        coreLogs:
+          type: integer
+          description: Feeds + diapers + sleeps.
+        pushSubscriptions:
+          type: integer
+        usersLast7d:
+          type: integer
+    AdminFamily:
+      type: object
+      required:
+        [id, name, slug, plan, createdAt, members, babies, lastFeedAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        plan:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        members:
+          type: integer
+        babies:
+          type: integer
+        lastFeedAt:
+          type: string
+          format: date-time
+          nullable: true
+    AdminUser:
+      type: object
+      required: [id, name, email, role, banned, banReason, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          nullable: true
+          description: Ours, system-admin role. "admin" or null.
+        banned:
+          type: boolean
+        banReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    BanUser:
+      type: object
+      description: Every field is optional; an absent body bans with no stated reason.
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+    SetUserPassword:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+    AuditEntry:
+      type: object
+      required: [id, adminId, adminName, action, target, detail, createdAt]
+      properties:
+        id:
+          type: string
+        adminId:
+          type: string
+        adminName:
+          type: string
+        action:
+          type: string
+        target:
+          type: string
+        detail:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    AuditNote:
+      type: object
+      required: [action, target]
+      properties:
+        action:
+          type: string
+          minLength: 1
+          maxLength: 60
+        target:
+          type: string
+          minLength: 1
+          maxLength: 200
+        detail:
+          type: string
+          maxLength: 500
     Error:
       type: object
       description: >-

@@ -697,19 +697,49 @@ func (s *service) SetActiveFamily(ctx context.Context, sessionToken, familyID st
 	return nil
 }
 
-// SetPassword sets a password for a user who may not have a usable one
-// (an OAuth or invite-provisioned account), revoking their other sessions:
-// an administrator changing someone's password is either a recovery or a
-// response to a compromise, and both want the old sessions gone.
+// SetPassword sets a user's password, whatever they had before — an OAuth
+// or invite-provisioned account with none, or a forgotten one — and revokes
+// their sessions: an administrator changing someone's password is either a
+// recovery or a response to a compromise, and both want the old sessions
+// gone.
+//
+// It does NOT take the current password, on purpose: the caller is an
+// operator acting on someone else's account (Task 21's
+// POST /api/admin/users/{id}/password), not the account's owner. Guarding
+// this is the API layer's job — it sits behind RequireSysadmin and audits
+// every call.
+//
+// Two paths, because Limen's credential plugin has no single method for
+// this. Its SetPassword establishes a FIRST password only
+// (ErrPasswordAlreadySet otherwise) and its UpdatePassword demands the
+// current one. So an account with no password goes through Limen (keeping
+// its own validation and session revocation), and an account that already
+// has one gets Limen's hasher plus our own UPDATE — the hash is Limen's
+// either way, so the stored value is exactly what its sign-in comparison
+// expects; only who issues the UPDATE differs.
 func (s *service) SetPassword(ctx context.Context, userID, newPassword string) error {
 	user, err := s.core.DBAction.FindUserByID(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("auth: load user: %w", err)
 	}
-	if err := s.cred.SetPassword(ctx, user, newPassword, true); err != nil {
-		return fmt.Errorf("auth: set password: %w", err)
+
+	if user.Password == nil || *user.Password == "" {
+		if err := s.cred.SetPassword(ctx, user, newPassword, true); err != nil {
+			return fmt.Errorf("auth: set password: %w", err)
+		}
+		return nil
 	}
-	return nil
+
+	hashed, err := s.cred.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("auth: hash password: %w", err)
+	}
+	if err := s.q.SetUserPassword(ctx, gen.SetUserPasswordParams{ID: userID, Password: &hashed}); err != nil {
+		return fmt.Errorf("auth: store password: %w", err)
+	}
+	// Same effect as the revokeOtherSessions:true the branch above asks
+	// Limen for: a reset must not leave a compromised session alive.
+	return s.RevokeAllSessions(ctx, userID)
 }
 
 // RevokeAllSessions signs a user out everywhere.

@@ -989,6 +989,45 @@ func (e Readyz503JSONResponseBodyOk) Valid() bool {
 	}
 }
 
+// AdminFamily defines model for AdminFamily.
+type AdminFamily struct {
+	Babies     int        `json:"babies"`
+	CreatedAt  time.Time  `json:"createdAt"`
+	Id         string     `json:"id"`
+	LastFeedAt *time.Time `json:"lastFeedAt"`
+	Members    int        `json:"members"`
+	Name       string     `json:"name"`
+	Plan       string     `json:"plan"`
+	Slug       string     `json:"slug"`
+}
+
+// AdminStats Platform totals. Every count is a plain integer — the underlying COUNT(*) is bigint and must be cast (`::int`) in SQL, or the driver hands it back as a string (CLAUDE.md's Postgres notes).
+type AdminStats struct {
+	Babies int `json:"babies"`
+
+	// CoreLogs Feeds + diapers + sleeps.
+	CoreLogs          int `json:"coreLogs"`
+	Families          int `json:"families"`
+	PushSubscriptions int `json:"pushSubscriptions"`
+
+	// Users Every row in `users`, the "Deleted user" tombstone included — the TypeScript predecessor counted it the same way once it had been created.
+	Users       int `json:"users"`
+	UsersLast7d int `json:"usersLast7d"`
+}
+
+// AdminUser defines model for AdminUser.
+type AdminUser struct {
+	BanReason *string   `json:"banReason"`
+	Banned    bool      `json:"banned"`
+	CreatedAt time.Time `json:"createdAt"`
+	Email     string    `json:"email"`
+	Id        string    `json:"id"`
+	Name      string    `json:"name"`
+
+	// Role Ours, system-admin role. "admin" or null.
+	Role *string `json:"role"`
+}
+
 // ApiKey One bearer API key, key material never included (see ApiKeyCreated for the one response that carries it).
 type ApiKey struct {
 	CreatedAt  time.Time  `json:"createdAt"`
@@ -1020,6 +1059,24 @@ type ApiKeyCreated struct {
 	RevokedAt *time.Time `json:"revokedAt"`
 }
 
+// AuditEntry defines model for AuditEntry.
+type AuditEntry struct {
+	Action    string    `json:"action"`
+	AdminId   string    `json:"adminId"`
+	AdminName string    `json:"adminName"`
+	CreatedAt time.Time `json:"createdAt"`
+	Detail    *string   `json:"detail"`
+	Id        string    `json:"id"`
+	Target    string    `json:"target"`
+}
+
+// AuditNote defines model for AuditNote.
+type AuditNote struct {
+	Action string  `json:"action"`
+	Detail *string `json:"detail,omitempty"`
+	Target string  `json:"target"`
+}
+
 // Baby defines model for Baby.
 type Baby struct {
 	BirthDate time.Time `json:"birthDate"`
@@ -1030,6 +1087,11 @@ type Baby struct {
 
 // BabySex defines model for Baby.Sex.
 type BabySex string
+
+// BanUser Every field is optional; an absent body bans with no stated reason.
+type BanUser struct {
+	Reason *string `json:"reason,omitempty"`
+}
 
 // BathLog defines model for BathLog.
 type BathLog struct {
@@ -1538,6 +1600,11 @@ type SetMemberRole struct {
 // SetMemberRoleRole defines model for SetMemberRole.Role.
 type SetMemberRoleRole string
 
+// SetUserPassword defines model for SetUserPassword.
+type SetUserPassword struct {
+	Password string `json:"password"`
+}
+
 // SleepLocation defines model for SleepLocation.
 type SleepLocation struct {
 	Id   string `json:"id"`
@@ -1848,6 +1915,15 @@ type LimitQuery = int
 // MemberIdPath defines model for memberIdPath.
 type MemberIdPath = string
 
+// ListAdminUsersParams defines parameters for ListAdminUsers.
+type ListAdminUsersParams struct {
+	// Query Case-insensitive substring match on name or email.
+	Query *string `form:"query,omitempty" json:"query,omitempty"`
+
+	// Limit Maximum number of rows to return.
+	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ListBathsParams defines parameters for ListBaths.
 type ListBathsParams struct {
 	// BabyId Restrict the result to one baby in the caller's family.
@@ -2014,6 +2090,15 @@ type Readyz200JSONResponseBodyOk bool
 
 // Readyz503JSONResponseBodyOk defines parameters for Readyz.
 type Readyz503JSONResponseBodyOk bool
+
+// CreateAdminAuditNoteJSONRequestBody defines body for CreateAdminAuditNote for application/json ContentType.
+type CreateAdminAuditNoteJSONRequestBody = AuditNote
+
+// BanAdminUserJSONRequestBody defines body for BanAdminUser for application/json ContentType.
+type BanAdminUserJSONRequestBody = BanUser
+
+// SetAdminUserPasswordJSONRequestBody defines body for SetAdminUserPassword for application/json ContentType.
+type SetAdminUserPasswordJSONRequestBody = SetUserPassword
 
 // CreateBabyJSONRequestBody defines body for CreateBaby for application/json ContentType.
 type CreateBabyJSONRequestBody = CreateBaby
