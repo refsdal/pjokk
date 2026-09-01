@@ -741,6 +741,22 @@ type CreateSleepLocation struct {
 	Name string `json:"name"`
 }
 
+// CreateVaccine defines model for CreateVaccine.
+type CreateVaccine struct {
+	BabyId       string    `json:"babyId"`
+	DoseNumber   *int      `json:"doseNumber,omitempty"`
+	Name         string    `json:"name"`
+	Notes        *string   `json:"notes,omitempty"`
+	ScheduleSlot *string   `json:"scheduleSlot,omitempty"`
+	Time         time.Time `json:"time"`
+}
+
+// CreateVaccineDismissal defines model for CreateVaccineDismissal.
+type CreateVaccineDismissal struct {
+	BabyId  string `json:"babyId"`
+	SlotKey string `json:"slotKey"`
+}
+
 // DiaperLog defines model for DiaperLog.
 type DiaperLog struct {
 	BabyId        string        `json:"babyId"`
@@ -1080,6 +1096,47 @@ type UpdateSleep struct {
 	StartTime *time.Time `json:"startTime,omitempty"`
 }
 
+// UpdateVaccine Every field is optional; an empty object is a no-op. `doseNumber`, `scheduleSlot` and `notes` may also be sent as `null` to CLEAR that column; `time`/`name` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
+type UpdateVaccine struct {
+	DoseNumber   *int       `json:"doseNumber,omitempty"`
+	Name         *string    `json:"name,omitempty"`
+	Notes        *string    `json:"notes,omitempty"`
+	ScheduleSlot *string    `json:"scheduleSlot,omitempty"`
+	Time         *time.Time `json:"time,omitempty"`
+}
+
+// VaccineDismissal A programme slot waved away for one baby. slotKey is a key into the bundled programme, deliberately not validated against it — the programme is data that can change without an API change.
+type VaccineDismissal struct {
+	BabyId  string `json:"babyId"`
+	Id      string `json:"id"`
+	SlotKey string `json:"slotKey"`
+}
+
+// VaccineDocument One file attached to a vaccine log. Fetch through `/api/files/{id}` — the object store is never public.
+type VaccineDocument struct {
+	ContentType string `json:"contentType"`
+	Filename    string `json:"filename"`
+	Id          string `json:"id"`
+	Size        int    `json:"size"`
+	Url         string `json:"url"`
+}
+
+// VaccineLog What was given, and when. Free — never plan-gated (only attaching a document is; see internal/api/files.go).
+type VaccineLog struct {
+	BabyId        string            `json:"babyId"`
+	CaretakerId   string            `json:"caretakerId"`
+	CaretakerName string            `json:"caretakerName"`
+	Documents     []VaccineDocument `json:"documents"`
+	DoseNumber    *int              `json:"doseNumber"`
+	Id            string            `json:"id"`
+	Name          string            `json:"name"`
+	Notes         *string           `json:"notes"`
+
+	// ScheduleSlot Slot key from the bundled programme ("mmr:1"), or null for an off-programme dose.
+	ScheduleSlot *string   `json:"scheduleSlot"`
+	Time         time.Time `json:"time"`
+}
+
 // Wake Defaults endTime to now on the server when omitted.
 type Wake struct {
 	EndTime *time.Time `json:"endTime,omitempty"`
@@ -1207,6 +1264,21 @@ type GetSummaryParams struct {
 	Tz *int `form:"tz,omitempty" json:"tz,omitempty"`
 }
 
+// ListVaccinesParams defines parameters for ListVaccines.
+type ListVaccinesParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+
+	// Limit Maximum number of rows to return.
+	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListVaccineDismissalsParams defines parameters for ListVaccineDismissals.
+type ListVaccineDismissalsParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+}
+
 // Healthz200JSONResponseBodyOk defines parameters for Healthz.
 type Healthz200JSONResponseBodyOk bool
 
@@ -1293,3 +1365,12 @@ type UpdateSleepJSONRequestBody = UpdateSleep
 
 // WakeSleepJSONRequestBody defines body for WakeSleep for application/json ContentType.
 type WakeSleepJSONRequestBody = Wake
+
+// CreateVaccineJSONRequestBody defines body for CreateVaccine for application/json ContentType.
+type CreateVaccineJSONRequestBody = CreateVaccine
+
+// CreateVaccineDismissalJSONRequestBody defines body for CreateVaccineDismissal for application/json ContentType.
+type CreateVaccineDismissalJSONRequestBody = CreateVaccineDismissal
+
+// UpdateVaccineJSONRequestBody defines body for UpdateVaccine for application/json ContentType.
+type UpdateVaccineJSONRequestBody = UpdateVaccine

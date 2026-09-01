@@ -1380,6 +1380,169 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/vaccines/dismissals:
+    get:
+      operationId: listVaccineDismissals
+      summary: >-
+        Programme slots waved away for one baby (or every baby in the
+        family when babyId is omitted). Free, like the vaccine log itself.
+      tags: [vaccines]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+      responses:
+        "200":
+          description: Dismissed programme slots.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VaccineDismissal"
+    post:
+      operationId: createVaccineDismissal
+      summary: >-
+        Hide a programme slot for one baby. Idempotent on the
+        (babyId,slotKey) unique index: dismissing an already-dismissed slot
+        returns the existing row rather than erroring (see
+        internal/api/vaccines.go).
+      tags: [vaccines]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVaccineDismissal"
+      responses:
+        "201":
+          description: Dismissed (or already was — same row either way).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaccineDismissal"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/vaccines/dismissals/{id}:
+    delete:
+      operationId: deleteVaccineDismissal
+      summary: Restore a dismissed slot.
+      tags: [vaccines]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Restored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No dismissal with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/vaccines:
+    get:
+      operationId: listVaccines
+      summary: >-
+        Vaccine logs in the caller's active family, newest first. Each
+        entry's `documents` array carries `url: "/api/files/{docId}"` for
+        any attached file (see internal/api/files.go — uploading is
+        disabled today, but existing documents still stream).
+      tags: [vaccines]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Vaccines, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VaccineLog"
+    post:
+      operationId: createVaccine
+      summary: Log a vaccine. Free — never plan-gated (only document upload is).
+      tags: [vaccines]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVaccine"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaccineLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/vaccines/{id}:
+    patch:
+      operationId: updateVaccine
+      summary: >-
+        Partial update. `doseNumber`, `scheduleSlot` and `notes` may be
+        sent as `null` to CLEAR that column; `time`/`name` are not
+        nullable — only settable or omitted.
+      tags: [vaccines]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVaccine"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaccineLog"
+        "404":
+          description: No vaccine log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteVaccine
+      summary: >-
+        Delete a vaccine log and every document attached to it. The DB row
+        cascades; the stored objects behind it do not, so
+        internal/api/vaccines.go deletes them from Storage after the row
+        is gone (a failure there leaks an orphan object rather than
+        leaving a document row pointing at nothing).
+      tags: [vaccines]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No vaccine log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/me:
     get:
       operationId: getMe
@@ -1939,6 +2102,145 @@ components:
         endTime:
           type: string
           format: date-time
+    VaccineDocument:
+      type: object
+      description: >-
+        One file attached to a vaccine log. Fetch through
+        `/api/files/{id}` — the object store is never public.
+      required: [id, filename, contentType, size, url]
+      properties:
+        id:
+          type: string
+        filename:
+          type: string
+        contentType:
+          type: string
+        size:
+          type: integer
+        url:
+          type: string
+    VaccineLog:
+      type: object
+      description: >-
+        What was given, and when. Free — never plan-gated (only attaching
+        a document is; see internal/api/files.go).
+      required:
+        - id
+        - babyId
+        - caretakerId
+        - caretakerName
+        - notes
+        - time
+        - name
+        - doseNumber
+        - scheduleSlot
+        - documents
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
+        name:
+          type: string
+        doseNumber:
+          type: integer
+          nullable: true
+        scheduleSlot:
+          type: string
+          nullable: true
+          description: >-
+            Slot key from the bundled programme ("mmr:1"), or null for an
+            off-programme dose.
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/VaccineDocument"
+    VaccineDismissal:
+      type: object
+      description: >-
+        A programme slot waved away for one baby. slotKey is a key into
+        the bundled programme, deliberately not validated against it — the
+        programme is data that can change without an API change.
+      required: [id, babyId, slotKey]
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        slotKey:
+          type: string
+    CreateVaccineDismissal:
+      type: object
+      required: [babyId, slotKey]
+      properties:
+        babyId:
+          type: string
+        slotKey:
+          type: string
+          minLength: 1
+          maxLength: 60
+    CreateVaccine:
+      type: object
+      required: [babyId, time, name]
+      properties:
+        babyId:
+          type: string
+        time:
+          type: string
+          format: date-time
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        doseNumber:
+          type: integer
+          minimum: 1
+          maximum: 20
+        scheduleSlot:
+          type: string
+          maxLength: 60
+        notes:
+          type: string
+          maxLength: 1000
+    UpdateVaccine:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `doseNumber`,
+        `scheduleSlot` and `notes` may also be sent as `null` to CLEAR that
+        column; `time`/`name` are not nullable — only settable or omitted
+        (see internal/api/feeds.go for the omitted-vs-null
+        presence-detection pattern this endpoint needs).
+      properties:
+        time:
+          type: string
+          format: date-time
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        doseNumber:
+          type: integer
+          minimum: 1
+          maximum: 20
+          nullable: true
+        scheduleSlot:
+          type: string
+          maxLength: 60
+          nullable: true
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
     Summary:
       type: object
       required:

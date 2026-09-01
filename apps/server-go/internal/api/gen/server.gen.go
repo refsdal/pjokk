@@ -190,6 +190,27 @@ type ServerInterface interface {
 	// GetSummary Everything the home screen needs in one call: last feed, last diaper, active + last sleep, active play, and today's local-day totals.
 	// (GET /api/summary)
 	GetSummary(w http.ResponseWriter, r *http.Request, params GetSummaryParams)
+	// ListVaccines Vaccine logs in the caller's active family, newest first. Each entry's `documents` array carries `url: "/api/files/{docId}"` for any attached file (see internal/api/files.go — uploading is disabled today, but existing documents still stream).
+	// (GET /api/vaccines)
+	ListVaccines(w http.ResponseWriter, r *http.Request, params ListVaccinesParams)
+	// CreateVaccine Log a vaccine. Free — never plan-gated (only document upload is).
+	// (POST /api/vaccines)
+	CreateVaccine(w http.ResponseWriter, r *http.Request)
+	// ListVaccineDismissals Programme slots waved away for one baby (or every baby in the family when babyId is omitted). Free, like the vaccine log itself.
+	// (GET /api/vaccines/dismissals)
+	ListVaccineDismissals(w http.ResponseWriter, r *http.Request, params ListVaccineDismissalsParams)
+	// CreateVaccineDismissal Hide a programme slot for one baby. Idempotent on the (babyId,slotKey) unique index: dismissing an already-dismissed slot returns the existing row rather than erroring (see internal/api/vaccines.go).
+	// (POST /api/vaccines/dismissals)
+	CreateVaccineDismissal(w http.ResponseWriter, r *http.Request)
+	// DeleteVaccineDismissal Restore a dismissed slot.
+	// (DELETE /api/vaccines/dismissals/{id})
+	DeleteVaccineDismissal(w http.ResponseWriter, r *http.Request, id IdPath)
+	// DeleteVaccine Delete a vaccine log and every document attached to it. The DB row cascades; the stored objects behind it do not, so internal/api/vaccines.go deletes them from Storage after the row is gone (a failure there leaks an orphan object rather than leaving a document row pointing at nothing).
+	// (DELETE /api/vaccines/{id})
+	DeleteVaccine(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdateVaccine Partial update. `doseNumber`, `scheduleSlot` and `notes` may be sent as `null` to CLEAR that column; `time`/`name` are not nullable — only settable or omitted.
+	// (PATCH /api/vaccines/{id})
+	UpdateVaccine(w http.ResponseWriter, r *http.Request, id IdPath)
 	// Healthz Liveness probe. Touches nothing — not even the database pool.
 	// (GET /healthz)
 	Healthz(w http.ResponseWriter, r *http.Request)
@@ -1719,6 +1740,191 @@ func (siw *ServerInterfaceWrapper) GetSummary(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ListVaccines operation middleware
+func (siw *ServerInterfaceWrapper) ListVaccines(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListVaccinesParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListVaccines(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateVaccine operation middleware
+func (siw *ServerInterfaceWrapper) CreateVaccine(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateVaccine(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListVaccineDismissals operation middleware
+func (siw *ServerInterfaceWrapper) ListVaccineDismissals(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListVaccineDismissalsParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListVaccineDismissals(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateVaccineDismissal operation middleware
+func (siw *ServerInterfaceWrapper) CreateVaccineDismissal(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateVaccineDismissal(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteVaccineDismissal operation middleware
+func (siw *ServerInterfaceWrapper) DeleteVaccineDismissal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteVaccineDismissal(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteVaccine operation middleware
+func (siw *ServerInterfaceWrapper) DeleteVaccine(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteVaccine(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateVaccine operation middleware
+func (siw *ServerInterfaceWrapper) UpdateVaccine(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateVaccine(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // Healthz operation middleware
 func (siw *ServerInterfaceWrapper) Healthz(w http.ResponseWriter, r *http.Request) {
 
@@ -1925,6 +2131,13 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/play/{id}/stop", wrapper.StopPlay)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/play/{id}", wrapper.DeletePlay)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/play/{id}", wrapper.UpdatePlay)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/vaccines/dismissals", wrapper.ListVaccineDismissals)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/vaccines/dismissals", wrapper.CreateVaccineDismissal)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/vaccines/dismissals/{id}", wrapper.DeleteVaccineDismissal)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/vaccines", wrapper.ListVaccines)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/vaccines", wrapper.CreateVaccine)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/vaccines/{id}", wrapper.DeleteVaccine)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/vaccines/{id}", wrapper.UpdateVaccine)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/me", wrapper.GetMe)
 
 	return m
@@ -3879,6 +4092,231 @@ func (response GetSummary404JSONResponse) VisitGetSummaryResponse(w http.Respons
 	return err
 }
 
+type ListVaccinesRequestObject struct {
+	Params ListVaccinesParams
+}
+
+type ListVaccinesResponseObject interface {
+	VisitListVaccinesResponse(w http.ResponseWriter) error
+}
+
+type ListVaccines200JSONResponse []VaccineLog
+
+func (response ListVaccines200JSONResponse) VisitListVaccinesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateVaccineRequestObject struct {
+	Body *CreateVaccineJSONRequestBody
+}
+
+type CreateVaccineResponseObject interface {
+	VisitCreateVaccineResponse(w http.ResponseWriter) error
+}
+
+type CreateVaccine201JSONResponse VaccineLog
+
+func (response CreateVaccine201JSONResponse) VisitCreateVaccineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateVaccine404JSONResponse Error
+
+func (response CreateVaccine404JSONResponse) VisitCreateVaccineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListVaccineDismissalsRequestObject struct {
+	Params ListVaccineDismissalsParams
+}
+
+type ListVaccineDismissalsResponseObject interface {
+	VisitListVaccineDismissalsResponse(w http.ResponseWriter) error
+}
+
+type ListVaccineDismissals200JSONResponse []VaccineDismissal
+
+func (response ListVaccineDismissals200JSONResponse) VisitListVaccineDismissalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateVaccineDismissalRequestObject struct {
+	Body *CreateVaccineDismissalJSONRequestBody
+}
+
+type CreateVaccineDismissalResponseObject interface {
+	VisitCreateVaccineDismissalResponse(w http.ResponseWriter) error
+}
+
+type CreateVaccineDismissal201JSONResponse VaccineDismissal
+
+func (response CreateVaccineDismissal201JSONResponse) VisitCreateVaccineDismissalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateVaccineDismissal404JSONResponse Error
+
+func (response CreateVaccineDismissal404JSONResponse) VisitCreateVaccineDismissalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteVaccineDismissalRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteVaccineDismissalResponseObject interface {
+	VisitDeleteVaccineDismissalResponse(w http.ResponseWriter) error
+}
+
+type DeleteVaccineDismissal200JSONResponse Ok
+
+func (response DeleteVaccineDismissal200JSONResponse) VisitDeleteVaccineDismissalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteVaccineDismissal404JSONResponse Error
+
+func (response DeleteVaccineDismissal404JSONResponse) VisitDeleteVaccineDismissalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteVaccineRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteVaccineResponseObject interface {
+	VisitDeleteVaccineResponse(w http.ResponseWriter) error
+}
+
+type DeleteVaccine200JSONResponse Ok
+
+func (response DeleteVaccine200JSONResponse) VisitDeleteVaccineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteVaccine404JSONResponse Error
+
+func (response DeleteVaccine404JSONResponse) VisitDeleteVaccineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateVaccineRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdateVaccineJSONRequestBody
+}
+
+type UpdateVaccineResponseObject interface {
+	VisitUpdateVaccineResponse(w http.ResponseWriter) error
+}
+
+type UpdateVaccine200JSONResponse VaccineLog
+
+func (response UpdateVaccine200JSONResponse) VisitUpdateVaccineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateVaccine404JSONResponse Error
+
+func (response UpdateVaccine404JSONResponse) VisitUpdateVaccineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type HealthzRequestObject struct {
 }
 
@@ -4115,6 +4553,27 @@ type StrictServerInterface interface {
 	// GetSummary Everything the home screen needs in one call: last feed, last diaper, active + last sleep, active play, and today's local-day totals.
 	// (GET /api/summary)
 	GetSummary(ctx context.Context, request GetSummaryRequestObject) (GetSummaryResponseObject, error)
+	// ListVaccines Vaccine logs in the caller's active family, newest first. Each entry's `documents` array carries `url: "/api/files/{docId}"` for any attached file (see internal/api/files.go — uploading is disabled today, but existing documents still stream).
+	// (GET /api/vaccines)
+	ListVaccines(ctx context.Context, request ListVaccinesRequestObject) (ListVaccinesResponseObject, error)
+	// CreateVaccine Log a vaccine. Free — never plan-gated (only document upload is).
+	// (POST /api/vaccines)
+	CreateVaccine(ctx context.Context, request CreateVaccineRequestObject) (CreateVaccineResponseObject, error)
+	// ListVaccineDismissals Programme slots waved away for one baby (or every baby in the family when babyId is omitted). Free, like the vaccine log itself.
+	// (GET /api/vaccines/dismissals)
+	ListVaccineDismissals(ctx context.Context, request ListVaccineDismissalsRequestObject) (ListVaccineDismissalsResponseObject, error)
+	// CreateVaccineDismissal Hide a programme slot for one baby. Idempotent on the (babyId,slotKey) unique index: dismissing an already-dismissed slot returns the existing row rather than erroring (see internal/api/vaccines.go).
+	// (POST /api/vaccines/dismissals)
+	CreateVaccineDismissal(ctx context.Context, request CreateVaccineDismissalRequestObject) (CreateVaccineDismissalResponseObject, error)
+	// DeleteVaccineDismissal Restore a dismissed slot.
+	// (DELETE /api/vaccines/dismissals/{id})
+	DeleteVaccineDismissal(ctx context.Context, request DeleteVaccineDismissalRequestObject) (DeleteVaccineDismissalResponseObject, error)
+	// DeleteVaccine Delete a vaccine log and every document attached to it. The DB row cascades; the stored objects behind it do not, so internal/api/vaccines.go deletes them from Storage after the row is gone (a failure there leaks an orphan object rather than leaving a document row pointing at nothing).
+	// (DELETE /api/vaccines/{id})
+	DeleteVaccine(ctx context.Context, request DeleteVaccineRequestObject) (DeleteVaccineResponseObject, error)
+	// UpdateVaccine Partial update. `doseNumber`, `scheduleSlot` and `notes` may be sent as `null` to CLEAR that column; `time`/`name` are not nullable — only settable or omitted.
+	// (PATCH /api/vaccines/{id})
+	UpdateVaccine(ctx context.Context, request UpdateVaccineRequestObject) (UpdateVaccineResponseObject, error)
 	// Healthz Liveness probe. Touches nothing — not even the database pool.
 	// (GET /healthz)
 	Healthz(ctx context.Context, request HealthzRequestObject) (HealthzResponseObject, error)
@@ -5791,6 +6250,205 @@ func (sh *strictHandler) GetSummary(w http.ResponseWriter, r *http.Request, para
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetSummaryResponseObject); ok {
 		if err := validResponse.VisitGetSummaryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListVaccines operation middleware
+func (sh *strictHandler) ListVaccines(w http.ResponseWriter, r *http.Request, params ListVaccinesParams) {
+	var request ListVaccinesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListVaccines(ctx, request.(ListVaccinesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListVaccines")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListVaccinesResponseObject); ok {
+		if err := validResponse.VisitListVaccinesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateVaccine operation middleware
+func (sh *strictHandler) CreateVaccine(w http.ResponseWriter, r *http.Request) {
+	var request CreateVaccineRequestObject
+
+	var body CreateVaccineJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateVaccine(ctx, request.(CreateVaccineRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateVaccine")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateVaccineResponseObject); ok {
+		if err := validResponse.VisitCreateVaccineResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListVaccineDismissals operation middleware
+func (sh *strictHandler) ListVaccineDismissals(w http.ResponseWriter, r *http.Request, params ListVaccineDismissalsParams) {
+	var request ListVaccineDismissalsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListVaccineDismissals(ctx, request.(ListVaccineDismissalsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListVaccineDismissals")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListVaccineDismissalsResponseObject); ok {
+		if err := validResponse.VisitListVaccineDismissalsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateVaccineDismissal operation middleware
+func (sh *strictHandler) CreateVaccineDismissal(w http.ResponseWriter, r *http.Request) {
+	var request CreateVaccineDismissalRequestObject
+
+	var body CreateVaccineDismissalJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateVaccineDismissal(ctx, request.(CreateVaccineDismissalRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateVaccineDismissal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateVaccineDismissalResponseObject); ok {
+		if err := validResponse.VisitCreateVaccineDismissalResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteVaccineDismissal operation middleware
+func (sh *strictHandler) DeleteVaccineDismissal(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteVaccineDismissalRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteVaccineDismissal(ctx, request.(DeleteVaccineDismissalRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteVaccineDismissal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteVaccineDismissalResponseObject); ok {
+		if err := validResponse.VisitDeleteVaccineDismissalResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteVaccine operation middleware
+func (sh *strictHandler) DeleteVaccine(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteVaccineRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteVaccine(ctx, request.(DeleteVaccineRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteVaccine")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteVaccineResponseObject); ok {
+		if err := validResponse.VisitDeleteVaccineResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateVaccine operation middleware
+func (sh *strictHandler) UpdateVaccine(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdateVaccineRequestObject
+
+	request.Id = id
+
+	var body UpdateVaccineJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateVaccine(ctx, request.(UpdateVaccineRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateVaccine")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateVaccineResponseObject); ok {
+		if err := validResponse.VisitUpdateVaccineResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

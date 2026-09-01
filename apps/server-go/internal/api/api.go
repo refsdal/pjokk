@@ -243,6 +243,22 @@ var operationAuthTiers = map[string]authTier{
 	"CreateSleepLocation": tierAdmin,
 	"DeleteSleepLocation": tierAdmin,
 
+	// Vaccines (Task 14; REF §A1 "vaccines.ts (+ files)"). Free, like the
+	// six Phase 3 kinds above — dismissals are their own tierFamily
+	// operations too, not folded into the log's tier. The multipart
+	// document-upload route and /api/files/{id} streaming/delete are
+	// hand-routed outside this generated interface entirely (see
+	// internal/api/files.go and skipSpecValidation's vaccineDocumentsPattern
+	// above) and therefore need no entry here.
+	"ListVaccines":  tierFamily,
+	"CreateVaccine": tierFamily,
+	"UpdateVaccine": tierFamily,
+	"DeleteVaccine": tierFamily,
+
+	"ListVaccineDismissals":  tierFamily,
+	"CreateVaccineDismissal": tierFamily,
+	"DeleteVaccineDismissal": tierFamily,
+
 	"DeleteBaby":          tierAdmin,
 	"DeleteFamilyMember":  tierAdmin,
 	"SetFamilyMemberRole": tierAdmin,
@@ -344,6 +360,19 @@ func authChain(d Deps) gen.StrictMiddlewareFunc {
 		}
 		return adaptMiddleware(chain)(f, operationID)
 	}
+}
+
+// familyChain builds the exact tierFamily chain (apiKeyAuth, then session,
+// then family — see authChain's tierFamily case) as a standalone
+// http.Handler wrapper, for the hand-routed routes in internal/api/files.go
+// that sit outside gen.StrictServerInterface entirely and therefore never
+// go through authChain's operationID-keyed dispatch.
+func familyChain(d Deps) func(http.Handler) http.Handler {
+	mwDeps := middleware.Deps{Auth: d.Auth, Q: d.Q, RateLimit: d.RateLimit, Now: d.Now}
+	apiKey := middleware.APIKeyAuth(mwDeps)
+	session := middleware.Session(mwDeps)
+	family := middleware.RequireFamily(mwDeps)
+	return func(h http.Handler) http.Handler { return apiKey(session(family(h))) }
 }
 
 // vaccineDocumentsPattern matches /api/vaccines/{id}/documents and anything
@@ -484,6 +513,17 @@ func NewHandler(d Deps) http.Handler {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write(web.ScalarHTML())
 	})
+
+	// Hand-routed outside the generated strict server (see internal/api/
+	// files.go's package doc comment): multipart bodies and binary
+	// streaming responses have no place in the JSON-only route tree
+	// oapi-codegen builds gen.StrictServerInterface from. Registered
+	// directly on mux, before the least-specific "/api/" pattern below,
+	// behind the SAME tierFamily chain (apiKeyAuth, then session, then
+	// family) every generated tierFamily operation runs behind —
+	// apps/api/src/app.ts's filesApp sits behind the identical "/api/*"
+	// apiKeyAuth middleware every other route does, so this port must too.
+	d.mountFileRoutes(mux, familyChain(d))
 
 	if d.ExtraRoutes != nil {
 		mwDeps := middleware.Deps{Auth: d.Auth, Q: d.Q, RateLimit: d.RateLimit, Now: d.Now}

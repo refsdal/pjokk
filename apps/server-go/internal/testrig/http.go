@@ -396,6 +396,29 @@ func (a *AppRig) DoArray(method, path, cookie string, body any) *ArrayResult {
 	return result
 }
 
+// DoRequest drives req straight through the rig's handler and decodes the
+// response like Do — for a request Do's json.Marshal-a-body convenience
+// can't express, e.g. a real multipart/form-data upload (see
+// vaccines_test.go's use of this to prove the disabled-uploads 403 against
+// an actual multipart body, not a JSON stand-in). Callers build req with
+// httptest.NewRequest themselves and set headers (Content-Type, Cookie, …)
+// on it directly.
+func (a *AppRig) DoRequest(req *http.Request) *Result {
+	a.t.Helper()
+	rec := httptest.NewRecorder()
+	a.handlerFor().ServeHTTP(rec, req)
+
+	raw := rec.Body.Bytes()
+	result := &Result{Status: rec.Code, Raw: raw, Header: rec.Header()}
+	if len(raw) > 0 {
+		var v map[string]any
+		if err := json.Unmarshal(raw, &v); err == nil {
+			result.JSON = v
+		}
+	}
+	return result
+}
+
 func (a *AppRig) roundTrip(method, path, cookie string, body any) *httptest.ResponseRecorder {
 	a.t.Helper()
 
