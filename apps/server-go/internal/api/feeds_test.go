@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -386,5 +387,40 @@ func TestFeedsRejectUnauthenticated(t *testing.T) {
 	res := a.Do(http.MethodGet, "/api/feeds", "", nil)
 	if res.Status != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", res.Status)
+	}
+}
+
+// withRawBody's structural size cap (internal/api/patch.go's
+// maxJSONBodyBytes): an oversized JSON PATCH body is rejected with 413
+// TOO_LARGE rather than being buffered to completion — and, just as
+// importantly, the rig's handler survives it and keeps serving normal
+// requests afterward (proving withRawBody's io.ReadAll-over-MaxBytesReader
+// doesn't crash or wedge anything on overflow).
+func TestUpdateFeedOversizedBodyIsRejected(t *testing.T) {
+	a := testrig.App(t)
+	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
+	babyID := a.NewBaby(familyID, "Nora")
+
+	created := a.Do(http.MethodPost, "/api/feeds", cookie, map[string]any{
+		"babyId": babyID,
+		"time":   time.Now().UTC().Format(time.RFC3339),
+		"type":   "bottle",
+	})
+	id, _ := created.JSON["id"].(string)
+
+	// Comfortably over maxJSONBodyBytes (1 MiB) once JSON-encoded.
+	huge := strings.Repeat("x", 2<<20)
+	res := a.Do(http.MethodPatch, "/api/feeds/"+id, cookie, map[string]any{"notes": huge})
+	if res.Status != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversized PATCH status = %d, body %s, want 413", res.Status, res.Raw)
+	}
+	if res.JSON["error"] != "Request body too large" || res.JSON["code"] != "TOO_LARGE" {
+		t.Errorf("body = %v, want {error:\"Request body too large\",code:\"TOO_LARGE\"}", res.JSON)
+	}
+
+	// The rig's handler is still healthy for a normal-sized request.
+	list := a.DoArray(http.MethodGet, "/api/feeds", cookie, nil)
+	if list.Status != http.StatusOK || len(list.JSON) != 1 {
+		t.Fatalf("GET /api/feeds after the oversized PATCH: status = %d, JSON = %v, want 200 with 1 row", list.Status, list.JSON)
 	}
 }
