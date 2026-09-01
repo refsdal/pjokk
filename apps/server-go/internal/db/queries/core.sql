@@ -23,7 +23,10 @@ SET "name" = $3, "birth_date" = $4, "sex" = $5
 WHERE "family_id" = $1 AND "id" = $2
 RETURNING *;
 
--- name: DeleteBaby :exec
+-- name: DeleteBaby :execrows
+-- :execrows (not :exec) so the caller can tell "deleted" from "no such baby
+-- in this family" — a 200 vs 404 distinction the handler needs and a plain
+-- :exec can't report.
 DELETE FROM "baby"
 WHERE "family_id" = $1 AND "id" = $2;
 

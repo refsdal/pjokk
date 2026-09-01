@@ -6,6 +6,52 @@
 // package web wraps whatever NewHandler returns with static asset serving
 // and REF §A9's headers; api.NewHandler itself is only ever reached for
 // /api/* requests (see web.Handler's routing).
+//
+// # Route registration pattern (established by Task 9, followed by every
+// route task after it)
+//
+// Every generated operation (a path+method in openapi/pjokk.yaml, one
+// gen.StrictServerInterface method) is registered exactly once, through
+// gen.NewStrictHandler + gen.HandlerWithOptions, on the SAME mux as
+// everything else in this file. Two cross-cutting concerns wrap that
+// registration, at two different generated-code layers:
+//
+//  1. Spec (request-shape) validation — kin-openapi checking a request
+//     against the spec's parameter/body schema — is wired as a
+//     gen.MiddlewareFunc via StdHTTPServerOptions.Middlewares. This layer
+//     runs BEFORE the strict handler's own naive json.Decode of the
+//     request body, which is the only point malformed JSON can be turned
+//     into the standard {"error":"...","code":"VALIDATION"} envelope
+//     instead of oapi-codegen's plain-text fallback. It has no
+//     operationID to key off, so it is applied uniformly (harmless for
+//     /healthz and /readyz, which have nothing to validate).
+//  2. Auth (who + which family + what role) is wired as a single
+//     gen.StrictMiddlewareFunc, via authChain, added to
+//     gen.NewStrictHandler's middlewares argument. This layer runs AFTER
+//     body decode, and DOES get the operationID — the only layer that
+//     does — which is why per-operation gating lives here rather than in
+//     (1). It looks up each operationID in operationAuthTiers and wraps
+//     the call in the matching middleware.Session/RequireFamily/
+//     RequireSession/RequireAdmin chain via adaptMiddleware, which lifts
+//     those ordinary http.Handler middlewares (built once, unit-tested on
+//     their own in internal/api/middleware) into the strict-server's
+//     (ctx, w, r, request)-shaped world instead of reimplementing
+//     authorization at that layer.
+//
+// A route task adding new operations MUST add each new operationID to
+// operationAuthTiers with the tier its route table calls for
+// (tierFamily is the default for ordinary family-scoped CRUD; tierAdmin
+// for family-admin-only actions; tierSession for the rare route, like
+// GET /api/me, that wants a caller but not a family; tierPublic for
+// none of the above). assertOperationAuthCoverage cross-checks the tier
+// map against the embedded spec at NewHandler build time and panics on
+// any mismatch in either direction — a missing entry (new spec operation,
+// no tier assigned: fails loud rather than shipping unauthenticated) or a
+// stale one (tier map entry with no matching spec operation: typo/rename
+// protection). Handlers implementing the new methods live in their own
+// file (see babies.go, me.go), each starting `var _ gen.StrictServerInterface
+// = Deps{}` is enforced once in system.go — Deps grows one method per
+// operation and must keep compiling against the whole interface.
 package api
 
 import (
@@ -92,6 +138,143 @@ func loadSpec() *openapi3.T {
 		panic(fmt.Sprintf("api: embedded spec is invalid: %v", err))
 	}
 	return spec
+}
+
+// authTier is how much of the middleware chain (REF §A5) an /api/ operation
+// runs behind. See this package's doc comment for the full pattern.
+type authTier int
+
+const (
+	// tierPublic runs no auth chain at all: liveness/readiness probes.
+	tierPublic authTier = iota
+	// tierSession requires a resolved caller (session or API key) but NOT
+	// an active family. Only GET /api/me uses this today.
+	tierSession
+	// tierFamily is the default for domain routes: caller + membership in
+	// the active family (middleware.Session + middleware.RequireFamily).
+	tierFamily
+	// tierAdmin is tierFamily plus middleware.RequireAdmin — the
+	// family-admin-only surface (member management, deleting a baby).
+	tierAdmin
+)
+
+// operationAuthTiers maps every generated operationID (== the
+// gen.StrictServerInterface method name) to the tier it runs behind.
+// assertOperationAuthCoverage enforces that this stays exhaustive and
+// exact against the embedded spec — see the package doc comment.
+var operationAuthTiers = map[string]authTier{
+	"Healthz": tierPublic,
+	"Readyz":  tierPublic,
+
+	"GetMe": tierSession,
+
+	"ListBabies":        tierFamily,
+	"CreateBaby":        tierFamily,
+	"UpdateBaby":        tierFamily,
+	"GetFamily":         tierFamily,
+	"ListFamilyMembers": tierFamily,
+
+	"DeleteBaby":          tierAdmin,
+	"DeleteFamilyMember":  tierAdmin,
+	"SetFamilyMemberRole": tierAdmin,
+}
+
+// assertOperationAuthCoverage panics unless operationAuthTiers has exactly
+// one entry per operationId in spec — no fewer (a new route task that forgot
+// to classify its operation) and no more (a stale entry left behind by a
+// rename). Called once, at NewHandler build time, so a wiring mistake is a
+// boot-time failure rather than a silently under-protected endpoint.
+func assertOperationAuthCoverage(spec *openapi3.T) {
+	seen := make(map[string]bool, len(operationAuthTiers))
+	for _, path := range spec.Paths.InMatchingOrder() {
+		item := spec.Paths.Find(path)
+		for method, op := range item.Operations() {
+			if op.OperationID == "" {
+				panic(fmt.Sprintf("api: %s %s has no operationId", method, path))
+			}
+			name := strings.ToUpper(op.OperationID[:1]) + op.OperationID[1:]
+			if _, ok := operationAuthTiers[name]; !ok {
+				panic(fmt.Sprintf(
+					"api: operation %q (%s %s) has no entry in operationAuthTiers — add one (see this package's doc comment)",
+					name, method, path))
+			}
+			seen[name] = true
+		}
+	}
+	for name := range operationAuthTiers {
+		if !seen[name] {
+			panic(fmt.Sprintf("api: operationAuthTiers has a stale entry %q with no matching spec operation", name))
+		}
+	}
+}
+
+// adaptMiddleware lifts an ordinary http.Handler middleware into a
+// gen.StrictMiddlewareFunc, so the existing, independently unit-tested
+// middleware.Session/RequireFamily/RequireSession/RequireAdmin chain gates
+// generated strict-server operations too, rather than being reimplemented
+// at the (ctx, request) layer strict-server exposes.
+//
+// The terminal handler captures f's result into resp/err by closure. When mw
+// rejects the request — writes directly to w and does not call
+// next.ServeHTTP, which is how every middleware in this chain reports a
+// rejection — resp/err are left at their zero values. The generated
+// strict-server dispatcher (server.gen.go's "response != nil" check after
+// every operation) already treats a nil response as "nothing more to
+// write", so a rejected request is never written twice.
+//
+// mw also receives the operationID: adaptMiddleware itself doesn't need it,
+// but StrictMiddlewareFunc's shape requires accepting it, and authChain
+// below already looked it up before calling here.
+func adaptMiddleware(mw func(http.Handler) http.Handler) gen.StrictMiddlewareFunc {
+	return func(f gen.StrictHandlerFunc, operationID string) gen.StrictHandlerFunc {
+		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+			var resp any
+			var err error
+			terminal := http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+				resp, err = f(req.Context(), w, req, request)
+			})
+			mw(terminal).ServeHTTP(w, r)
+			return resp, err
+		}
+	}
+}
+
+// authChain is the one gen.StrictMiddlewareFunc passed to gen.NewStrictHandler:
+// it looks up operationID in operationAuthTiers and wraps the call in the
+// matching middleware chain (REF §A5's order: APIKeyAuth, Session,
+// RequireFamily/RequireSession, RequireAdmin).
+func authChain(d Deps) gen.StrictMiddlewareFunc {
+	mwDeps := middleware.Deps{Auth: d.Auth, Q: d.Q, RateLimit: d.RateLimit, Now: d.Now}
+	apiKey := middleware.APIKeyAuth(mwDeps)
+	session := middleware.Session(mwDeps)
+	requireSession := middleware.RequireSession()
+	family := middleware.RequireFamily(mwDeps)
+	admin := middleware.RequireAdmin()
+
+	return func(f gen.StrictHandlerFunc, operationID string) gen.StrictHandlerFunc {
+		tier, ok := operationAuthTiers[operationID]
+		if !ok {
+			// assertOperationAuthCoverage already panicked at NewHandler
+			// build time if this were reachable; kept as a loud fallback
+			// rather than silently letting the request through.
+			panic("api: no authTier for operation " + operationID)
+		}
+
+		var chain func(http.Handler) http.Handler
+		switch tier {
+		case tierPublic:
+			return f
+		case tierSession:
+			chain = func(h http.Handler) http.Handler { return apiKey(session(requireSession(h))) }
+		case tierFamily:
+			chain = func(h http.Handler) http.Handler { return apiKey(session(family(h))) }
+		case tierAdmin:
+			chain = func(h http.Handler) http.Handler { return apiKey(session(family(admin(h)))) }
+		default:
+			panic(fmt.Sprintf("api: unknown authTier %d for operation %q", tier, operationID))
+		}
+		return adaptMiddleware(chain)(f, operationID)
+	}
 }
 
 // vaccineDocumentsPattern matches /api/vaccines/{id}/documents and anything
@@ -191,6 +374,7 @@ func NewHandler(d Deps) http.Handler {
 		// but fails to re-marshal would be a kin-openapi bug, not ours.
 		panic(fmt.Sprintf("api: marshal embedded spec: %v", err))
 	}
+	assertOperationAuthCoverage(spec)
 
 	if d.RateLimit == nil {
 		// One mistake, one failure mode: middleware.RateLimit panics on a nil
@@ -247,10 +431,18 @@ func NewHandler(d Deps) http.Handler {
 	// therefore the generated routes below — doesn't recognise.
 	mux.Handle("/api/", withSpecValidation(spec, http.HandlerFunc(handleAPINotFound)))
 
-	// Registers GET /healthz and GET /readyz directly on mux (both are
-	// top-level paths, outside /api/, per REF §A1).
-	strictHandler := gen.NewStrictHandler(d, nil)
-	gen.HandlerWithOptions(strictHandler, gen.StdHTTPServerOptions{BaseRouter: mux})
+	// Registers every generated operation on mux: GET /healthz and GET
+	// /readyz (top-level, outside /api/, per REF §A1) plus, from Task 9
+	// on, every /api/ operation in the spec. See this package's doc
+	// comment for the two-layer wrapping below (spec validation, then
+	// auth) and why each lives at the generated-code layer it does.
+	strictHandler := gen.NewStrictHandler(d, []gen.StrictMiddlewareFunc{authChain(d)})
+	gen.HandlerWithOptions(strictHandler, gen.StdHTTPServerOptions{
+		BaseRouter: mux,
+		Middlewares: []gen.MiddlewareFunc{
+			func(next http.Handler) http.Handler { return withSpecValidation(spec, next) },
+		},
+	})
 
 	// Outermost, deliberately. net/http sets RemoteAddr from the socket
 	// before ANY handler runs, so the proxy-hop rewrite has to wrap the

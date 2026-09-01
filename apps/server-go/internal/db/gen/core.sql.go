@@ -48,7 +48,7 @@ func (q *Queries) CreateBaby(ctx context.Context, arg CreateBabyParams) (Baby, e
 	return i, err
 }
 
-const deleteBaby = `-- name: DeleteBaby :exec
+const deleteBaby = `-- name: DeleteBaby :execrows
 DELETE FROM "baby"
 WHERE "family_id" = $1 AND "id" = $2
 `
@@ -58,9 +58,15 @@ type DeleteBabyParams struct {
 	ID       string
 }
 
-func (q *Queries) DeleteBaby(ctx context.Context, arg DeleteBabyParams) error {
-	_, err := q.db.Exec(ctx, deleteBaby, arg.FamilyID, arg.ID)
-	return err
+// :execrows (not :exec) so the caller can tell "deleted" from "no such baby
+// in this family" — a 200 vs 404 distinction the handler needs and a plain
+// :exec can't report.
+func (q *Queries) DeleteBaby(ctx context.Context, arg DeleteBabyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteBaby, arg.FamilyID, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getBaby = `-- name: GetBaby :one

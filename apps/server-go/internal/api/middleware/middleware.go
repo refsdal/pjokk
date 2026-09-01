@@ -110,7 +110,17 @@ func withIdentity(r *http.Request, id identity) *http.Request {
 // SessionFrom returns the resolved session, or nil when the caller is
 // anonymous or authenticated by an API key's synthetic identity.
 func SessionFrom(r *http.Request) *auth.Session {
-	id, _ := identityFrom(r)
+	return SessionFromContext(r.Context())
+}
+
+// SessionFromContext is SessionFrom for a caller that only has a
+// context.Context rather than a *http.Request — namely the generated
+// strict-server handlers (internal/api/gen), whose methods take
+// (context.Context, RequestObject) with no ResponseWriter/Request in sight.
+// See internal/api's adaptMiddleware for how a context built by this
+// package's http.Handler-shaped middleware reaches those handlers.
+func SessionFromContext(ctx context.Context) *auth.Session {
+	id, _ := ctx.Value(identityKey).(identity)
 	return id.session
 }
 
@@ -124,8 +134,14 @@ func IsAPIKey(r *http.Request) bool {
 // value means the request never passed RequireFamily — which is a wiring bug,
 // not a runtime condition: no handler should be reachable without it.
 func Family(r *http.Request) FamilyCtx {
-	ctx, _ := r.Context().Value(familyKey).(FamilyCtx)
-	return ctx
+	return FamilyFromContext(r.Context())
+}
+
+// FamilyFromContext is Family for a caller that only has a context.Context.
+// See SessionFromContext's doc comment for why this exists.
+func FamilyFromContext(ctx context.Context) FamilyCtx {
+	fc, _ := ctx.Value(familyKey).(FamilyCtx)
+	return fc
 }
 
 // Session resolves the caller once per request and never rejects (REF §A5
@@ -152,6 +168,25 @@ func Session(d Deps) func(http.Handler) http.Handler {
 				return
 			}
 			next.ServeHTTP(w, withIdentity(r, identity{session: session}))
+		})
+	}
+}
+
+// RequireSession is the minimal gate: a caller (session or API key) must
+// exist, full stop — unlike RequireFamily it does not care whether they have
+// an active family. GET /api/me is the one route that wants exactly this: it
+// reports family/member/plan as null for a family-less caller rather than
+// refusing them (that IS the route's whole purpose), but still must not be
+// reachable anonymously. Mount it behind Session, same as RequireFamily.
+func RequireSession() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			id, _ := identityFrom(r)
+			if id.session == nil {
+				respond.Error(w, http.StatusUnauthorized, "Not signed in", "UNAUTHENTICATED")
+				return
+			}
+			next.ServeHTTP(w, r)
 		})
 	}
 }

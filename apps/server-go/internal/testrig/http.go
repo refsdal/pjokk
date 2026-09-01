@@ -306,6 +306,26 @@ func (a *AppRig) NewFamily(name, adminEmail string) (familyID, cookie string) {
 	return familyID, c.Name + "=" + c.Value
 }
 
+// AddMember adds userID to familyID with role, signs them in, points the
+// fresh session at that family, and returns a ready-to-use Cookie header
+// value — the multi-member counterpart to NewFamily, for tests exercising
+// admin-vs-member behaviour (role changes, removal, the tierAdmin routes).
+// email must be the address userID (a prior SignUp) was created with; role
+// is auth.RoleAdmin or auth.RoleMember.
+func (a *AppRig) AddMember(familyID, userID, role, email string) string {
+	a.t.Helper()
+	ctx := context.Background()
+
+	if err := a.Deps.Auth.AddMember(ctx, familyID, userID, role); err != nil {
+		a.t.Fatalf("testrig: AddMember(%q, %q, %q): %v", familyID, userID, role, err)
+	}
+	c := a.signInCookie(email)
+	if err := a.Deps.Auth.SetActiveFamily(ctx, c.Value, familyID); err != nil {
+		a.t.Fatalf("testrig: SetActiveFamily(%q, %q): %v", c.Value, familyID, err)
+	}
+	return c.Name + "=" + c.Value
+}
+
 // NewBaby inserts a baby directly via sqlc — bypassing HTTP, since Task 9's
 // /api/babies routes are what the HTTP path itself exercises — and returns
 // its id.

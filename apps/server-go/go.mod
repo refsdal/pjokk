@@ -11,6 +11,7 @@ require (
 	github.com/getkin/kin-openapi v0.149.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/oapi-codegen/nethttp-middleware v1.2.0
+	github.com/oapi-codegen/runtime v1.7.0
 	github.com/pressly/goose/v3 v3.27.3
 	github.com/thecodearcher/limen v0.2.1
 	github.com/thecodearcher/limen/adapters/sql v0.2.0
@@ -22,6 +23,7 @@ require (
 
 require (
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
+	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.20 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.1 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.1 // indirect
@@ -32,6 +34,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.1 // indirect
 	github.com/go-openapi/jsonpointer v1.0.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect

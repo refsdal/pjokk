@@ -11,10 +11,39 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/oapi-codegen/runtime"
 )
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListBabies Babies in the caller's active family, oldest first.
+	// (GET /api/babies)
+	ListBabies(w http.ResponseWriter, r *http.Request)
+	// CreateBaby Create a baby in the caller's active family. Free — no plan gate.
+	// (POST /api/babies)
+	CreateBaby(w http.ResponseWriter, r *http.Request)
+	// DeleteBaby Family-admin only. Deletes the baby and EVERY log for them (cascade).
+	// (DELETE /api/babies/{id})
+	DeleteBaby(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdateBaby Partial update. An empty body is a no-op that returns the baby unchanged.
+	// (PATCH /api/babies/{id})
+	UpdateBaby(w http.ResponseWriter, r *http.Request, id IdPath)
+	// GetFamily The caller's active family.
+	// (GET /api/family)
+	GetFamily(w http.ResponseWriter, r *http.Request)
+	// ListFamilyMembers Caretakers in the caller's active family.
+	// (GET /api/family/members)
+	ListFamilyMembers(w http.ResponseWriter, r *http.Request)
+	// DeleteFamilyMember Remove a member from the caller's active family. Family-admin only.
+	// (DELETE /api/family/members/{memberId})
+	DeleteFamilyMember(w http.ResponseWriter, r *http.Request, memberId MemberIdPath)
+	// SetFamilyMemberRole Change a member's role in the caller's active family. Family-admin only.
+	// (POST /api/family/members/{memberId}/role)
+	SetFamilyMemberRole(w http.ResponseWriter, r *http.Request, memberId MemberIdPath)
+	// GetMe Session info for the SPA shell. Requires a session but NOT an active family — the family/member/plan fields are null when the caller has none.
+	// (GET /api/me)
+	GetMe(w http.ResponseWriter, r *http.Request)
 	// Healthz Liveness probe. Touches nothing — not even the database pool.
 	// (GET /healthz)
 	Healthz(w http.ResponseWriter, r *http.Request)
@@ -31,6 +60,180 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListBabies operation middleware
+func (siw *ServerInterfaceWrapper) ListBabies(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListBabies(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateBaby operation middleware
+func (siw *ServerInterfaceWrapper) CreateBaby(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateBaby(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteBaby operation middleware
+func (siw *ServerInterfaceWrapper) DeleteBaby(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteBaby(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateBaby operation middleware
+func (siw *ServerInterfaceWrapper) UpdateBaby(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateBaby(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetFamily operation middleware
+func (siw *ServerInterfaceWrapper) GetFamily(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFamily(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListFamilyMembers operation middleware
+func (siw *ServerInterfaceWrapper) ListFamilyMembers(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListFamilyMembers(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteFamilyMember operation middleware
+func (siw *ServerInterfaceWrapper) DeleteFamilyMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "memberId" -------------
+	var memberId MemberIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "memberId", r.PathValue("memberId"), &memberId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "memberId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteFamilyMember(w, r, memberId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetFamilyMemberRole operation middleware
+func (siw *ServerInterfaceWrapper) SetFamilyMemberRole(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "memberId" -------------
+	var memberId MemberIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "memberId", r.PathValue("memberId"), &memberId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "memberId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetFamilyMemberRole(w, r, memberId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMe operation middleware
+func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // Healthz operation middleware
 func (siw *ServerInterfaceWrapper) Healthz(w http.ResponseWriter, r *http.Request) {
@@ -182,8 +385,325 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/healthz", wrapper.Healthz)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/readyz", wrapper.Readyz)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/babies", wrapper.ListBabies)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/babies", wrapper.CreateBaby)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/babies/{id}", wrapper.DeleteBaby)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/babies/{id}", wrapper.UpdateBaby)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/family", wrapper.GetFamily)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/family/members", wrapper.ListFamilyMembers)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/family/members/{memberId}", wrapper.DeleteFamilyMember)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/family/members/{memberId}/role", wrapper.SetFamilyMemberRole)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/me", wrapper.GetMe)
 
 	return m
+}
+
+type ListBabiesRequestObject struct {
+}
+
+type ListBabiesResponseObject interface {
+	VisitListBabiesResponse(w http.ResponseWriter) error
+}
+
+type ListBabies200JSONResponse []Baby
+
+func (response ListBabies200JSONResponse) VisitListBabiesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBabyRequestObject struct {
+	Body *CreateBabyJSONRequestBody
+}
+
+type CreateBabyResponseObject interface {
+	VisitCreateBabyResponse(w http.ResponseWriter) error
+}
+
+type CreateBaby201JSONResponse Baby
+
+func (response CreateBaby201JSONResponse) VisitCreateBabyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteBabyRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteBabyResponseObject interface {
+	VisitDeleteBabyResponse(w http.ResponseWriter) error
+}
+
+type DeleteBaby200JSONResponse Ok
+
+func (response DeleteBaby200JSONResponse) VisitDeleteBabyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteBaby403JSONResponse Error
+
+func (response DeleteBaby403JSONResponse) VisitDeleteBabyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteBaby404JSONResponse Error
+
+func (response DeleteBaby404JSONResponse) VisitDeleteBabyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBabyRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdateBabyJSONRequestBody
+}
+
+type UpdateBabyResponseObject interface {
+	VisitUpdateBabyResponse(w http.ResponseWriter) error
+}
+
+type UpdateBaby200JSONResponse Baby
+
+func (response UpdateBaby200JSONResponse) VisitUpdateBabyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBaby404JSONResponse Error
+
+func (response UpdateBaby404JSONResponse) VisitUpdateBabyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFamilyRequestObject struct {
+}
+
+type GetFamilyResponseObject interface {
+	VisitGetFamilyResponse(w http.ResponseWriter) error
+}
+
+type GetFamily200JSONResponse Family
+
+func (response GetFamily200JSONResponse) VisitGetFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFamily404JSONResponse Error
+
+func (response GetFamily404JSONResponse) VisitGetFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListFamilyMembersRequestObject struct {
+}
+
+type ListFamilyMembersResponseObject interface {
+	VisitListFamilyMembersResponse(w http.ResponseWriter) error
+}
+
+type ListFamilyMembers200JSONResponse []Member
+
+func (response ListFamilyMembers200JSONResponse) VisitListFamilyMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFamilyMemberRequestObject struct {
+	MemberId MemberIdPath `json:"memberId"`
+}
+
+type DeleteFamilyMemberResponseObject interface {
+	VisitDeleteFamilyMemberResponse(w http.ResponseWriter) error
+}
+
+type DeleteFamilyMember200JSONResponse Ok
+
+func (response DeleteFamilyMember200JSONResponse) VisitDeleteFamilyMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFamilyMember403JSONResponse Error
+
+func (response DeleteFamilyMember403JSONResponse) VisitDeleteFamilyMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFamilyMember404JSONResponse Error
+
+func (response DeleteFamilyMember404JSONResponse) VisitDeleteFamilyMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetFamilyMemberRoleRequestObject struct {
+	MemberId MemberIdPath `json:"memberId"`
+	Body     *SetFamilyMemberRoleJSONRequestBody
+}
+
+type SetFamilyMemberRoleResponseObject interface {
+	VisitSetFamilyMemberRoleResponse(w http.ResponseWriter) error
+}
+
+type SetFamilyMemberRole200JSONResponse Ok
+
+func (response SetFamilyMemberRole200JSONResponse) VisitSetFamilyMemberRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetFamilyMemberRole403JSONResponse Error
+
+func (response SetFamilyMemberRole403JSONResponse) VisitSetFamilyMemberRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetFamilyMemberRole404JSONResponse Error
+
+func (response SetFamilyMemberRole404JSONResponse) VisitSetFamilyMemberRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMeRequestObject struct {
+}
+
+type GetMeResponseObject interface {
+	VisitGetMeResponse(w http.ResponseWriter) error
+}
+
+type GetMe200JSONResponse Me
+
+func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type HealthzRequestObject struct {
@@ -251,6 +771,33 @@ func (response Readyz503JSONResponse) VisitReadyzResponse(w http.ResponseWriter)
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListBabies Babies in the caller's active family, oldest first.
+	// (GET /api/babies)
+	ListBabies(ctx context.Context, request ListBabiesRequestObject) (ListBabiesResponseObject, error)
+	// CreateBaby Create a baby in the caller's active family. Free — no plan gate.
+	// (POST /api/babies)
+	CreateBaby(ctx context.Context, request CreateBabyRequestObject) (CreateBabyResponseObject, error)
+	// DeleteBaby Family-admin only. Deletes the baby and EVERY log for them (cascade).
+	// (DELETE /api/babies/{id})
+	DeleteBaby(ctx context.Context, request DeleteBabyRequestObject) (DeleteBabyResponseObject, error)
+	// UpdateBaby Partial update. An empty body is a no-op that returns the baby unchanged.
+	// (PATCH /api/babies/{id})
+	UpdateBaby(ctx context.Context, request UpdateBabyRequestObject) (UpdateBabyResponseObject, error)
+	// GetFamily The caller's active family.
+	// (GET /api/family)
+	GetFamily(ctx context.Context, request GetFamilyRequestObject) (GetFamilyResponseObject, error)
+	// ListFamilyMembers Caretakers in the caller's active family.
+	// (GET /api/family/members)
+	ListFamilyMembers(ctx context.Context, request ListFamilyMembersRequestObject) (ListFamilyMembersResponseObject, error)
+	// DeleteFamilyMember Remove a member from the caller's active family. Family-admin only.
+	// (DELETE /api/family/members/{memberId})
+	DeleteFamilyMember(ctx context.Context, request DeleteFamilyMemberRequestObject) (DeleteFamilyMemberResponseObject, error)
+	// SetFamilyMemberRole Change a member's role in the caller's active family. Family-admin only.
+	// (POST /api/family/members/{memberId}/role)
+	SetFamilyMemberRole(ctx context.Context, request SetFamilyMemberRoleRequestObject) (SetFamilyMemberRoleResponseObject, error)
+	// GetMe Session info for the SPA shell. Requires a session but NOT an active family — the family/member/plan fields are null when the caller has none.
+	// (GET /api/me)
+	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
 	// Healthz Liveness probe. Touches nothing — not even the database pool.
 	// (GET /healthz)
 	Healthz(ctx context.Context, request HealthzRequestObject) (HealthzResponseObject, error)
@@ -296,6 +843,251 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListBabies operation middleware
+func (sh *strictHandler) ListBabies(w http.ResponseWriter, r *http.Request) {
+	var request ListBabiesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListBabies(ctx, request.(ListBabiesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListBabies")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListBabiesResponseObject); ok {
+		if err := validResponse.VisitListBabiesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateBaby operation middleware
+func (sh *strictHandler) CreateBaby(w http.ResponseWriter, r *http.Request) {
+	var request CreateBabyRequestObject
+
+	var body CreateBabyJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateBaby(ctx, request.(CreateBabyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateBaby")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateBabyResponseObject); ok {
+		if err := validResponse.VisitCreateBabyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteBaby operation middleware
+func (sh *strictHandler) DeleteBaby(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteBabyRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteBaby(ctx, request.(DeleteBabyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteBaby")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteBabyResponseObject); ok {
+		if err := validResponse.VisitDeleteBabyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateBaby operation middleware
+func (sh *strictHandler) UpdateBaby(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdateBabyRequestObject
+
+	request.Id = id
+
+	var body UpdateBabyJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateBaby(ctx, request.(UpdateBabyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateBaby")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateBabyResponseObject); ok {
+		if err := validResponse.VisitUpdateBabyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetFamily operation middleware
+func (sh *strictHandler) GetFamily(w http.ResponseWriter, r *http.Request) {
+	var request GetFamilyRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetFamily(ctx, request.(GetFamilyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetFamily")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetFamilyResponseObject); ok {
+		if err := validResponse.VisitGetFamilyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListFamilyMembers operation middleware
+func (sh *strictHandler) ListFamilyMembers(w http.ResponseWriter, r *http.Request) {
+	var request ListFamilyMembersRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListFamilyMembers(ctx, request.(ListFamilyMembersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListFamilyMembers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListFamilyMembersResponseObject); ok {
+		if err := validResponse.VisitListFamilyMembersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteFamilyMember operation middleware
+func (sh *strictHandler) DeleteFamilyMember(w http.ResponseWriter, r *http.Request, memberId MemberIdPath) {
+	var request DeleteFamilyMemberRequestObject
+
+	request.MemberId = memberId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteFamilyMember(ctx, request.(DeleteFamilyMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteFamilyMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteFamilyMemberResponseObject); ok {
+		if err := validResponse.VisitDeleteFamilyMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetFamilyMemberRole operation middleware
+func (sh *strictHandler) SetFamilyMemberRole(w http.ResponseWriter, r *http.Request, memberId MemberIdPath) {
+	var request SetFamilyMemberRoleRequestObject
+
+	request.MemberId = memberId
+
+	var body SetFamilyMemberRoleJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetFamilyMemberRole(ctx, request.(SetFamilyMemberRoleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetFamilyMemberRole")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetFamilyMemberRoleResponseObject); ok {
+		if err := validResponse.VisitSetFamilyMemberRoleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMe operation middleware
+func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
+	var request GetMeRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMe(ctx, request.(GetMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMeResponseObject); ok {
+		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // Healthz operation middleware

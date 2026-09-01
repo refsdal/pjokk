@@ -46,10 +46,8 @@ func TestAppRigSignUpSignInGatesOnSession(t *testing.T) {
 	}
 }
 
-// TestAppRigNewFamilyAndBaby exercises NewFamily/NewBaby and, since
-// /api/babies is Task 9's route and does not exist yet, proves routing and
-// the JSON error envelope through the unmatched-path 404 instead of a real
-// babies list.
+// TestAppRigNewFamilyAndBaby exercises NewFamily/NewBaby against the real
+// GET /api/babies route (internal/api/babies.go, Task 9).
 func TestAppRigNewFamilyAndBaby(t *testing.T) {
 	app := testrig.App(t)
 
@@ -63,10 +61,16 @@ func TestAppRigNewFamilyAndBaby(t *testing.T) {
 		t.Fatal("NewBaby returned an empty id")
 	}
 
-	res := app.Do(http.MethodGet, "/api/babies", cookie, nil)
-	if res.Status != http.StatusNotFound || res.JSON["code"] != "NOT_FOUND" {
-		t.Fatalf("GET /api/babies = %d %v, want 404 NOT_FOUND (the route itself lands in Task 9)",
-			res.Status, res.JSON)
+	res := app.DoArray(http.MethodGet, "/api/babies", cookie, nil)
+	if res.Status != http.StatusOK {
+		t.Fatalf("GET /api/babies = %d %s, want 200", res.Status, res.Raw)
+	}
+	if len(res.JSON) != 1 {
+		t.Fatalf("GET /api/babies JSON = %v, want 1 baby", res.JSON)
+	}
+	row, ok := res.JSON[0].(map[string]any)
+	if !ok || row["id"] != babyID {
+		t.Errorf("GET /api/babies[0] = %v, want id %q", res.JSON[0], babyID)
 	}
 }
 

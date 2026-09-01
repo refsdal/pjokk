@@ -59,6 +59,201 @@ paths:
                     enum: [false]
                   error:
                     type: string
+
+  /api/babies:
+    get:
+      operationId: listBabies
+      summary: Babies in the caller's active family, oldest first.
+      tags: [babies]
+      responses:
+        "200":
+          description: Babies in the active family.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Baby"
+    post:
+      operationId: createBaby
+      summary: Create a baby in the caller's active family. Free — no plan gate.
+      tags: [babies]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBaby"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Baby"
+  /api/babies/{id}:
+    patch:
+      operationId: updateBaby
+      summary: >-
+        Partial update. An empty body is a no-op that returns the baby
+        unchanged.
+      tags: [babies]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBaby"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Baby"
+        "404":
+          description: No baby with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteBaby
+      summary: >-
+        Family-admin only. Deletes the baby and EVERY log for them
+        (cascade).
+      tags: [babies]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "403":
+          description: Family admin only.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No baby with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/family:
+    get:
+      operationId: getFamily
+      summary: The caller's active family.
+      tags: [family]
+      responses:
+        "200":
+          description: The active family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Family"
+        "404":
+          description: Family missing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/family/members:
+    get:
+      operationId: listFamilyMembers
+      summary: Caretakers in the caller's active family.
+      tags: [family]
+      responses:
+        "200":
+          description: Caretakers in the family.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Member"
+  /api/family/members/{memberId}:
+    delete:
+      operationId: deleteFamilyMember
+      summary: Remove a member from the caller's active family. Family-admin only.
+      tags: [family]
+      parameters:
+        - $ref: "#/components/parameters/memberIdPath"
+      responses:
+        "200":
+          description: Removed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "403":
+          description: Family admin only.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such member in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/family/members/{memberId}/role:
+    post:
+      operationId: setFamilyMemberRole
+      summary: Change a member's role in the caller's active family. Family-admin only.
+      tags: [family]
+      parameters:
+        - $ref: "#/components/parameters/memberIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetMemberRole"
+      responses:
+        "200":
+          description: Role changed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "403":
+          description: Family admin only.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such member in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/me:
+    get:
+      operationId: getMe
+      summary: >-
+        Session info for the SPA shell. Requires a session but NOT an
+        active family — the family/member/plan fields are null when the
+        caller has none.
+      tags: [me]
+      responses:
+        "200":
+          description: The caller's session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+
 components:
   parameters:
     babyIdQuery:
@@ -77,7 +272,147 @@ components:
         type: integer
         minimum: 1
         maximum: 200
+    idPath:
+      name: id
+      in: path
+      description: Resource id.
+      required: true
+      schema:
+        type: string
+    memberIdPath:
+      name: memberId
+      in: path
+      description: The family-membership row id (NOT the user id).
+      required: true
+      schema:
+        type: string
   schemas:
+    Ok:
+      type: object
+      description: The standard `{ok:true}` success body for actions with no other payload.
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+    Baby:
+      type: object
+      required: [id, name, birthDate, sex]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        birthDate:
+          type: string
+          format: date-time
+        sex:
+          type: string
+          enum: [girl, boy]
+          nullable: true
+      x-go-name: Baby
+    CreateBaby:
+      type: object
+      required: [name, birthDate]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        birthDate:
+          type: string
+          format: date-time
+        sex:
+          type: string
+          enum: [girl, boy]
+    UpdateBaby:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `sex` may also
+        be sent as `null`, which — like omitting it — leaves the baby's sex
+        unchanged (Go's JSON decoding cannot tell "absent" from "null" for a
+        nullable-optional field without a bespoke wrapper type, and no
+        caller needs to clear sex back to unknown today; see
+        internal/api/babies.go).
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        birthDate:
+          type: string
+          format: date-time
+        sex:
+          type: string
+          enum: [girl, boy]
+          nullable: true
+    Member:
+      type: object
+      required: [memberId, userId, name, email, role, image]
+      properties:
+        memberId:
+          type: string
+          description: The family-membership row id (NOT the user id).
+        userId:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        image:
+          type: string
+          nullable: true
+    Family:
+      type: object
+      required: [id, name, slug, plan]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        plan:
+          type: string
+    SetMemberRole:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [admin, member]
+    Me:
+      type: object
+      description: >-
+        familyId/memberRole/plan/impersonatedBy are null when the caller has
+        no active family (or, for impersonatedBy, is not impersonated).
+      required:
+        [userId, name, email, role, familyId, memberRole, plan, impersonatedBy]
+      properties:
+        userId:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          nullable: true
+          description: Ours, system-admin role. "admin" or null.
+        familyId:
+          type: string
+          nullable: true
+        memberRole:
+          type: string
+          nullable: true
+        plan:
+          type: string
+          nullable: true
+        impersonatedBy:
+          type: string
+          nullable: true
     Error:
       type: object
       description: >-
