@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ChipGroup } from "@/components/Chips";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { api, unwrap } from "@/lib/api";
+import { client, unwrap } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import {
   currentSubscription,
@@ -28,12 +28,14 @@ export function NotificationsSection() {
   const prefs = useQuery({
     queryKey: ["pushPrefs"],
     queryFn: async () =>
-      unwrap<{ feedReminderHours: 0 | 3 | 4 | 6 }>(await api.push.prefs.$get()),
+      unwrap<{ feedReminderHours: 0 | 3 | 4 | 6 }>(
+        client.GET("/api/push/prefs"),
+      ),
   });
 
   const savePrefs = useMutation({
     mutationFn: async (feedReminderHours: 0 | 3 | 4 | 6) =>
-      unwrap(await api.push.prefs.$put({ json: { feedReminderHours } })),
+      unwrap(client.PUT("/api/push/prefs", { body: { feedReminderHours } })),
     onSettled: () =>
       void queryClient.invalidateQueries({ queryKey: ["pushPrefs"] }),
     onError: (err) => toast(err.message, "error"),

@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Baby, Family, Invite, Member } from "@pjokk/shared";
-import { api, unwrap } from "../api";
+import { client, unwrap } from "../api";
 
 export function useFamily() {
   return useQuery({
     queryKey: ["family"],
-    queryFn: async () => unwrap<Family>(await api.family.$get()),
+    queryFn: async () => unwrap<Family>(client.GET("/api/family")),
   });
 }
 
@@ -18,14 +18,14 @@ export function usePremium(): boolean {
 export function useBabies() {
   return useQuery({
     queryKey: ["babies"],
-    queryFn: async () => unwrap<Baby[]>(await api.babies.$get()),
+    queryFn: async () => unwrap<Baby[]>(client.GET("/api/babies")),
   });
 }
 
 export function useMembers() {
   return useQuery({
     queryKey: ["members"],
-    queryFn: async () => unwrap<Member[]>(await api.family.members.$get()),
+    queryFn: async () => unwrap<Member[]>(client.GET("/api/family/members")),
   });
 }
 
@@ -33,6 +33,6 @@ export function useInvites(enabled: boolean) {
   return useQuery({
     queryKey: ["invites"],
     enabled,
-    queryFn: async () => unwrap<Invite[]>(await api.invites.$get()),
+    queryFn: async () => unwrap<Invite[]>(client.GET("/api/invites")),
   });
 }

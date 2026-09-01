@@ -1,6 +1,6 @@
 import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
 import type { PlayLog, PlayType, Summary } from "@pjokk/shared";
-import { api, unwrap } from "../api";
+import { client, unwrap } from "../api";
 import { t } from "../i18n";
 import { toast } from "../toast";
 import { invalidateLogs } from "./keys";
@@ -37,8 +37,8 @@ export function usePlays(babyId: string | undefined, limit = 25) {
     enabled: !!babyId,
     queryFn: async () =>
       unwrap<PlayLog[]>(
-        await api.play.$get({
-          query: { babyId: babyId!, limit: String(limit) },
+        client.GET("/api/play", {
+          params: { query: { babyId: babyId!, limit } },
         }),
       ),
   });
@@ -47,7 +47,7 @@ export function usePlays(babyId: string | undefined, limit = 25) {
 export function registerPlayMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["startPlay"], {
     mutationFn: async (vars: StartPlayVars) =>
-      unwrap<PlayLog>(await api.play.$post({ json: vars })),
+      unwrap<PlayLog>(client.POST("/api/play", { body: vars })),
     onMutate: (vars: StartPlayVars) => {
       const previous = qc.getQueryData<Summary>(["summary", vars.babyId]);
       qc.setQueryData<Summary>(["summary", vars.babyId], (old) =>
@@ -82,7 +82,7 @@ export function registerPlayMutationDefaults(qc: QueryClient) {
   // A finished session logged after the fact — no active-state patching.
   qc.setMutationDefaults(["logPlay"], {
     mutationFn: async (vars: LogPlayVars) =>
-      unwrap<PlayLog>(await api.play.$post({ json: vars })),
+      unwrap<PlayLog>(client.POST("/api/play", { body: vars })),
     onError: (err: Error) =>
       toast(
         `${t("Could not save")} (${t("activity")}): ${err.message}`,
@@ -93,7 +93,10 @@ export function registerPlayMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["stopPlay"], {
     mutationFn: async ({ id, ...body }: StopPlayVars) =>
       unwrap<PlayLog>(
-        await api.play[":id"].stop.$post({ param: { id }, json: body }),
+        client.POST("/api/play/{id}/stop", {
+          params: { path: { id } },
+          body,
+        }),
       ),
     onError: (err: Error) =>
       toast(`${t("Could not stop: ")}${err.message}`, "error"),
@@ -102,7 +105,10 @@ export function registerPlayMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["updatePlay"], {
     mutationFn: async ({ id, patch }: UpdatePlayVars) =>
       unwrap<PlayLog>(
-        await api.play[":id"].$patch({ param: { id }, json: patch }),
+        client.PATCH("/api/play/{id}", {
+          params: { path: { id } },
+          body: patch,
+        }),
       ),
     onError: (err: Error) =>
       toast(
@@ -113,7 +119,7 @@ export function registerPlayMutationDefaults(qc: QueryClient) {
   });
   qc.setMutationDefaults(["deletePlay"], {
     mutationFn: async ({ id }: DeletePlayVars) =>
-      unwrap(await api.play[":id"].$delete({ param: { id } })),
+      unwrap(client.DELETE("/api/play/{id}", { params: { path: { id } } })),
     onError: (err: Error) =>
       toast(t("Could not delete: ") + err.message, "error"),
     onSettled: () => invalidateLogs(qc),

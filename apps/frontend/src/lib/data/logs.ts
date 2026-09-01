@@ -1,6 +1,6 @@
 import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
 import type { DiaperLog, FeedLog, SleepLog, Summary } from "@pjokk/shared";
-import { api, unwrap } from "../api";
+import { client, unwrap } from "../api";
 import { t } from "../i18n";
 import { toast } from "../toast";
 import { invalidateLogs } from "./keys";
@@ -47,10 +47,12 @@ export function useSummary(babyId: string | undefined) {
     refetchInterval: 60_000,
     queryFn: async () =>
       unwrap<Summary>(
-        await api.summary.$get({
-          query: {
-            babyId: babyId!,
-            tz: String(new Date().getTimezoneOffset()),
+        client.GET("/api/summary", {
+          params: {
+            query: {
+              babyId: babyId!,
+              tz: new Date().getTimezoneOffset(),
+            },
           },
         }),
       ),
@@ -63,8 +65,8 @@ export function useFeeds(babyId: string | undefined, limit = 25) {
     enabled: !!babyId,
     queryFn: async () =>
       unwrap<FeedLog[]>(
-        await api.feeds.$get({
-          query: { babyId: babyId!, limit: String(limit) },
+        client.GET("/api/feeds", {
+          params: { query: { babyId: babyId!, limit } },
         }),
       ),
   });
@@ -76,8 +78,8 @@ export function useDiapers(babyId: string | undefined, limit = 25) {
     enabled: !!babyId,
     queryFn: async () =>
       unwrap<DiaperLog[]>(
-        await api.diapers.$get({
-          query: { babyId: babyId!, limit: String(limit) },
+        client.GET("/api/diapers", {
+          params: { query: { babyId: babyId!, limit } },
         }),
       ),
   });
@@ -156,7 +158,7 @@ export interface DeleteVars {
 export function registerLogMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["logFeed"], {
     mutationFn: async (vars: LogFeedVars) =>
-      unwrap<FeedLog>(await api.feeds.$post({ json: vars })),
+      unwrap<FeedLog>(client.POST("/api/feeds", { body: vars })),
     onMutate: (vars: LogFeedVars) => {
       const snap = snapshotSummary(qc, vars.babyId);
       patchSummary(qc, vars.babyId, (old) =>
@@ -190,7 +192,7 @@ export function registerLogMutationDefaults(qc: QueryClient) {
   });
   qc.setMutationDefaults(["logDiaper"], {
     mutationFn: async (vars: LogDiaperVars) =>
-      unwrap<DiaperLog>(await api.diapers.$post({ json: vars })),
+      unwrap<DiaperLog>(client.POST("/api/diapers", { body: vars })),
     onMutate: (vars: LogDiaperVars) => {
       const snap = snapshotSummary(qc, vars.babyId);
       patchSummary(qc, vars.babyId, (old) =>
@@ -219,7 +221,7 @@ export function registerLogMutationDefaults(qc: QueryClient) {
   });
   qc.setMutationDefaults(["startSleep"], {
     mutationFn: async (vars: StartSleepVars) =>
-      unwrap<SleepLog>(await api.sleep.$post({ json: vars })),
+      unwrap<SleepLog>(client.POST("/api/sleep", { body: vars })),
     onMutate: (vars: StartSleepVars) => {
       const snap = snapshotSummary(qc, vars.babyId);
       patchSummary(qc, vars.babyId, (old) => ({
@@ -246,7 +248,10 @@ export function registerLogMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["wakeSleep"], {
     mutationFn: async ({ id, ...body }: WakeSleepVars) =>
       unwrap<SleepLog>(
-        await api.sleep[":id"].wake.$post({ param: { id }, json: body }),
+        client.POST("/api/sleep/{id}/wake", {
+          params: { path: { id } },
+          body,
+        }),
       ),
     onError: (err: Error) =>
       toast(`${t("Could not wake: ")}${err.message}`, "error"),
@@ -255,7 +260,10 @@ export function registerLogMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["updateFeed"], {
     mutationFn: async ({ id, patch }: UpdateFeedVars) =>
       unwrap<FeedLog>(
-        await api.feeds[":id"].$patch({ param: { id }, json: patch }),
+        client.PATCH("/api/feeds/{id}", {
+          params: { path: { id } },
+          body: patch,
+        }),
       ),
     onError: saveErrorToast("feed"),
     onSettled: () => invalidateLogs(qc),
@@ -263,7 +271,10 @@ export function registerLogMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["updateDiaper"], {
     mutationFn: async ({ id, patch }: UpdateDiaperVars) =>
       unwrap<DiaperLog>(
-        await api.diapers[":id"].$patch({ param: { id }, json: patch }),
+        client.PATCH("/api/diapers/{id}", {
+          params: { path: { id } },
+          body: patch,
+        }),
       ),
     onError: saveErrorToast("diaper"),
     onSettled: () => invalidateLogs(qc),
@@ -271,28 +282,31 @@ export function registerLogMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["updateSleep"], {
     mutationFn: async ({ id, patch }: UpdateSleepVars) =>
       unwrap<SleepLog>(
-        await api.sleep[":id"].$patch({ param: { id }, json: patch }),
+        client.PATCH("/api/sleep/{id}", {
+          params: { path: { id } },
+          body: patch,
+        }),
       ),
     onError: saveErrorToast("feed"),
     onSettled: () => invalidateLogs(qc),
   });
   qc.setMutationDefaults(["deleteFeed"], {
     mutationFn: async ({ id }: DeleteVars) =>
-      unwrap(await api.feeds[":id"].$delete({ param: { id } })),
+      unwrap(client.DELETE("/api/feeds/{id}", { params: { path: { id } } })),
     onError: (err: Error) =>
       toast(t("Could not delete: ") + err.message, "error"),
     onSettled: () => invalidateLogs(qc),
   });
   qc.setMutationDefaults(["deleteDiaper"], {
     mutationFn: async ({ id }: DeleteVars) =>
-      unwrap(await api.diapers[":id"].$delete({ param: { id } })),
+      unwrap(client.DELETE("/api/diapers/{id}", { params: { path: { id } } })),
     onError: (err: Error) =>
       toast(t("Could not delete: ") + err.message, "error"),
     onSettled: () => invalidateLogs(qc),
   });
   qc.setMutationDefaults(["deleteSleep"], {
     mutationFn: async ({ id }: DeleteVars) =>
-      unwrap(await api.sleep[":id"].$delete({ param: { id } })),
+      unwrap(client.DELETE("/api/sleep/{id}", { params: { path: { id } } })),
     onError: (err: Error) =>
       toast(t("Could not delete: ") + err.message, "error"),
     onSettled: () => invalidateLogs(qc),

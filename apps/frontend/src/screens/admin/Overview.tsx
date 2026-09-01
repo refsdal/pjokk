@@ -1,10 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import type { z } from "@hono/zod-openapi";
-import type { AdminStatsSchema } from "@pjokk/shared";
 import { Card } from "@/components/ui/card";
-import { api, unwrap } from "@/lib/api";
+import { client, unwrap } from "@/lib/api";
+import type { components } from "@/lib/api-schema";
 
-type AdminStats = z.infer<typeof AdminStatsSchema>;
+type AdminStats = components["schemas"]["AdminStats"];
 
 function StatTile({ label, value }: { label: string; value: number }) {
   return (
@@ -18,7 +17,7 @@ function StatTile({ label, value }: { label: string; value: number }) {
 export function AdminOverview() {
   const stats = useQuery({
     queryKey: ["admin", "stats"],
-    queryFn: async () => unwrap<AdminStats>(await api.admin.stats.$get()),
+    queryFn: async () => unwrap<AdminStats>(client.GET("/api/admin/stats")),
   });
   const s = stats.data;
 

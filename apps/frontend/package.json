@@ -5,7 +5,8 @@
   "type": "module",
   "dependencies": {
     "@pjokk/api": "workspace:*",
-    "@pjokk/shared": "workspace:*"
+    "@pjokk/shared": "workspace:*",
+    "openapi-fetch": "^0.17.0"
   },
   "scripts": {
     "dev": "vite dev",

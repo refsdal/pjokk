@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { Stats, Timeline, TimelineFilter } from "@pjokk/shared";
-import { api, unwrap } from "../api";
+import { client, unwrap } from "../api";
 
 // Read-only aggregate views: the merged timeline and the stats window.
 
@@ -14,12 +14,14 @@ export function useTimeline(
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) =>
       unwrap<Timeline>(
-        await api.timeline.$get({
-          query: {
-            babyId: babyId!,
-            limit: "50",
-            ...(pageParam ? { before: pageParam } : {}),
-            ...(filter ? { filter } : {}),
+        client.GET("/api/timeline", {
+          params: {
+            query: {
+              babyId: babyId!,
+              limit: 50,
+              ...(pageParam ? { before: pageParam } : {}),
+              ...(filter ? { filter } : {}),
+            },
           },
         }),
       ),
@@ -34,11 +36,13 @@ export function useStats(babyId: string | undefined, days: 1 | 7 | 30) {
     staleTime: 60_000,
     queryFn: async () =>
       unwrap<Stats>(
-        await api.stats.$get({
-          query: {
-            babyId: babyId!,
-            days: String(days),
-            tz: String(new Date().getTimezoneOffset()),
+        client.GET("/api/stats", {
+          params: {
+            query: {
+              babyId: babyId!,
+              days,
+              tz: new Date().getTimezoneOffset(),
+            },
           },
         }),
       ),

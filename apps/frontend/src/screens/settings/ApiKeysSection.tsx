@@ -5,7 +5,7 @@ import { ChipGroup } from "@/components/Chips";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { api, unwrap } from "@/lib/api";
+import { client, unwrap } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { formatRelative } from "@/lib/time";
 import { toast } from "@/lib/toast";
@@ -19,14 +19,14 @@ export function ApiKeysSection() {
 
   const keys = useQuery({
     queryKey: ["apiKeys"],
-    queryFn: async () => unwrap<ApiKey[]>(await api.keys.$get()),
+    queryFn: async () => unwrap<ApiKey[]>(client.GET("/api/keys")),
   });
 
   const createKey = useMutation({
     mutationFn: async () =>
       unwrap<ApiKeyCreated>(
-        await api.keys.$post({
-          json: {
+        client.POST("/api/keys", {
+          body: {
             name: name.trim(),
             readOnly,
             ...(expiry === "never" ? {} : { expiresInDays: Number(expiry) }),
@@ -43,7 +43,7 @@ export function ApiKeysSection() {
 
   const revokeKey = useMutation({
     mutationFn: async (id: string) =>
-      unwrap(await api.keys[":id"].$delete({ param: { id } })),
+      unwrap(client.DELETE("/api/keys/{id}", { params: { path: { id } } })),
     onSuccess: () =>
       void queryClient.invalidateQueries({ queryKey: ["apiKeys"] }),
     // A failed revoke must never look like success — the key stays live.

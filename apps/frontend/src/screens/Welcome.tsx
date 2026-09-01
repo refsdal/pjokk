@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ChipGroup } from "@/components/Chips";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { api, unwrap } from "@/lib/api";
+import { client, unwrap } from "@/lib/api";
 import { authClient, useSession } from "@/lib/auth-client";
 import { t } from "@/lib/i18n";
 import { toLocalDateInput } from "@/lib/time";
@@ -59,8 +59,8 @@ export function WelcomeScreen() {
     setBusy(true);
     try {
       await unwrap(
-        await api.babies.$post({
-          json: {
+        client.POST("/api/babies", {
+          body: {
             name: babyName.trim(),
             birthDate: new Date(birthDate).toISOString(),
             ...(sex ? { sex } : {}),

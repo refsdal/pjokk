@@ -6,7 +6,7 @@ import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet } from "@/components/Sheet";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { api, unwrap } from "@/lib/api";
+import { client, unwrap } from "@/lib/api";
 import { authClient, useSession } from "@/lib/auth-client";
 import { useInvites, useMembers } from "@/lib/data";
 import { t } from "@/lib/i18n";
@@ -151,8 +151,8 @@ export function FamilySection({ isAdmin }: { isAdmin: boolean }) {
   const createInvite = useMutation({
     mutationFn: async () =>
       unwrap<Invite>(
-        await api.invites.$post({
-          json: { role: "member", expiresInHours: 72, maxUses: 5 },
+        client.POST("/api/invites", {
+          body: { role: "member", expiresInHours: 72, maxUses: 5 },
         }),
       ),
     onSuccess: (invite) => {
@@ -164,7 +164,9 @@ export function FamilySection({ isAdmin }: { isAdmin: boolean }) {
 
   const revokeInvite = useMutation({
     mutationFn: async (code: string) =>
-      unwrap(await api.invites[":code"].$delete({ param: { code } })),
+      unwrap(
+        client.DELETE("/api/invites/{code}", { params: { path: { code } } }),
+      ),
     onSuccess: () => {
       setShownInvite(null);
       void queryClient.invalidateQueries({ queryKey: ["invites"] });

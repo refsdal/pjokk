@@ -1,6 +1,6 @@
 import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
 import type { MeasurementType, MedicineUnit } from "@pjokk/shared";
-import { api, ApiError, unwrap } from "../api";
+import { ApiError, client, unwrap } from "../api";
 import { t } from "../i18n";
 import { toast } from "../toast";
 import { invalidateLogs } from "./keys";
@@ -25,33 +25,56 @@ export type OtherKind =
   | "measurement"
   | "pump";
 
-// Heterogeneously typed hono-client sub-objects; dispatch is by kind and the
-// per-kind payload types below keep call sites honest.
-const otherApi: Record<
-  OtherKind,
-  {
-    $get: (args: {
-      query: { babyId: string; limit: string };
-    }) => Promise<Response>;
-    $post: (args: { json: unknown }) => Promise<Response>;
-  } & Record<
-    ":id",
-    {
-      $patch: (args: {
-        param: { id: string };
-        json: unknown;
-      }) => Promise<Response>;
-      $delete: (args: { param: { id: string } }) => Promise<Response>;
-    }
-  >
-> = {
-  medicine: api.medicine as never,
-  bath: api.baths as never,
-  note: api.notes as never,
-  milestone: api.milestones as never,
-  measurement: api.measurements as never,
-  pump: api.pumps as never,
+// Path templates per kind — dispatch is by kind and the per-kind payload
+// types below keep call sites honest. client.GET/POST/PATCH/DELETE want a
+// path LITERAL straight from the generated schema, which a
+// runtime-dispatched string can't be, hence the `as never` casts on the
+// four wrappers below (mirrors the old hono-client sub-objects' `as never`).
+const otherListPath: Record<OtherKind, string> = {
+  medicine: "/api/medicine",
+  bath: "/api/baths",
+  note: "/api/notes",
+  milestone: "/api/milestones",
+  measurement: "/api/measurements",
+  pump: "/api/pumps",
 };
+const otherItemPath: Record<OtherKind, string> = {
+  medicine: "/api/medicine/{id}",
+  bath: "/api/baths/{id}",
+  note: "/api/notes/{id}",
+  milestone: "/api/milestones/{id}",
+  measurement: "/api/measurements/{id}",
+  pump: "/api/pumps/{id}",
+};
+
+function otherGet(kind: OtherKind, babyId: string, limit: number) {
+  return client.GET(
+    otherListPath[kind] as never,
+    {
+      params: { query: { babyId, limit } },
+    } as never,
+  );
+}
+function otherPost(kind: OtherKind, body: unknown) {
+  return client.POST(otherListPath[kind] as never, { body } as never);
+}
+function otherPatch(kind: OtherKind, id: string, body: unknown) {
+  return client.PATCH(
+    otherItemPath[kind] as never,
+    {
+      params: { path: { id } },
+      body,
+    } as never,
+  );
+}
+function otherDelete(kind: OtherKind, id: string) {
+  return client.DELETE(
+    otherItemPath[kind] as never,
+    {
+      params: { path: { id } },
+    } as never,
+  );
+}
 
 type OtherBase = { babyId: string; time: string; notes?: string };
 
@@ -78,7 +101,7 @@ export interface UpdateOtherVars {
   kind: OtherKind;
   id: string;
   // Per-kind field set; omitted = untouched, null = cleared. Validated
-  // server-side by the kind's zod schema.
+  // server-side by the kind's generated request schema.
   patch: Record<string, unknown>;
 }
 
@@ -91,13 +114,11 @@ export interface DeleteOtherVars {
 // last-value prefill has data by the time a kind is chosen (first-ever open
 // included).
 export function prefetchOtherLists(qc: QueryClient, babyId: string) {
-  for (const kind of Object.keys(otherApi) as OtherKind[]) {
+  for (const kind of Object.keys(otherListPath) as OtherKind[]) {
     void qc.prefetchQuery({
       queryKey: ["other", kind, babyId],
       queryFn: async () =>
-        unwrap<Record<string, unknown>[]>(
-          await otherApi[kind].$get({ query: { babyId, limit: "10" } }),
-        ),
+        unwrap<Record<string, unknown>[]>(otherGet(kind, babyId, 10)),
       staleTime: 60_000,
     });
   }
@@ -112,11 +133,7 @@ export function useOtherList(
     queryKey: ["other", kind, babyId],
     enabled: enabled && !!babyId,
     queryFn: async () =>
-      unwrap<Record<string, unknown>[]>(
-        await otherApi[kind].$get({
-          query: { babyId: babyId!, limit: "10" },
-        }),
-      ),
+      unwrap<Record<string, unknown>[]>(otherGet(kind, babyId!, 10)),
   });
 }
 
@@ -127,33 +144,27 @@ export function useMeasurements(babyId: string | undefined) {
     queryFn: async () =>
       unwrap<
         { time: string; type: "weight" | "length" | "head"; value: number }[]
-      >(
-        await api.measurements.$get({
-          query: { babyId: babyId!, limit: "200" },
-        }),
-      ),
+      >(otherGet("measurement", babyId!, 200)),
   });
 }
 
 export function registerOtherMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["createOther"], {
     mutationFn: async ({ kind, ...body }: CreateOtherVars) =>
-      unwrap(await otherApi[kind].$post({ json: body })),
+      unwrap(otherPost(kind, body)),
     onError: (err: Error) => toastMutationError(t("Could not save: "), err),
     onSettled: () => invalidateLogs(qc),
   });
   qc.setMutationDefaults(["updateOther"], {
     mutationFn: async ({ kind, id, patch }: UpdateOtherVars) =>
-      unwrap(
-        await otherApi[kind][":id"].$patch({ param: { id }, json: patch }),
-      ),
+      unwrap(otherPatch(kind, id, patch)),
     onError: (err: Error) =>
       toast(t("Could not update: ") + err.message, "error"),
     onSettled: () => invalidateLogs(qc),
   });
   qc.setMutationDefaults(["deleteOther"], {
     mutationFn: async ({ kind, id }: DeleteOtherVars) =>
-      unwrap(await otherApi[kind][":id"].$delete({ param: { id } })),
+      unwrap(otherDelete(kind, id)),
     onError: (err: Error) =>
       toast(t("Could not delete: ") + err.message, "error"),
     onSettled: () => invalidateLogs(qc),

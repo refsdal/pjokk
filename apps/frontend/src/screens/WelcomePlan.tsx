@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { CSSProperties } from "react";
 import { IconCheck } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
-import { api, unwrap } from "@/lib/api";
+import { API_BASE, unwrap } from "@/lib/api";
 import { authClient } from "@/lib/auth-client";
 import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
@@ -96,9 +96,15 @@ export function PlanStep({
     setBusy(true);
     try {
       if (plan === "lifetime") {
-        const { url } = await unwrap<{ url: string }>(
-          await api.billing.lifetime.$post(),
-        );
+        // NOTE (Task 25): see BillingSection.tsx's buyLifetime — the Go
+        // backend has no billing routes, so this stays a raw fetch rather
+        // than an invented client.POST call. 404s until Task 27 removes
+        // the plan step from Welcome entirely (REF §A8 "Billing removal").
+        const res = await fetch(`${API_BASE}/api/billing/lifetime`, {
+          method: "POST",
+          credentials: "include",
+        });
+        const { url } = await unwrap<{ url: string }>(res);
         window.location.assign(url);
         return;
       }

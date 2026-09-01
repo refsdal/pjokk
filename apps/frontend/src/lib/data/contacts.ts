@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Contact, CreateContact, UpdateContact } from "@pjokk/shared";
-import { api, unwrap } from "../api";
+import { client, unwrap } from "../api";
 
 export function useContacts() {
   return useQuery({
     queryKey: ["contacts"],
-    queryFn: async () => unwrap<Contact[]>(await api.contacts.$get()),
+    queryFn: async () => unwrap<Contact[]>(client.GET("/api/contacts")),
   });
 }
 
@@ -15,13 +15,13 @@ export function useSaveContact(id?: string) {
     mutationFn: async (json: CreateContact | UpdateContact) =>
       id
         ? unwrap<Contact>(
-            await api.contacts[":id"].$patch({
-              param: { id },
-              json: json as UpdateContact,
+            client.PATCH("/api/contacts/{id}", {
+              params: { path: { id } },
+              body: json as UpdateContact,
             }),
           )
         : unwrap<Contact>(
-            await api.contacts.$post({ json: json as CreateContact }),
+            client.POST("/api/contacts", { body: json as CreateContact }),
           ),
     onSuccess: () =>
       void queryClient.invalidateQueries({ queryKey: ["contacts"] }),
@@ -32,7 +32,7 @@ export function useDeleteContact() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) =>
-      unwrap(await api.contacts[":id"].$delete({ param: { id } })),
+      unwrap(client.DELETE("/api/contacts/{id}", { params: { path: { id } } })),
     onSuccess: () =>
       void queryClient.invalidateQueries({ queryKey: ["contacts"] }),
   });

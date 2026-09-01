@@ -5,7 +5,7 @@ import { Sheet } from "@/components/Sheet";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { api, unwrap } from "@/lib/api";
+import { client, unwrap } from "@/lib/api";
 import { authClient, useSession } from "@/lib/auth-client";
 import { toast } from "@/lib/toast";
 import type { AdminUser } from "./lib";
@@ -126,8 +126,8 @@ function UserSheet({
                     // the tombstone first, audits, then removes the account.
                     async () =>
                       unwrap(
-                        await api.admin.users[":id"].delete.$post({
-                          param: { id: user.id },
+                        client.POST("/api/admin/users/{id}/delete", {
+                          params: { path: { id: user.id } },
                         }),
                       ),
                   )

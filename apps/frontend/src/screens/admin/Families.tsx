@@ -1,24 +1,28 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { z } from "@hono/zod-openapi";
-import type { AdminFamilySchema } from "@pjokk/shared";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Card } from "@/components/ui/card";
-import { api, unwrap } from "@/lib/api";
+import { client, unwrap } from "@/lib/api";
+import type { components } from "@/lib/api-schema";
 import { formatRelative } from "@/lib/time";
 import { toast } from "@/lib/toast";
 
-type AdminFamily = z.infer<typeof AdminFamilySchema>;
+type AdminFamily = components["schemas"]["AdminFamily"];
 
 export function AdminFamilies() {
   const queryClient = useQueryClient();
   const families = useQuery({
     queryKey: ["admin", "families"],
-    queryFn: async () => unwrap<AdminFamily[]>(await api.admin.families.$get()),
+    queryFn: async () =>
+      unwrap<AdminFamily[]>(client.GET("/api/admin/families")),
   });
 
   const deleteFamily = useMutation({
     mutationFn: async (id: string) =>
-      unwrap(await api.admin.families[":id"].$delete({ param: { id } })),
+      unwrap(
+        client.DELETE("/api/admin/families/{id}", {
+          params: { path: { id } },
+        }),
+      ),
     onSuccess: () => {
       toast("Family deleted");
       void queryClient.invalidateQueries({ queryKey: ["admin"] });
@@ -26,9 +30,20 @@ export function AdminFamilies() {
     onError: (err) => toast(err.message, "error"),
   });
 
+  // NOTE (Task 25): the Go backend has no plan-set endpoint any more —
+  // "Billing is gone" (internal/api/admin.go's package doc comment). This
+  // mutation and the comp/revoke buttons below are dead against the new
+  // backend and are Task 27's to remove (REF §A8 lists admin/Families.tsx
+  // under "simplify plan-conditioned rendering"). Left as a pre-existing
+  // compile error on purpose rather than invented against a route that
+  // doesn't exist.
   const setPlan = useMutation({
     mutationFn: async (vars: { id: string; plan: "free" | "comp" }) =>
       unwrap(
+        // `api` (the old hono client) is intentionally gone — see the NOTE
+        // above. Left as a genuine compile error for Task 27 to remove
+        // along with the rest of this mutation; not converted because
+        // there is no matching Go route.
         await api.admin.families[":id"].plan.$post({
           param: { id: vars.id },
           json: { plan: vars.plan },

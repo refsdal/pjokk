@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { api, unwrap } from "@/lib/api";
+import { API_BASE, unwrap } from "@/lib/api";
 import { authClient } from "@/lib/auth-client";
 import { useFamily } from "@/lib/data";
 import { t } from "@/lib/i18n";
@@ -67,9 +67,18 @@ export function BillingSection({ isAdmin }: { isAdmin: boolean }) {
 
   const buyLifetime = async () => {
     try {
-      const { url } = await unwrap<{ url: string }>(
-        await api.billing.lifetime.$post(),
-      );
+      // NOTE (Task 25): the Go backend has no billing routes at all —
+      // "Billing is gone" (internal/api/admin.go). There is no
+      // /api/billing/lifetime in openapi/pjokk.yaml to generate a typed
+      // call for, so this stays a raw fetch (same bypass pattern as the
+      // vaccine-document routes in lib/data/vaccines.ts) rather than an
+      // invented client.POST call. It will 404 until Task 27 removes this
+      // component entirely (REF §A8 "Billing removal").
+      const res = await fetch(`${API_BASE}/api/billing/lifetime`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const { url } = await unwrap<{ url: string }>(res);
       window.location.assign(url);
     } catch (err) {
       toast((err as Error).message, "error");
