@@ -190,6 +190,9 @@ type ServerInterface interface {
 	// GetSummary Everything the home screen needs in one call: last feed, last diaper, active + last sleep, active play, and today's local-day totals.
 	// (GET /api/summary)
 	GetSummary(w http.ResponseWriter, r *http.Request, params GetSummaryParams)
+	// ListTimeline The merged feed of everything, newest first. Sleep and play entries sort by their startTime (active sessions have endTime null); every other kind sorts by time. filter=other selects the eight non-core kinds (medicine, bath, note, milestone, measurement, pump, play, vaccine) together; omitting filter returns all eleven.
+	// (GET /api/timeline)
+	ListTimeline(w http.ResponseWriter, r *http.Request, params ListTimelineParams)
 	// ListVaccines Vaccine logs in the caller's active family, newest first. Each entry's `documents` array carries `url: "/api/files/{docId}"` for any attached file (see internal/api/files.go — uploading is disabled today, but existing documents still stream).
 	// (GET /api/vaccines)
 	ListVaccines(w http.ResponseWriter, r *http.Request, params ListVaccinesParams)
@@ -1740,6 +1743,78 @@ func (siw *ServerInterfaceWrapper) GetSummary(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ListTimeline operation middleware
+func (siw *ServerInterfaceWrapper) ListTimeline(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListTimelineParams
+
+	// ------------- Required query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "before" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "before", r.URL.Query(), &params.Before, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "before"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "before", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "filter" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "filter", r.URL.Query(), &params.Filter, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "filter"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "filter", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTimeline(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListVaccines operation middleware
 func (siw *ServerInterfaceWrapper) ListVaccines(w http.ResponseWriter, r *http.Request) {
 
@@ -2138,6 +2213,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/vaccines", wrapper.CreateVaccine)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/vaccines/{id}", wrapper.DeleteVaccine)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/vaccines/{id}", wrapper.UpdateVaccine)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/timeline", wrapper.ListTimeline)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/me", wrapper.GetMe)
 
 	return m
@@ -4092,6 +4168,42 @@ func (response GetSummary404JSONResponse) VisitGetSummaryResponse(w http.Respons
 	return err
 }
 
+type ListTimelineRequestObject struct {
+	Params ListTimelineParams
+}
+
+type ListTimelineResponseObject interface {
+	VisitListTimelineResponse(w http.ResponseWriter) error
+}
+
+type ListTimeline200JSONResponse Timeline
+
+func (response ListTimeline200JSONResponse) VisitListTimelineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTimeline404JSONResponse Error
+
+func (response ListTimeline404JSONResponse) VisitListTimelineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListVaccinesRequestObject struct {
 	Params ListVaccinesParams
 }
@@ -4553,6 +4665,9 @@ type StrictServerInterface interface {
 	// GetSummary Everything the home screen needs in one call: last feed, last diaper, active + last sleep, active play, and today's local-day totals.
 	// (GET /api/summary)
 	GetSummary(ctx context.Context, request GetSummaryRequestObject) (GetSummaryResponseObject, error)
+	// ListTimeline The merged feed of everything, newest first. Sleep and play entries sort by their startTime (active sessions have endTime null); every other kind sorts by time. filter=other selects the eight non-core kinds (medicine, bath, note, milestone, measurement, pump, play, vaccine) together; omitting filter returns all eleven.
+	// (GET /api/timeline)
+	ListTimeline(ctx context.Context, request ListTimelineRequestObject) (ListTimelineResponseObject, error)
 	// ListVaccines Vaccine logs in the caller's active family, newest first. Each entry's `documents` array carries `url: "/api/files/{docId}"` for any attached file (see internal/api/files.go — uploading is disabled today, but existing documents still stream).
 	// (GET /api/vaccines)
 	ListVaccines(ctx context.Context, request ListVaccinesRequestObject) (ListVaccinesResponseObject, error)
@@ -6250,6 +6365,32 @@ func (sh *strictHandler) GetSummary(w http.ResponseWriter, r *http.Request, para
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetSummaryResponseObject); ok {
 		if err := validResponse.VisitGetSummaryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListTimeline operation middleware
+func (sh *strictHandler) ListTimeline(w http.ResponseWriter, r *http.Request, params ListTimelineParams) {
+	var request ListTimelineRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListTimeline(ctx, request.(ListTimelineRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListTimeline")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListTimelineResponseObject); ok {
+		if err := validResponse.VisitListTimelineResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -1543,6 +1543,59 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/timeline:
+    get:
+      operationId: listTimeline
+      summary: >-
+        The merged feed of everything, newest first. Sleep and play entries
+        sort by their startTime (active sessions have endTime null); every
+        other kind sorts by time. filter=other selects the eight non-core
+        kinds (medicine, bath, note, milestone, measurement, pump, play,
+        vaccine) together; omitting filter returns all eleven.
+      tags: [timeline]
+      parameters:
+        - name: babyId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: before
+          in: query
+          required: false
+          description: >-
+            Opaque keyset cursor from a previous page's nextCursor
+            ("<epochMs>|<id>"). The id tiebreak keeps pagination lossless
+            across equal timestamps.
+          schema:
+            type: string
+            pattern: ^\d{1,15}\|.{1,64}$
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: filter
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [feeds, diapers, sleep, other]
+      responses:
+        "200":
+          description: Timeline page.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Timeline"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/me:
     get:
       operationId: getMe
@@ -2241,6 +2294,62 @@ components:
           type: string
           maxLength: 1000
           nullable: true
+    TimelineEntry:
+      type: object
+      description: >-
+        One row in the merged timeline. `kind`, `id`, `babyId`,
+        `caretakerId`, `caretakerName` and `notes` are present on every
+        entry regardless of kind; everything else is kind-specific and only
+        present for the kinds that have it (e.g. `startTime`/`endTime` on
+        sleep and play, `time` on the other nine, `documents` only on
+        vaccine) — see internal/api/timeline.go's per-kind entry builders,
+        ported field-for-field from apps/api/src/routes/timeline.ts's merge.
+        Modeled as an open object (kind + a handful of always-present fields
+        typed, everything else additionalProperties) rather than a oneOf
+        discriminated union: oapi-codegen has no clean Go representation for
+        eleven structurally different variants sharing one JSON shape.
+      required: [kind, id, babyId, caretakerId, caretakerName, notes]
+      properties:
+        kind:
+          type: string
+          enum:
+            - feed
+            - diaper
+            - sleep
+            - medicine
+            - bath
+            - note
+            - milestone
+            - measurement
+            - pump
+            - play
+            - vaccine
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+      additionalProperties: true
+    Timeline:
+      type: object
+      required: [entries, nextCursor]
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimelineEntry"
+        nextCursor:
+          type: string
+          nullable: true
+          description: >-
+            Opaque keyset cursor ("<epochMs>|<id>"); pass back as ?before=
+            for the next (older) page. Null when there is no further page.
     Summary:
       type: object
       required:

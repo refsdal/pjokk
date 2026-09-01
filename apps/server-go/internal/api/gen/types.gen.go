@@ -4,6 +4,8 @@
 package gen
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -376,6 +378,51 @@ func (e SetMemberRoleRole) Valid() bool {
 	}
 }
 
+// Defines values for TimelineEntryKind.
+const (
+	TimelineEntryKindBath        TimelineEntryKind = "bath"
+	TimelineEntryKindDiaper      TimelineEntryKind = "diaper"
+	TimelineEntryKindFeed        TimelineEntryKind = "feed"
+	TimelineEntryKindMeasurement TimelineEntryKind = "measurement"
+	TimelineEntryKindMedicine    TimelineEntryKind = "medicine"
+	TimelineEntryKindMilestone   TimelineEntryKind = "milestone"
+	TimelineEntryKindNote        TimelineEntryKind = "note"
+	TimelineEntryKindPlay        TimelineEntryKind = "play"
+	TimelineEntryKindPump        TimelineEntryKind = "pump"
+	TimelineEntryKindSleep       TimelineEntryKind = "sleep"
+	TimelineEntryKindVaccine     TimelineEntryKind = "vaccine"
+)
+
+// Valid indicates whether the value is a known member of the TimelineEntryKind enum.
+func (e TimelineEntryKind) Valid() bool {
+	switch e {
+	case TimelineEntryKindBath:
+		return true
+	case TimelineEntryKindDiaper:
+		return true
+	case TimelineEntryKindFeed:
+		return true
+	case TimelineEntryKindMeasurement:
+		return true
+	case TimelineEntryKindMedicine:
+		return true
+	case TimelineEntryKindMilestone:
+		return true
+	case TimelineEntryKindNote:
+		return true
+	case TimelineEntryKindPlay:
+		return true
+	case TimelineEntryKindPump:
+		return true
+	case TimelineEntryKindSleep:
+		return true
+	case TimelineEntryKindVaccine:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UpdateBabySex.
 const (
 	UpdateBabySexBoy  UpdateBabySex = "boy"
@@ -538,6 +585,30 @@ func (e UpdatePumpSide) Valid() bool {
 	case UpdatePumpSideLeft:
 		return true
 	case UpdatePumpSideRight:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListTimelineParamsFilter.
+const (
+	ListTimelineParamsFilterDiapers ListTimelineParamsFilter = "diapers"
+	ListTimelineParamsFilterFeeds   ListTimelineParamsFilter = "feeds"
+	ListTimelineParamsFilterOther   ListTimelineParamsFilter = "other"
+	ListTimelineParamsFilterSleep   ListTimelineParamsFilter = "sleep"
+)
+
+// Valid indicates whether the value is a known member of the ListTimelineParamsFilter enum.
+func (e ListTimelineParamsFilter) Valid() bool {
+	switch e {
+	case ListTimelineParamsFilterDiapers:
+		return true
+	case ListTimelineParamsFilterFeeds:
+		return true
+	case ListTimelineParamsFilterOther:
+		return true
+	case ListTimelineParamsFilterSleep:
 		return true
 	default:
 		return false
@@ -984,6 +1055,28 @@ type Summary struct {
 	} `json:"today"`
 }
 
+// Timeline defines model for Timeline.
+type Timeline struct {
+	Entries []TimelineEntry `json:"entries"`
+
+	// NextCursor Opaque keyset cursor ("<epochMs>|<id>"); pass back as ?before= for the next (older) page. Null when there is no further page.
+	NextCursor *string `json:"nextCursor"`
+}
+
+// TimelineEntry One row in the merged timeline. `kind`, `id`, `babyId`, `caretakerId`, `caretakerName` and `notes` are present on every entry regardless of kind; everything else is kind-specific and only present for the kinds that have it (e.g. `startTime`/`endTime` on sleep and play, `time` on the other nine, `documents` only on vaccine) — see internal/api/timeline.go's per-kind entry builders, ported field-for-field from apps/api/src/routes/timeline.ts's merge. Modeled as an open object (kind + a handful of always-present fields typed, everything else additionalProperties) rather than a oneOf discriminated union: oapi-codegen has no clean Go representation for eleven structurally different variants sharing one JSON shape.
+type TimelineEntry struct {
+	BabyId               string                 `json:"babyId"`
+	CaretakerId          string                 `json:"caretakerId"`
+	CaretakerName        string                 `json:"caretakerName"`
+	Id                   string                 `json:"id"`
+	Kind                 TimelineEntryKind      `json:"kind"`
+	Notes                *string                `json:"notes"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// TimelineEntryKind defines model for TimelineEntry.Kind.
+type TimelineEntryKind string
+
 // UpdateBaby Every field is optional; an empty object is a no-op. `sex` may also be sent as `null`, which — like omitting it — leaves the baby's sex unchanged (Go's JSON decoding cannot tell "absent" from "null" for a nullable-optional field without a bespoke wrapper type, and no caller needs to clear sex back to unknown today; see internal/api/babies.go).
 type UpdateBaby struct {
 	BirthDate *time.Time     `json:"birthDate,omitempty"`
@@ -1264,6 +1357,19 @@ type GetSummaryParams struct {
 	Tz *int `form:"tz,omitempty" json:"tz,omitempty"`
 }
 
+// ListTimelineParams defines parameters for ListTimeline.
+type ListTimelineParams struct {
+	BabyId string `form:"babyId" json:"babyId"`
+
+	// Before Opaque keyset cursor from a previous page's nextCursor ("<epochMs>|<id>"). The id tiebreak keeps pagination lossless across equal timestamps.
+	Before *string                   `form:"before,omitempty" json:"before,omitempty"`
+	Limit  *int                      `form:"limit,omitempty" json:"limit,omitempty"`
+	Filter *ListTimelineParamsFilter `form:"filter,omitempty" json:"filter,omitempty"`
+}
+
+// ListTimelineParamsFilter defines parameters for ListTimeline.
+type ListTimelineParamsFilter string
+
 // ListVaccinesParams defines parameters for ListVaccines.
 type ListVaccinesParams struct {
 	// BabyId Restrict the result to one baby in the caller's family.
@@ -1374,3 +1480,134 @@ type CreateVaccineDismissalJSONRequestBody = CreateVaccineDismissal
 
 // UpdateVaccineJSONRequestBody defines body for UpdateVaccine for application/json ContentType.
 type UpdateVaccineJSONRequestBody = UpdateVaccine
+
+// Getter for additional properties for TimelineEntry. Returns the specified
+// element and whether it was found
+func (a TimelineEntry) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for TimelineEntry
+func (a *TimelineEntry) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for TimelineEntry to handle AdditionalProperties
+func (a *TimelineEntry) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["babyId"]; found {
+		err = json.Unmarshal(raw, &a.BabyId)
+		if err != nil {
+			return fmt.Errorf("error reading 'babyId': %w", err)
+		}
+		delete(object, "babyId")
+	}
+
+	if raw, found := object["caretakerId"]; found {
+		err = json.Unmarshal(raw, &a.CaretakerId)
+		if err != nil {
+			return fmt.Errorf("error reading 'caretakerId': %w", err)
+		}
+		delete(object, "caretakerId")
+	}
+
+	if raw, found := object["caretakerName"]; found {
+		err = json.Unmarshal(raw, &a.CaretakerName)
+		if err != nil {
+			return fmt.Errorf("error reading 'caretakerName': %w", err)
+		}
+		delete(object, "caretakerName")
+	}
+
+	if raw, found := object["id"]; found {
+		err = json.Unmarshal(raw, &a.Id)
+		if err != nil {
+			return fmt.Errorf("error reading 'id': %w", err)
+		}
+		delete(object, "id")
+	}
+
+	if raw, found := object["kind"]; found {
+		err = json.Unmarshal(raw, &a.Kind)
+		if err != nil {
+			return fmt.Errorf("error reading 'kind': %w", err)
+		}
+		delete(object, "kind")
+	}
+
+	if raw, found := object["notes"]; found {
+		err = json.Unmarshal(raw, &a.Notes)
+		if err != nil {
+			return fmt.Errorf("error reading 'notes': %w", err)
+		}
+		delete(object, "notes")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for TimelineEntry to handle AdditionalProperties
+func (a TimelineEntry) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["babyId"], err = json.Marshal(a.BabyId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'babyId': %w", err)
+	}
+
+	object["caretakerId"], err = json.Marshal(a.CaretakerId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'caretakerId': %w", err)
+	}
+
+	object["caretakerName"], err = json.Marshal(a.CaretakerName)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'caretakerName': %w", err)
+	}
+
+	object["id"], err = json.Marshal(a.Id)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'id': %w", err)
+	}
+
+	object["kind"], err = json.Marshal(a.Kind)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'kind': %w", err)
+	}
+
+	object["notes"], err = json.Marshal(a.Notes)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'notes': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}

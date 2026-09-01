@@ -259,6 +259,10 @@ var operationAuthTiers = map[string]authTier{
 	"CreateVaccineDismissal": tierFamily,
 	"DeleteVaccineDismissal": tierFamily,
 
+	// Timeline (Task 15; REF §A1 timeline.ts): the merged, keyset-paginated
+	// feed across all eleven kinds above. Ordinary family-scoped read.
+	"ListTimeline": tierFamily,
+
 	"DeleteBaby":          tierAdmin,
 	"DeleteFamilyMember":  tierAdmin,
 	"SetFamilyMemberRole": tierAdmin,
