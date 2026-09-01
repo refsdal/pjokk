@@ -9,11 +9,17 @@ itself, container and all, lives on **app.pjokk.no**, whose signed-in home
 screen is `/home`. Test environment: **test.pjokk.no** (the app host; the
 landing site has no separate test deploy).
 
-> **Runtime note (2026-08-28):** the app ran on Cloudflare Workers + D1 + R2 +
-> KV through Phase 10. It now runs as a Bun process in a container against
-> Postgres and S3-compatible storage. Comments through the codebase that say
-> "this used to be X on Workers" are deliberate: they record why a piece of
-> code is shaped the way it is.
+> **Runtime note (2026-09-01):** the app has had three runtimes. It ran on
+> Cloudflare Workers + D1 + R2 + KV through Phase 10; it then ran as a Bun
+> process in a container against Postgres and S3-compatible storage; since
+> the Go migration the backend is a single static Go binary in a `scratch`
+> image, still against Postgres and object storage, with the SPA embedded in
+> the binary. Comments through the codebase that say "this used to be X on
+> Workers" or "ports `apps/api/src/routes/feeds.ts`" are deliberate: they
+> record why a piece of code is shaped the way it is, and which TypeScript
+> file each Go file and Go test is answerable to. `apps/api` and
+> `apps/server/src/*.ts` no longer exist — a path with `src/` and a `.ts`
+> extension in a comment is always history. `apps/server` is the Go module.
 
 ## Product principles (read before writing any UI)
 
@@ -41,55 +47,79 @@ landing site has no separate test deploy).
 ## Stack (decided — do not substitute)
 
 **Backend**
-- Bun, one process serving both the SPA (static files) and the API. One
-  container image. No CORS in the default setup (same origin).
-- Hono for routing. All routes built with `@hono/zod-openapi` — each endpoint's
-  zod schema does triple duty: runtime validation, OpenAPI spec, inferred types
-  for the RPC client. ONE route tree (no separate "RPC for us / OpenAPI for
-  others"). Serve interactive docs with Scalar at `/api/docs`.
-- Drizzle ORM + Postgres (`drizzle-orm/bun-sql`, Bun's native client).
-  Migrations via drizzle-kit generate → `bun run migrate` from source, or
-  `/app/dispatch migrate` (alias `migrations`) in the image for an explicit
-  one-off. The **default dispatch mode also migrates**, at startup, guarded by
-  a Postgres advisory lock (`MIGRATION_LOCK_KEY`, `apps/server/src/migrate.ts`)
-  so several containers booting at once serialise instead of racing to apply
-  the same DDL — the first acquires the lock and migrates, the rest block and
-  then find nothing pending. `server` mode NEVER migrates; it is what
-  replicas run. Orchestrated deployments (Kubernetes, several `server`
-  replicas) should still prefer the explicit one-off `migrate` before a
-  rollout, ahead of any replica depending on the new schema, rather than
-  relying on whichever replica happens to boot first — the advisory lock
-  makes that one-off safe to run concurrently with a starting default-mode
-  container, it does not make it unnecessary.
-- Any S3-compatible store for files (MinIO in compose; S3/R2/Ceph in
-  production). Never a public bucket — stream through an authed Hono route
-  (`/api/files/:id`). Access it ONLY through
-  `apps/api/src/infrastructure/storage.ts`, whose `put` takes `Blob | string`
-  and NOT a ReadableStream: Bun's S3 client silently writes the string
-  "[object ReadableStream]" if handed one.
-- A `rate_limit` Postgres table for rate-limiting counters.
-- Scheduled work (reminders, nightly backup) runs via `bun run cron
-  <nightly|frequent>` from source, `/app/dispatch cron <job>` in the image. The
-  in-process scheduler (`apps/server/src/cron.ts`) uses Bun's builtin
-  `Bun.cron` with `tz: "UTC"` explicit (the image sets no `TZ`, and the 30-day
-  backup retention window is a privacy-policy commitment stated in UTC).
-  There is no env flag for this any more — the dispatch mode expresses it:
-  the default mode and `worker` mode both start the scheduler, `server` mode
-  never does. Under Kubernetes, scale `server` for HTTP and drive the
-  scheduled work from either CronJobs or exactly one `worker` replica — never
-  more than one thing scheduling at once, or every replica/worker fires every
-  job N times.
-- Configuration is environment variables, parsed and validated with zod at
-  startup (`apps/server/src/env.ts`). Add new settings there, never by reading
-  `process.env` at a call site.
-- `apps/api` never constructs a dependency at module scope and never reads
-  `process.env`; it is a library that receives its collaborators through a
-  plain `Deps` object (`apps/api/src/deps.ts`) passed to `createApi(deps)`.
-  `apps/server` is the sole composition root: it builds `Deps`
-  (`apps/server/src/deps.ts`) from validated config and hands it to
-  `createApi`, to `bun run cron`, and to the in-process scheduler. This keeps
-  the API testable without a container and, in principle, portable to a
-  different host process.
+- Go 1.27, stdlib `net/http` — no web framework. One static, CGO-free binary
+  (`apps/server`, module `github.com/refsdal/pjokk/server`) serving both the
+  SPA and the API from one process. The SPA, the OpenAPI spec, the SQL
+  migrations and the IANA zone database are all `go:embed`ed, which is what
+  lets the runtime image be `scratch`. No CORS in the default setup (same
+  origin).
+- **Spec first.** `openapi/pjokk.yaml` at the repo root is hand-written and
+  is the single source of truth. It does triple duty: `oapi-codegen`
+  generates the **strict server** interface and types into
+  `apps/server/internal/api/gen` (committed — neither CI nor the image runs
+  codegen), kin-openapi validates every request against it at runtime as
+  middleware, and `bun run gen:client` turns it into
+  `apps/frontend/src/lib/api-schema.d.ts` for the SPA. Adding an endpoint
+  means editing the YAML and running `go generate ./...` from `apps/server`;
+  `internal/api/pjokk.yaml` is a committed copy of the same file that exists
+  only because `go:embed` cannot reach above the module root — never
+  hand-edit it. Scalar docs at `/api/docs`, behind a session gate.
+- pgx v5 (`pgxpool`) + sqlc for queries + goose for migrations. No ORM: the
+  queries in `internal/db/queries` are SQL, and sqlc generates typed Go for
+  them into `internal/db/gen`. Migrations run via `/app/pjokk migrate`
+  (alias `migrations`) in the image, or `go run ./cmd/pjokk migrate` from
+  source. The **default dispatch mode also migrates**, at startup, guarded by
+  a Postgres advisory lock (`MIGRATION_LOCK_KEY`,
+  `apps/server/internal/db/migrate.go`) so several containers booting at once
+  serialise instead of racing to apply the same DDL — the first acquires the
+  lock and migrates, the rest block and then find nothing pending. `server`
+  mode NEVER migrates; it is what replicas run. Orchestrated deployments
+  (Kubernetes, several `server` replicas) should still prefer the explicit
+  one-off `migrate` before a rollout, ahead of any replica depending on the
+  new schema, rather than relying on whichever replica happens to boot first
+  — the advisory lock makes that one-off safe to run concurrently with a
+  starting default-mode container, it does not make it unnecessary.
+- Files go through the `storage.Storage` port
+  (`apps/server/internal/storage`), which has **two drivers** chosen by
+  `STORAGE_DRIVER`: `s3` (any S3-compatible store — MinIO, S3, R2, Ceph) and
+  `fs` (a mounted volume, `STORAGE_FS_PATH`). `fs` is the compose default and
+  the reason a self-hoster needs two containers rather than four. Never a
+  public bucket — files are always streamed back through an authed route
+  (`/api/files/:id`). Access storage ONLY through the port; nothing else
+  constructs an S3 client.
+- A `rate_limit` Postgres table for the app's own rate-limiting counters.
+  (Distinct from `rate_limits`, which is Limen's — see Auth below.)
+- Scheduled work (reminders, nightly backup) runs via `/app/pjokk cron
+  <nightly|frequent>` in the image, `go run ./cmd/pjokk cron <job>` from
+  source. The in-process scheduler (`apps/server/internal/cron`) uses
+  `robfig/cron/v3` with the location set to UTC **explicitly** (robfig
+  defaults to `time.Local`, the image sets no `TZ`, and the 30-day backup
+  retention window is a privacy-policy commitment stated in UTC). There is no
+  env flag for this — the dispatch mode expresses it: the default mode and
+  `worker` mode both start the scheduler, `server` mode never does. Under
+  Kubernetes, scale `server` for HTTP and drive the scheduled work from
+  either CronJobs or exactly one `worker` replica — never more than one thing
+  scheduling at once, or every replica/worker fires every job N times.
+- Web push is `SherClockHolmes/webpush-go` (VAPID). Absent `VAPID_*` the
+  subsystem is simply off and the boot log says so.
+- Configuration is environment variables, parsed and validated at startup in
+  `apps/server/internal/config`, which reports EVERY problem at once rather
+  than failing on the first. Add new settings there, never by reading
+  `os.Getenv` at a call site.
+- `internal/api` never constructs a dependency and never reads the
+  environment; it receives its collaborators through a plain `Deps` struct
+  (`apps/server/internal/api/api.go`) passed to `NewHandler(deps)`.
+  `cmd/pjokk` is the sole composition root: it builds `Deps` from validated
+  config and hands it to the API, to the cron CLI, and to the in-process
+  scheduler. This is why the suite can exercise the whole API in-process
+  against a real Postgres without a container.
+- **No billing.** Stripe, `@better-auth/stripe`, the entitlements module and
+  `canUse` are all gone. `organization.plan` survives as a vestigial column
+  (values still `free`), but nothing reads it to gate anything: everything
+  that was Premium — calendar, contacts, play, API keys, CSV export, the
+  growth chart, stats beyond 7 days, vaccine documents — is free. A
+  self-hosted tracker has nobody to bill. Do not reintroduce a gate without
+  reintroducing a reason.
 
 **EU data residency is mandatory**
 - The app stores GDPR Article 9 health data about children. Every stateful
@@ -104,53 +134,83 @@ landing site has no separate test deploy).
   and confirm the backup target is EU too. The nightly snapshot contains every
   table, health data included, so a bucket in the wrong region undoes the
   whole arrangement.
-- The rate limiter still stores a SHA-256 hash of the client IP rather than
-  the address. The original reason (KV was globally replicated and could not
-  be pinned) no longer applies now that counters live in the same EU database,
-  but there is still no reason to start recording addresses. Keep it that way.
+- **No component stores a client IP address.** The app's own rate limiter
+  keys on a digest, not the address; the original reason (KV was globally
+  replicated and could not be pinned) no longer applies now that counters
+  live in the same EU database, but there is still no reason to start
+  recording addresses. Limen needed the same treatment in two places its
+  defaults did record one — its rate-limiter key generator and, less
+  obviously, the `ip_address` it writes into every session row's `metadata`
+  JSON — so `internal/auth` passes a keyed extractor to both. It is an
+  **HMAC**-SHA-256 derived from `AUTH_SECRET` with its own domain separator,
+  not a bare digest: the IPv4 space is small enough that an unkeyed hash of
+  an address is reversible in seconds and would not be pseudonymisation at
+  all. Keep it that way.
 - The privacy policy (`apps/frontend/src/screens/legal/privacy.tsx`) names the
   processors and promises EU storage. **It must be kept in step with where the
   container is actually deployed** — it is a legal statement, not decoration.
 
 **Auth & tenancy**
-- better-auth with the **Organizations plugin**. An organization IS a family.
-  Members can belong to multiple families; the session's active organization is
-  the current family. Roles: parents = `admin` (settings, invites, deletes),
-  others = `member` (log + view).
-- Social sign-in: Google + email/passkey at launch. Design the login screen to
-  accept a third provider button (Apple) without rework — Apple sign-in becomes
-  mandatory only if/when a Capacitor App Store build ships.
+- **Limen** (`github.com/thecodearcher/limen`) with its credential-password,
+  oauth/oauth-google and **organization** plugins, replacing better-auth. An
+  organization IS a family. Members can belong to multiple families; the
+  session's active organization is the current family. Roles: parents =
+  `admin` (settings, invites, deletes), others = `member` (log + view).
+  Sessions are opaque cookies (`limen_session`); the SPA talks to it through
+  `limen-auth/react`.
+- **Limen is confined to `apps/server/internal/auth` and reached only through
+  the `auth.Service` interface.** Nothing outside that package imports Limen.
+  It is a young library and this is the seam that makes replacing it a
+  rewrite of one package rather than of the app; it is also where the
+  hardening lives. Two rules that must survive any upgrade:
+  - **Every Limen dependency is version-pinned**, adapters and plugins
+    included. Its HTTP surface and defaults move between releases.
+  - **Its HTTP routes are an ALLOWLIST, not a denylist.** Registering the
+    plugins mounts ~40 routes, most of which duplicate or contradict Pjokk's
+    own API. `internal/auth` disables everything known except credential
+    sign-in, Google authorize + callback, signout, the session read, and
+    organization create/list/switch (plus signup when `OPEN_SIGNUP=1`).
+    `knownRouteIDs` is hand-maintained: an upgrade that adds a route
+    upstream would silently enable it, which is why
+    `TestLimenRouteAllowlist` probes concrete paths.
+- Social sign-in: Google + email/password. Design the login screen to accept a
+  third provider button (Apple) without rework — Apple sign-in becomes
+  mandatory only if/when a Capacitor App Store build ships. **Passkeys are
+  gone**: better-auth's plugin was server-side only and never had UI, and
+  Limen has no equivalent, so nothing observable was lost.
 - **Open signup is DISABLED.** Accounts can only be created through the
-  invite-code redeem flow. This is the closed-alpha mechanism.
-- Custom invite codes (better-auth org invitations are email-addressed; wrong
-  grain for QR-at-Sunday-dinner). Table:
+  invite-code redeem flow. This is the closed-alpha mechanism. Organization
+  creation is restricted the same way — only a sysadmin or a user who belongs
+  to no family may create one — so a redeemed invite cannot be parlayed into
+  an unlimited supply of families.
+- Custom invite codes (Limen's org invitations, like better-auth's, are
+  email-addressed; wrong grain for QR-at-Sunday-dinner). Table:
   `family_invite(code, familyId, role, expiresAt, maxUses, usedCount)`.
   Defaults: 72 h expiry, revocable, role baked into the code. Redeem endpoint is
   rate-limited (codes are credentials). Flow: open `https://app.pjokk.no/join/CODE`
   (also rendered as QR) → social sign-in → validate code → addMember → land on
   family home.
-- The better-auth instance is built ONCE at startup (`apps/server/src/deps.ts`,
-  inside `createDeps`) and handed to requests through Hono context. It used to be per-request
-  because D1 bindings only existed inside the handler — which meant every
-  request rebuilt a Stripe client and the whole plugin chain. Do not
-  reintroduce that.
-- Billing is optional: `createStripe` returns null without credentials and the
-  stripe plugin is then not registered at all. The SDK throws from its
-  constructor on an empty key, so anything that assumes a client exists must
-  handle null.
-- Enable the better-auth **bearer plugin** from day one (cookies for web,
-  bearer tokens for a future Capacitor shell — both coexist).
+- The Limen instance is built ONCE at startup, in `cmd/pjokk`'s composition
+  root, and handed to handlers through `Deps`. It used to be per-request under
+  Workers because D1 bindings only existed inside the handler — which meant
+  every request rebuilt the whole plugin chain. Do not reintroduce that.
+- **API keys are our own table**, not an auth-library plugin: `api_key`
+  (`pjk_` bearer tokens, SHA-256 at rest, read-only flag, family-scoped) for
+  Home Assistant / Grafana. Cookies for web, bearer keys for integrations, and
+  a future Capacitor shell reuses the same header path.
 
 **Tenancy discipline (non-negotiable)**
-- Every domain table carries `familyId` referencing the organization.
-- A Hono middleware resolves `familyId` from the session's active organization.
-- All Drizzle access goes through family-scoped query helpers. No handler ever
-  queries a domain table without the family scope. Enforce from commit one.
-- Resources are owned by the family, never the user (this also makes future
-  org-level billing inherit cleanly).
-- Families have a `plan` column (always `free` for now). One central entitlement
-  helper `canUse(family, feature)` — any future gate routes through it; today it
-  returns true.
+- Every domain table carries `family_id` referencing the organization.
+- `internal/api/middleware` resolves the family from the session's active
+  organization and puts it on the request context; a route that needs one is
+  wrapped in `RequireFamily` (403 `NO_FAMILY` otherwise).
+- **Every sqlc query on a domain table takes `family_id` in its WHERE
+  clause** — the scope lives in the SQL, not in a handler's discipline. No
+  handler ever queries a domain table without it. Enforce from commit one.
+- Resources are owned by the family, never the user.
+- Families have a `plan` column, always `free`. It is vestigial: there is no
+  `canUse`, no entitlements module, and no 402. Every feature is available to
+  every family (see "No billing" above).
 
 **Frontend**
 - Vite + React SPA. TanStack Router + TanStack Query + TanStack Table.
@@ -160,8 +220,14 @@ landing site has no separate test deploy).
   Charts (perpetual beta). Do NOT add TanStack DB or Store now.
 - UI: Tailwind + shadcn/ui + vaul for bottom sheets. Mobile-first. Crank touch
   targets well above shadcn defaults on log-flow screens (44 px minimum).
-- Hono RPC client (`hono/client`) with a configurable API base URL
-  (`''` same-origin on web; overridable for a future native shell).
+- API client: `openapi-fetch` over `apps/frontend/src/lib/api-schema.d.ts`,
+  which `bun run gen:client` generates from `openapi/pjokk.yaml` (it replaced
+  the Hono RPC client, which could only exist while the server was
+  TypeScript). Configurable base URL (`''` same-origin on web; overridable
+  for a future native shell). `lib/api.ts`'s `unwrap` adapts openapi-fetch's
+  `{ data, error }` result back to the throw-`ApiError` shape every call site
+  expects. The generated `.d.ts` is committed and excluded from biome —
+  reformatting it would make regeneration a diff.
 - Offline: `persistQueryClient` to IndexedDB (timeline renders instantly
   offline) + paused mutations that queue and auto-resume. Logging a feed with
   no signal must not fail.
@@ -208,7 +274,12 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
 
 ## Data model (Phase 1 core)
 
-better-auth tables (user/session/account/organization/member/…) + domain:
+Limen tables (`users`/`sessions`/`accounts`/`organizations`/
+`organization_members`/`organization_member_roles`/`verifications`/
+`rate_limits`/`organization_invitations`) + domain. Note the plural table
+names and the join-table roles: these are Limen's shapes, verified against
+the library rather than guessed, and they are NOT the better-auth names the
+Bun-era schema used. Domain tables kept their singular names:
 
 - `baby(id, familyId, name, birthDate, …)`
 - `sleep_log(id, familyId, babyId, caretakerId, startTime, endTime NULL while
@@ -227,27 +298,40 @@ sheet pattern — build the pattern well once.
 
 ## Postgres notes (respect these)
 
-- **Real transactions.** Multi-row atomic writes use `db.transaction()`. D1
-  had only `batch()`, which is why several writes were once split into a
-  batch plus a separate ownership check, and why invite redemption was
-  hand-written SQL with duplicated guards and a compensating DELETE. Those are
-  gone; do not reintroduce the pattern.
+- **Real transactions.** Multi-row atomic writes use `pgx`'s `Begin`/`Commit`
+  (`pool.BeginTx`, with the sqlc `Queries` bound to the transaction via
+  `WithTx`). D1 had only `batch()`, which is why several writes were once
+  split into a batch plus a separate ownership check, and why invite
+  redemption was hand-written SQL with duplicated guards and a compensating
+  DELETE. Those are gone; do not reintroduce the pattern.
 - **Dialect traps that types cannot catch.** All three of these were live bugs
-  during the port:
-  - `COUNT()` is bigint, and the driver returns bigints as **strings**. Cast
-    raw aggregates: `COUNT(*)::int`.
+  during the Bun-era port and are still true:
+  - `COUNT()` is bigint. sqlc types it `int64` in Go, but cast raw aggregates
+    to `::int` where the API contract is an int.
   - Postgres `real` is 4-byte single precision, unlike SQLite's 8-byte REAL.
-    Use `doublePrecision` for anything measured (weights, doses).
+    Use `double precision` for anything measured (weights, doses).
   - `timestamptz - integer` is not an operator. Lead times are intervals:
     `start_time - (minutes * interval '1 minute')`.
-- **Unique violations** are detected by SQLSTATE `23505` via
-  `isUniqueViolation()`, never by matching error text.
-- **`user` is a reserved word.** Quote it in any hand-written SQL.
-- Timestamps are `timestamptz` everywhere, via the `ts()` column factory.
-  Drizzle maps them to JS `Date`, exactly as the old epoch-ms integers did.
+- **Unique violations** are detected by SQLSTATE `23505` (a `*pgconn.PgError`
+  with `Code == "23505"`), never by matching error text.
+- **`user` is a reserved word** — the reason Limen's table is `users`. Quote
+  any identifier that collides.
+- Timestamps are `timestamptz` everywhere and map to Go `time.Time`, exactly
+  as they mapped to JS `Date` before, and to epoch-ms integers before that.
 - Backups: a nightly row dump to object storage, pruned after 30 days — the
   window the privacy policy commits to for a deletion to take full effect. A
-  row dump rather than `pg_dump` so the image needs no Postgres client binary.
+  row dump rather than `pg_dump` so the image needs no Postgres client binary
+  (the `scratch` runtime could not run one anyway). Two deliberate
+  subtractions: **live credential columns are nulled before the dump**
+  (`users.password`, `accounts.access_token`/`refresh_token`/`id_token`,
+  `sessions.token`) — thirty days of retained snapshots must not amount to
+  thirty days of valid session cookies — and the `impersonation` table is
+  excluded outright, because every one of its rows is a pair of live session
+  tokens and there is nothing else in it worth restoring.
+  `jobs.DeliberatelyExcluded` names it alongside the two rate-limit tables
+  and goose's bookkeeping, and `backup_tables_test.go` checks the list
+  against the live schema **in both directions**, so "every table" stays
+  true as the schema grows.
 
 ## Phased roadmap
 
@@ -353,6 +437,27 @@ sheet pattern — build the pattern well once.
 > arithmetic, an unconditional Stripe client that crash-looped without
 > credentials, and a rate limiter that silently degraded to one shared bucket
 > behind an ingress.
+>
+> **Go migration (2026-09-01):** the backend was rewritten in Go and the
+> TypeScript one deleted. `apps/api` + `apps/server` (Bun, Hono,
+> `@hono/zod-openapi`, Drizzle, better-auth, Stripe) are gone; `apps/server`
+> is now a Go module producing one static binary that embeds the SPA, the
+> spec and the migrations, shipped from a `scratch` image built for amd64 and
+> arm64. What changed in kind, not just in language: the OpenAPI document
+> flipped from generated to **hand-written and authoritative**
+> (`openapi/pjokk.yaml` → oapi-codegen strict server + runtime request
+> validation + the SPA's client types); Drizzle became sqlc + goose over pgx;
+> better-auth became **Limen**, confined behind `internal/auth`'s
+> `auth.Service` with a route allowlist; the object store gained an **`fs`
+> driver** so a self-hoster needs two containers, not four. **Billing was
+> dropped entirely** — no Stripe, no entitlements, no 402: every feature that
+> was Premium is free, `organization.plan` is vestigial. Passkeys went with
+> better-auth (server-side only, no UI, nothing observable lost). The cutover
+> was a **fresh database** — no data was migrated, the schema is Limen-shaped
+> and differs from the better-auth one — and the dispatch modes, the advisory
+> -lock migrate semantics and the 30-day backup window are all unchanged. The
+> suite was ported test-for-test: every Go test file names the `apps/api`
+> test it descends from.
 
 1. **Core loop:** schema, auth (social + orgs + invite codes), tenancy
    middleware, home screen with status cards + Feed/Diaper/Sleep sheets,
@@ -377,18 +482,32 @@ sheet pattern — build the pattern well once.
 
 ## Engineering conventions
 
-- TypeScript strict everywhere. Zod schemas are the single source of truth
-  (validation → OpenAPI → client types).
+- Two languages, one repo. Go for the server (`apps/server`, its own module,
+  outside the bun workspace); TypeScript strict for everything else. Neither
+  toolchain runs the other's build — `bun run build` produces the SPA and the
+  landing site, `go build ./cmd/pjokk` produces the server, and the Dockerfile
+  is the only place both meet.
+- `openapi/pjokk.yaml` is the single source of truth for API shapes
+  (validation → generated Go server → generated TS client). `packages/shared`
+  is now only the SPA's domain types, and no longer describes the wire.
 - No `<form>` submission tricks; standard handlers.
-- Keep bundle size honest (Workers limits; Drizzle not Prisma partly for this).
+- Keep bundle size honest — the SPA is embedded in the binary, so it is also
+  image size.
 - Category color tokens defined once in the Tailwind theme; used by home grid,
   timeline, charts.
-- Tests: `bun run test`, run against a REAL Postgres (`docker compose -f
-  docker-compose.test.yml up -d`) — the database is the thing most likely to
-  differ, so faking it defeats the purpose. Object storage is substituted with
-  an in-memory `Storage`. Prioritize the tenancy middleware, invite redeem
-  flow, and active-session logic. Each test FILE starts from an empty database;
-  rate-limit counters are cleared between individual tests.
+- Tests, both halves against a REAL Postgres where a database is involved
+  (`docker compose -f docker-compose.test.yml up -d`, which publishes 55432)
+  — the database is the thing most likely to differ, so faking it defeats the
+  purpose:
+  - `cd apps/server && go test -p 1 ./...` — **`-p 1` is required**: several
+    packages truncate shared tables between tests and are not safe to run as
+    concurrent packages against one database. Object storage is substituted
+    with an in-memory `Storage`. Prioritize the tenancy middleware, invite
+    redeem flow, and active-session logic.
+  - `bun test apps/frontend apps/landing` (or `bun run test`) — the SPA's own
+    unit tests and the landing site's render tests. No database.
+  - `bun run check` is lint + i18n coverage + typecheck for the TypeScript
+    side; `go vet ./...` for the Go side.
 - Commit style: small, scoped commits following **Conventional Commits**
   (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, …). Reference the
   roadmap phase in the body when the work is phase-scoped, e.g.
