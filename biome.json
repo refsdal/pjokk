@@ -7,6 +7,7 @@
       "scripts/**",
       "*.ts",
       "!apps/frontend/src/data",
+      "!apps/frontend/src/lib/api-schema.d.ts",
       "!apps/server",
       "!apps/landing/dist",
       "!.claude",

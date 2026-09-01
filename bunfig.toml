@@ -1,12 +1,12 @@
 [install]
 # Bun defaults to the "isolated" linker once a `workspaces` field exists,
 # which gives each workspace package its own node_modules containing only
-# what its own package.json declares. Every third-party dependency (hono,
-# drizzle-orm, better-auth, stripe, web-push, react, …) is declared ONLY in
-# the root manifest, so under the isolated linker apps/api, apps/server and
-# apps/frontend would not be able to resolve any of them. "hoisted" restores
-# the flat node_modules layout this repo already used before workspaces
-# existed, which links all workspace packages by name and gives every
-# package access to the root-declared dependencies. Revisit this if
-# third-party deps are ever split out per package.
+# what its own package.json declares. Every third-party dependency (react,
+# recharts, zod, vaul, …) is declared ONLY in the root manifest, so under the
+# isolated linker apps/frontend, apps/landing and packages/shared would not be
+# able to resolve any of them. "hoisted" restores the flat node_modules layout
+# this repo already used before workspaces existed, which links all workspace
+# packages by name and gives every package access to the root-declared
+# dependencies. Revisit this if third-party deps are ever split out per
+# package.
 linker = "hoisted"
