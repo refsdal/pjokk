@@ -55,6 +55,19 @@ type Deps struct {
 	AppURL           string
 	VAPIDPublicKey   string
 	TrustedProxyHops int
+
+	// ExtraRoutes, when non-nil, is called while building the mux, after the
+	// standard routes are registered and before the /api/ catch-all. protect
+	// wraps a handler in the SAME Session + RequireFamily chain every real
+	// family-scoped route will use from Task 9 on, so a route registered
+	// through it is indistinguishable — from the middleware's point of
+	// view — from a shipped one.
+	//
+	// This exists ONLY for internal/testrig's AppRig.MountProtected, which
+	// needs to prove that chain end-to-end (200 with a family session, 403
+	// NO_FAMILY without one) ahead of any real domain route existing yet.
+	// Every real composition (cmd/pjokk) leaves this nil.
+	ExtraRoutes func(mux *http.ServeMux, protect func(http.Handler) http.Handler)
 }
 
 // specYAML is a committed copy of the repo-root openapi/pjokk.yaml (see
@@ -218,6 +231,14 @@ func NewHandler(d Deps) http.Handler {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write(web.ScalarHTML())
 	})
+
+	if d.ExtraRoutes != nil {
+		mwDeps := middleware.Deps{Auth: d.Auth, Q: d.Q, RateLimit: d.RateLimit, Now: d.Now}
+		protect := func(h http.Handler) http.Handler {
+			return middleware.Session(mwDeps)(middleware.RequireFamily(mwDeps)(h))
+		}
+		d.ExtraRoutes(mux, protect)
+	}
 
 	// Least-specific pattern: catches every /api/* request not claimed by
 	// a more specific pattern above (net/http's ServeMux dispatches by
