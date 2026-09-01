@@ -58,6 +58,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -436,7 +437,22 @@ func NewHandler(d Deps) http.Handler {
 	// on, every /api/ operation in the spec. See this package's doc
 	// comment for the two-layer wrapping below (spec validation, then
 	// auth) and why each lives at the generated-code layer it does.
-	strictHandler := gen.NewStrictHandler(d, []gen.StrictMiddlewareFunc{authChain(d)})
+	//
+	// NewStrictHandlerWithOptions (not the plain NewStrictHandler) so both
+	// error paths the generated strict-server machinery can hit answer
+	// with the standard {"error","code"} envelope instead of
+	// oapi-codegen's own default (http.Error(w, err.Error(), status): a
+	// text/plain body with the raw Go error string — a request-decode
+	// failure OR a handler method returning (nil, err) would otherwise
+	// leak internals (e.g. a raw pgx error) straight to the client).
+	strictHandler := gen.NewStrictHandlerWithOptions(
+		d,
+		[]gen.StrictMiddlewareFunc{authChain(d)},
+		gen.StrictHTTPServerOptions{
+			RequestErrorHandlerFunc:  requestErrorHandler,
+			ResponseErrorHandlerFunc: responseErrorHandler,
+		},
+	)
 	gen.HandlerWithOptions(strictHandler, gen.StdHTTPServerOptions{
 		BaseRouter: mux,
 		Middlewares: []gen.MiddlewareFunc{
@@ -458,4 +474,37 @@ func NewHandler(d Deps) http.Handler {
 // earlier pattern claimed.
 func handleAPINotFound(w http.ResponseWriter, _ *http.Request) {
 	respond.Error(w, http.StatusNotFound, "Not found", "NOT_FOUND")
+}
+
+// responseErrorHandler is gen.StrictHTTPServerOptions.ResponseErrorHandlerFunc:
+// reached whenever a gen.StrictServerInterface method (every operation in
+// babies.go, me.go, and every future route file) returns a non-nil error —
+// almost always a database failure, since a handler returns a typed
+// ResponseObject for every condition its own logic anticipates (404, 403,
+// …) and only reaches for a plain error on the ones it doesn't. The real
+// error is logged server-side; the client gets the same
+// {"error":"Internal error","code":"INTERNAL"} envelope every other
+// unexpected-failure path in this file uses (see requireSession above), not
+// oapi-codegen's default text/plain err.Error() — which would leak
+// internals (e.g. a raw pgx error naming a table or column) straight to the
+// caller.
+func responseErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
+	log.Printf("api: %s %s: %v", r.Method, r.URL.Path, err)
+	respond.Error(w, http.StatusInternalServerError, "Internal error", "INTERNAL")
+}
+
+// requestErrorHandler is gen.StrictHTTPServerOptions.RequestErrorHandlerFunc:
+// reached when a strict-server method's own json.Decode of the request body
+// fails. In the normal case this is unreachable — withSpecValidation (wired
+// as this handler's outer Middlewares layer, see NewHandler) already
+// rejects a body that fails to parse as JSON, or that parses but violates
+// the spec's schema, before the strict handler's decode ever runs — but a
+// body that parses as JSON, passes kin-openapi's schema check, and still
+// fails Go's stricter decode (e.g. a numeric field kin-openapi's laxer
+// checking let through as a bool) is possible in principle. Answers with
+// the SAME envelope withSpecValidation's ErrorHandlerWithOpts uses, so a
+// caller can't tell which of the two layers caught its malformed request.
+func requestErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
+	log.Printf("api: %s %s: invalid request: %v", r.Method, r.URL.Path, err)
+	respond.Error(w, http.StatusBadRequest, "Invalid request", "VALIDATION")
 }

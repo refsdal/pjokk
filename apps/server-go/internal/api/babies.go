@@ -29,10 +29,16 @@ import (
 // granularity. middleware.RequireAdmin's rejection envelope
 // ({"error":"Admin only","code":"FORBIDDEN"}) is byte-for-byte what the
 // TypeScript handler wrote by hand, so callers see no difference.
+//
+// CreateBaby and UpdateBaby both take a required request body that the
+// generated Go type still spells as a nilable pointer; both guard it the
+// same way, via errNoRequestBody — see its doc comment for why that's a
+// plain (500) error rather than a typed 4xx response, and how it differs
+// from UpdateBaby's genuinely-empty-body no-op.
 
 // notFound is the {"error":"Not found","code":"NOT_FOUND"} envelope every
 // 404 below uses except GetFamily, whose TypeScript predecessor used a
-// different message (see getFamilyNotFound).
+// different message ("Family not found" — see GetFamily).
 func notFound() gen.Error {
 	return gen.Error{Error: "Not found", Code: "NOT_FOUND"}
 }
@@ -69,6 +75,27 @@ func (d Deps) ListBabies(ctx context.Context, _ gen.ListBabiesRequestObject) (ge
 	return gen.ListBabies200JSONResponse(out), nil
 }
 
+// errNoRequestBody is the one convention this package uses for an
+// impossible-in-practice nil request body: every operation with a required
+// requestBody (CreateBaby, UpdateBaby, and every future POST/PATCH route
+// that follows this pattern) can, per the generated Go types, be called
+// with req.Body == nil — but spec (request-shape) validation, wired as
+// NewHandler's outer Middlewares layer ahead of the strict handler's own
+// body decode, already rejects a request with no body before any
+// gen.StrictServerInterface method runs. Reaching this is therefore a
+// wiring bug in that validation layer, not a real, reachable client error:
+// a plain error (routed through responseErrorHandler to the standard 500
+// INTERNAL envelope, logged server-side) rather than a typed 4xx response,
+// and the SAME shape everywhere rather than each handler inventing its own.
+//
+// This is distinct from — and must not be confused with — a genuinely
+// empty JSON object body ({}), which decodes to a non-nil Body pointing at
+// an all-nil-fields struct; see UpdateBaby for how that (real, tested,
+// meaningful) case is handled.
+func errNoRequestBody(operation string) error {
+	return fmt.Errorf("api: %s reached with no request body", operation)
+}
+
 // CreateBaby implements POST /api/babies. REF: free in Go — the
 // multipleBabies 402 gate apps/api/src/routes/babies.ts applied is removed
 // (CLAUDE.md's entitlement helper always returns true today; Task 9's route
@@ -76,13 +103,7 @@ func (d Deps) ListBabies(ctx context.Context, _ gen.ListBabiesRequestObject) (ge
 func (d Deps) CreateBaby(ctx context.Context, req gen.CreateBabyRequestObject) (gen.CreateBabyResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	if req.Body == nil {
-		// Unreachable in practice: the spec marks this requestBody
-		// required, and the spec-validation layer (api.go's
-		// withSpecValidation, wired ahead of the strict handler's own
-		// decode) refuses a request with no body before this method is
-		// ever called. Kept as a named error rather than a nil-pointer
-		// panic if that invariant is ever weakened.
-		return nil, fmt.Errorf("api: CreateBaby reached with no body")
+		return nil, errNoRequestBody("CreateBaby")
 	}
 	body := req.Body
 
@@ -105,10 +126,12 @@ func (d Deps) CreateBaby(ctx context.Context, req gen.CreateBabyRequestObject) (
 }
 
 // UpdateBaby implements PATCH /api/babies/{id}. REF: "{name?, birthDate?,
-// sex?} → Baby / 404". An empty body is a no-op that re-reads the row
-// unchanged, mirroring apps/api/src/db/scoped.ts's updateBaby (compactPatch
-// on an empty patch skips the UPDATE entirely rather than running one with
-// no SET clause).
+// sex?} → Baby / 404". A genuinely empty JSON object body ({}, which
+// decodes to a non-nil Body whose three fields are all nil) is a no-op
+// that re-reads the row unchanged, mirroring apps/api/src/db/scoped.ts's
+// updateBaby (compactPatch on an empty patch skips the UPDATE entirely
+// rather than running one with no SET clause). This is NOT the same
+// condition as req.Body itself being nil — see errNoRequestBody.
 //
 // sex is nullable+optional in the OpenAPI schema, but a plain Go pointer
 // (what oapi-codegen generates for it) cannot distinguish "the field was
@@ -130,8 +153,11 @@ func (d Deps) UpdateBaby(ctx context.Context, req gen.UpdateBabyRequestObject) (
 		return nil, err
 	}
 
+	if req.Body == nil {
+		return nil, errNoRequestBody("UpdateBaby")
+	}
 	body := req.Body
-	if body == nil || (body.Name == nil && body.BirthDate == nil && body.Sex == nil) {
+	if body.Name == nil && body.BirthDate == nil && body.Sex == nil {
 		return gen.UpdateBaby200JSONResponse(serBaby(existing)), nil
 	}
 
