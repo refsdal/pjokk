@@ -63,3 +63,21 @@ GROUP BY om."id", om."organization_id", om."user_id", om."created_at", o."plan";
 INSERT INTO "users" ("id", "email", "name", "banned")
 VALUES ($1, 'deleted@pjokk.invalid', 'Deleted user', true)
 ON CONFLICT DO NOTHING;
+
+-- name: ValidBabyIDs :many
+-- Tenancy backstop for a caller-supplied set of baby ids (calendar's
+-- babyIds, contacts' babyIds — join tables carry no family_id of their
+-- own): which of ids actually belong to this family. Callers (see
+-- internal/api/calendar.go's/contacts.go's refsValid) compare
+-- len(result) against len(the deduped input) rather than existence-check
+-- one id at a time.
+SELECT "id" FROM "baby"
+WHERE "family_id" = $1 AND "id" = ANY(sqlc.slice(ids));
+
+-- name: ValidFamilyMemberUserIDs :many
+-- Same backstop as ValidBabyIDs, for calendar's assigneeUserIds: which of
+-- ids are members of this family. organization_members is Limen's own
+-- membership table (see GetMembership above) — no role check here, any
+-- member (parent or caretaker) can be assigned.
+SELECT "user_id" FROM "organization_members"
+WHERE "organization_id" = $1 AND "user_id" = ANY(sqlc.slice(ids));

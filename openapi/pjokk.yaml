@@ -1543,6 +1543,232 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/calendar/events:
+    get:
+      operationId: listCalendarEvents
+      summary: >-
+        Family-wide planned events starting in [from, to). Free (no plan
+        gate — creation was premium in the TS predecessor; this port
+        removes that gate, see internal/api/calendar.go).
+      tags: [calendar]
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: Inclusive range start, RFC3339 with an explicit offset.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: true
+          description: >-
+            Exclusive range end. Must be after `from`, and the span must not
+            exceed 366 days.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Events in [from, to), ascending by startTime.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalendarEvent"
+        "400":
+          description: to <= from, or the span exceeds 366 days.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      operationId: createCalendarEvent
+      summary: >-
+        Create a family-wide (or baby-specific) event. babyIds/
+        assigneeUserIds must belong to the caller's family — see
+        internal/api/calendar.go's refsValid. Duplicate ids are deduped
+        before insert.
+      tags: [calendar]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCalendarEvent"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarEvent"
+        "400":
+          description: Unknown baby or family member reference.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/calendar/events/{id}:
+    patch:
+      operationId: updateCalendarEvent
+      summary: >-
+        Partial update. `description`/`location`/`durationMin`/
+        `remindMinutesBefore` may be sent as `null` to CLEAR that column;
+        `title`/`category`/`startTime`/`allDay` are not nullable — only
+        settable or omitted. An event that IS (or becomes, via this same
+        PATCH) all-day always has durationMin cleared. Changing `startTime`
+        or `remindMinutesBefore` re-arms the reminder sweep (clears
+        remindedAt). `babyIds`/`assigneeUserIds`, when present, REPLACE the
+        link set; omitted leaves it untouched.
+      tags: [calendar]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCalendarEvent"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarEvent"
+        "400":
+          description: Unknown baby or family member reference.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No event with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteCalendarEvent
+      summary: Delete an event; its link rows cascade.
+      tags: [calendar]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No event with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/contacts:
+    get:
+      operationId: listContacts
+      summary: >-
+        The family's address book, by name. Zero linked babies means a
+        contact the whole family shares. Free (no plan gate — see
+        internal/api/contacts.go).
+      tags: [contacts]
+      responses:
+        "200":
+          description: Contacts, by name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contact"
+    post:
+      operationId: createContact
+      summary: >-
+        Create a contact. babyIds must belong to the caller's family — see
+        internal/api/contacts.go's refsValid. Duplicate ids are deduped
+        before insert.
+      tags: [contacts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateContact"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+        "400":
+          description: Unknown baby reference.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/contacts/{id}:
+    patch:
+      operationId: updateContact
+      summary: >-
+        Partial update. `role`/`icon`/`phone`/`email`/`website`/`notes` may
+        be sent as `null` to CLEAR that column; `name` is not nullable —
+        only settable or omitted. `babyIds`, when present, REPLACES the
+        link set; omitted leaves it untouched.
+      tags: [contacts]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateContact"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+        "400":
+          description: Unknown baby reference.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No contact with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteContact
+      summary: Delete a contact; its link rows cascade.
+      tags: [contacts]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No contact with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/timeline:
     get:
       operationId: listTimeline
@@ -2820,6 +3046,344 @@ components:
           type: string
           maxLength: 1000
           nullable: true
+    CalendarEvent:
+      type: object
+      description: >-
+        A family-wide (or baby-specific) planned event. Free (no plan
+        gate — creation was premium in the TS predecessor; this port
+        removes that gate).
+      required:
+        - id
+        - title
+        - description
+        - location
+        - category
+        - startTime
+        - allDay
+        - durationMin
+        - remindMinutesBefore
+        - createdBy
+        - createdByName
+        - babies
+        - assignees
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        category:
+          type: string
+          enum: [doctor, vaccination, babysitting, family, other]
+        startTime:
+          type: string
+          format: date-time
+        allDay:
+          type: boolean
+        durationMin:
+          type: integer
+          format: int32
+          nullable: true
+        remindMinutesBefore:
+          type: integer
+          format: int32
+          nullable: true
+        createdBy:
+          type: string
+        createdByName:
+          type: string
+        babies:
+          type: array
+          description: Zero babies = family-wide event.
+          items:
+            type: object
+            required: [id, name]
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+        assignees:
+          type: array
+          items:
+            type: object
+            required: [userId, name]
+            properties:
+              userId:
+                type: string
+              name:
+                type: string
+    CreateCalendarEvent:
+      type: object
+      required: [title, startTime]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+        location:
+          type: string
+          maxLength: 200
+        category:
+          type: string
+          enum: [doctor, vaccination, babysitting, family, other]
+          default: other
+        startTime:
+          type: string
+          format: date-time
+        allDay:
+          type: boolean
+          default: false
+          description: All-day events are single-day; the server nulls durationMin when set.
+        durationMin:
+          type: integer
+          format: int32
+          minimum: 5
+          maximum: 1440
+        remindMinutesBefore:
+          type: integer
+          format: int32
+          minimum: 15
+          maximum: 10080
+        babyIds:
+          type: array
+          maxItems: 10
+          default: []
+          items:
+            type: string
+        assigneeUserIds:
+          type: array
+          maxItems: 20
+          default: []
+          items:
+            type: string
+    UpdateCalendarEvent:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op.
+        `description`/`location`/`durationMin`/`remindMinutesBefore` may
+        also be sent as `null` to CLEAR that column; `title`/`category`/
+        `startTime`/`allDay` are not nullable — only settable or omitted.
+        `babyIds`/`assigneeUserIds`, when present, REPLACE the link set;
+        omitted leaves it untouched (see internal/api/calendar.go).
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+          nullable: true
+        location:
+          type: string
+          maxLength: 200
+          nullable: true
+        category:
+          type: string
+          enum: [doctor, vaccination, babysitting, family, other]
+        startTime:
+          type: string
+          format: date-time
+        allDay:
+          type: boolean
+        durationMin:
+          type: integer
+          format: int32
+          minimum: 5
+          maximum: 1440
+          nullable: true
+        remindMinutesBefore:
+          type: integer
+          format: int32
+          minimum: 15
+          maximum: 10080
+          nullable: true
+        babyIds:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+        assigneeUserIds:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+    Contact:
+      type: object
+      description: >-
+        One entry in the family's address book. Zero linked babies means
+        the contact belongs to the whole family. Free (no plan gate — see
+        internal/api/contacts.go).
+      required:
+        - id
+        - name
+        - role
+        - icon
+        - phone
+        - email
+        - website
+        - notes
+        - babies
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          nullable: true
+        icon:
+          type: string
+          enum:
+            [
+              user,
+              doctor,
+              nurse,
+              hospital,
+              dental,
+              family,
+              grandparent,
+              daycare,
+              friend,
+              phone,
+            ]
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        website:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        babies:
+          type: array
+          description: Zero babies = a contact the whole family shares.
+          items:
+            type: object
+            required: [id, name]
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+    CreateContact:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        role:
+          type: string
+          maxLength: 60
+        icon:
+          type: string
+          enum:
+            [
+              user,
+              doctor,
+              nurse,
+              hospital,
+              dental,
+              family,
+              grandparent,
+              daycare,
+              friend,
+              phone,
+            ]
+        phone:
+          type: string
+          maxLength: 40
+        email:
+          type: string
+          format: email
+          maxLength: 200
+        website:
+          type: string
+          maxLength: 200
+          description: >-
+            Free text, deliberately not validated as a URL — people type
+            "legesenteret.no" and saving matters more than being right
+            about URL shape.
+        notes:
+          type: string
+          maxLength: 2000
+        babyIds:
+          type: array
+          maxItems: 10
+          default: []
+          items:
+            type: string
+    UpdateContact:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op.
+        `role`/`icon`/`phone`/`email`/`website`/`notes` may also be sent as
+        `null` to CLEAR that column; `name` is not nullable — only settable
+        or omitted. `babyIds`, when present, REPLACES the link set; omitted
+        leaves it untouched.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        role:
+          type: string
+          maxLength: 60
+          nullable: true
+        icon:
+          type: string
+          enum:
+            [
+              user,
+              doctor,
+              nurse,
+              hospital,
+              dental,
+              family,
+              grandparent,
+              daycare,
+              friend,
+              phone,
+            ]
+          nullable: true
+        phone:
+          type: string
+          maxLength: 40
+          nullable: true
+        email:
+          type: string
+          format: email
+          maxLength: 200
+          nullable: true
+        website:
+          type: string
+          maxLength: 200
+          nullable: true
+        notes:
+          type: string
+          maxLength: 2000
+          nullable: true
+        babyIds:
+          type: array
+          maxItems: 10
+          items:
+            type: string
     Error:
       type: object
       description: >-

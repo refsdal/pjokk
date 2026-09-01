@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for BabySex.
@@ -27,6 +29,75 @@ func (e BabySex) Valid() bool {
 	}
 }
 
+// Defines values for CalendarEventCategory.
+const (
+	CalendarEventCategoryBabysitting CalendarEventCategory = "babysitting"
+	CalendarEventCategoryDoctor      CalendarEventCategory = "doctor"
+	CalendarEventCategoryFamily      CalendarEventCategory = "family"
+	CalendarEventCategoryOther       CalendarEventCategory = "other"
+	CalendarEventCategoryVaccination CalendarEventCategory = "vaccination"
+)
+
+// Valid indicates whether the value is a known member of the CalendarEventCategory enum.
+func (e CalendarEventCategory) Valid() bool {
+	switch e {
+	case CalendarEventCategoryBabysitting:
+		return true
+	case CalendarEventCategoryDoctor:
+		return true
+	case CalendarEventCategoryFamily:
+		return true
+	case CalendarEventCategoryOther:
+		return true
+	case CalendarEventCategoryVaccination:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ContactIcon.
+const (
+	ContactIconDaycare     ContactIcon = "daycare"
+	ContactIconDental      ContactIcon = "dental"
+	ContactIconDoctor      ContactIcon = "doctor"
+	ContactIconFamily      ContactIcon = "family"
+	ContactIconFriend      ContactIcon = "friend"
+	ContactIconGrandparent ContactIcon = "grandparent"
+	ContactIconHospital    ContactIcon = "hospital"
+	ContactIconNurse       ContactIcon = "nurse"
+	ContactIconPhone       ContactIcon = "phone"
+	ContactIconUser        ContactIcon = "user"
+)
+
+// Valid indicates whether the value is a known member of the ContactIcon enum.
+func (e ContactIcon) Valid() bool {
+	switch e {
+	case ContactIconDaycare:
+		return true
+	case ContactIconDental:
+		return true
+	case ContactIconDoctor:
+		return true
+	case ContactIconFamily:
+		return true
+	case ContactIconFriend:
+		return true
+	case ContactIconGrandparent:
+		return true
+	case ContactIconHospital:
+		return true
+	case ContactIconNurse:
+		return true
+	case ContactIconPhone:
+		return true
+	case ContactIconUser:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateBabySex.
 const (
 	CreateBabySexBoy  CreateBabySex = "boy"
@@ -39,6 +110,75 @@ func (e CreateBabySex) Valid() bool {
 	case CreateBabySexBoy:
 		return true
 	case CreateBabySexGirl:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateCalendarEventCategory.
+const (
+	CreateCalendarEventCategoryBabysitting CreateCalendarEventCategory = "babysitting"
+	CreateCalendarEventCategoryDoctor      CreateCalendarEventCategory = "doctor"
+	CreateCalendarEventCategoryFamily      CreateCalendarEventCategory = "family"
+	CreateCalendarEventCategoryOther       CreateCalendarEventCategory = "other"
+	CreateCalendarEventCategoryVaccination CreateCalendarEventCategory = "vaccination"
+)
+
+// Valid indicates whether the value is a known member of the CreateCalendarEventCategory enum.
+func (e CreateCalendarEventCategory) Valid() bool {
+	switch e {
+	case CreateCalendarEventCategoryBabysitting:
+		return true
+	case CreateCalendarEventCategoryDoctor:
+		return true
+	case CreateCalendarEventCategoryFamily:
+		return true
+	case CreateCalendarEventCategoryOther:
+		return true
+	case CreateCalendarEventCategoryVaccination:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateContactIcon.
+const (
+	CreateContactIconDaycare     CreateContactIcon = "daycare"
+	CreateContactIconDental      CreateContactIcon = "dental"
+	CreateContactIconDoctor      CreateContactIcon = "doctor"
+	CreateContactIconFamily      CreateContactIcon = "family"
+	CreateContactIconFriend      CreateContactIcon = "friend"
+	CreateContactIconGrandparent CreateContactIcon = "grandparent"
+	CreateContactIconHospital    CreateContactIcon = "hospital"
+	CreateContactIconNurse       CreateContactIcon = "nurse"
+	CreateContactIconPhone       CreateContactIcon = "phone"
+	CreateContactIconUser        CreateContactIcon = "user"
+)
+
+// Valid indicates whether the value is a known member of the CreateContactIcon enum.
+func (e CreateContactIcon) Valid() bool {
+	switch e {
+	case CreateContactIconDaycare:
+		return true
+	case CreateContactIconDental:
+		return true
+	case CreateContactIconDoctor:
+		return true
+	case CreateContactIconFamily:
+		return true
+	case CreateContactIconFriend:
+		return true
+	case CreateContactIconGrandparent:
+		return true
+	case CreateContactIconHospital:
+		return true
+	case CreateContactIconNurse:
+		return true
+	case CreateContactIconPhone:
+		return true
+	case CreateContactIconUser:
 		return true
 	default:
 		return false
@@ -441,6 +581,75 @@ func (e UpdateBabySex) Valid() bool {
 	}
 }
 
+// Defines values for UpdateCalendarEventCategory.
+const (
+	UpdateCalendarEventCategoryBabysitting UpdateCalendarEventCategory = "babysitting"
+	UpdateCalendarEventCategoryDoctor      UpdateCalendarEventCategory = "doctor"
+	UpdateCalendarEventCategoryFamily      UpdateCalendarEventCategory = "family"
+	UpdateCalendarEventCategoryOther       UpdateCalendarEventCategory = "other"
+	UpdateCalendarEventCategoryVaccination UpdateCalendarEventCategory = "vaccination"
+)
+
+// Valid indicates whether the value is a known member of the UpdateCalendarEventCategory enum.
+func (e UpdateCalendarEventCategory) Valid() bool {
+	switch e {
+	case UpdateCalendarEventCategoryBabysitting:
+		return true
+	case UpdateCalendarEventCategoryDoctor:
+		return true
+	case UpdateCalendarEventCategoryFamily:
+		return true
+	case UpdateCalendarEventCategoryOther:
+		return true
+	case UpdateCalendarEventCategoryVaccination:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateContactIcon.
+const (
+	UpdateContactIconDaycare     UpdateContactIcon = "daycare"
+	UpdateContactIconDental      UpdateContactIcon = "dental"
+	UpdateContactIconDoctor      UpdateContactIcon = "doctor"
+	UpdateContactIconFamily      UpdateContactIcon = "family"
+	UpdateContactIconFriend      UpdateContactIcon = "friend"
+	UpdateContactIconGrandparent UpdateContactIcon = "grandparent"
+	UpdateContactIconHospital    UpdateContactIcon = "hospital"
+	UpdateContactIconNurse       UpdateContactIcon = "nurse"
+	UpdateContactIconPhone       UpdateContactIcon = "phone"
+	UpdateContactIconUser        UpdateContactIcon = "user"
+)
+
+// Valid indicates whether the value is a known member of the UpdateContactIcon enum.
+func (e UpdateContactIcon) Valid() bool {
+	switch e {
+	case UpdateContactIconDaycare:
+		return true
+	case UpdateContactIconDental:
+		return true
+	case UpdateContactIconDoctor:
+		return true
+	case UpdateContactIconFamily:
+		return true
+	case UpdateContactIconFriend:
+		return true
+	case UpdateContactIconGrandparent:
+		return true
+	case UpdateContactIconHospital:
+		return true
+	case UpdateContactIconNurse:
+		return true
+	case UpdateContactIconPhone:
+		return true
+	case UpdateContactIconUser:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UpdateDiaperType.
 const (
 	UpdateDiaperTypeBoth  UpdateDiaperType = "both"
@@ -681,6 +890,54 @@ type BathLog struct {
 	Time          time.Time `json:"time"`
 }
 
+// CalendarEvent A family-wide (or baby-specific) planned event. Free (no plan gate — creation was premium in the TS predecessor; this port removes that gate).
+type CalendarEvent struct {
+	AllDay    bool `json:"allDay"`
+	Assignees []struct {
+		Name   string `json:"name"`
+		UserId string `json:"userId"`
+	} `json:"assignees"`
+
+	// Babies Zero babies = family-wide event.
+	Babies []struct {
+		Id   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"babies"`
+	Category            CalendarEventCategory `json:"category"`
+	CreatedBy           string                `json:"createdBy"`
+	CreatedByName       string                `json:"createdByName"`
+	Description         *string               `json:"description"`
+	DurationMin         *int32                `json:"durationMin"`
+	Id                  string                `json:"id"`
+	Location            *string               `json:"location"`
+	RemindMinutesBefore *int32                `json:"remindMinutesBefore"`
+	StartTime           time.Time             `json:"startTime"`
+	Title               string                `json:"title"`
+}
+
+// CalendarEventCategory defines model for CalendarEvent.Category.
+type CalendarEventCategory string
+
+// Contact One entry in the family's address book. Zero linked babies means the contact belongs to the whole family. Free (no plan gate — see internal/api/contacts.go).
+type Contact struct {
+	// Babies Zero babies = a contact the whole family shares.
+	Babies []struct {
+		Id   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"babies"`
+	Email   *string      `json:"email"`
+	Icon    *ContactIcon `json:"icon"`
+	Id      string       `json:"id"`
+	Name    string       `json:"name"`
+	Notes   *string      `json:"notes"`
+	Phone   *string      `json:"phone"`
+	Role    *string      `json:"role"`
+	Website *string      `json:"website"`
+}
+
+// ContactIcon defines model for Contact.Icon.
+type ContactIcon string
+
 // CreateBaby defines model for CreateBaby.
 type CreateBaby struct {
 	BirthDate time.Time      `json:"birthDate"`
@@ -697,6 +954,41 @@ type CreateBath struct {
 	Notes  *string   `json:"notes,omitempty"`
 	Time   time.Time `json:"time"`
 }
+
+// CreateCalendarEvent defines model for CreateCalendarEvent.
+type CreateCalendarEvent struct {
+	// AllDay All-day events are single-day; the server nulls durationMin when set.
+	AllDay              *bool                        `json:"allDay,omitempty"`
+	AssigneeUserIds     *[]string                    `json:"assigneeUserIds,omitempty"`
+	BabyIds             *[]string                    `json:"babyIds,omitempty"`
+	Category            *CreateCalendarEventCategory `json:"category,omitempty"`
+	Description         *string                      `json:"description,omitempty"`
+	DurationMin         *int32                       `json:"durationMin,omitempty"`
+	Location            *string                      `json:"location,omitempty"`
+	RemindMinutesBefore *int32                       `json:"remindMinutesBefore,omitempty"`
+	StartTime           time.Time                    `json:"startTime"`
+	Title               string                       `json:"title"`
+}
+
+// CreateCalendarEventCategory defines model for CreateCalendarEvent.Category.
+type CreateCalendarEventCategory string
+
+// CreateContact defines model for CreateContact.
+type CreateContact struct {
+	BabyIds *[]string            `json:"babyIds,omitempty"`
+	Email   *openapi_types.Email `json:"email,omitempty"`
+	Icon    *CreateContactIcon   `json:"icon,omitempty"`
+	Name    string               `json:"name"`
+	Notes   *string              `json:"notes,omitempty"`
+	Phone   *string              `json:"phone,omitempty"`
+	Role    *string              `json:"role,omitempty"`
+
+	// Website Free text, deliberately not validated as a URL — people type "legesenteret.no" and saving matters more than being right about URL shape.
+	Website *string `json:"website,omitempty"`
+}
+
+// CreateContactIcon defines model for CreateContact.Icon.
+type CreateContactIcon string
 
 // CreateDiaper defines model for CreateDiaper.
 type CreateDiaper struct {
@@ -1093,6 +1385,38 @@ type UpdateBath struct {
 	Time  *time.Time `json:"time,omitempty"`
 }
 
+// UpdateCalendarEvent Every field is optional; an empty object is a no-op. `description`/`location`/`durationMin`/`remindMinutesBefore` may also be sent as `null` to CLEAR that column; `title`/`category`/ `startTime`/`allDay` are not nullable — only settable or omitted. `babyIds`/`assigneeUserIds`, when present, REPLACE the link set; omitted leaves it untouched (see internal/api/calendar.go).
+type UpdateCalendarEvent struct {
+	AllDay              *bool                        `json:"allDay,omitempty"`
+	AssigneeUserIds     *[]string                    `json:"assigneeUserIds,omitempty"`
+	BabyIds             *[]string                    `json:"babyIds,omitempty"`
+	Category            *UpdateCalendarEventCategory `json:"category,omitempty"`
+	Description         *string                      `json:"description,omitempty"`
+	DurationMin         *int32                       `json:"durationMin,omitempty"`
+	Location            *string                      `json:"location,omitempty"`
+	RemindMinutesBefore *int32                       `json:"remindMinutesBefore,omitempty"`
+	StartTime           *time.Time                   `json:"startTime,omitempty"`
+	Title               *string                      `json:"title,omitempty"`
+}
+
+// UpdateCalendarEventCategory defines model for UpdateCalendarEvent.Category.
+type UpdateCalendarEventCategory string
+
+// UpdateContact Every field is optional; an empty object is a no-op. `role`/`icon`/`phone`/`email`/`website`/`notes` may also be sent as `null` to CLEAR that column; `name` is not nullable — only settable or omitted. `babyIds`, when present, REPLACES the link set; omitted leaves it untouched.
+type UpdateContact struct {
+	BabyIds *[]string            `json:"babyIds,omitempty"`
+	Email   *openapi_types.Email `json:"email,omitempty"`
+	Icon    *UpdateContactIcon   `json:"icon,omitempty"`
+	Name    *string              `json:"name,omitempty"`
+	Notes   *string              `json:"notes,omitempty"`
+	Phone   *string              `json:"phone,omitempty"`
+	Role    *string              `json:"role,omitempty"`
+	Website *string              `json:"website,omitempty"`
+}
+
+// UpdateContactIcon defines model for UpdateContact.Icon.
+type UpdateContactIcon string
+
 // UpdateDiaper Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time`/`type` are not nullable — only settable or omitted (see internal/api/feeds.go for the presence-detection pattern this endpoint shares with UpdateFeed).
 type UpdateDiaper struct {
 	Notes *string           `json:"notes,omitempty"`
@@ -1256,6 +1580,15 @@ type ListBathsParams struct {
 	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// ListCalendarEventsParams defines parameters for ListCalendarEvents.
+type ListCalendarEventsParams struct {
+	// From Inclusive range start, RFC3339 with an explicit offset.
+	From time.Time `form:"from" json:"from"`
+
+	// To Exclusive range end. Must be after `from`, and the span must not exceed 366 days.
+	To time.Time `form:"to" json:"to"`
+}
+
 // ListDiapersParams defines parameters for ListDiapers.
 type ListDiapersParams struct {
 	// BabyId Restrict the result to one baby in the caller's family.
@@ -1405,6 +1738,18 @@ type CreateBathJSONRequestBody = CreateBath
 
 // UpdateBathJSONRequestBody defines body for UpdateBath for application/json ContentType.
 type UpdateBathJSONRequestBody = UpdateBath
+
+// CreateCalendarEventJSONRequestBody defines body for CreateCalendarEvent for application/json ContentType.
+type CreateCalendarEventJSONRequestBody = CreateCalendarEvent
+
+// UpdateCalendarEventJSONRequestBody defines body for UpdateCalendarEvent for application/json ContentType.
+type UpdateCalendarEventJSONRequestBody = UpdateCalendarEvent
+
+// CreateContactJSONRequestBody defines body for CreateContact for application/json ContentType.
+type CreateContactJSONRequestBody = CreateContact
+
+// UpdateContactJSONRequestBody defines body for UpdateContact for application/json ContentType.
+type UpdateContactJSONRequestBody = UpdateContact
 
 // CreateDiaperJSONRequestBody defines body for CreateDiaper for application/json ContentType.
 type CreateDiaperJSONRequestBody = CreateDiaper

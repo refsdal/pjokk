@@ -263,6 +263,20 @@ var operationAuthTiers = map[string]authTier{
 	// feed across all eleven kinds above. Ordinary family-scoped read.
 	"ListTimeline": tierFamily,
 
+	// Calendar + contacts (Task 16; REF §A1 calendar.ts/contacts.ts). Both
+	// were premium-gated (402 on create) in the TS predecessor; this port
+	// removes that gate entirely — every operation, including create, is
+	// ordinary tierFamily CRUD (see internal/api/calendar.go's and
+	// contacts.go's package doc comments).
+	"ListCalendarEvents":  tierFamily,
+	"CreateCalendarEvent": tierFamily,
+	"UpdateCalendarEvent": tierFamily,
+	"DeleteCalendarEvent": tierFamily,
+	"ListContacts":        tierFamily,
+	"CreateContact":       tierFamily,
+	"UpdateContact":       tierFamily,
+	"DeleteContact":       tierFamily,
+
 	"DeleteBaby":          tierAdmin,
 	"DeleteFamilyMember":  tierAdmin,
 	"SetFamilyMemberRole": tierAdmin,

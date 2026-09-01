@@ -43,6 +43,30 @@ type ServerInterface interface {
 	// UpdateBath Partial update. `notes` may be sent as `null` to CLEAR it; `time` is not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
 	// (PATCH /api/baths/{id})
 	UpdateBath(w http.ResponseWriter, r *http.Request, id IdPath)
+	// ListCalendarEvents Family-wide planned events starting in [from, to). Free (no plan gate — creation was premium in the TS predecessor; this port removes that gate, see internal/api/calendar.go).
+	// (GET /api/calendar/events)
+	ListCalendarEvents(w http.ResponseWriter, r *http.Request, params ListCalendarEventsParams)
+	// CreateCalendarEvent Create a family-wide (or baby-specific) event. babyIds/ assigneeUserIds must belong to the caller's family — see internal/api/calendar.go's refsValid. Duplicate ids are deduped before insert.
+	// (POST /api/calendar/events)
+	CreateCalendarEvent(w http.ResponseWriter, r *http.Request)
+	// DeleteCalendarEvent Delete an event; its link rows cascade.
+	// (DELETE /api/calendar/events/{id})
+	DeleteCalendarEvent(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdateCalendarEvent Partial update. `description`/`location`/`durationMin`/ `remindMinutesBefore` may be sent as `null` to CLEAR that column; `title`/`category`/`startTime`/`allDay` are not nullable — only settable or omitted. An event that IS (or becomes, via this same PATCH) all-day always has durationMin cleared. Changing `startTime` or `remindMinutesBefore` re-arms the reminder sweep (clears remindedAt). `babyIds`/`assigneeUserIds`, when present, REPLACE the link set; omitted leaves it untouched.
+	// (PATCH /api/calendar/events/{id})
+	UpdateCalendarEvent(w http.ResponseWriter, r *http.Request, id IdPath)
+	// ListContacts The family's address book, by name. Zero linked babies means a contact the whole family shares. Free (no plan gate — see internal/api/contacts.go).
+	// (GET /api/contacts)
+	ListContacts(w http.ResponseWriter, r *http.Request)
+	// CreateContact Create a contact. babyIds must belong to the caller's family — see internal/api/contacts.go's refsValid. Duplicate ids are deduped before insert.
+	// (POST /api/contacts)
+	CreateContact(w http.ResponseWriter, r *http.Request)
+	// DeleteContact Delete a contact; its link rows cascade.
+	// (DELETE /api/contacts/{id})
+	DeleteContact(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdateContact Partial update. `role`/`icon`/`phone`/`email`/`website`/`notes` may be sent as `null` to CLEAR that column; `name` is not nullable — only settable or omitted. `babyIds`, when present, REPLACES the link set; omitted leaves it untouched.
+	// (PATCH /api/contacts/{id})
+	UpdateContact(w http.ResponseWriter, r *http.Request, id IdPath)
 	// ListDiapers Diaper logs in the caller's active family, newest first.
 	// (GET /api/diapers)
 	ListDiapers(w http.ResponseWriter, r *http.Request, params ListDiapersParams)
@@ -414,6 +438,198 @@ func (siw *ServerInterfaceWrapper) UpdateBath(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateBath(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCalendarEvents operation middleware
+func (siw *ServerInterfaceWrapper) ListCalendarEvents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListCalendarEventsParams
+
+	// ------------- Required query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCalendarEvents(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateCalendarEvent operation middleware
+func (siw *ServerInterfaceWrapper) CreateCalendarEvent(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateCalendarEvent(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteCalendarEvent operation middleware
+func (siw *ServerInterfaceWrapper) DeleteCalendarEvent(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteCalendarEvent(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateCalendarEvent operation middleware
+func (siw *ServerInterfaceWrapper) UpdateCalendarEvent(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateCalendarEvent(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListContacts operation middleware
+func (siw *ServerInterfaceWrapper) ListContacts(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListContacts(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateContact operation middleware
+func (siw *ServerInterfaceWrapper) CreateContact(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateContact(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteContact operation middleware
+func (siw *ServerInterfaceWrapper) DeleteContact(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteContact(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateContact operation middleware
+func (siw *ServerInterfaceWrapper) UpdateContact(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateContact(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2213,6 +2429,14 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/vaccines", wrapper.CreateVaccine)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/vaccines/{id}", wrapper.DeleteVaccine)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/vaccines/{id}", wrapper.UpdateVaccine)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/calendar/events", wrapper.ListCalendarEvents)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/calendar/events", wrapper.CreateCalendarEvent)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/calendar/events/{id}", wrapper.DeleteCalendarEvent)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/calendar/events/{id}", wrapper.UpdateCalendarEvent)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/contacts", wrapper.ListContacts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/contacts", wrapper.CreateContact)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/contacts/{id}", wrapper.DeleteContact)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/contacts/{id}", wrapper.UpdateContact)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/timeline", wrapper.ListTimeline)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/me", wrapper.GetMe)
 
@@ -2469,6 +2693,309 @@ func (response UpdateBath200JSONResponse) VisitUpdateBathResponse(w http.Respons
 type UpdateBath404JSONResponse Error
 
 func (response UpdateBath404JSONResponse) VisitUpdateBathResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCalendarEventsRequestObject struct {
+	Params ListCalendarEventsParams
+}
+
+type ListCalendarEventsResponseObject interface {
+	VisitListCalendarEventsResponse(w http.ResponseWriter) error
+}
+
+type ListCalendarEvents200JSONResponse []CalendarEvent
+
+func (response ListCalendarEvents200JSONResponse) VisitListCalendarEventsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCalendarEvents400JSONResponse Error
+
+func (response ListCalendarEvents400JSONResponse) VisitListCalendarEventsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCalendarEventRequestObject struct {
+	Body *CreateCalendarEventJSONRequestBody
+}
+
+type CreateCalendarEventResponseObject interface {
+	VisitCreateCalendarEventResponse(w http.ResponseWriter) error
+}
+
+type CreateCalendarEvent201JSONResponse CalendarEvent
+
+func (response CreateCalendarEvent201JSONResponse) VisitCreateCalendarEventResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCalendarEvent400JSONResponse Error
+
+func (response CreateCalendarEvent400JSONResponse) VisitCreateCalendarEventResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteCalendarEventRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteCalendarEventResponseObject interface {
+	VisitDeleteCalendarEventResponse(w http.ResponseWriter) error
+}
+
+type DeleteCalendarEvent200JSONResponse Ok
+
+func (response DeleteCalendarEvent200JSONResponse) VisitDeleteCalendarEventResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteCalendarEvent404JSONResponse Error
+
+func (response DeleteCalendarEvent404JSONResponse) VisitDeleteCalendarEventResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCalendarEventRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdateCalendarEventJSONRequestBody
+}
+
+type UpdateCalendarEventResponseObject interface {
+	VisitUpdateCalendarEventResponse(w http.ResponseWriter) error
+}
+
+type UpdateCalendarEvent200JSONResponse CalendarEvent
+
+func (response UpdateCalendarEvent200JSONResponse) VisitUpdateCalendarEventResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCalendarEvent400JSONResponse Error
+
+func (response UpdateCalendarEvent400JSONResponse) VisitUpdateCalendarEventResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCalendarEvent404JSONResponse Error
+
+func (response UpdateCalendarEvent404JSONResponse) VisitUpdateCalendarEventResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListContactsRequestObject struct {
+}
+
+type ListContactsResponseObject interface {
+	VisitListContactsResponse(w http.ResponseWriter) error
+}
+
+type ListContacts200JSONResponse []Contact
+
+func (response ListContacts200JSONResponse) VisitListContactsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateContactRequestObject struct {
+	Body *CreateContactJSONRequestBody
+}
+
+type CreateContactResponseObject interface {
+	VisitCreateContactResponse(w http.ResponseWriter) error
+}
+
+type CreateContact201JSONResponse Contact
+
+func (response CreateContact201JSONResponse) VisitCreateContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateContact400JSONResponse Error
+
+func (response CreateContact400JSONResponse) VisitCreateContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteContactRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteContactResponseObject interface {
+	VisitDeleteContactResponse(w http.ResponseWriter) error
+}
+
+type DeleteContact200JSONResponse Ok
+
+func (response DeleteContact200JSONResponse) VisitDeleteContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteContact404JSONResponse Error
+
+func (response DeleteContact404JSONResponse) VisitDeleteContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateContactRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdateContactJSONRequestBody
+}
+
+type UpdateContactResponseObject interface {
+	VisitUpdateContactResponse(w http.ResponseWriter) error
+}
+
+type UpdateContact200JSONResponse Contact
+
+func (response UpdateContact200JSONResponse) VisitUpdateContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateContact400JSONResponse Error
+
+func (response UpdateContact400JSONResponse) VisitUpdateContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateContact404JSONResponse Error
+
+func (response UpdateContact404JSONResponse) VisitUpdateContactResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -4518,6 +5045,30 @@ type StrictServerInterface interface {
 	// UpdateBath Partial update. `notes` may be sent as `null` to CLEAR it; `time` is not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
 	// (PATCH /api/baths/{id})
 	UpdateBath(ctx context.Context, request UpdateBathRequestObject) (UpdateBathResponseObject, error)
+	// ListCalendarEvents Family-wide planned events starting in [from, to). Free (no plan gate — creation was premium in the TS predecessor; this port removes that gate, see internal/api/calendar.go).
+	// (GET /api/calendar/events)
+	ListCalendarEvents(ctx context.Context, request ListCalendarEventsRequestObject) (ListCalendarEventsResponseObject, error)
+	// CreateCalendarEvent Create a family-wide (or baby-specific) event. babyIds/ assigneeUserIds must belong to the caller's family — see internal/api/calendar.go's refsValid. Duplicate ids are deduped before insert.
+	// (POST /api/calendar/events)
+	CreateCalendarEvent(ctx context.Context, request CreateCalendarEventRequestObject) (CreateCalendarEventResponseObject, error)
+	// DeleteCalendarEvent Delete an event; its link rows cascade.
+	// (DELETE /api/calendar/events/{id})
+	DeleteCalendarEvent(ctx context.Context, request DeleteCalendarEventRequestObject) (DeleteCalendarEventResponseObject, error)
+	// UpdateCalendarEvent Partial update. `description`/`location`/`durationMin`/ `remindMinutesBefore` may be sent as `null` to CLEAR that column; `title`/`category`/`startTime`/`allDay` are not nullable — only settable or omitted. An event that IS (or becomes, via this same PATCH) all-day always has durationMin cleared. Changing `startTime` or `remindMinutesBefore` re-arms the reminder sweep (clears remindedAt). `babyIds`/`assigneeUserIds`, when present, REPLACE the link set; omitted leaves it untouched.
+	// (PATCH /api/calendar/events/{id})
+	UpdateCalendarEvent(ctx context.Context, request UpdateCalendarEventRequestObject) (UpdateCalendarEventResponseObject, error)
+	// ListContacts The family's address book, by name. Zero linked babies means a contact the whole family shares. Free (no plan gate — see internal/api/contacts.go).
+	// (GET /api/contacts)
+	ListContacts(ctx context.Context, request ListContactsRequestObject) (ListContactsResponseObject, error)
+	// CreateContact Create a contact. babyIds must belong to the caller's family — see internal/api/contacts.go's refsValid. Duplicate ids are deduped before insert.
+	// (POST /api/contacts)
+	CreateContact(ctx context.Context, request CreateContactRequestObject) (CreateContactResponseObject, error)
+	// DeleteContact Delete a contact; its link rows cascade.
+	// (DELETE /api/contacts/{id})
+	DeleteContact(ctx context.Context, request DeleteContactRequestObject) (DeleteContactResponseObject, error)
+	// UpdateContact Partial update. `role`/`icon`/`phone`/`email`/`website`/`notes` may be sent as `null` to CLEAR that column; `name` is not nullable — only settable or omitted. `babyIds`, when present, REPLACES the link set; omitted leaves it untouched.
+	// (PATCH /api/contacts/{id})
+	UpdateContact(ctx context.Context, request UpdateContactRequestObject) (UpdateContactResponseObject, error)
 	// ListDiapers Diaper logs in the caller's active family, newest first.
 	// (GET /api/diapers)
 	ListDiapers(ctx context.Context, request ListDiapersRequestObject) (ListDiapersResponseObject, error)
@@ -4959,6 +5510,236 @@ func (sh *strictHandler) UpdateBath(w http.ResponseWriter, r *http.Request, id I
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateBathResponseObject); ok {
 		if err := validResponse.VisitUpdateBathResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCalendarEvents operation middleware
+func (sh *strictHandler) ListCalendarEvents(w http.ResponseWriter, r *http.Request, params ListCalendarEventsParams) {
+	var request ListCalendarEventsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCalendarEvents(ctx, request.(ListCalendarEventsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCalendarEvents")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCalendarEventsResponseObject); ok {
+		if err := validResponse.VisitListCalendarEventsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateCalendarEvent operation middleware
+func (sh *strictHandler) CreateCalendarEvent(w http.ResponseWriter, r *http.Request) {
+	var request CreateCalendarEventRequestObject
+
+	var body CreateCalendarEventJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateCalendarEvent(ctx, request.(CreateCalendarEventRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateCalendarEvent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateCalendarEventResponseObject); ok {
+		if err := validResponse.VisitCreateCalendarEventResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteCalendarEvent operation middleware
+func (sh *strictHandler) DeleteCalendarEvent(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteCalendarEventRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteCalendarEvent(ctx, request.(DeleteCalendarEventRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteCalendarEvent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteCalendarEventResponseObject); ok {
+		if err := validResponse.VisitDeleteCalendarEventResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateCalendarEvent operation middleware
+func (sh *strictHandler) UpdateCalendarEvent(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdateCalendarEventRequestObject
+
+	request.Id = id
+
+	var body UpdateCalendarEventJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateCalendarEvent(ctx, request.(UpdateCalendarEventRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateCalendarEvent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateCalendarEventResponseObject); ok {
+		if err := validResponse.VisitUpdateCalendarEventResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListContacts operation middleware
+func (sh *strictHandler) ListContacts(w http.ResponseWriter, r *http.Request) {
+	var request ListContactsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListContacts(ctx, request.(ListContactsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListContacts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListContactsResponseObject); ok {
+		if err := validResponse.VisitListContactsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateContact operation middleware
+func (sh *strictHandler) CreateContact(w http.ResponseWriter, r *http.Request) {
+	var request CreateContactRequestObject
+
+	var body CreateContactJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateContact(ctx, request.(CreateContactRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateContact")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateContactResponseObject); ok {
+		if err := validResponse.VisitCreateContactResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteContact operation middleware
+func (sh *strictHandler) DeleteContact(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteContactRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteContact(ctx, request.(DeleteContactRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteContact")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteContactResponseObject); ok {
+		if err := validResponse.VisitDeleteContactResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateContact operation middleware
+func (sh *strictHandler) UpdateContact(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdateContactRequestObject
+
+	request.Id = id
+
+	var body UpdateContactJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateContact(ctx, request.(UpdateContactRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateContact")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateContactResponseObject); ok {
+		if err := validResponse.VisitUpdateContactResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

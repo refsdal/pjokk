@@ -249,3 +249,73 @@ func (q *Queries) UpsertTombstone(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, upsertTombstone, id)
 	return err
 }
+
+const validBabyIDs = `-- name: ValidBabyIDs :many
+SELECT "id" FROM "baby"
+WHERE "family_id" = $1 AND "id" = ANY($2)
+`
+
+type ValidBabyIDsParams struct {
+	FamilyID string
+	Ids      []string
+}
+
+// Tenancy backstop for a caller-supplied set of baby ids (calendar's
+// babyIds, contacts' babyIds — join tables carry no family_id of their
+// own): which of ids actually belong to this family. Callers (see
+// internal/api/calendar.go's/contacts.go's refsValid) compare
+// len(result) against len(the deduped input) rather than existence-check
+// one id at a time.
+func (q *Queries) ValidBabyIDs(ctx context.Context, arg ValidBabyIDsParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, validBabyIDs, arg.FamilyID, arg.Ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const validFamilyMemberUserIDs = `-- name: ValidFamilyMemberUserIDs :many
+SELECT "user_id" FROM "organization_members"
+WHERE "organization_id" = $1 AND "user_id" = ANY($2)
+`
+
+type ValidFamilyMemberUserIDsParams struct {
+	OrganizationID string
+	Ids            []string
+}
+
+// Same backstop as ValidBabyIDs, for calendar's assigneeUserIds: which of
+// ids are members of this family. organization_members is Limen's own
+// membership table (see GetMembership above) — no role check here, any
+// member (parent or caretaker) can be assigned.
+func (q *Queries) ValidFamilyMemberUserIDs(ctx context.Context, arg ValidFamilyMemberUserIDsParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, validFamilyMemberUserIDs, arg.OrganizationID, arg.Ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var user_id string
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
