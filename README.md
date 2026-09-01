@@ -39,34 +39,35 @@ somewhere to put files.
 
 ## Quick start
 
-Nothing to clone, nothing to build:
+Nothing to clone, nothing to build, two containers:
 
 ```sh
 curl -O https://raw.githubusercontent.com/refsdal/pjokk/main/docker-compose.selfhost.yml
 
-BETTER_AUTH_SECRET=$(openssl rand -base64 32) \
-S3_SECRET_ACCESS_KEY=$(openssl rand -base64 24) \
+AUTH_SECRET=$(openssl rand -base64 32) \
   docker compose -f docker-compose.selfhost.yml up -d
 ```
 
-That brings up Postgres and MinIO for files, and starts the app on
-<http://localhost:3000> — its default mode migrates itself under a Postgres
-advisory lock before it starts serving, so there is no separate migration
-step to wait on.
+That brings up Postgres and the app on <http://localhost:3000>, with uploaded
+files and the nightly backups on a local volume (`STORAGE_DRIVER=fs`) — no
+object store to run. The default mode migrates itself under a Postgres
+advisory lock before it starts serving, so there is no separate migration step
+to wait on.
 
 To create the first account, start it once with `OPEN_SIGNUP=1`, sign in, then
 set it back to `0` — after that, accounts exist only through invite codes.
-Put those two secrets in a `.env` file next to the compose file so they survive
-a restart; **if `BETTER_AUTH_SECRET` changes, every existing session is
-invalidated.**
+Put `AUTH_SECRET` in a `.env` file next to the compose file so it survives a
+restart; **if it changes, every existing session is invalidated.**
 
-Already running Postgres and an S3 bucket? Skip the compose file entirely:
+Already running Postgres, and want files in a bucket rather than a volume?
+Skip the compose file entirely:
 
 ```sh
 docker run -d --name pjokk -p 3000:3000 \
   -e DATABASE_URL='postgres://user:pass@host:5432/pjokk' \
   -e APP_URL='https://pjokk.example.com' \
-  -e BETTER_AUTH_SECRET='...' \
+  -e AUTH_SECRET='...' \
+  -e STORAGE_DRIVER=s3 \
   -e S3_BUCKET='pjokk-files' \
   -e S3_ENDPOINT='https://s3.eu-north-1.amazonaws.com' \
   -e S3_ACCESS_KEY_ID='...' -e S3_SECRET_ACCESS_KEY='...' \
@@ -81,24 +82,35 @@ one-off).
 ## Self-hosting
 
 The image is `ghcr.io/refsdal/pjokk` — `:latest`, `:<version>`, or
-`:sha-<sha>` to pin exactly. It runs anywhere a container does, as one process
-serving both the SPA and the API.
+`:sha-<sha>` to pin exactly, built for `linux/amd64` and `linux/arm64`. It
+runs anywhere a container does, as one process serving both the SPA and the
+API.
+
+Inside it is a single static Go binary on a `scratch` base: no shell, no libc,
+no package manager, nothing to `exec` into and nothing to patch. The SPA, the
+OpenAPI spec, the SQL migrations and the timezone database are all compiled
+into the binary, and it runs as uid 65532.
 
 ### Configuration
 
-Environment variables only, validated at startup — a bad value stops the
-process with a message naming the problem rather than surfacing later as a
-puzzling 500. **Seven are required:**
+Environment variables only, validated at startup — and *every* problem is
+reported at once, so a misconfigured container crash-loops with a list rather
+than making you fix one variable per restart. **Four are always required:**
 
 | Variable | What it is |
 |---|---|
 | `DATABASE_URL` | libpq connection string, e.g. `postgres://pjokk:pw@db:5432/pjokk` |
-| `APP_URL` | The public origin people type. better-auth signs cookies and builds OAuth callbacks from it, so a wrong value breaks sign-in in ways that look like anything except a configuration error |
-| `BETTER_AUTH_SECRET` | `openssl rand -base64 32`. Changing it invalidates every session |
-| `S3_BUCKET` | Bucket for vaccine documents and the nightly backups |
-| `S3_ENDPOINT` | Full endpoint URL. Required rather than inferred from a region — guessing is how data ends up in the wrong jurisdiction |
-| `S3_ACCESS_KEY_ID` | |
-| `S3_SECRET_ACCESS_KEY` | |
+| `APP_URL` | The public origin people type. Sessions are signed and OAuth callbacks are built from it, and an `http://` value also means cookies are issued without `Secure`, so a wrong value breaks sign-in in ways that look like anything except a configuration error |
+| `AUTH_SECRET` | `openssl rand -base64 32`, at least 32 bytes. Changing it invalidates every session |
+| `STORAGE_DRIVER` | `fs` or `s3` — see below. No default: where a child's health records are written is not a thing to guess |
+
+`STORAGE_DRIVER=fs` then requires `STORAGE_FS_PATH` (the image creates `/data`
+owned by uid 65532 so a fresh named volume inherits it). `STORAGE_DRIVER=s3`
+requires all four of `S3_BUCKET`, `S3_ENDPOINT` (full URL — required rather
+than inferred from a region, because guessing is how data ends up in the wrong
+jurisdiction), `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`, plus optionally
+`S3_REGION` (defaults to `auto`, which is right for R2 and MinIO and wrong for
+most managed buckets).
 
 The ones you will most likely also want:
 
@@ -108,10 +120,12 @@ The ones you will most likely also want:
 | `OPEN_SIGNUP` | `0` | The founder-bootstrap escape hatch. `1` allows account creation without an invite |
 | `PORT` | `3000` | |
 
-`GOOGLE_*` enables Google sign-in, `VAPID_*` enables web push, `STRIPE_*`
-enables billing. Absent means the feature is simply off — the app logs which
-subsystems are disabled at startup rather than failing.
-[`.env.example`](.env.example) documents every variable.
+`GOOGLE_*` enables Google sign-in and `VAPID_*` enables web push. Absent means
+the feature is simply off — the app names the disabled subsystems in its boot
+log rather than failing. There is no `STRIPE_*`: Pjokk has no billing, and
+every feature is available to every family.
+[`.env.example`](.env.example) documents every variable and is the complete
+contract — if it is not listed there, the app does not read it.
 
 ### Scheduled work
 
@@ -132,14 +146,14 @@ serves the app, and runs the scheduler, all in one process.
 migrates and never schedules, so any number of them is safe), and drive the
 scheduled work one of two ways:
 
-- One dedicated `worker` replica — same image, `dispatch worker` — running
+- One dedicated `worker` replica — same image, argument `worker` — running
   the scheduler and nothing else; or
 - CronJobs against the same image, if you would rather not run a persistent
   worker process:
 
   ```sh
-  /app/dispatch cron frequent     # */15 * * * *
-  /app/dispatch cron nightly      # 15 3 * * *
+  /app/pjokk cron frequent     # */15 * * * *
+  /app/pjokk cron nightly      # 15 3 * * *
   ```
 
   Set `concurrencyPolicy: Forbid` on both — Kubernetes has no built-in
@@ -173,28 +187,37 @@ default-mode container can never race each other either.
 ### Backups
 
 With the scheduler running, the app writes a JSON snapshot of every table to
-`backups/YYYY-MM-DD.json` in your bucket each night, and prunes snapshots older
-than **30 days** — the window the privacy policy commits to for a deletion to
-take full effect.
+`backups/YYYY-MM-DD.json` — in your bucket under `STORAGE_DRIVER=s3`, on the
+volume under `fs` — each night, and prunes snapshots older than **30 days**,
+the window the privacy policy commits to for a deletion to take full effect.
 
-A row dump rather than `pg_dump`, so the image needs no Postgres client binary,
-and the result stays portable across whatever runs the database.
+A row dump rather than `pg_dump`, so the image needs no Postgres client binary
+(the `scratch` runtime could not run one), and the result stays portable across
+whatever runs the database.
 
-The table list is checked against the live schema by a test, so "every table"
-stays true as the schema grows.
+The table list is checked against the live schema by a test, in both
+directions, so "every table" stays true as the schema grows.
 
-Two things to know before you rely on it:
+Three things to know before you rely on it:
 
 - **Restores are manual.** There is no restore command. The snapshot is
   `{ exportedAt, tables: { <table>: [rows...] } }` — readable, and insertable
   in foreign-key order, but you are writing that script yourself.
-- **Password hashes are excluded** from the `account` table on purpose. A
-  restore therefore loses email/password logins; Google and passkey users are
-  unaffected. That is the deliberate trade — a snapshot in object storage
-  should not be a credential database.
+- **Live credentials are nulled out.** Password hashes (`users.password`),
+  OAuth access/refresh/id tokens (`accounts.*`) and session tokens
+  (`sessions.token`) never reach the snapshot. Thirty days of retained
+  backups must not amount to thirty days of usable session cookies. A restore
+  therefore loses email/password logins and signs everyone out; Google users
+  just re-authorize.
+- **The `impersonation` table is skipped entirely**, along with the
+  rate-limit counters and the migration bookkeeping. Its rows are pairs of
+  live session tokens, and restoring them would be actively wrong rather than
+  merely incomplete.
 
 If that is not enough for you, take an ordinary `pg_dump` of the same database
-on your own schedule. The two are complementary.
+on your own schedule. The two are complementary — and under `fs` the backups
+sit on the same volume as the files, which is not off-host storage; copy the
+volume somewhere else.
 
 ### Behind a proxy
 
@@ -214,53 +237,85 @@ the arrangement.
 
 ## How it's built
 
-Two deploys. The container is one Bun process serving the SPA and the API under
+Two deploys. The container is one Go process serving the SPA and the API under
 `/api` — entirely behind auth, with nothing public to say. The marketing page
 and the legal documents are a separate static site, `apps/landing`, published
 to the apex with no server and no JavaScript of its own.
 
 | Layer | Choice |
 |---|---|
-| Runtime | Bun, compiled to a single binary on a distroless base — no shell, no package manager, no `node_modules` in the runtime image |
-| API | Hono + `@hono/zod-openapi` — zod schemas drive validation, OpenAPI (Scalar at `/api/docs`), and the typed RPC client |
-| Data | Drizzle ORM + Postgres; any S3-compatible store for files (MinIO in the compose stack) |
-| Auth | better-auth — Google + email/passkey, Organizations plugin (an organization *is* a family), invite-code redeem as the only signup door |
-| Frontend | Vite + React, TanStack Router/Query, Tailwind + shadcn-style components, vaul bottom sheets |
+| Runtime | Go 1.27, stdlib `net/http`, no framework. One static CGO-free binary on `scratch`, with the SPA, the spec, the migrations and the tz database embedded in it |
+| API | Spec-first: `openapi/pjokk.yaml` is hand-written and authoritative. oapi-codegen generates the strict server, kin-openapi validates every request against the same spec at runtime, and openapi-typescript generates the SPA's client types from it. Scalar docs at `/api/docs` |
+| Data | pgx + sqlc (typed Go from plain SQL) + goose migrations, on Postgres. Files through a storage port with two drivers: `fs` (a volume) or `s3` (any S3-compatible store) |
+| Auth | [Limen](https://github.com/thecodearcher/limen) — Google + email/password, its Organizations plugin (an organization *is* a family), invite-code redeem as the only signup door. Confined to `internal/auth` behind one interface, with its HTTP routes on an allowlist |
+| Frontend | Vite + React, TanStack Router/Query, Tailwind + shadcn-style components, vaul bottom sheets, `openapi-fetch` against the generated schema |
 | Offline | TanStack Query persisted to IndexedDB + paused-mutation queue; Workbox PWA with update toast |
-| Tests | `bun run test` against a real Postgres — tenancy, invite redeem, and sleep-session logic run against the database they ship on |
+| Tests | `go test -p 1 ./...` against a real Postgres — tenancy, invite redeem, and sleep-session logic run against the database they ship on |
 
-Every domain table carries a `familyId`, and all data access flows through
-family-scoped query helpers behind a tenancy middleware — cross-family access
-is structurally impossible, and tested to stay that way.
+Every domain table carries a `family_id`, and the scope is written into the
+SQL of every query rather than left to a handler to remember — cross-family
+access is structurally impossible, and tested to stay that way.
 
-`apps/api` is a library that receives its collaborators: `apps/server` builds a
-`Deps` object once at startup and hands it to `createApi(deps)`. Nothing in the
-API constructs a database connection or reads `process.env`, which is what
-makes the test suite cheap to write.
+`internal/api` receives its collaborators: `cmd/pjokk` builds a `Deps` struct
+once at startup and hands it to `NewHandler(deps)`. Nothing in the API
+constructs a database connection or reads the environment, which is what lets
+the suite exercise the whole API in-process without a container.
+
+There is no billing. Every feature is available to every family — a
+self-hosted tracker has nobody to bill.
 
 ## Development
 
+Two toolchains, because the app is two halves: Go builds the server, Bun
+builds the SPA and the landing site.
+
 ```sh
 bun install
-docker compose -f docker-compose.test.yml up -d   # database for tests + dev
-bun run migrate                                   # apply the schema
-bun run seed                                      # demo family, baby Nora, a day of logs
-bun run dev:server                                # API on :3000
+docker compose -f docker-compose.test.yml up -d   # Postgres on :55432, for tests and dev
+
+cd apps/server && go run ./cmd/pjokk migrate      # apply the schema
+cd apps/server && go run ./cmd/pjokk              # API on :3000 (also migrates, then serves)
 bun run dev                                       # SPA on :5173, proxying /api
 ```
 
-Sign in locally with `anders@pjokk.local` / `pjokk-dev`.
+The server needs the same variables the container does — put them in a `.env`
+and export it, or pass them inline. For a laptop, `DATABASE_URL` pointing at
+the compose database, `APP_URL=http://localhost:3000`, any 32-byte
+`AUTH_SECRET`, `STORAGE_DRIVER=fs` and a `STORAGE_FS_PATH` you can write to.
+
+There is no seed script. Start once with `OPEN_SIGNUP=1`, create an account
+through the UI, then set it back to `0` — the same bootstrap a self-hoster
+does, so it is the path that stays tested.
 
 ```sh
-bun run test            # against the Postgres from docker-compose.test.yml
-bun run check           # lint + typecheck (every package)
-bun run build           # SPA, server binary, and the landing site
+cd apps/server && go test -p 1 ./...   # against the Postgres from docker-compose.test.yml
+cd apps/server && go vet ./...
+bun run test                           # SPA + landing unit tests
+bun run check                          # lint + i18n coverage + typecheck
+bun run build                          # SPA and the landing site
+bun run gen:client                     # regenerate the SPA's types from openapi/pjokk.yaml
 ```
+
+`-p 1` is not optional: several Go packages truncate shared tables between
+tests and cannot run as concurrent packages against one database.
+
+After editing `openapi/pjokk.yaml`, run `go generate ./...` from `apps/server`
+(needs `oapi-codegen` v2.8.0 on `PATH`) and `bun run gen:client` from the root.
+Generated code is committed; neither CI nor the image runs a code generator.
 
 `docker-compose.yml` builds from source and is the contributor's stack;
 `docker-compose.selfhost.yml` pulls the published image and is the
 self-hoster's. They are deliberately separate so a self-hoster never needs the
-repository.
+repository. Both default to `STORAGE_DRIVER=fs`; add the overlay to swap in
+MinIO and the `s3` driver:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.s3.yml up
+```
+
+`docker compose run --rm migrate` and `docker compose run --rm cron nightly`
+run those one-offs against the same built image (both behind the `tools`
+profile, so `up` does not start them).
 
 ### Versioning and images
 
@@ -288,26 +343,52 @@ pushes `:<version>`, `:latest` and `:sha-<sha>`, then creates the git tag — in
 that order, so a failed push never leaves a tag pointing at an image that does
 not exist.
 
+Images are multi-arch (`linux/amd64` + `linux/arm64`). Building one locally:
+
+```sh
+docker build -t pjokk:dev .              # single arch, loads into the local store
+bash scripts/build-image.sh              # both arches, verify-only
+TAG=ghcr.io/refsdal/pjokk:v1 PUSH=1 bash scripts/build-image.sh
+```
+
+Neither architecture runs under QEMU — the Go toolchain cross-compiles, and
+JavaScript has no architecture — so the second one costs a link step rather
+than a second build. A multi-platform result is a manifest list, which the
+local image store cannot hold, which is why the two-arch build without
+`PUSH=1` verifies and discards.
+
 ## Repository layout
 
 ```
-packages/shared/   @pjokk/shared    zod schemas — the single source of truth for API shapes
-apps/api/          @pjokk/api       Hono API, tenancy middleware, Drizzle schema, jobs
-  ├─ infrastructure/                the adapters: db, storage, auth, stripe, push, rate limit
-  ├─ migrations/                    Postgres migrations (drizzle-kit)
-  └─ test/                          bun tests, run against a real Postgres
-apps/server/       @pjokk/server    the composition root: builds Deps once and dispatches to
-                                    the default, server, worker, cron, migrate or healthcheck mode
+openapi/pjokk.yaml                  the API contract — hand-written, and the source of both
+                                    the generated Go server and the SPA's client types
+apps/server/                        the Go module (github.com/refsdal/pjokk/server)
+  ├─ cmd/pjokk/                     composition root + dispatch table: default, server, worker,
+  │                                 migrate, cron <job>, healthcheck
+  └─ internal/
+      ├─ api/                       routes, middleware, gen/ (oapi-codegen output)
+      ├─ auth/                      the ONLY package that imports Limen, behind auth.Service
+      ├─ config/                    every environment variable, validated at startup
+      ├─ db/                        queries/ (SQL) → gen/ (sqlc), migrations/ (goose)
+      ├─ jobs/                      nightly backup + prune, feed and calendar reminders
+      ├─ storage/                   the object-storage port: fs and s3 drivers
+      ├─ web/                       static asset serving, security headers, the embedded SPA
+      └─ testrig/                   in-process HTTP rig the route tests drive
+packages/shared/   @pjokk/shared    the SPA's domain types (no longer describes the wire)
 apps/frontend/     @pjokk/frontend  React SPA (screens, log sheets, offline plumbing) + tests
 apps/landing/      @pjokk/landing   static marketing + legal site for the apex — see below
 ```
 
+`apps/server` is a Go module and deliberately *not* a bun workspace: the two
+toolchains never call each other, and the Dockerfile is the only place they
+meet.
+
 ### The landing site (apps/landing)
 
 Separate from the container, and not built or published by it — the Dockerfile
-deliberately runs only `build:client` + `build:server`, so a landing-only
-render failure never fails the image build (see DECISIONS.md, "Landing split").
-Build it with:
+deliberately runs the frontend workspace's own build rather than the root
+`bun run build`, so a landing-only render failure never fails the image build
+(see DECISIONS.md, "Landing split"). Build it with:
 
 ```sh
 SITE_URL=https://pjokk.no APP_URL=https://app.pjokk.no OPEN_SIGNUP=0 INDEXABLE=1 \
