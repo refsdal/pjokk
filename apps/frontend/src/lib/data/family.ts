@@ -2,6 +2,37 @@ import { useQuery } from "@tanstack/react-query";
 import type { Baby, Family, Invite, Member } from "@pjokk/shared";
 import { client, unwrap } from "../api";
 
+// Who the caller is, according to the server. This replaces every read the
+// screens used to take off the better-auth session object — the system-admin
+// role (the old `isSysadmin(session)` cast), the active family
+// (`session.session.activeOrganizationId`), the display name, and the
+// impersonation banner's `impersonatedBy`. Limen's own session payload
+// carries none of that: the Go server registers no user additional-fields
+// schema, so /api/auth/me is id + email only. One request, server truth.
+export interface Me {
+  userId: string;
+  name: string;
+  email: string;
+  /** System-admin role — "admin" or null. NOT the family role. */
+  role: string | null;
+  familyId: string | null;
+  /** Role inside the active family — "admin"/"owner"/"member", or null. */
+  memberRole: string | null;
+  plan: string | null;
+  /** The real admin's user id while this session is impersonating. */
+  impersonatedBy: string | null;
+}
+
+export function useMe() {
+  return useQuery({
+    queryKey: ["me"],
+    queryFn: async () => unwrap<Me>(client.GET("/api/me")),
+    // A 401 here means "signed out", which the auth gates already handle;
+    // retrying it just delays the redirect to /login.
+    retry: false,
+  });
+}
+
 export function useFamily() {
   return useQuery({
     queryKey: ["family"],

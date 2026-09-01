@@ -40,12 +40,15 @@ export function JoinScreen() {
   const joinPath = `/join/${code}`;
 
   const googleSignIn = async () => {
-    // requestSignUp: signup is closed everywhere EXCEPT through this flow.
-    await signIn.social({
-      provider: "google",
-      callbackURL: joinPath,
-      requestSignUp: true,
-    });
+    // Signup is closed everywhere EXCEPT through this flow. better-auth took
+    // a per-call `requestSignUp` flag for that; Limen has no client-side
+    // equivalent — the Go OAuth callback decides whether an unknown Google
+    // account may be created.
+    try {
+      await signIn.google(joinPath);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t("Sign-in failed"), "error");
+    }
   };
 
   const redeem = async () => {
@@ -54,9 +57,16 @@ export function JoinScreen() {
       const result = await unwrap<{ familyId: string; familyName: string }>(
         client.POST("/api/invites/redeem", { body: { code } }),
       );
-      await authClient.organization.setActive({
-        organizationId: result.familyId,
-      });
+      // The redeem handler already switches the session to the new family
+      // (setActiveFamilyBestEffort), but that is explicitly best-effort and
+      // non-fatal server-side, so ask again from here. A failure is not worth
+      // failing the join over — the membership row is written either way, and
+      // the family switcher can recover it.
+      try {
+        await authClient.organization.switch({ id: result.familyId });
+      } catch {
+        // Ignored on purpose: see above.
+      }
       await queryClient.invalidateQueries();
       toast(t("Welcome to ") + result.familyName);
       void navigate({ to: "/home" });

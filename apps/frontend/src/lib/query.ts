@@ -31,3 +31,13 @@ export const persistOptions = {
   maxAge: 14 * DAY,
   buster: "v1",
 };
+
+// Forget everything, in memory AND on disk. Needed wherever the identity
+// behind the cache changes — sign in, sign out, start/stop impersonating —
+// because the cache outlives the page: without the persister half, a reload
+// would restore the previous account's `me`, family and members straight
+// from IndexedDB and render them before the network could correct it.
+export async function resetCache(): Promise<void> {
+  queryClient.clear();
+  await persister.removeClient();
+}

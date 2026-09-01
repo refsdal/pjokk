@@ -22,11 +22,11 @@ import { FeedSheet } from "@/components/sheets/FeedSheet";
 import { MoreSheet, OtherLogSheet } from "@/components/sheets/OtherLogSheet";
 import { PlaySheet } from "@/components/sheets/PlaySheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
-import { useSession } from "@/lib/auth-client";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   prefetchOtherLists,
   useFeeds,
+  useMe,
   useSummary,
   useWakeSleep,
   type OtherKind,
@@ -53,7 +53,7 @@ function feedDetail(feed: {
 }
 
 export function HomeScreen() {
-  const { data: session } = useSession();
+  const me = useMe();
   const { babies, baby } = useSelectedBaby();
   const summary = useSummary(baby?.id);
   const feeds = useFeeds(baby?.id);
@@ -126,9 +126,9 @@ export function HomeScreen() {
         <BabySwitcher />
         <div
           className="flex h-11 w-11 items-center justify-center rounded-full bg-accent-soft text-base font-bold text-accent"
-          title={session?.user.name}
+          title={me.data?.name}
         >
-          {(session?.user.name ?? "?").slice(0, 1).toUpperCase()}
+          {(me.data?.name ?? "?").slice(0, 1).toUpperCase()}
         </div>
       </header>
 

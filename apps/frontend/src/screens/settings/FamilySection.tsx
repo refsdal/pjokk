@@ -7,23 +7,23 @@ import { Sheet } from "@/components/Sheet";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { client, unwrap } from "@/lib/api";
-import { authClient, useSession } from "@/lib/auth-client";
-import { useInvites, useMembers } from "@/lib/data";
+import { useInvites, useMe, useMembers } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { SectionTitle } from "./lib";
 
-// Household admin's member controls: promote/demote + remove. better-auth's
-// org plugin enforces the permissions server-side; the client also guards
-// against demoting/removing the last admin so a family can't strand itself.
+// Household admin's member controls: promote/demote + remove. These are our
+// own family-scoped routes now, not Limen's organization plugin (whose member
+// routes are disabled server-side): the family is resolved from the session,
+// so neither call takes an organization id. The server enforces family-admin;
+// the client also guards against demoting/removing the last admin so a family
+// can't strand itself.
 function MemberSheet({
   member,
-  familyId,
   adminCount,
   onClose,
 }: {
   member: Member | null;
-  familyId: string | undefined;
   adminCount: number;
   onClose: () => void;
 }) {
@@ -38,26 +38,24 @@ function MemberSheet({
   };
 
   const setRole = useMutation({
-    mutationFn: async (role: "admin" | "member") => {
-      const res = await authClient.organization.updateMemberRole({
-        memberId: member!.memberId,
-        role,
-        organizationId: familyId,
-      });
-      if (res.error) throw new Error(res.error.message);
-    },
+    mutationFn: async (role: "admin" | "member") =>
+      unwrap(
+        client.POST("/api/family/members/{memberId}/role", {
+          params: { path: { memberId: member!.memberId } },
+          body: { role },
+        }),
+      ),
     onSuccess: () => done(t("Role updated")),
     onError: (err) => toast(err.message, "error"),
   });
 
   const remove = useMutation({
-    mutationFn: async () => {
-      const res = await authClient.organization.removeMember({
-        memberIdOrEmail: member!.memberId,
-        organizationId: familyId,
-      });
-      if (res.error) throw new Error(res.error.message);
-    },
+    mutationFn: async () =>
+      unwrap(
+        client.DELETE("/api/family/members/{memberId}", {
+          params: { path: { memberId: member!.memberId } },
+        }),
+      ),
     onSuccess: () => done(t("Removed from the family")),
     onError: (err) => toast(err.message, "error"),
   });
@@ -125,12 +123,11 @@ function InviteQR({ url }: { url: string }) {
 
 export function FamilySection({ isAdmin }: { isAdmin: boolean }) {
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
+  const me = useMe();
   const members = useMembers();
   const invites = useInvites(isAdmin);
   const [shownInvite, setShownInvite] = useState<Invite | null>(null);
   const [manageMember, setManageMember] = useState<Member | null>(null);
-  const familyId = session?.session.activeOrganizationId ?? undefined;
   const adminCount = (members.data ?? []).filter(
     (m) => m.role === "admin" || m.role === "owner",
   ).length;
@@ -189,7 +186,7 @@ export function FamilySection({ isAdmin }: { isAdmin: boolean }) {
       <SectionTitle>{t("Family")}</SectionTitle>
       <Card className="divide-y divide-line p-0">
         {(members.data ?? []).map((m) => {
-          const manageable = isAdmin && m.userId !== session?.user.id;
+          const manageable = isAdmin && m.userId !== me.data?.userId;
           const row = (
             <>
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-soft text-sm font-bold text-accent">
@@ -223,7 +220,6 @@ export function FamilySection({ isAdmin }: { isAdmin: boolean }) {
 
       <MemberSheet
         member={manageMember}
-        familyId={familyId}
         adminCount={adminCount}
         onClose={() => setManageMember(null)}
       />
