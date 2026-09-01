@@ -84,7 +84,7 @@ const en: LandingCopy = {
   heroTitle: "When did the baby last eat?",
   heroBody:
     "Pjokk answers the moment you open it — and logs the next feed in two taps. Built for the whole family, and for the three-in-the-morning version of you.",
-  freeLine: "Free to start. Premium if you want more.",
+  freeLine: "Free and self-hosted. All features included.",
   inviteLine:
     "Invited to a family? Open the link or scan the QR code you were sent.",
   otherLang: "Norsk",
@@ -152,7 +152,7 @@ const nb: LandingCopy = {
   heroTitle: "Når spiste babyen sist?",
   heroBody:
     "Pjokk svarer med én gang du åpner appen — og logger neste måltid på to trykk. Laget for hele familien, og for deg klokka tre om natta.",
-  freeLine: "Gratis å komme i gang. Premium hvis du vil ha mer.",
+  freeLine: "Gratis og selvdrevet. Alle funksjoner inkludert.",
   inviteLine:
     "Invitert til en familie? Åpne lenka eller skann QR-koden du har fått.",
   otherLang: "English",

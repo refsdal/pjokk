@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@pjokk/api": "workspace:*",
     "@pjokk/shared": "workspace:*",
     "limen-auth": "^0.1.1",
     "openapi-fetch": "^0.17.0"

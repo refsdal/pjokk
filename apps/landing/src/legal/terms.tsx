@@ -49,22 +49,6 @@ export function En() {
         may suspend an account that does.
       </p>
 
-      <H>Paid plans</H>
-      <p>
-        Some features require a Premium plan. Subscriptions are billed monthly
-        or yearly through Stripe and renew until cancelled; a lifetime plan is a
-        single payment. You can cancel at any time from Settings → Billing, and
-        keep access until the period you have paid for ends. If a plan lapses
-        you keep access to everything you already recorded — you can still read,
-        edit, export and delete it — you simply cannot create new entries of the
-        premium kinds.
-      </p>
-      <p>
-        As Norwegian consumer law provides, you have a 14-day right to withdraw
-        from a purchase. Asking us to start immediately means that right ends
-        once the service has been fully delivered.
-      </p>
-
       <H>Availability</H>
       <p>
         Pjokk is early software offered as it is. We do not promise it will be
@@ -154,22 +138,6 @@ export function Nb() {
         Ikke bruk Pjokk til å lagre andres opplysninger uten at de vet om det,
         til å bryte loven, eller til å angripe eller overbelaste tjenesten. Vi
         kan sperre en konto som gjør det.
-      </p>
-
-      <H>Betalte planer</H>
-      <p>
-        Enkelte funksjoner krever Premium. Abonnementer faktureres månedlig
-        eller årlig gjennom Stripe og fornyes til de sies opp; en livstidsplan
-        er en engangsbetaling. Du kan si opp når som helst under Innstillinger →
-        Betaling, og beholder tilgangen ut perioden du har betalt for. Utløper
-        en plan, beholder du tilgangen til alt du allerede har registrert — du
-        kan fortsatt lese, redigere, eksportere og slette det — du kan bare ikke
-        opprette nye oppføringer av premium-typene.
-      </p>
-      <p>
-        Som norsk forbrukerlovgivning fastsetter, har du 14 dagers angrerett ved
-        kjøp. Ber du oss starte leveringen umiddelbart, faller angreretten bort
-        når tjenesten er levert i sin helhet.
       </p>
 
       <H>Tilgjengelighet</H>

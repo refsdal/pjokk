@@ -40,10 +40,11 @@ export function useFamily() {
   });
 }
 
-// Shared premium check — the same `plan !== "free"` read used across every
-// client-side entitlement gate.
+// Billing removed (self-hosted Pjokk has no plans): all features are free.
+// Kept as a hook — rather than deleted and call sites rewritten — so the
+// (now dead) entitlement call sites didn't need touching one by one.
 export function usePremium(): boolean {
-  return (useFamily().data?.plan ?? "free") !== "free";
+  return true;
 }
 
 export function useBabies() {

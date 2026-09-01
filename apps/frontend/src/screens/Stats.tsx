@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Bar,
   BarChart,
@@ -10,22 +10,15 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  IconBabyBottle,
-  IconLock,
-  IconMoon,
-  IconRuler,
-} from "@tabler/icons-react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { IconBabyBottle, IconMoon, IconRuler } from "@tabler/icons-react";
 import type { Baby } from "@pjokk/shared";
 import { ErrorState } from "@/components/QueryStates";
 import { ChipGroup } from "@/components/Chips";
 import { Card } from "@/components/ui/card";
 import { OtherLogSheet } from "@/components/sheets/OtherLogSheet";
 import { BabySwitcher } from "@/components/BabySwitcher";
-import { useFamily, useMeasurements, usePremium, useStats } from "@/lib/data";
+import { useMeasurements, useStats } from "@/lib/data";
 import { useSelectedBaby } from "@/lib/selected-baby";
-import { toast } from "@/lib/toast";
 import {
   ageInMonths,
   formatPercentile,
@@ -166,18 +159,10 @@ function GrowthChart({ baby }: { baby: Baby }) {
 
 export function StatsScreen() {
   const { baby } = useSelectedBaby();
-  const family = useFamily();
-  const navigate = useNavigate();
   const [days, setDays] = useState<1 | 7 | 30>(7);
   const [measureOpen, setMeasureOpen] = useState(false);
   const stats = useStats(baby?.id, days);
   const s = stats.data;
-
-  const premium = usePremium();
-
-  useEffect(() => {
-    if (days === 30 && family.isSuccess && !premium) setDays(7);
-  }, [days, premium, family.isSuccess]);
 
   const chartData = (s?.days ?? []).map((d) => {
     const date = new Date(`${d.date}T00:00:00`);
@@ -217,27 +202,10 @@ export function StatsScreen() {
         options={[
           { value: "1", label: t("Day") },
           { value: "7", label: t("Week") },
-          {
-            value: "30",
-            label: premium ? (
-              t("Month")
-            ) : (
-              <span className="inline-flex items-center gap-1">
-                {t("Month")}
-                <IconLock className="h-3.5 w-3.5" />
-              </span>
-            ),
-          },
+          { value: "30", label: t("Month") },
         ]}
         value={String(days)}
-        onChange={(v) => {
-          if (v === "30" && !premium) {
-            toast(t("Month view is a Premium feature"));
-            void navigate({ to: "/settings" });
-            return;
-          }
-          setDays(Number(v) as 1 | 7 | 30);
-        }}
+        onChange={(v) => setDays(Number(v) as 1 | 7 | 30)}
       />
 
       <div className="space-y-3 pb-tabbar">
@@ -307,14 +275,7 @@ export function StatsScreen() {
 
         <button
           type="button"
-          onClick={() => {
-            if (!premium) {
-              toast(t("Premium feature — upgrade in Settings"));
-              void navigate({ to: "/settings" });
-              return;
-            }
-            setMeasureOpen(true);
-          }}
+          onClick={() => setMeasureOpen(true)}
           className="flex w-full items-center gap-3 rounded-xl2 border border-line bg-surface p-4 text-left active:bg-surface-2"
         >
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-2 text-growth">
@@ -344,9 +305,7 @@ export function StatsScreen() {
               </p>
             ) : (
               <p className="text-sm text-muted">
-                {premium
-                  ? t("Log a weight under More → Measurement")
-                  : t("Weight tracking is a Premium feature.")}
+                {t("Log a weight under More → Measurement")}
               </p>
             )}
           </div>
@@ -360,27 +319,7 @@ export function StatsScreen() {
           />
         )}
 
-        {baby &&
-          (premium ? (
-            <GrowthChart baby={baby} />
-          ) : (
-            <Card className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted">
-                <IconLock className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-ink">
-                  {t("Growth chart")}
-                </p>
-                <p className="text-xs text-muted">
-                  {t("WHO percentile curves are a Premium feature.")}{" "}
-                  <Link to="/settings" className="underline">
-                    {t("Upgrade")}
-                  </Link>
-                </p>
-              </div>
-            </Card>
-          ))}
+        {baby && <GrowthChart baby={baby} />}
       </div>
     </div>
   );

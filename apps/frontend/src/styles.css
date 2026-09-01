@@ -119,48 +119,8 @@ input[type="number"] {
   animation: pulse-soft 2.4s ease-in-out infinite;
 }
 
-/* Welcome plan step: the feature checklist cascades between Free and
-   Premium — each item sets --d (its stagger delay); checks pop in with a
-   small spring, labels warm from muted to ink. */
-.plan-check,
-.plan-circle {
-  transition:
-    opacity 0.2s ease var(--d, 0ms),
-    transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) var(--d, 0ms);
-}
-.plan-check {
-  opacity: 0;
-  transform: scale(0.3);
-}
-.plan-check.on {
-  opacity: 1;
-  transform: scale(1);
-}
-.plan-circle.on {
-  opacity: 0;
-  transform: scale(0.4);
-}
-.plan-label {
-  transition: color 0.35s ease var(--d, 0ms);
-}
-@keyframes plan-pop {
-  0% {
-    transform: scale(0.5);
-  }
-  60% {
-    transform: scale(1.15);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-.plan-radio-on {
-  animation: plan-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .animate-pulse-soft,
-  .plan-radio-on {
+  .animate-pulse-soft {
     animation: none;
   }
   * {

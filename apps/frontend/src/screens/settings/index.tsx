@@ -3,13 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { API_BASE } from "@/lib/api";
 import { signOut } from "@/lib/auth-client";
-import { useFamily, useMe } from "@/lib/data";
+import { useMe } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { legalUrl } from "@/lib/site";
 import { ApiKeysSection } from "./ApiKeysSection";
 import { AppearanceSection } from "./AppearanceSection";
 import { BabiesSection } from "./BabiesSection";
-import { BillingSection } from "./BillingSection";
 import { ContactsSection } from "./ContactsSection";
 import { FamilySection } from "./FamilySection";
 import { SectionTitle } from "./lib";
@@ -21,7 +20,6 @@ export function SettingsScreen() {
   // against the member list; /api/me reports it directly, from the same
   // membership row the server enforces on.
   const me = useMe();
-  const premium = (useFamily().data?.plan ?? "free") !== "free";
 
   const myRole = me.data?.memberRole;
   const isAdmin = myRole === "admin" || myRole === "owner";
@@ -46,34 +44,10 @@ export function SettingsScreen() {
 
         <AppearanceSection />
 
-        <BillingSection isAdmin={isAdmin} />
-
-        {isAdmin && premium && (
+        {isAdmin && (
           <>
             <SectionTitle>{t("API keys")}</SectionTitle>
             <ApiKeysSection />
-          </>
-        )}
-
-        {isAdmin && !premium && (
-          <>
-            <SectionTitle>{t("API keys")}</SectionTitle>
-            <Card className="space-y-3">
-              <p className="text-sm text-muted">
-                {t("API keys are a Premium feature.")}
-              </p>
-              <Button
-                size="full"
-                variant="outline"
-                onClick={() =>
-                  document
-                    .getElementById("billing")
-                    ?.scrollIntoView({ behavior: "smooth" })
-                }
-              >
-                {t("Upgrade")} · {t("Premium")}
-              </Button>
-            </Card>
           </>
         )}
 

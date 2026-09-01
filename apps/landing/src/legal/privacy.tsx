@@ -41,11 +41,6 @@ export function En() {
           <strong>Notification settings</strong> and, if you enable push, a
           subscription identifier for your browser or device.
         </li>
-        <li>
-          <strong>Billing:</strong> if you subscribe, Stripe handles the payment
-          and we store only the resulting subscription status. We never see or
-          store your card number.
-        </li>
       </List>
 
       <H>Health information</H>
@@ -70,10 +65,6 @@ export function En() {
           calendar reminders, only when you turn them on. Basis: your consent.
         </li>
         <li>
-          <strong>To take payment</strong>, if you subscribe. Basis: our
-          agreement with you.
-        </li>
-        <li>
           <strong>To keep the service secure</strong> — rate limiting, and an
           audit trail of administrative actions. Basis: our legitimate interest
           in protecting other families' data.
@@ -93,9 +84,6 @@ export function En() {
         <li>
           <strong>Our hosting provider</strong> — servers, database and file
           storage, all within the EU. All application data lives here.
-        </li>
-        <li>
-          <strong>Stripe</strong> — payments, if you subscribe.
         </li>
         <li>
           <strong>Google</strong> — only if you choose to sign in with Google.
@@ -222,11 +210,6 @@ export function Nb() {
           <strong>Varslingsinnstillinger</strong> og, hvis du slår på push, en
           abonnements-ID for nettleseren eller enheten din.
         </li>
-        <li>
-          <strong>Betaling:</strong> hvis du abonnerer, håndterer Stripe
-          betalingen, og vi lagrer bare den resulterende abonnementsstatusen. Vi
-          ser aldri og lagrer aldri kortnummeret ditt.
-        </li>
       </List>
 
       <H>Helseopplysninger</H>
@@ -253,10 +236,6 @@ export function Nb() {
           Grunnlag: ditt samtykke.
         </li>
         <li>
-          <strong>For å ta betalt</strong>, hvis du abonnerer. Grunnlag: avtalen
-          med deg.
-        </li>
-        <li>
           <strong>For å holde tjenesten sikker</strong> — hastighetsbegrensning
           og en revisjonslogg over administrative handlinger. Grunnlag: vår
           berettigede interesse i å beskytte andre familiers opplysninger.
@@ -276,9 +255,6 @@ export function Nb() {
         <li>
           <strong>Vår driftsleverandør</strong> — servere, database og
           fillagring, alt innenfor EU. Alle appdata ligger her.
-        </li>
-        <li>
-          <strong>Stripe</strong> — betaling, hvis du abonnerer.
         </li>
         <li>
           <strong>Google</strong> — kun hvis du velger å logge inn med Google.

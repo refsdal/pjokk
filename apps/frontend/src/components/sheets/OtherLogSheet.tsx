@@ -1,6 +1,5 @@
 import {
   IconBath,
-  IconLock,
   IconMilk,
   IconNote,
   IconPill,
@@ -27,7 +26,6 @@ import { Input } from "@/components/ui/input";
 import {
   useCreateOther,
   useDeleteOther,
-  useFamily,
   useOtherList,
   useUpdateOther,
   type CreateOtherVars,
@@ -37,16 +35,6 @@ import { t } from "@/lib/i18n";
 import { playKindMeta, playTypeOrder } from "@/lib/play-ui";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-
-// Kinds gated behind Premium on the free plan (Task 1's server-side 402s).
-// Medicine stays free.
-const GATED_KINDS: ReadonlySet<OtherKind> = new Set([
-  "bath",
-  "note",
-  "milestone",
-  "measurement",
-  "pump",
-]);
 
 export type OtherEntry = Extract<TimelineEntry, { kind: OtherKind }>;
 
@@ -112,7 +100,6 @@ export function MoreSheet({
   onPickPlay: (type: PlayType) => void;
 }) {
   const navigate = useNavigate();
-  const premium = (useFamily().data?.plan ?? "free") !== "free";
 
   // Play kinds are timed sessions with their own endpoints, so they sit
   // beside the generic kinds here rather than inside otherKindMeta.
@@ -121,29 +108,25 @@ export function MoreSheet({
     label: string;
     icon: TablerIcon;
     tint: string;
-    locked: boolean;
     pick: () => void;
   }[] = [
     ...(Object.keys(otherKindMeta) as OtherKind[]).map((kind) => ({
       key: kind,
       ...otherKindMeta[kind],
-      locked: !premium && GATED_KINDS.has(kind),
       pick: () => onPick(kind),
     })),
     ...playTypeOrder.map((type) => ({
       key: `play:${type}`,
       ...playKindMeta[type],
-      locked: !premium,
       pick: () => onPickPlay(type),
     })),
-    // Vaccines are free and open a screen, not a sheet — the programme
-    // schedule needs more room than a tray.
+    // Vaccines open a screen, not a sheet — the programme schedule needs
+    // more room than a tray.
     {
       key: "vaccines",
       label: "Vaccines",
       icon: IconVaccine,
       tint: "text-growth",
-      locked: false,
       pick: () => {
         onOpenChange(false);
         void navigate({ to: "/vaccines" });
@@ -154,35 +137,21 @@ export function MoreSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange} title={t("Log something")}>
       <div className="grid grid-cols-3 gap-3 pt-1 pb-6">
-        {tiles.map(({ key, label, icon: Icon, tint, locked, pick }) => {
+        {tiles.map(({ key, label, icon: Icon, tint, pick }) => {
           return (
             <button
               key={key}
               type="button"
-              onClick={
-                locked
-                  ? () => {
-                      toast(t("Premium feature — upgrade in Settings"));
-                      onOpenChange(false);
-                      void navigate({ to: "/settings" });
-                    }
-                  : pick
-              }
-              className={cn(
-                "flex h-24 flex-col items-center justify-center gap-2 rounded-xl2 border border-line bg-surface select-none active:scale-[0.97] active:bg-surface-2",
-                locked && "opacity-60",
-              )}
+              onClick={pick}
+              className="flex h-24 flex-col items-center justify-center gap-2 rounded-xl2 border border-line bg-surface select-none active:scale-[0.97] active:bg-surface-2"
             >
               <span
                 className={cn(
                   "relative flex h-10 w-10 items-center justify-center rounded-full bg-surface-2",
-                  locked ? "text-muted" : tint,
+                  tint,
                 )}
               >
                 <Icon className="h-5 w-5" />
-                {locked && (
-                  <IconLock className="absolute -right-1 -bottom-1 h-4 w-4 rounded-full bg-surface p-0.5 text-muted" />
-                )}
               </span>
               <span className="text-sm font-bold text-ink">{t(label)}</span>
             </button>

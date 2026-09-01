@@ -6,7 +6,7 @@ import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet } from "@/components/Sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ApiError, client, unwrap } from "@/lib/api";
+import { client, unwrap } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { toLocalDateInput } from "@/lib/time";
 import { toast } from "@/lib/toast";
@@ -64,13 +64,7 @@ export function BabySheet({
           );
     },
     onSuccess: done,
-    onError: (err) => {
-      if (err instanceof ApiError && err.code === "PLAN_REQUIRED") {
-        toast(t("Premium feature — upgrade in Settings"), "error");
-        return;
-      }
-      toast(err.message, "error");
-    },
+    onError: (err) => toast(err.message, "error"),
   });
 
   const remove = useMutation({

@@ -9,7 +9,7 @@ import type {
   CreateCalendarEvent,
   UpdateCalendarEvent,
 } from "@pjokk/shared";
-import { ApiError, client, unwrap } from "../api";
+import { client, unwrap } from "../api";
 import { t } from "../i18n";
 import { toast } from "../toast";
 
@@ -20,10 +20,6 @@ const invalidateCalendar = (qc: QueryClient) =>
   void qc.invalidateQueries({ queryKey: ["calendar"] });
 
 function toastCalendarError(err: Error) {
-  if (err instanceof ApiError && err.code === "PLAN_REQUIRED") {
-    toast(t("Premium feature — upgrade in Settings"), "error");
-    return;
-  }
   toast(t("Could not save: ") + err.message, "error");
 }
 

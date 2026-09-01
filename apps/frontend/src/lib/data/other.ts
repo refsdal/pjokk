@@ -1,17 +1,11 @@
 import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
 import type { MeasurementType, MedicineUnit } from "@pjokk/shared";
-import { ApiError, client, unwrap } from "../api";
+import { client, unwrap } from "../api";
 import { t } from "../i18n";
 import { toast } from "../toast";
 import { invalidateLogs } from "./keys";
 
-// Server 402s for a gated kind carry `code: "PLAN_REQUIRED"` — surface the
-// friendly upgrade copy instead of the raw server message in that case.
 function toastMutationError(prefix: string, err: Error) {
-  if (err instanceof ApiError && err.code === "PLAN_REQUIRED") {
-    toast(t("Premium feature — upgrade in Settings"), "error");
-    return;
-  }
   toast(prefix + err.message, "error");
 }
 
