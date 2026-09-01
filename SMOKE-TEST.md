@@ -27,19 +27,26 @@ Required before anything works:
 ```
 DATABASE_URL          postgres://…            (EU region — see below)
 APP_URL               https://app.pjokk.no
-BETTER_AUTH_SECRET    openssl rand -base64 32
-S3_*                  bucket, endpoint, key, secret (EU region)
+AUTH_SECRET           openssl rand -base64 32   (≥ 32 bytes)
+STORAGE_DRIVER        s3  (then S3_BUCKET / S3_ENDPOINT / S3_ACCESS_KEY_ID /
+                           S3_SECRET_ACCESS_KEY, EU region)
+                      fs  (then STORAGE_FS_PATH — a volume, no bucket at all)
 ```
+
+A misconfiguration is reported in full at startup: the process lists **every**
+bad or missing variable at once and exits, rather than failing on the first.
 
 `SITE_URL` (default `https://pjokk.no`) only affects where the app's own
 Settings/Login/Join screens link out to the legal pages — set it if you are
 self-hosting under a different apex than pjokk.no.
 
 For Google sign-in, create an OAuth 2.0 Web client with redirect URI
-`https://app.pjokk.no/api/auth/callback/google` (and the `test.` equivalent),
-then set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`. Without them the app
-still runs — it logs `disabled: Google sign-in` at startup and offers only
-email/password.
+`https://app.pjokk.no/api/auth/oauth/google/callback` (and the `test.`
+equivalent), then set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`. Without
+them the app still runs — it names Google sign-in among the disabled
+subsystems at startup and offers only email/password. **The callback path
+changed with the Go rewrite** (it was `/api/auth/callback/google` under
+better-auth); an existing OAuth client needs the new URI added.
 
 > **Data residency.** The database, the bucket AND the backup target must be
 > in the EU. Cloudflare used to enforce this with jurisdiction pinning; now
@@ -49,8 +56,13 @@ email/password.
 Apply migrations as a one-off **before** the app serves traffic:
 
 ```sh
-/app/dispatch migrate           # inside the image; or the compose `migrate` service
+/app/pjokk migrate              # inside the image; or the compose `migrate` service
 ```
+
+The default dispatch mode also migrates itself at startup, under a Postgres
+advisory lock — a single container needs no separate step. The explicit
+one-off is for orchestrated rollouts, where the schema must land before any
+replica depending on it starts.
 
 ## 1. Founder account (bootstrap)
 
@@ -62,10 +74,11 @@ Apply migrations as a one-off **before** the app serves traffic:
 5. Promote yourself to sysadmin, then `/admin` is available:
 
    ```sh
-   psql "$DATABASE_URL" -c "UPDATE \"user\" SET role='admin' WHERE email='<you>'"
+   psql "$DATABASE_URL" -c "UPDATE users SET role='admin' WHERE email='<you>'"
    ```
 
-   `"user"` must be quoted — it is a reserved word in Postgres.
+   The table is `users`, plural — Limen's name, chosen because `user` is a
+   reserved word in Postgres.
 
 ## 2. Invite → second caretaker joins
 
@@ -90,10 +103,10 @@ Apply migrations as a one-off **before** the app serves traffic:
 
 ## 4. Attribution
 
-14. In dev (`bun run dev` + `bun run seed`, sign in as anders@pjokk.local /
-    pjokk-dev): `/api/feeds` rows carry `caretakerName` alternating
-    Anders/Kristine. Live: log one entry from each account and GET
-    `/api/summary?babyId=…` — `caretakerName` matches whoever logged it.
+14. Log one entry from each account, then GET `/api/summary?babyId=…` —
+    `caretakerName` matches whoever logged it, and the timeline rows say
+    "by <name>". (There is no seed script; in dev, bootstrap the same way
+    section 1 does, with `OPEN_SIGNUP=1`.)
 
 ## 5. Push notifications
 
@@ -107,15 +120,19 @@ Apply migrations as a one-off **before** the app serves traffic:
 
     Reminders need the scheduler to be running — the default single-container
     dispatch mode and `worker` mode both start it; `server` mode does not.
-    Otherwise a CronJob invoking `/app/dispatch cron frequent` covers it. If
+    Otherwise a CronJob invoking `/app/pjokk cron frequent` covers it. If
     nothing runs it, no reminder ever fires and the app looks broken in a way
     the logs will not explain.
 18. Backups: after the nightly job, `backups/YYYY-MM-DD.json` appears in the
     bucket. Force one to check the wiring without waiting:
 
     ```sh
-    /app/dispatch cron nightly   # in the image (bun run cron from source)
+    /app/pjokk cron nightly      # in the image
+    # from source: cd apps/server && go run ./cmd/pjokk cron nightly
     ```
+
+    Under `STORAGE_DRIVER=fs` the snapshot lands on the volume instead of a
+    bucket — same key, `backups/YYYY-MM-DD.json`.
 
 ## 6. PWA + polish
 
@@ -140,35 +157,11 @@ Apply migrations as a one-off **before** the app serves traffic:
     21 times from one IP and confirming a second IP is unaffected.
 26. **Under Kubernetes, run `server` mode for every HTTP replica** (it never
     starts the scheduler) and drive the two jobs from CronJobs
-    (`/app/dispatch cron nightly` at 03:15 UTC, `/app/dispatch cron frequent`
+    (`/app/pjokk cron nightly` at 03:15 UTC, `/app/pjokk cron frequent`
     every 15 min) or exactly one dedicated `worker` replica. Running the
     default mode, or more than one `worker`, fires every reminder N times.
 
-## 8. Stripe billing
-
-Run the test-mode pass on the **test environment** first; production only
-ever holds live keys.
-
-27. Set all five `STRIPE_*` values (live mode in production): secret key,
-    webhook secret, and the three price ids (`STRIPE_PRICE_PREMIUM_MONTHLY` /
-    `_YEARLY` / `_LIFETIME`). With them absent the app logs
-    `disabled: billing` and the billing routes are not registered at all.
-28. In the Stripe dashboard: add a webhook endpoint
-    `https://app.pjokk.no/api/auth/stripe/webhook` subscribed to
-    `checkout.session.completed`, `customer.subscription.created`,
-    `customer.subscription.updated`, `customer.subscription.deleted`; copy
-    the signing secret into `STRIPE_WEBHOOK_SECRET`.
-29. Verify all three prices are NOK and tax behaviour is **inclusive**;
-    confirm Stripe Tax is enabled on the account.
-30. Test-mode end-to-end pass:
-    - Subscribe monthly with card `4242 4242 4242 4242` → plan flips to
-      `premium`; open the Customer Portal from Settings → Billing → cancel →
-      verify the downgrade lands at period end (not immediately).
-    - Buy lifetime → plan flips to `lifetime`.
-    - In `/admin`, comp a family (plan → `comp`) then revoke it (plan →
-      `free`) → verify the audit trail records `billing.plan.set` both ways.
-
-## 9. Landing page checks (apps/landing — a separate static deploy)
+## 8. Landing page checks (apps/landing — a separate static deploy)
 
 The marketing/legal site is built once (`bun run build:landing`, see
 README.md for its four env vars) and published to `pjokk.no` independently
@@ -177,13 +170,13 @@ now, not per request, so these checks are against whatever was last
 published there — re-run them after every landing publish, not every app
 deploy.
 
-31. `https://pjokk.no/` shows the landing page with **Sign in** (or **Get
+27. `https://pjokk.no/` shows the landing page with **Sign in** (or **Get
     started** if that build had `OPEN_SIGNUP=1`) linking to
     `https://app.pjokk.no/login`.
-32. `https://pjokk.no/nb/` shows the Norwegian document; the header's language
+28. `https://pjokk.no/nb/` shows the Norwegian document; the header's language
     toggle on either page links to the other's own document tree
     (`/nb/privacy` ↔ `/privacy`, not a query string or a runtime negotiation).
-33. Indexability, driven entirely by `INDEXABLE` **at the landing build**,
+29. Indexability, driven entirely by `INDEXABLE` **at the landing build**,
     fail-safe default noindex:
 
     ```sh
@@ -198,64 +191,74 @@ deploy.
     no `INDEXABLE` env var on the container to get wrong. (The old caveat
     about Cloudflare's Managed robots.txt prepending its own `Allow: /` no
     longer applies — nothing rewrites the response now.)
-34. With the PWA installed on `app.pjokk.no`, opening `https://app.pjokk.no/`
+30. With the PWA installed on `app.pjokk.no`, opening `https://app.pjokk.no/`
     in the browser still shows the app (offline too — the service worker's
     `navigateFallbackDenylist` no longer excludes `/`, since `/` is the app's
     own entry point, not the landing page). A push notification opens
     `/home`.
-35. Paste `https://pjokk.no` into a chat (Messenger, Slack, iMessage) — the
+31. Paste `https://pjokk.no` into a chat (Messenger, Slack, iMessage) — the
     preview shows the title, the description and the brand card. Regenerate
     that card with `node scripts/gen-og.mjs` if the icon ever changes.
-36. From `app.pjokk.no`, Login / Settings / the Join consent screen all link
+32. From `app.pjokk.no`, Login / Settings / the Join consent screen all link
     to `pjokk.no/privacy` and `/terms` (or the `/nb/` document on a Norwegian
     device) — never to `app.pjokk.no` itself, and never to the English
     document from a Norwegian session.
 
-## 10. Moving off Cloudflare (one-time)
+## 9. Cutover to a new host (one-time)
 
-The container starts from an **empty database** — no data is carried over from
-D1. Everyone signs in again, and any invite link already handed out stops
-working, because those embed `APP_URL` and the family they point at no longer
-exists. Invites expire after 72 h; run this when none is live.
+The container starts from an **empty database**. This was true moving off
+Cloudflare (no data carried over from D1) and it is true again after the Go
+rewrite: the auth schema is Limen-shaped and no converter was written, so the
+previous instance's accounts do not come across. Everyone signs in again, and
+any invite link already handed out stops working, because those embed
+`APP_URL` and the family they point at no longer exists. Invites expire after
+72 h; run this when none is live.
 
-37. Stand the container up on the new host and verify with sections 1–7
+33. Stand the container up on the new host and verify with sections 1–7
     against `test.pjokk.no` before touching production DNS. `pjokk.no`'s
     static site is a separate publish target and does not need a new host at
     all if it already lives somewhere durable (object storage + CDN, a
     static host, …) — only the container is moving.
-38. Point `app.pjokk.no` and `test.pjokk.no` at the new container host.
+34. Point `app.pjokk.no` and `test.pjokk.no` at the new container host.
     Terminate TLS at your proxy/ingress; the app speaks plain HTTP on `PORT`
     and does not manage certificates. `pjokk.no` and `www.pjokk.no` point at
     wherever the static landing build is published, which may be a different
     host entirely.
-39. `www.pjokk.no` → `https://pjokk.no` (301, preserve query string) has to be
+35. `www.pjokk.no` → `https://pjokk.no` (301, preserve query string) has to be
     handled by whatever sits in front of the static site — neither it nor the
     container serves `www`.
-40. Google Cloud Console → the OAuth client → confirm the redirect URI is
-    still `https://app.pjokk.no/api/auth/callback/google` (and the `test.`
-    equivalent). Unchanged if the domain is.
-41. Stripe → confirm the webhook endpoint still resolves at
-    `https://app.pjokk.no/api/auth/stripe/webhook`. The signing secret
-    changes if you create a new endpoint rather than editing the existing one.
-42. Re-bootstrap the founder account (section 1) and re-issue invites.
-43. Sign in again on every device. An installed PWA keeps working as long as
+36. Google Cloud Console → the OAuth client → the redirect URI is now
+    `https://app.pjokk.no/api/auth/oauth/google/callback` (and the `test.`
+    equivalent). This CHANGED with the Go rewrite; the better-auth path
+    (`/api/auth/callback/google`) no longer exists.
+37. Re-bootstrap the founder account (section 1) and re-issue invites.
+38. Sign in again on every device. An installed PWA keeps working as long as
     the hostname is unchanged.
 
 ## Verified automatically
 
-- **194 tests** (`bun run test`, never the bare `bun test`): 150 in
-  `@pjokk/api` against a real Postgres — tenancy isolation (cross-family
-  reads/writes impossible, stale session claims re-verified), invite
-  lifecycle (transactional redeem with `SELECT … FOR UPDATE`,
-  expiry/revoke/exhaustion, rate limiting), active-sleep state machine
-  (single active session enforced by a partial unique index, idempotent
-  wake), summary shape, billing gates, admin console; 13 in `@pjokk/server`;
-  21 in `@pjokk/frontend`; 10 in `@pjokk/landing` (both languages of both the
-  marketing page and the legal-page shell — CTA state, hreflang/canonical
-  correctness, the last-updated date, indexability).
+- **397 Go tests** (`cd apps/server && go test -p 1 ./...`, against a real
+  Postgres; `-p 1` is required, several packages truncate shared tables) —
+  tenancy isolation (cross-family reads/writes impossible, stale session
+  claims re-verified), invite lifecycle (transactional redeem, expiry /
+  revoke / exhaustion, rate limiting), the active sleep and play state
+  machines (single active session enforced by a partial unique index,
+  idempotent wake), summary and timeline shape, the admin console, the
+  migration advisory lock, the backup table list against the live schema,
+  and the auth hardening (Limen route allowlist, hashed session metadata,
+  ban enforcement). Every test file names the `apps/api` test it was ported
+  from.
+- **32 TypeScript tests** (`bun run test`): 22 in `@pjokk/frontend`, 10 in
+  `@pjokk/landing` (both languages of both the marketing page and the
+  legal-page shell — CTA state, hreflang/canonical correctness, the
+  last-updated date, indexability).
 - **Image smoke test in CI**: migrations apply from the image, the container
   boots, `/readyz` reaches Postgres, `/` serves the SPA shell (the app now
-  lives at the container's own root), and `robots.txt` is an unconditional
+  lives at the container's own root), a credential sign-in with unknown
+  credentials answers 401 (proving Limen loaded, its Postgres adapter
+  resolved, and a query ran end to end in the compiled binary), the rate
+  limiter wrote a row, `cron frequent` runs from the same image, and
+  `robots.txt` is an unconditional
   `Disallow: /` — the container has nothing to index, so there is no
   `INDEXABLE` switch to check there any more. `apps/landing`'s own build is
   verified separately (its own test suite, plus a CI artifact upload — see

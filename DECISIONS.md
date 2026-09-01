@@ -1110,3 +1110,121 @@ edited, per this file's append-only convention.
   `Service` interface documents that whatever sets `banned` MUST also call
   `RevokeAllSessions`, because a live bearer token that merely fails two
   specific checks is one forgotten check away from working again.
+
+## Go backend migration (2026-09-01)
+
+- **Why Go at all.** The Bun backend worked; the reasons to leave it were
+  operational rather than a defect. A single static CGO-free binary on
+  `scratch` is a runtime image with no shell, no libc, no package manager and
+  no `node_modules` — nothing to patch, nothing to exec into, and a
+  vulnerability surface that is the binary plus one CA bundle. It
+  cross-compiles, so multi-arch (amd64 + arm64) costs a link step rather than
+  a QEMU build. And every asset the process needs — SPA, spec, migrations,
+  tzdata — is compiled in, which is what makes `scratch` possible at all.
+  Nothing about the product changed; the roadmap above is untouched.
+- **The OpenAPI document flipped from output to input.** Under
+  `@hono/zod-openapi` the spec was *generated* from zod schemas, which meant
+  it could only ever describe what the TypeScript happened to do. It is now
+  hand-written (`openapi/pjokk.yaml`) and authoritative in three directions:
+  oapi-codegen generates the strict server interface from it, kin-openapi
+  validates every request against it at runtime, and openapi-typescript
+  generates the SPA's client types from the same file. A route that drifts
+  from the contract now fails to compile or fails validation, rather than
+  quietly redefining it. `internal/api/pjokk.yaml` is a committed copy that
+  exists only because `go:embed` cannot reach above the module root; the
+  `go generate` step copies it and a test fails if the two diverge.
+- **Limen is confined to `internal/auth` behind one interface, and every
+  Limen module is version-pinned.** Limen is a young library on a 0.x
+  version; adopting it meant accepting that its API and its defaults will
+  move. Handlers, middleware and jobs never import a Limen type — they see
+  `auth.Service` (resolve session, resolve active family + role, create user,
+  add member, …). If Limen stalls or breaks, the blast radius is one package
+  rather than every route. The pinning is part of the same decision: an
+  unpinned minor could silently add an HTTP route (see the route-allowlist
+  entry above) or change a hashing parameter. Two upgrade obligations follow,
+  and both are load-bearing: re-check `knownRouteIDs` against the new
+  release, and re-run the auth suite, which asserts the hardening
+  behaviourally rather than by inspection.
+- **`pjk_` API keys stayed our own table; no auth-plugin key mechanism.** The
+  design sketch assumed Limen would provide an api-key plugin the way
+  better-auth did. It does not — v0.2.x publishes credential-password, oauth,
+  oauth-google and organization, and nothing else — so the question answered
+  itself, but the answer would have been the same anyway: `api_key` is
+  family-scoped with a `read_only` flag and a displayable 12-character
+  prefix, and it authorises against Pjokk's own operation tiers. A generic
+  plugin would have keyed on the user, not the family, which is the wrong
+  grain for a resource model where families own everything.
+- **Billing is gone, not ported.** Stripe, `@better-auth/stripe`, the
+  `entitlements` module, `canUse`, every 402 `PLAN_REQUIRED` gate and the
+  webhook plumbing were all dropped rather than rewritten in Go. Pjokk ships
+  as a container someone runs themselves; there is nobody to bill, and a
+  soft-lock that can never fire is just a code path nothing tests.
+  Everything that was Premium — calendar, contacts, play, API keys, CSV
+  export, growth chart, stats beyond seven days, vaccine documents — is now
+  simply available. `organization.plan` survives as a column (still `free`)
+  so the schema does not need a migration if billing ever returns, but
+  nothing reads it. Passkeys went the same way and for a weaker reason:
+  better-auth's plugin was server-side only and never had UI, so deleting it
+  removed nothing a user could see.
+- **The cutover was a fresh database.** No data migration was written and
+  none was run. The auth schema is Limen-shaped (`users`, `sessions`,
+  `accounts`, `organization_members`, roles on a join row) and differs from
+  the better-auth one structurally, not cosmetically; password hashes are
+  argon2id where better-auth wrote scrypt. Writing a converter would have
+  been a second, untested code path guarding real health data, for the
+  benefit of one closed-alpha instance whose entire content is reproducible.
+  Bootstrap is the documented one: `OPEN_SIGNUP=1`, create the founder
+  account, set it back to `0`.
+- **An `fs` storage driver, so self-hosting needs two containers instead of
+  four.** The Bun app spoke only S3, which meant a self-hoster ran MinIO (and
+  a MinIO init job) to store a handful of vaccine PDFs. `storage.Storage` now
+  has two implementations behind the same port: `s3` for anyone who already
+  has a bucket, `fs` for a mounted volume — and `fs` is the compose default.
+  The image creates `/data` owned by uid 65532 at build time precisely so a
+  fresh named volume inherits that ownership: a `scratch` image has no shell
+  and no `chown` to fix it up at runtime. Trade recorded honestly in the
+  README: under `fs` the nightly backup lands on the same volume as the
+  files, which is not off-host storage.
+- **The nightly backup nulls live credentials and skips `impersonation`
+  entirely.** The TypeScript job only had a dev-only `account.password` to
+  strip. Limen's schema carries more: OAuth access/refresh/id tokens on
+  `accounts`, and — the one that matters — the literal session cookie in
+  `sessions.token`. Backups are retained thirty days, so an unredacted
+  snapshot would be "a valid session cookie for every user signed in that
+  day", standing for a month, in object storage. Those columns are nulled; a
+  session row minus its token is still useful for knowing who existed and
+  when. `impersonation` is not redacted column-by-column but dropped from the
+  list, because every row in it is a *pair* of live session tokens (the
+  impersonated user's and the sysadmin's) and there is nothing else in the
+  table worth restoring. `backup_tables_test.go` checks the list against the
+  live schema in both directions, so a new table is a failing test rather
+  than a silent omission.
+- **Creating a family is restricted to a sysadmin or a user who belongs to no
+  family.** Signup being invite-only is not on its own a closed alpha: a
+  redeemed invite would otherwise let anyone mint unlimited organizations
+  through the family switcher's own create route. `allowOrgCreation` is
+  wired into Limen's `WithAllowOrgCreation` hook, so both entry points — our
+  `CreateFamily` and Limen's `POST /organizations` — run through the same
+  check and it cannot be bypassed by picking the other path. It fails
+  **closed** on a query error: a user who cannot be read is neither provably
+  a sysadmin nor provably family-less, and "deny" is the safe side of that.
+- **`packages/shared` was demoted rather than deleted.** It was the single
+  source of truth for API shapes; the spec is now. What the SPA still imports
+  from it is ~40 domain types and one enum tuple, so the file stays, with
+  plain `zod` instead of `@hono/zod-openapi` and its 75 `.openapi("Name")`
+  tags stripped — those named schemas in a document this package no longer
+  generates. It is now a partial duplicate of the generated
+  `api-schema.d.ts`, which is a known and deliberate loose end: collapsing
+  the two means touching ~40 SPA files and belongs in its own change.
+- **`apps/frontend/src/lib/api-schema.d.ts` is excluded from biome.** It is
+  openapi-typescript output. Formatting it would mean `bun run gen:client`
+  produces a diff every time, which turns "is the client in sync with the
+  spec?" from a byte comparison into a judgement call.
+- **`scripts/seed.mjs` was deleted, not ported.** It hand-wrote rows for the
+  Drizzle schema and better-auth's scrypt hashes; against the Limen schema
+  it would have needed argon2id in the plugin's exact parameters (its
+  verifier ignores the parameters stored in the PHC string and uses its own
+  config, so a mismatch fails silently) plus the `organization_member_roles`
+  join. A seed that produces an unusable password is worse than no seed. The
+  documented dev bootstrap is `OPEN_SIGNUP=1`, which is also what a
+  self-hoster does — so it is the path that stays exercised.
