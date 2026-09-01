@@ -1,0 +1,13 @@
+# oapi-codegen config for the shared request/response/component types.
+# Kept separate from cfg-server.yaml so a future client generator (or a
+# second server target) can reuse the types without re-running the
+# strict-server generator. See generate.go for the go:generate wiring.
+package: gen
+output: internal/api/gen/types.gen.go
+generate:
+  models: true
+output-options:
+  # Keep components/schemas that no operation references yet (Error) so the
+  # type exists ahead of the endpoints that will use it in later tasks,
+  # rather than silently vanishing until then.
+  skip-prune: true

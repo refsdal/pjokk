@@ -1,0 +1,104 @@
+openapi: 3.0.3
+info:
+  title: Pjokk API
+  description: >-
+    Pjokk is a self-hosted baby tracker for families. This spec is the single
+    source of truth for the Go server's HTTP surface: it drives runtime
+    request validation (kin-openapi nethttp-middleware), the generated
+    strict-server routes and types (oapi-codegen), and the interactive docs
+    served at /api/docs (Scalar, reading /api/openapi.json — this file,
+    converted to JSON at runtime).
+  version: "1.0.0"
+servers:
+  - url: /
+paths:
+  /healthz:
+    get:
+      operationId: healthz
+      summary: Liveness probe. Touches nothing — not even the database pool.
+      tags: [system]
+      responses:
+        "200":
+          description: The process is alive.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+  /readyz:
+    get:
+      operationId: readyz
+      summary: Readiness probe. Runs `SELECT 1` against the database pool.
+      tags: [system]
+      responses:
+        "200":
+          description: The process is ready to serve traffic.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+        "503":
+          description: The database is unreachable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, error]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [false]
+                  error:
+                    type: string
+components:
+  parameters:
+    babyIdQuery:
+      name: babyId
+      in: query
+      description: Restrict the result to one baby in the caller's family.
+      required: false
+      schema:
+        type: string
+    limitQuery:
+      name: limit
+      in: query
+      description: Maximum number of rows to return.
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+  schemas:
+    Error:
+      type: object
+      description: >-
+        The error envelope used by every non-2xx JSON response in the API
+        (CLAUDE.md: "{error: string, code: string}" everywhere).
+      required: [error, code]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        issues:
+          type: array
+          description: >-
+            Optional per-field validation issues. The frontend only reads
+            error/code today; issues exist for future, more specific UI.
+          items:
+            type: object
+            required: [path, message]
+            properties:
+              path:
+                type: string
+              message:
+                type: string

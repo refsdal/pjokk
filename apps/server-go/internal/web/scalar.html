@@ -1,0 +1,23 @@
+<!doctype html>
+<!--
+  Served ONLY at GET /api/docs (internal/api, session-gated). This page is
+  allowed to load a script from an external CDN, which the rest of the app
+  never is: REF §A9's CSP (script-src 'self'; ...) applies to non-/api
+  responses, and /api/docs is an /api/* route — REF §A1's mount-order note
+  says explicitly "No CSP on API". Do not reuse this file, or its CDN
+  script tag, outside that one route.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Pjokk API docs</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <script
+      id="api-reference"
+      data-url="/api/openapi.json"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+  </body>
+</html>
