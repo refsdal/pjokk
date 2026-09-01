@@ -8,7 +8,8 @@ import {
   IconUsersGroup,
 } from "@tabler/icons-react";
 import { TabBar, type TabItem } from "@/components/TabBar";
-import { isSysadmin, useSession } from "@/lib/auth-client";
+import { useSession } from "@/lib/auth-client";
+import { useMe } from "@/lib/data";
 
 // Operator console shell: role guard + its own bottom tab bar (same
 // component as the app's), so each concern gets a page that can grow.
@@ -22,9 +23,13 @@ const adminTabs: TabItem[] = [
 
 export function AdminShell() {
   const { data: session, isPending } = useSession();
-  if (isPending) return <div className="min-h-dvh" />;
+  // The system-admin role is ours, not Limen's — it lives on our users table
+  // and reaches the client only through GET /api/me. Every /api/admin route
+  // re-checks it server-side; this gate is just navigation.
+  const me = useMe();
+  if (isPending || me.isPending) return <div className="min-h-dvh" />;
   if (!session) return <Navigate to="/login" />;
-  if (!isSysadmin(session)) return <Navigate to="/home" />;
+  if (me.data?.role !== "admin") return <Navigate to="/home" />;
 
   return (
     <div className="min-h-dvh">

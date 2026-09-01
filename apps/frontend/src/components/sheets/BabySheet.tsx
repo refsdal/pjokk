@@ -6,7 +6,7 @@ import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet } from "@/components/Sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { api, ApiError, unwrap } from "@/lib/api";
+import { client, unwrap } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { toLocalDateInput } from "@/lib/time";
 import { toast } from "@/lib/toast";
@@ -52,27 +52,28 @@ export function BabySheet({
       };
       return baby
         ? unwrap(
-            await api.babies[":id"].$patch({ param: { id: baby.id }, json }),
+            client.PATCH("/api/babies/{id}", {
+              params: { path: { id: baby.id } },
+              body: json,
+            }),
           )
         : unwrap(
-            await api.babies.$post({
-              json: { ...json, sex: sex ?? undefined },
+            client.POST("/api/babies", {
+              body: { ...json, sex: sex ?? undefined },
             }),
           );
     },
     onSuccess: done,
-    onError: (err) => {
-      if (err instanceof ApiError && err.code === "PLAN_REQUIRED") {
-        toast(t("Premium feature — upgrade in Settings"), "error");
-        return;
-      }
-      toast(err.message, "error");
-    },
+    onError: (err) => toast(err.message, "error"),
   });
 
   const remove = useMutation({
     mutationFn: async () =>
-      unwrap(await api.babies[":id"].$delete({ param: { id: baby!.id } })),
+      unwrap(
+        client.DELETE("/api/babies/{id}", {
+          params: { path: { id: baby!.id } },
+        }),
+      ),
     onSuccess: () => {
       toast(t("Baby removed"));
       done();

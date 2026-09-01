@@ -4,29 +4,35 @@ import { useState } from "react";
 import { ChipGroup } from "@/components/Chips";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { api, unwrap } from "@/lib/api";
-import { authClient, useSession } from "@/lib/auth-client";
+import { client, unwrap } from "@/lib/api";
+import { authClient, signOut, useSession } from "@/lib/auth-client";
+import { useMe } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { toLocalDateInput } from "@/lib/time";
 import { toast } from "@/lib/toast";
-import { PlanStep } from "./WelcomePlan";
 
 // Family founders land here once (everyone else arrives via /join/CODE).
 // Two steps on one screen: name the family, then add the baby.
 export function WelcomeScreen() {
   const { data: session, isPending } = useSession();
+  const me = useMe();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const hasFamily = !!session?.session.activeOrganizationId;
+  const hasFamily = !!me.data?.familyId;
 
   const [familyName, setFamilyName] = useState("");
   const [babyName, setBabyName] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [sex, setSex] = useState<"girl" | "boy" | null>(null);
-  const [showPlan, setShowPlan] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  if (!isPending && !session) {
+  // Wait for /api/me as well as the session: `hasFamily` comes from it now,
+  // and rendering before it lands would show the "create a family" step to
+  // someone who already has one.
+  if (isPending || me.isPending) {
+    return <div className="min-h-dvh" />;
+  }
+  if (!session) {
     return <Navigate to="/login" />;
   }
 
@@ -39,14 +45,14 @@ export function WelcomeScreen() {
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-|-$/g, "") || "family"
       }-${Math.random().toString(36).slice(2, 7)}`;
-      const { data, error } = await authClient.organization.create({
+      // Limen's create handler makes the new organization active on the
+      // session itself (SetActiveOrganization, before it responds), so there
+      // is no separate switch call to make here — the invalidate below is
+      // what surfaces it, via GET /api/me.
+      await authClient.organization.create({
         name: familyName.trim(),
         slug,
       });
-      if (error || !data) {
-        throw new Error(error?.message ?? "Could not create family");
-      }
-      await authClient.organization.setActive({ organizationId: data.id });
       await queryClient.invalidateQueries();
     } catch (err) {
       toast(err instanceof Error ? err.message : t("Failed"), "error");
@@ -59,8 +65,8 @@ export function WelcomeScreen() {
     setBusy(true);
     try {
       await unwrap(
-        await api.babies.$post({
-          json: {
+        client.POST("/api/babies", {
+          body: {
             name: babyName.trim(),
             birthDate: new Date(birthDate).toISOString(),
             ...(sex ? { sex } : {}),
@@ -68,7 +74,7 @@ export function WelcomeScreen() {
         }),
       );
       await queryClient.invalidateQueries();
-      setShowPlan(true);
+      void navigate({ to: "/home" });
     } catch (err) {
       toast(err instanceof Error ? err.message : t("Failed"), "error");
     } finally {
@@ -81,20 +87,11 @@ export function WelcomeScreen() {
       <div className="text-center">
         <img src="/icon.svg" alt="" className="mx-auto h-16 w-16" />
         <h1 className="mt-2 text-2xl font-extrabold text-ink">
-          {!hasFamily
-            ? t("Set up your family")
-            : showPlan
-              ? t("Choose your plan")
-              : t("Who are we tracking?")}
+          {!hasFamily ? t("Set up your family") : t("Who are we tracking?")}
         </h1>
       </div>
 
-      {hasFamily && showPlan ? (
-        <PlanStep
-          familyId={session?.session.activeOrganizationId ?? ""}
-          onFree={() => void navigate({ to: "/home" })}
-        />
-      ) : !hasFamily ? (
+      {!hasFamily ? (
         <form
           className="space-y-3"
           onSubmit={(e) => {
@@ -128,9 +125,7 @@ export function WelcomeScreen() {
               type="button"
               className="text-sm text-muted underline"
               onClick={() =>
-                void authClient
-                  .signOut()
-                  .then(() => window.location.assign("/login"))
+                void signOut().then(() => window.location.assign("/login"))
               }
             >
               {t("Sign out")}

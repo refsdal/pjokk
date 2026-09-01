@@ -1,19 +1,15 @@
-import { IconLock, IconPlus } from "@tabler/icons-react";
+import { IconPlus } from "@tabler/icons-react";
 import { useState } from "react";
 import type { Baby } from "@pjokk/shared";
 import { BabySheet } from "@/components/sheets/BabySheet";
 import { Card } from "@/components/ui/card";
-import { useBabies, usePremium } from "@/lib/data";
+import { useBabies } from "@/lib/data";
 import { t } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
 import { formatAge } from "@/lib/time";
-import { cn } from "@/lib/utils";
 import { SectionTitle } from "./lib";
 
 export function BabiesSection({ isAdmin }: { isAdmin: boolean }) {
   const babies = useBabies();
-  const premium = usePremium();
-  const atLimit = !premium && (babies.data?.length ?? 0) >= 1;
   const [editBaby, setEditBaby] = useState<Baby | null>(null);
   const [adding, setAdding] = useState(false);
 
@@ -37,32 +33,11 @@ export function BabiesSection({ isAdmin }: { isAdmin: boolean }) {
         ))}
         <button
           type="button"
-          onClick={
-            atLimit
-              ? () => {
-                  toast(t("Premium feature — upgrade in Settings"));
-                  document
-                    .getElementById("billing")
-                    ?.scrollIntoView({ behavior: "smooth" });
-                }
-              : () => setAdding(true)
-          }
-          className={cn(
-            "flex w-full items-center gap-2 px-4 py-3 text-left font-semibold text-ink-soft active:bg-surface-2",
-            atLimit && "text-muted opacity-60",
-          )}
+          onClick={() => setAdding(true)}
+          className="flex w-full items-center gap-2 px-4 py-3 text-left font-semibold text-ink-soft active:bg-surface-2"
         >
-          {atLimit ? (
-            <IconLock className="h-5 w-5" />
-          ) : (
-            <IconPlus className="h-5 w-5" />
-          )}
+          <IconPlus className="h-5 w-5" />
           {t("Add baby")}
-          {atLimit && (
-            <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-bold text-accent">
-              {t("Premium")}
-            </span>
-          )}
         </button>
       </Card>
       <BabySheet

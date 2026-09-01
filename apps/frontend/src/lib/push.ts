@@ -1,4 +1,4 @@
-import { api, unwrap } from "./api";
+import { client, unwrap } from "./api";
 
 // Web push behind a small interface (CLAUDE.md): the native shell later
 // implements the same enable/disable/status contract with device tokens.
@@ -31,7 +31,7 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
 
 export async function enablePush(): Promise<void> {
   const { publicKey } = await unwrap<{ publicKey: string }>(
-    await api.push.config.$get(),
+    client.GET("/api/push/config"),
   );
   const permission = await Notification.requestPermission();
   if (permission !== "granted") {
@@ -47,8 +47,8 @@ export async function enablePush(): Promise<void> {
     throw new Error("Browser returned an incomplete subscription");
   }
   await unwrap(
-    await api.push.subscribe.$post({
-      json: {
+    client.POST("/api/push/subscribe", {
+      body: {
         endpoint: json.endpoint,
         p256dh: json.keys.p256dh,
         auth: json.keys.auth,
@@ -61,12 +61,16 @@ export async function disablePush(): Promise<void> {
   const sub = await currentSubscription();
   if (!sub) return;
   await unwrap(
-    await api.push.unsubscribe.$post({ json: { endpoint: sub.endpoint } }),
+    client.POST("/api/push/unsubscribe", {
+      body: { endpoint: sub.endpoint },
+    }),
   );
   await sub.unsubscribe();
 }
 
 export async function sendTestPush(): Promise<number> {
-  const { sent } = await unwrap<{ sent: number }>(await api.push.test.$post());
+  const { sent } = await unwrap<{ sent: number }>(
+    client.POST("/api/push/test"),
+  );
   return sent;
 }

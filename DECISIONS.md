@@ -999,3 +999,232 @@ edited, per this file's append-only convention.
   building a whole `Deps` (auth, storage, push, Stripe, …) for it would be
   dead weight in an image that has no server listening. `apps/server/src/deps.ts`'s
   docstring documents this exception inline.
+
+## Container run modes (2026-08-31)
+
+- **`SCHEDULER` is gone; the dispatch mode expresses it instead.** The env
+  flag let two things drift out of sync with each other — a replica's mode
+  (is it the one serving HTTP?) and whether it also ran the scheduler — which
+  is exactly the shape of bug that ships as "every reminder fires twice"
+  after someone copies an env block without noticing the flag. Modes make the
+  two facts one fact: `server` mode has no code path that starts the
+  scheduler at all, so a fleet of `server` replicas cannot double-fire no
+  matter how the env is templated. The new modes: no argument (default;
+  migrates, serves, schedules — a single container's whole job), `server`
+  (serves only — what replicas run), `worker` (schedules only, plus a
+  `/healthz` so its container still passes the image's HEALTHCHECK), and
+  `migrate`/`migrations` (the pre-existing one-off, now an explicit alias
+  pair since a typo'd extra "s" was exactly the kind of thing this
+  redesign's error message already guards against for other subcommands).
+- **The default mode migrates at startup, under `pg_advisory_lock`.** The
+  previous rule ("migrate.ts: run as a ONE-OFF job... never at app startup")
+  existed because drizzle's migrator takes no lock of its own — verified
+  by reading `pg-core/dialect.js`'s `migrate()`: it reads the last-applied
+  migration with a plain `session.all()` outside any transaction, then only
+  wraps the actual DDL statements in one. Nothing serialises two callers
+  racing that read. Wrapping the whole step in an advisory lock
+  (`MIGRATION_LOCK_KEY`, a fixed int64 that must never change — renumbering
+  it would silently stop two versions from contending during a rollout) makes
+  the race safe instead of removing it: N containers booting at once now
+  serialise on the lock, the first migrates, the rest block and then find
+  nothing pending. The one part worth recording carefully: `pg_advisory_lock`
+  is per-session (per physical connection), but drizzle's migrator issues
+  several independent statements through `db.session`, each of which calls
+  straight through to `client.unsafe(...)` — so a normal pooled client (the
+  `createDb` used everywhere else, including the earlier "migrate.ts calls
+  createDb directly" entry above, now superseded for this file) would be free
+  to hand the lock call, the migration, and the unlock to three different
+  physical connections, silently defeating the lock. `applyMigrations` uses a
+  DEDICATED `new SQL(url, { max: 1 })` client for the whole step instead, so
+  every borrow from the pool resolves to the same one connection. Proven in
+  `apps/server/test/migrate.test.ts`, not asserted by inspection: a second
+  connection holds the lock, `applyMigrations` is started against the same
+  key, and the test polls `pg_stat_activity` (a backend other than the lock
+  holder genuinely waiting on `pg_advisory_lock`) until it observes the
+  block — ground truth from Postgres itself rather than a fixed sleep plus a
+  hopeful assertion. A companion test drives a bad `DATABASE_URL` through
+  `applyMigrations` and asserts it rejects, not `process.exit`s, since the
+  function is now also called from the default dispatch mode, which needs to
+  fall through to a clean, logged failure rather than a silent process death
+  disguised as one.
+- **`worker` mode answers `/healthz` for one reason: the image's own
+  HEALTHCHECK doesn't know which mode it's probing.** The Dockerfile's
+  `HEALTHCHECK` runs `/app/dispatch healthcheck` unconditionally against
+  `PORT` regardless of what command the container was started with. A
+  `worker` container that only ran the scheduler and served nothing would
+  fail that probe forever and get restart-looped by whatever orchestrates
+  it, despite doing its job correctly — so `worker` mode runs a minimal
+  `Bun.serve` that answers `/healthz` with `{"ok":true}` and 404s everything
+  else, just enough to keep the existing probe meaningful without giving
+  `worker` any of the app's real routes.
+- **Limen's built-in rate limiter and its session metadata both keyed on the
+  raw client IP; both are now hashed.** Two places in Limen v0.2.1 record an
+  address by default, and neither is obvious from the outside.
+  `NewDefaultRateLimiterConfig` sets `KeyGenerator: ipExtractorFromRemoteAddr`
+  and — more surprising — `opaqueSessionManager.storeSession` writes
+  `{"ip_address": <raw address>, "user_agent": …}` into every session row's
+  JSON `metadata` column on every sign-in. The limiter's default store is
+  in-process memory (`StoreTypeCache`), so its keys never reach the database
+  and the `rate_limits` table stays empty unless someone switches the store;
+  the session metadata, however, is persisted, and sessions live seven days.
+  Storing addresses next to Article 9 health data is exactly what the privacy
+  policy promises we do not do, so `internal/auth` passes the same keyed
+  extractor to both (`limen.WithSessionIPAddressExtractor`, and
+  `WithHTTPRateLimiter(WithRateLimiterKeyGenerator(...))`). It is an
+  **HMAC-SHA-256**, not a bare digest: the IPv4 address space is small
+  enough to enumerate, so an unkeyed hash of an address is reversible with
+  a rainbow table in seconds and would not be pseudonymisation at all. The
+  key is derived from `AUTH_SECRET` with its own domain separator
+  (`:client-ip`) so it can never be the same bytes as the signing secret,
+  and it is instance-local — the right scope, since the digest only needs
+  to be comparable within one deployment. Limen's limiter is
+  left ENABLED rather than replaced with a no-op: it protects the auth routes
+  in-process with sensible per-route rules (5 sign-ins / 10 s), our own
+  `rate_limit` table covers the app's routes, and a hashed key gives up
+  nothing we wanted. A test asserts the persisted metadata contains a 64-char
+  digest and not the address (`TestSessionMetadataStoresNoRawAddress`) —
+  the guarantee is behavioural, so it is checked behaviourally.
+- **Limen's HTTP surface is an allowlist, not a denylist.** Registering the
+  credential, oauth and organization plugins mounts roughly forty routes, most
+  of which duplicate or contradict Pjokk's own API — Limen's invitations are
+  email-addressed (wrong grain; `family_invite` is the real mechanism), its
+  member and role routes apply Limen's permission model rather than ours, and
+  `GET /auth/sessions` serialises a session's own token and metadata back to
+  its owner. Every route left on is one we have implicitly accepted
+  responsibility for, so `internal/auth` computes the disabled set as
+  "everything known, minus a short allowlist": credential sign-in, Google
+  authorize + callback, signout, the session read, and organization
+  create/list/switch (plus signup when `OPEN_SIGNUP=1`). `knownRouteIDs` is
+  hand-maintained and must be revisited on every Limen upgrade — a route added
+  upstream and not listed there would be silently enabled — which is why
+  `TestLimenRouteAllowlist` probes twenty concrete paths rather than asserting
+  something about the list itself. That test was verified non-vacuous by
+  temporarily widening the allowlist and watching all twenty become reachable.
+- **A ban is enforced by revocation, not by a flag every reader must
+  remember.** `users.banned` is checked in two places — `SessionFromRequest`
+  (which reports a banned user as signed out, covering our own routes) and a
+  guard wrapping Limen's router (which Limen never asks about, so a banned
+  account could otherwise still read `/api/auth/me` or switch families with a
+  pre-ban cookie). Signout stays reachable, or a banned user's browser keeps a
+  cookie it cannot clear. Neither check is a substitute for revocation: the
+  `Service` interface documents that whatever sets `banned` MUST also call
+  `RevokeAllSessions`, because a live bearer token that merely fails two
+  specific checks is one forgotten check away from working again.
+
+## Go backend migration (2026-09-01)
+
+- **Why Go at all.** The Bun backend worked; the reasons to leave it were
+  operational rather than a defect. A single static CGO-free binary on
+  `scratch` is a runtime image with no shell, no libc, no package manager and
+  no `node_modules` — nothing to patch, nothing to exec into, and a
+  vulnerability surface that is the binary plus one CA bundle. It
+  cross-compiles, so multi-arch (amd64 + arm64) costs a link step rather than
+  a QEMU build. And every asset the process needs — SPA, spec, migrations,
+  tzdata — is compiled in, which is what makes `scratch` possible at all.
+  Nothing about the product changed; the roadmap above is untouched.
+- **The OpenAPI document flipped from output to input.** Under
+  `@hono/zod-openapi` the spec was *generated* from zod schemas, which meant
+  it could only ever describe what the TypeScript happened to do. It is now
+  hand-written (`openapi/pjokk.yaml`) and authoritative in three directions:
+  oapi-codegen generates the strict server interface from it, kin-openapi
+  validates every request against it at runtime, and openapi-typescript
+  generates the SPA's client types from the same file. A route that drifts
+  from the contract now fails to compile or fails validation, rather than
+  quietly redefining it. `internal/api/pjokk.yaml` is a committed copy that
+  exists only because `go:embed` cannot reach above the module root; the
+  `go generate` step copies it and a test fails if the two diverge.
+- **Limen is confined to `internal/auth` behind one interface, and every
+  Limen module is version-pinned.** Limen is a young library on a 0.x
+  version; adopting it meant accepting that its API and its defaults will
+  move. Handlers, middleware and jobs never import a Limen type — they see
+  `auth.Service` (resolve session, resolve active family + role, create user,
+  add member, …). If Limen stalls or breaks, the blast radius is one package
+  rather than every route. The pinning is part of the same decision: an
+  unpinned minor could silently add an HTTP route (see the route-allowlist
+  entry above) or change a hashing parameter. Two upgrade obligations follow,
+  and both are load-bearing: re-check `knownRouteIDs` against the new
+  release, and re-run the auth suite, which asserts the hardening
+  behaviourally rather than by inspection.
+- **`pjk_` API keys stayed our own table; no auth-plugin key mechanism.** The
+  design sketch assumed Limen would provide an api-key plugin the way
+  better-auth did. It does not — v0.2.x publishes credential-password, oauth,
+  oauth-google and organization, and nothing else — so the question answered
+  itself, but the answer would have been the same anyway: `api_key` is
+  family-scoped with a `read_only` flag and a displayable 12-character
+  prefix, and it authorises against Pjokk's own operation tiers. A generic
+  plugin would have keyed on the user, not the family, which is the wrong
+  grain for a resource model where families own everything.
+- **Billing is gone, not ported.** Stripe, `@better-auth/stripe`, the
+  `entitlements` module, `canUse`, every 402 `PLAN_REQUIRED` gate and the
+  webhook plumbing were all dropped rather than rewritten in Go. Pjokk ships
+  as a container someone runs themselves; there is nobody to bill, and a
+  soft-lock that can never fire is just a code path nothing tests.
+  Everything that was Premium — calendar, contacts, play, API keys, CSV
+  export, growth chart, stats beyond seven days, vaccine documents — is now
+  simply available. `organization.plan` survives as a column (still `free`)
+  so the schema does not need a migration if billing ever returns, but
+  nothing reads it. Passkeys went the same way and for a weaker reason:
+  better-auth's plugin was server-side only and never had UI, so deleting it
+  removed nothing a user could see.
+- **The cutover was a fresh database.** No data migration was written and
+  none was run. The auth schema is Limen-shaped (`users`, `sessions`,
+  `accounts`, `organization_members`, roles on a join row) and differs from
+  the better-auth one structurally, not cosmetically; password hashes are
+  argon2id where better-auth wrote scrypt. Writing a converter would have
+  been a second, untested code path guarding real health data, for the
+  benefit of one closed-alpha instance whose entire content is reproducible.
+  Bootstrap is the documented one: `OPEN_SIGNUP=1`, create the founder
+  account, set it back to `0`.
+- **An `fs` storage driver, so self-hosting needs two containers instead of
+  four.** The Bun app spoke only S3, which meant a self-hoster ran MinIO (and
+  a MinIO init job) to store a handful of vaccine PDFs. `storage.Storage` now
+  has two implementations behind the same port: `s3` for anyone who already
+  has a bucket, `fs` for a mounted volume — and `fs` is the compose default.
+  The image creates `/data` owned by uid 65532 at build time precisely so a
+  fresh named volume inherits that ownership: a `scratch` image has no shell
+  and no `chown` to fix it up at runtime. Trade recorded honestly in the
+  README: under `fs` the nightly backup lands on the same volume as the
+  files, which is not off-host storage.
+- **The nightly backup nulls live credentials and skips `impersonation`
+  entirely.** The TypeScript job only had a dev-only `account.password` to
+  strip. Limen's schema carries more: OAuth access/refresh/id tokens on
+  `accounts`, and — the one that matters — the literal session cookie in
+  `sessions.token`. Backups are retained thirty days, so an unredacted
+  snapshot would be "a valid session cookie for every user signed in that
+  day", standing for a month, in object storage. Those columns are nulled; a
+  session row minus its token is still useful for knowing who existed and
+  when. `impersonation` is not redacted column-by-column but dropped from the
+  list, because every row in it is a *pair* of live session tokens (the
+  impersonated user's and the sysadmin's) and there is nothing else in the
+  table worth restoring. `backup_tables_test.go` checks the list against the
+  live schema in both directions, so a new table is a failing test rather
+  than a silent omission.
+- **Creating a family is restricted to a sysadmin or a user who belongs to no
+  family.** Signup being invite-only is not on its own a closed alpha: a
+  redeemed invite would otherwise let anyone mint unlimited organizations
+  through the family switcher's own create route. `allowOrgCreation` is
+  wired into Limen's `WithAllowOrgCreation` hook, so both entry points — our
+  `CreateFamily` and Limen's `POST /organizations` — run through the same
+  check and it cannot be bypassed by picking the other path. It fails
+  **closed** on a query error: a user who cannot be read is neither provably
+  a sysadmin nor provably family-less, and "deny" is the safe side of that.
+- **`packages/shared` was demoted rather than deleted.** It was the single
+  source of truth for API shapes; the spec is now. What the SPA still imports
+  from it is ~40 domain types and one enum tuple, so the file stays, with
+  plain `zod` instead of `@hono/zod-openapi` and its 75 `.openapi("Name")`
+  tags stripped — those named schemas in a document this package no longer
+  generates. It is now a partial duplicate of the generated
+  `api-schema.d.ts`, which is a known and deliberate loose end: collapsing
+  the two means touching ~40 SPA files and belongs in its own change.
+- **`apps/frontend/src/lib/api-schema.d.ts` is excluded from biome.** It is
+  openapi-typescript output. Formatting it would mean `bun run gen:client`
+  produces a diff every time, which turns "is the client in sync with the
+  spec?" from a byte comparison into a judgement call.
+- **`scripts/seed.mjs` was deleted, not ported.** It hand-wrote rows for the
+  Drizzle schema and better-auth's scrypt hashes; against the Limen schema
+  it would have needed argon2id in the plugin's exact parameters (its
+  verifier ignores the parameters stored in the PHC string and uses its own
+  config, so a mismatch fails silently) plus the `organization_member_roles`
+  join. A seed that produces an unusable password is worse than no seed. The
+  documented dev bootstrap is `OPEN_SIGNUP=1`, which is also what a
+  self-hoster does — so it is the path that stays exercised.

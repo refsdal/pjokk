@@ -7,7 +7,6 @@ import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet } from "@/components/Sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ApiError } from "@/lib/api";
 import { contactIconMeta, websiteHref } from "@/lib/contact-ui";
 import { useBabies, useDeleteContact, useSaveContact } from "@/lib/data";
 import { t } from "@/lib/i18n";
@@ -112,13 +111,7 @@ export function ContactSheet({
       },
       {
         onSuccess: () => onOpenChange(false),
-        onError: (err) => {
-          if (err instanceof ApiError && err.code === "PLAN_REQUIRED") {
-            toast(t("Premium feature — upgrade in Settings"), "error");
-            return;
-          }
-          toast(err.message, "error");
-        },
+        onError: (err) => toast(err.message, "error"),
       },
     );
   };

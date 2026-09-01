@@ -1,16 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
-import type { z } from "@hono/zod-openapi";
-import type { AuditEntrySchema } from "@pjokk/shared";
 import { Card } from "@/components/ui/card";
-import { api, unwrap } from "@/lib/api";
+import { client, unwrap } from "@/lib/api";
+import type { components } from "@/lib/api-schema";
 import { formatRelative } from "@/lib/time";
 
-type AuditEntry = z.infer<typeof AuditEntrySchema>;
+type AuditEntry = components["schemas"]["AuditEntry"];
 
 export function AdminAudit() {
   const auditLog = useQuery({
     queryKey: ["admin", "audit"],
-    queryFn: async () => unwrap<AuditEntry[]>(await api.admin.audit.$get()),
+    queryFn: async () => unwrap<AuditEntry[]>(client.GET("/api/admin/audit")),
   });
 
   return (

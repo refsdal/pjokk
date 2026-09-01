@@ -2,17 +2,15 @@ import { useMemo, useState } from "react";
 import {
   IconChevronLeft,
   IconChevronRight,
-  IconLock,
   IconPlus,
 } from "@tabler/icons-react";
-import { Link, useNavigate } from "@tanstack/react-router";
 import type { CalendarEvent } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
 import { ErrorState } from "@/components/QueryStates";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EventSheet } from "@/components/sheets/EventSheet";
-import { useCalendarEvents, usePremium } from "@/lib/data";
+import { useCalendarEvents } from "@/lib/data";
 import {
   calendarCategoryMeta,
   dayKey,
@@ -21,7 +19,6 @@ import {
 } from "@/lib/calendar-ui";
 import { t } from "@/lib/i18n";
 import { formatClock, formatDay } from "@/lib/time";
-import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 const monthFmt = new Intl.DateTimeFormat("nb-NO", {
@@ -90,8 +87,6 @@ function EventRow({
 }
 
 export function CalendarScreen() {
-  const premium = usePremium();
-  const navigate = useNavigate();
   const [view, setView] = useState<"month" | "week">("month");
   const [anchor, setAnchor] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -154,14 +149,7 @@ export function CalendarScreen() {
     setSelectedDay(null);
   };
 
-  const addEvent = () => {
-    if (!premium) {
-      toast(t("Premium feature — upgrade in Settings"));
-      void navigate({ to: "/settings" });
-      return;
-    }
-    setSheet({ open: true, edit: null });
-  };
+  const addEvent = () => setSheet({ open: true, edit: null });
 
   // List content: the selected day's events, else the upcoming feed.
   const listEvents = selectedDay
@@ -282,11 +270,7 @@ export function CalendarScreen() {
 
         <Button size="full" onClick={addEvent}>
           <span className="inline-flex items-center gap-1.5">
-            {premium ? (
-              <IconPlus className="h-5 w-5" />
-            ) : (
-              <IconLock className="h-5 w-5" />
-            )}
+            <IconPlus className="h-5 w-5" />
             {t("Add event")}
           </span>
         </Button>
@@ -303,30 +287,11 @@ export function CalendarScreen() {
         <p className="pt-1 text-xs font-semibold tracking-wide text-muted uppercase">
           {selectedDay ? dayLabel(new Date(selectedDay)) : t("Upcoming")}
         </p>
-        {listGroups.length === 0 &&
-          !listLoading &&
-          (premium ? (
-            <p className="py-6 text-center text-sm text-muted">
-              {t("No upcoming events")}
-            </p>
-          ) : (
-            <Card className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted">
-                <IconLock className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-ink">
-                  {t("Calendar is a Premium feature")}
-                </p>
-                <p className="text-xs text-muted">
-                  {t("Plan appointments and family events together.")}{" "}
-                  <Link to="/settings" className="underline">
-                    {t("Upgrade")}
-                  </Link>
-                </p>
-              </div>
-            </Card>
-          ))}
+        {listGroups.length === 0 && !listLoading && (
+          <p className="py-6 text-center text-sm text-muted">
+            {t("No upcoming events")}
+          </p>
+        )}
         {listGroups.map((group) => (
           <div key={dayKey(group.day)}>
             {!selectedDay && (

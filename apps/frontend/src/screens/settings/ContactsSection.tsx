@@ -1,18 +1,15 @@
-import { IconLock, IconPhone, IconPlus } from "@tabler/icons-react";
+import { IconPhone, IconPlus } from "@tabler/icons-react";
 import { useState } from "react";
 import type { Contact } from "@pjokk/shared";
 import { ContactSheet } from "@/components/sheets/ContactSheet";
 import { Card } from "@/components/ui/card";
 import { contactIconFor } from "@/lib/contact-ui";
-import { useContacts, usePremium } from "@/lib/data";
+import { useContacts } from "@/lib/data";
 import { t } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
 import { SectionTitle } from "./lib";
 
 export function ContactsSection() {
   const contacts = useContacts();
-  const premium = usePremium();
   const [editContact, setEditContact] = useState<Contact | null>(null);
   const [adding, setAdding] = useState(false);
 
@@ -34,32 +31,11 @@ export function ContactsSection() {
 
         <button
           type="button"
-          onClick={
-            premium
-              ? () => setAdding(true)
-              : () => {
-                  toast(t("Premium feature — upgrade in Settings"));
-                  document
-                    .getElementById("billing")
-                    ?.scrollIntoView({ behavior: "smooth" });
-                }
-          }
-          className={cn(
-            "flex w-full items-center gap-2 px-4 py-3 text-left font-semibold text-ink-soft active:bg-surface-2",
-            !premium && "text-muted opacity-60",
-          )}
+          onClick={() => setAdding(true)}
+          className="flex w-full items-center gap-2 px-4 py-3 text-left font-semibold text-ink-soft active:bg-surface-2"
         >
-          {premium ? (
-            <IconPlus className="h-5 w-5" />
-          ) : (
-            <IconLock className="h-5 w-5" />
-          )}
+          <IconPlus className="h-5 w-5" />
           {t("Add contact")}
-          {!premium && (
-            <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-bold text-accent">
-              {t("Premium")}
-            </span>
-          )}
         </button>
       </Card>
 

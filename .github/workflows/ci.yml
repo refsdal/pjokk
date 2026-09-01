@@ -48,6 +48,21 @@ jobs:
       - name: Tests
         run: bun run test
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/server/go.mod
+
+      # apps/server is the backend: a Go module, outside the bun workspace,
+      # so the steps above never touch it. Same TEST_DATABASE_URL, same
+      # Postgres service — -p 1 because several Go test packages truncate
+      # shared tables between tests and are not safe to run as concurrent
+      # packages against one database.
+      - name: Go vet
+        run: cd apps/server && go vet ./...
+
+      - name: Go tests
+        run: cd apps/server && go test -p 1 -count=1 ./...
+
       - name: Build
         run: bun run build
 
@@ -137,14 +152,16 @@ jobs:
             sleep 1
           done
 
+          # fs storage driver, not s3: it needs no MinIO container, and the
+          # image already creates /data (owned by the unprivileged user) at
+          # build time, so a bare `docker run` with no volume still works —
+          # see docker-compose.yml's own default for the same reasoning.
           env_args=(
             -e DATABASE_URL=postgres://pjokk:pjokk@pg:5432/pjokk
             -e APP_URL=http://localhost:3000
-            -e BETTER_AUTH_SECRET=ci-secret-not-for-production-use
-            -e S3_BUCKET=pjokk-files
-            -e S3_ENDPOINT=http://minio:9000
-            -e S3_ACCESS_KEY_ID=ci
-            -e S3_SECRET_ACCESS_KEY=ci
+            -e AUTH_SECRET=ci-smoke-test-secret-at-least-32-bytes-long
+            -e STORAGE_DRIVER=fs
+            -e STORAGE_FS_PATH=/data
           )
 
           # Migrations must apply from the image itself.
@@ -168,20 +185,21 @@ jobs:
           curl -fsS http://localhost:3000/ | grep -qi '<title>Pjokk'
           curl -fsS http://localhost:3000/robots.txt | grep -q 'Disallow: /'
 
-          # The server is BUNDLED (bun build), and `bun run test` runs against
-          # source — so these two probes are the only thing standing between a
-          # bundling regression and production. They deliberately need no
-          # fixtures.
+          # The server is a compiled Go binary in a scratch image, and
+          # `go test` runs against source — so this probe is the only thing
+          # standing between a build/link regression and production. It
+          # needs no fixtures.
           #
           # A sign-in with unknown credentials must answer 401. Reaching that
-          # answer means better-auth loaded, its drizzle adapter resolved, and
-          # a query ran against Postgres — the code path most at risk from a
-          # bundler, since better-auth resolves adapters dynamically. A broken
-          # bundle gives 500 here, not 401.
+          # answer means Limen loaded, its Postgres adapter resolved, and a
+          # query ran end to end — the code path most at risk from anything
+          # that breaks at link time, since Limen resolves its plugin chain
+          # at startup. A broken build gives 500 here, not 401. Body field is
+          # "credential" (Limen's credential-password plugin), not "email".
           status=$(curl -s -o /dev/null -w '%{http_code}' \
-            -X POST http://localhost:3000/api/auth/sign-in/email \
+            -X POST http://localhost:3000/api/auth/signin/credential \
             -H 'content-type: application/json' -H 'origin: http://localhost:3000' \
-            -d '{"email":"nobody@example.invalid","password":"wrong-password"}')
+            -d '{"credential":"nobody@example.invalid","password":"wrong-password"}')
           test "$status" = "401" || { echo "sign-in probe returned $status, expected 401"; exit 1; }
 
           # That request also had to WRITE: the rate limiter increments a

@@ -9,7 +9,7 @@ import type {
   CreateCalendarEvent,
   UpdateCalendarEvent,
 } from "@pjokk/shared";
-import { api, ApiError, unwrap } from "../api";
+import { client, unwrap } from "../api";
 import { t } from "../i18n";
 import { toast } from "../toast";
 
@@ -20,10 +20,6 @@ const invalidateCalendar = (qc: QueryClient) =>
   void qc.invalidateQueries({ queryKey: ["calendar"] });
 
 function toastCalendarError(err: Error) {
-  if (err instanceof ApiError && err.code === "PLAN_REQUIRED") {
-    toast(t("Premium feature — upgrade in Settings"), "error");
-    return;
-  }
   toast(t("Could not save: ") + err.message, "error");
 }
 
@@ -32,8 +28,10 @@ export function useCalendarEvents(from: Date, to: Date) {
     queryKey: ["calendar", from.getTime(), to.getTime()],
     queryFn: async () =>
       unwrap<CalendarEvent[]>(
-        await api.calendar.events.$get({
-          query: { from: from.toISOString(), to: to.toISOString() },
+        client.GET("/api/calendar/events", {
+          params: {
+            query: { from: from.toISOString(), to: to.toISOString() },
+          },
         }),
       ),
   });
@@ -43,7 +41,7 @@ export function useCreateCalendarEvent() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (body: CreateCalendarEvent) =>
-      unwrap<CalendarEvent>(await api.calendar.events.$post({ json: body })),
+      unwrap<CalendarEvent>(client.POST("/api/calendar/events", { body })),
     onError: toastCalendarError,
     onSettled: () => invalidateCalendar(qc),
   });
@@ -60,7 +58,10 @@ export function useUpdateCalendarEvent() {
       patch: UpdateCalendarEvent;
     }) =>
       unwrap<CalendarEvent>(
-        await api.calendar.events[":id"].$patch({ param: { id }, json: patch }),
+        client.PATCH("/api/calendar/events/{id}", {
+          params: { path: { id } },
+          body: patch,
+        }),
       ),
     onError: toastCalendarError,
     onSettled: () => invalidateCalendar(qc),
@@ -71,7 +72,11 @@ export function useDeleteCalendarEvent() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id }: { id: string }) =>
-      unwrap(await api.calendar.events[":id"].$delete({ param: { id } })),
+      unwrap(
+        client.DELETE("/api/calendar/events/{id}", {
+          params: { path: { id } },
+        }),
+      ),
     onError: (err: Error) =>
       toast(t("Could not delete: ") + err.message, "error"),
     onSettled: () => invalidateCalendar(qc),

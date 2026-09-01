@@ -223,15 +223,6 @@ const nb: Record<string, string> = {
   "set sex in Settings for percentiles":
     "angi kjønn i Innstillinger for persentiler",
   "Log a weight under More → Measurement": "Logg en vekt under Mer → Måling",
-  "Weight tracking is a Premium feature.":
-    "Vektsporing er en Premium-funksjon.",
-  "Month view is a Premium feature": "Månedsvisning er en Premium-funksjon",
-  "Growth chart": "Vekstkurve",
-  "WHO percentile curves are a Premium feature.":
-    "WHO-percentilkurver er en Premium-funksjon.",
-  Upgrade: "Oppgrader",
-  "Premium feature — upgrade in Settings":
-    "Premium-funksjon — oppgrader i innstillingene",
 
   // Settings
   Family: "Familie",
@@ -352,56 +343,6 @@ const nb: Record<string, string> = {
   "1 year": "1 år",
   "Never expires": "Utløper aldri",
 
-  // Billing
-  Plan: "Abonnement",
-  "Current plan": "Gjeldende plan",
-  Free: "Gratis",
-  Premium: "Premium",
-  "Premium · lifetime": "Premium · livstid",
-  "Premium · complimentary": "Premium · sponset",
-  "Premium unlocks more babies, all activity types, growth charts, month stats, CSV export and API keys.":
-    "Premium låser opp flere babyer, alle aktivitetstyper, vekstkurver, månedsstatistikk, CSV-eksport og API-nøkler.",
-  "Premium monthly — 20 kr/mo": "Premium månedlig — 20 kr/mnd",
-  "Premium yearly — 200 kr/yr": "Premium årlig — 200 kr/år",
-  "Lifetime — 400 kr once": "Livstid — 400 kr én gang",
-  "Ask a family admin to upgrade.":
-    "Be en familieadministrator om å oppgradere.",
-  "Manage subscription": "Administrer abonnement",
-  "Payment received — welcome to Premium!":
-    "Betaling mottatt — velkommen til Premium!",
-  "Something went wrong": "Noe gikk galt",
-  "API keys are a Premium feature.": "API-nøkler er en Premium-funksjon.",
-
-  // Welcome plan step
-  "Choose your plan": "Velg abonnement",
-  "You can change this anytime in Settings.":
-    "Du kan endre dette når som helst i innstillingene.",
-  "Premium monthly": "Premium månedlig",
-  "Premium yearly": "Premium årlig",
-  "Premium lifetime": "Premium livstid",
-  "2 months free": "2 måneder gratis",
-  "0 kr": "0 kr",
-  "20 kr/mo": "20 kr/mnd",
-  "200 kr/yr": "200 kr/år",
-  "400 kr": "400 kr",
-  "Included with Free": "Inkludert i Gratis",
-  "Included with Premium": "Inkludert i Premium",
-  "1 baby": "1 baby",
-  "Feeds, sleep & diapers": "Måltider, søvn og bleier",
-  "Medicine log": "Medisinlogg",
-  "Timeline & full history": "Tidslinje og full historikk",
-  "Week stats": "Ukestatistikk",
-  "Reminders & night mode": "Påminnelser og nattmodus",
-  "More babies": "Flere babyer",
-  "Bath, notes, milestones & more": "Bad, notater, milepæler og mer",
-  "Growth charts (WHO)": "Vekstkurver (WHO)",
-  "Month stats": "Månedsstatistikk",
-  "CSV export": "CSV-eksport",
-  "Start tracking": "Kom i gang",
-  "Continue to checkout": "Fortsett til betaling",
-  "Paid plans continue to secure checkout with Stripe.":
-    "Betalte planer fortsetter til sikker betaling hos Stripe.",
-
   // Calendar
   Calendar: "Kalender",
   Upcoming: "Kommende",
@@ -409,9 +350,6 @@ const nb: Record<string, string> = {
   "All day": "Hele dagen",
   "Add event": "Legg til hendelse",
   "No upcoming events": "Ingen kommende hendelser",
-  "Calendar is a Premium feature": "Kalenderen er en Premium-funksjon",
-  "Plan appointments and family events together.":
-    "Planlegg avtaler og familiehendelser sammen.",
   Previous: "Forrige",
   Next: "Neste",
   "New event": "Ny hendelse",

@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SleepLocation } from "@pjokk/shared";
-import { api, unwrap } from "../api";
+import { client, unwrap } from "../api";
 
 export function useSleepLocations() {
   return useQuery({
     queryKey: ["sleep-locations"],
     queryFn: async () =>
-      unwrap<SleepLocation[]>(await api["sleep-locations"].$get()),
+      unwrap<SleepLocation[]>(client.GET("/api/sleep-locations")),
   });
 }
 
@@ -15,7 +15,7 @@ export function useAddSleepLocation() {
   return useMutation({
     mutationFn: async (name: string) =>
       unwrap<SleepLocation>(
-        await api["sleep-locations"].$post({ json: { name } }),
+        client.POST("/api/sleep-locations", { body: { name } }),
       ),
     onSuccess: () =>
       void queryClient.invalidateQueries({ queryKey: ["sleep-locations"] }),
@@ -26,7 +26,11 @@ export function useDeleteSleepLocation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) =>
-      unwrap(await api["sleep-locations"][":id"].$delete({ param: { id } })),
+      unwrap(
+        client.DELETE("/api/sleep-locations/{id}", {
+          params: { path: { id } },
+        }),
+      ),
     onSuccess: () =>
       void queryClient.invalidateQueries({ queryKey: ["sleep-locations"] }),
   });

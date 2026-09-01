@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { VaccineDismissal, VaccineLog } from "@pjokk/shared";
-import { API_BASE, api, unwrap } from "../api";
+import { API_BASE, client, unwrap } from "../api";
 import { invalidateLogs } from "./keys";
 
 export type CreateVaccineVars = {
@@ -29,8 +29,8 @@ export function useVaccines(babyId: string | undefined) {
     enabled: !!babyId,
     queryFn: async () =>
       unwrap<VaccineLog[]>(
-        await api.vaccines.$get({
-          query: { babyId: babyId!, limit: "200" },
+        client.GET("/api/vaccines", {
+          params: { query: { babyId: babyId!, limit: 200 } },
         }),
       ),
   });
@@ -40,7 +40,7 @@ export function useCreateVaccine() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (vars: CreateVaccineVars) =>
-      unwrap<VaccineLog>(await api.vaccines.$post({ json: vars })),
+      unwrap<VaccineLog>(client.POST("/api/vaccines", { body: vars })),
     onSuccess: () => invalidateLogs(qc),
   });
 }
@@ -50,7 +50,10 @@ export function useUpdateVaccine() {
   return useMutation({
     mutationFn: async ({ id, patch }: UpdateVaccineVars) =>
       unwrap<VaccineLog>(
-        await api.vaccines[":id"].$patch({ param: { id }, json: patch }),
+        client.PATCH("/api/vaccines/{id}", {
+          params: { path: { id } },
+          body: patch,
+        }),
       ),
     onSuccess: () => invalidateLogs(qc),
   });
@@ -60,7 +63,7 @@ export function useDeleteVaccine() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) =>
-      unwrap(await api.vaccines[":id"].$delete({ param: { id } })),
+      unwrap(client.DELETE("/api/vaccines/{id}", { params: { path: { id } } })),
     onSuccess: () => invalidateLogs(qc),
   });
 }
@@ -71,7 +74,9 @@ export function useVaccineDismissals(babyId: string | undefined) {
     enabled: !!babyId,
     queryFn: async () =>
       unwrap<VaccineDismissal[]>(
-        await api.vaccines.dismissals.$get({ query: { babyId: babyId! } }),
+        client.GET("/api/vaccines/dismissals", {
+          params: { query: { babyId: babyId! } },
+        }),
       ),
   });
 }
@@ -81,7 +86,7 @@ export function useDismissVaccineSlot() {
   return useMutation({
     mutationFn: async (vars: { babyId: string; slotKey: string }) =>
       unwrap<VaccineDismissal>(
-        await api.vaccines.dismissals.$post({ json: vars }),
+        client.POST("/api/vaccines/dismissals", { body: vars }),
       ),
     onSuccess: () => invalidateLogs(qc),
   });
@@ -91,7 +96,11 @@ export function useRestoreVaccineSlot() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) =>
-      unwrap(await api.vaccines.dismissals[":id"].$delete({ param: { id } })),
+      unwrap(
+        client.DELETE("/api/vaccines/dismissals/{id}", {
+          params: { path: { id } },
+        }),
+      ),
     onSuccess: () => invalidateLogs(qc),
   });
 }

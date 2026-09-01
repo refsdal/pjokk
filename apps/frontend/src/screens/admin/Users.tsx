@@ -5,8 +5,9 @@ import { Sheet } from "@/components/Sheet";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { api, unwrap } from "@/lib/api";
-import { authClient, useSession } from "@/lib/auth-client";
+import { client, unwrap } from "@/lib/api";
+import { useMe } from "@/lib/data";
+import { resetCache } from "@/lib/query";
 import { toast } from "@/lib/toast";
 import type { AdminUser } from "./lib";
 
@@ -20,8 +21,8 @@ function UserSheet({
   refresh: () => void;
 }) {
   const [password, setPassword] = useState("");
-  const { data: session } = useSession();
-  const isSelf = user?.id === session?.user.id;
+  const me = useMe();
+  const isSelf = user?.id === me.data?.userId;
 
   // Auditing happens server-side for every admin op (issue #6).
   const run = async (label: string, fn: () => Promise<unknown>) => {
@@ -54,7 +55,11 @@ function UserSheet({
             variant="outline"
             onClick={() =>
               void run("Sessions revoked", () =>
-                authClient.admin.revokeUserSessions({ userId: user.id }),
+                unwrap(
+                  client.POST("/api/admin/users/{id}/sessions/revoke", {
+                    params: { path: { id: user.id } },
+                  }),
+                ),
               )
             }
           >
@@ -73,10 +78,12 @@ function UserSheet({
               disabled={password.length < 8}
               onClick={() =>
                 void run("Password set", () =>
-                  authClient.admin.setUserPassword({
-                    userId: user.id,
-                    newPassword: password,
-                  }),
+                  unwrap(
+                    client.POST("/api/admin/users/{id}/password", {
+                      params: { path: { id: user.id } },
+                      body: { password },
+                    }),
+                  ),
                 )
               }
             >
@@ -92,11 +99,17 @@ function UserSheet({
                 onClick={() =>
                   void run(user.banned ? "Unbanned" : "Banned", () =>
                     user.banned
-                      ? authClient.admin.unbanUser({ userId: user.id })
-                      : authClient.admin.banUser({
-                          userId: user.id,
-                          banReason: "banned via admin console",
-                        }),
+                      ? unwrap(
+                          client.POST("/api/admin/users/{id}/unban", {
+                            params: { path: { id: user.id } },
+                          }),
+                        )
+                      : unwrap(
+                          client.POST("/api/admin/users/{id}/ban", {
+                            params: { path: { id: user.id } },
+                            body: { reason: "banned via admin console" },
+                          }),
+                        ),
                   )
                 }
               >
@@ -108,9 +121,16 @@ function UserSheet({
                 variant="secondary"
                 onClick={() =>
                   void run("Impersonating", async () => {
-                    await authClient.admin.impersonateUser({
-                      userId: user.id,
-                    });
+                    await unwrap(
+                      client.POST("/api/admin/users/{id}/impersonate", {
+                        params: { path: { id: user.id } },
+                      }),
+                    );
+                    // The session cookie now belongs to the target; the
+                    // persisted query cache still holds the admin's own
+                    // /api/me, family and members. Drop it before the reload
+                    // or the app renders the wrong person.
+                    await resetCache();
                     window.location.assign("/home");
                   })
                 }
@@ -126,8 +146,8 @@ function UserSheet({
                     // the tombstone first, audits, then removes the account.
                     async () =>
                       unwrap(
-                        await api.admin.users[":id"].delete.$post({
-                          param: { id: user.id },
+                        client.POST("/api/admin/users/{id}/delete", {
+                          params: { path: { id: user.id } },
                         }),
                       ),
                   )
@@ -147,13 +167,12 @@ export function AdminUsers() {
 
   const users = useQuery({
     queryKey: ["admin", "users"],
-    queryFn: async () => {
-      const res = await authClient.admin.listUsers({
-        query: { limit: 200, sortBy: "createdAt", sortDirection: "desc" },
-      });
-      if (res.error) throw new Error(res.error.message);
-      return res.data.users as AdminUser[];
-    },
+    // Newest-first ordering is the server's, not a query parameter:
+    // GET /api/admin/users replaced better-auth's client-side listUsers.
+    queryFn: async () =>
+      unwrap<AdminUser[]>(
+        client.GET("/api/admin/users", { params: { query: { limit: 200 } } }),
+      ),
   });
 
   return (

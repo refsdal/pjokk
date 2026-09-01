@@ -1,0 +1,85 @@
+# S3 overlay: swaps STORAGE_DRIVER=fs for a real object store and brings a
+# MinIO to talk to.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.s3.yml up
+#
+# Use it when you want to exercise the S3 code path locally, or as the shape
+# to copy when pointing a deployment at a managed bucket — in which case drop
+# the minio services and set S3_ENDPOINT/S3_REGION at the real thing.
+#
+# **EU data residency is mandatory** (CLAUDE.md): Pjokk stores GDPR Article 9
+# health data about children, and the nightly backup written to this bucket
+# contains every table. Cloudflare's jurisdiction flags used to enforce this
+# at resource-creation time; nothing does now, so choosing a non-EU region
+# here is a silent compliance failure that nothing will warn you about. The
+# bucket, the database and every backup target must live in the EU.
+
+services:
+  # WARNING: MINIO_ROOT_USER/PASSWORD default to the throwaway "pjokkdev" /
+  # "pjokkdevsecret" pair below when S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY are
+  # unset — deliberately, for a copy-paste-and-go local try. This MinIO is
+  # not meant to be reachable from anywhere but the compose network (the API
+  # port has no host binding; the console is bound to 127.0.0.1 only), so
+  # never put this overlay behind a reverse proxy or expose its ports beyond
+  # localhost without setting real credentials first.
+  minio:
+    image: quay.io/minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-pjokkdev}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-pjokkdevsecret}
+    volumes:
+      - minio-data:/data
+    ports:
+      # Console only, for poking at the bucket. The app reaches MinIO over the
+      # compose network, so the API port needs no host binding.
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Creates the bucket, then exits. MinIO has no "create bucket on boot"
+  # setting, and the app deliberately does not create buckets itself: an app
+  # that can create a bucket can also create the wrong one, in the wrong
+  # region, and nobody notices until the data is somewhere unintended.
+  minio-init:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+      mc alias set local http://minio:9000
+      '${S3_ACCESS_KEY_ID:-pjokkdev}' '${S3_SECRET_ACCESS_KEY:-pjokkdevsecret}' &&
+      mc mb --ignore-existing local/${S3_BUCKET:-pjokk-files} &&
+      echo 'bucket ready'
+      "
+
+  app:
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+    environment: &s3-env
+      STORAGE_DRIVER: s3
+      S3_BUCKET: ${S3_BUCKET:-pjokk-files}
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-pjokkdev}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-pjokkdevsecret}
+      # MinIO ignores the region; a managed bucket does not — set it to the
+      # EU region the bucket actually lives in.
+      S3_REGION: ${S3_REGION:-auto}
+
+  migrate:
+    environment: *s3-env
+
+  cron:
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+    environment: *s3-env
+
+volumes:
+  minio-data:

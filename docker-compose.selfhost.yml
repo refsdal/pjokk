@@ -1,0 +1,108 @@
+# Pjokk, self-hosted, from the published image:
+#
+#   AUTH_SECRET=$(openssl rand -base64 32) \
+#     docker compose -f docker-compose.selfhost.yml up -d
+#
+# Nothing to clone and nothing to build — this pulls ghcr.io/refsdal/pjokk.
+# Contributors want docker-compose.yml instead, which builds from source; the
+# two files are deliberately separate so a self-hoster never needs the repo.
+#
+# What runs: Postgres for the data, a local volume for files (vaccine
+# documents and the nightly backups, via STORAGE_DRIVER=fs), and the app in
+# its default mode — it migrates itself under a Postgres advisory lock at
+# startup, then serves with its in-process scheduler running. A single
+# container has no orchestrator to drive migrations or cron separately, so the
+# default mode does both itself.
+#
+# Two containers, no object store: the fs driver exists precisely so that a
+# self-hoster is not required to run a MinIO (or hold S3 credentials) to store
+# a handful of vaccine PDFs.
+#
+# Already have Postgres and an S3 bucket? Skip this file: run the image
+# directly, point DATABASE_URL at your database, and set STORAGE_DRIVER=s3
+# with the four S3_* variables. See the README's "Self-hosting" section, and
+# CLAUDE.md on EU data residency — the nightly backup contains every table,
+# health data included, so the bucket's region is a compliance decision.
+#
+# BACK UP THE VOLUMES. `pjokk-data` holds the uploaded files and the nightly
+# backup JSON; `db-data` holds everything else. A backup written to the same
+# host as the database is not a backup.
+
+name: pjokk
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pjokk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pjokk}
+      POSTGRES_DB: pjokk
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      # -d as well as -U: without the database name pg_isready reports ready
+      # while the init scripts are still creating it, and the migration then
+      # fails on a database that does not exist yet.
+      test: ["CMD-SHELL", "pg_isready -U pjokk -d pjokk"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    image: ghcr.io/refsdal/pjokk:${PJOKK_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      # The image creates /data owned by uid 65532 (the container's
+      # unprivileged `pjokk` user) and Docker copies that ownership onto a
+      # fresh named volume — which is what makes this writable by an image
+      # that has no shell and no chown to fix it up at runtime. Bind-mount a
+      # host directory instead and you must chown it to 65532 yourself.
+      - pjokk-data:/data
+    environment:
+      DATABASE_URL: postgres://pjokk:${POSTGRES_PASSWORD:-pjokk}@db:5432/pjokk
+
+      # The public origin people type. Behind a reverse proxy with TLS this is
+      # your https:// address, not localhost — sessions are signed and OAuth
+      # callbacks are built from it, and an http:// value also means cookies
+      # are issued without Secure. A wrong value breaks sign-in in ways that
+      # look like anything except a configuration error.
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      AUTH_SECRET: "${AUTH_SECRET:?generate one with: openssl rand -base64 32}"
+
+      # The public apex the SPA links its legal pages to. This only affects
+      # the server's own boot-log view, not the running SPA: legal links are
+      # baked into the client bundle at IMAGE BUILD time (the Dockerfile's
+      # SITE_URL build arg), and this file pulls a pre-built image rather
+      # than building one — see docker-compose.yml, which builds from source
+      # and can take the build arg. Left unset here, the published image's
+      # bundle keeps whatever SITE_URL it was built with.
+      SITE_URL: ${SITE_URL:-}
+
+      STORAGE_DRIVER: fs
+      STORAGE_FS_PATH: /data
+
+      # The only door to a first account. Set to 1, sign up once, set it back
+      # to 0 — after that, accounts exist only through invite codes.
+      OPEN_SIGNUP: ${OPEN_SIGNUP:-0}
+
+      # Behind a reverse proxy, set this to the number of proxies in front —
+      # otherwise the rate limiter ignores X-Forwarded-For (by design, since it
+      # is caller-supplied) and buckets every client together.
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-0}
+
+      # Optional subsystems. Absent means the feature is simply off, and the
+      # app names the disabled ones at startup rather than failing.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+
+volumes:
+  db-data:
+  pjokk-data:

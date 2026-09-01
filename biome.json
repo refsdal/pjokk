@@ -7,7 +7,8 @@
       "scripts/**",
       "*.ts",
       "!apps/frontend/src/data",
-      "!apps/api/migrations/meta",
+      "!apps/frontend/src/lib/api-schema.d.ts",
+      "!apps/server",
       "!apps/landing/dist",
       "!.claude",
       "!scripts/import-sprout-track.mjs"
@@ -64,30 +65,5 @@
         "organizeImports": "off"
       }
     }
-  },
-  "overrides": [
-    {
-      "includes": ["apps/api/**"],
-      "linter": {
-        "rules": {
-          "style": {
-            "noRestrictedImports": {
-              "level": "error",
-              "options": {
-                "paths": {
-                  "@pjokk/api/infrastructure": "Routes and middleware receive their collaborators through Deps. Importing an adapter directly bypasses injection.",
-                  "@pjokk/api/infrastructure/db": "Use deps.db.",
-                  "@pjokk/api/infrastructure/auth": "Use deps.auth.",
-                  "@pjokk/api/infrastructure/storage": "Use deps.storage.",
-                  "@pjokk/api/infrastructure/rate-limit": "Use deps.rateLimit.",
-                  "@pjokk/api/infrastructure/push": "Use deps.push.",
-                  "@pjokk/api/infrastructure/stripe": "Use deps.stripe."
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  ]
+  }
 }

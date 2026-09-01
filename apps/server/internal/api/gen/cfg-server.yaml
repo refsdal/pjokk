@@ -1,0 +1,13 @@
+# oapi-codegen config for the strict std-http server interface.
+#
+# strict-server generates a StrictServerInterface whose methods take/return
+# typed request/response structs (no manual param parsing) and RegisterHandlers
+# to wire it onto a std-http mux; std-http-server targets net/http, matching
+# this module's stack (no chi/echo/gin dependency). See generate.go.
+package: gen
+output: internal/api/gen/server.gen.go
+generate:
+  std-http-server: true
+  strict-server: true
+output-options:
+  skip-prune: true

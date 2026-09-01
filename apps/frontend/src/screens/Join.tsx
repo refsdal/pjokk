@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useState } from "react";
 import { ErrorState } from "@/components/QueryStates";
 import { Button } from "@/components/ui/button";
-import { api, unwrap } from "@/lib/api";
+import { client, unwrap } from "@/lib/api";
 import { authClient, signIn, useSession } from "@/lib/auth-client";
 import { t } from "@/lib/i18n";
 import { legalUrl } from "@/lib/site";
@@ -29,7 +29,9 @@ export function JoinScreen() {
     queryKey: ["invite-info", code],
     queryFn: async () =>
       unwrap<InviteInfo>(
-        await api.invites.info[":code"].$get({ param: { code } }),
+        client.GET("/api/invites/info/{code}", {
+          params: { path: { code } },
+        }),
       ),
     staleTime: 30_000,
     retry: false,
@@ -38,23 +40,33 @@ export function JoinScreen() {
   const joinPath = `/join/${code}`;
 
   const googleSignIn = async () => {
-    // requestSignUp: signup is closed everywhere EXCEPT through this flow.
-    await signIn.social({
-      provider: "google",
-      callbackURL: joinPath,
-      requestSignUp: true,
-    });
+    // Signup is closed everywhere EXCEPT through this flow. better-auth took
+    // a per-call `requestSignUp` flag for that; Limen has no client-side
+    // equivalent — the Go OAuth callback decides whether an unknown Google
+    // account may be created.
+    try {
+      await signIn.google(joinPath);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t("Sign-in failed"), "error");
+    }
   };
 
   const redeem = async () => {
     setBusy(true);
     try {
       const result = await unwrap<{ familyId: string; familyName: string }>(
-        await api.invites.redeem.$post({ json: { code } }),
+        client.POST("/api/invites/redeem", { body: { code } }),
       );
-      await authClient.organization.setActive({
-        organizationId: result.familyId,
-      });
+      // The redeem handler already switches the session to the new family
+      // (setActiveFamilyBestEffort), but that is explicitly best-effort and
+      // non-fatal server-side, so ask again from here. A failure is not worth
+      // failing the join over — the membership row is written either way, and
+      // the family switcher can recover it.
+      try {
+        await authClient.organization.switch({ id: result.familyId });
+      } catch {
+        // Ignored on purpose: see above.
+      }
       await queryClient.invalidateQueries();
       toast(t("Welcome to ") + result.familyName);
       void navigate({ to: "/home" });

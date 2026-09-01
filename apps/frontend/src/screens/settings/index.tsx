@@ -2,14 +2,13 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { API_BASE } from "@/lib/api";
-import { isSysadmin, signOut, useSession } from "@/lib/auth-client";
-import { useFamily, useMembers } from "@/lib/data";
+import { signOut } from "@/lib/auth-client";
+import { useMe } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { legalUrl } from "@/lib/site";
 import { ApiKeysSection } from "./ApiKeysSection";
 import { AppearanceSection } from "./AppearanceSection";
 import { BabiesSection } from "./BabiesSection";
-import { BillingSection } from "./BillingSection";
 import { ContactsSection } from "./ContactsSection";
 import { FamilySection } from "./FamilySection";
 import { SectionTitle } from "./lib";
@@ -17,11 +16,12 @@ import { NotificationsSection } from "./NotificationsSection";
 import { SleepLocationsSection } from "./SleepLocationsSection";
 
 export function SettingsScreen() {
-  const { data: session } = useSession();
-  const members = useMembers();
-  const premium = (useFamily().data?.plan ?? "free") !== "free";
+  // The family role used to be derived by matching the session's user id
+  // against the member list; /api/me reports it directly, from the same
+  // membership row the server enforces on.
+  const me = useMe();
 
-  const myRole = members.data?.find((m) => m.userId === session?.user.id)?.role;
+  const myRole = me.data?.memberRole;
   const isAdmin = myRole === "admin" || myRole === "owner";
 
   return (
@@ -44,34 +44,10 @@ export function SettingsScreen() {
 
         <AppearanceSection />
 
-        <BillingSection isAdmin={isAdmin} />
-
-        {isAdmin && premium && (
+        {isAdmin && (
           <>
             <SectionTitle>{t("API keys")}</SectionTitle>
             <ApiKeysSection />
-          </>
-        )}
-
-        {isAdmin && !premium && (
-          <>
-            <SectionTitle>{t("API keys")}</SectionTitle>
-            <Card className="space-y-3">
-              <p className="text-sm text-muted">
-                {t("API keys are a Premium feature.")}
-              </p>
-              <Button
-                size="full"
-                variant="outline"
-                onClick={() =>
-                  document
-                    .getElementById("billing")
-                    ?.scrollIntoView({ behavior: "smooth" })
-                }
-              >
-                {t("Upgrade")} · {t("Premium")}
-              </Button>
-            </Card>
           </>
         )}
 
@@ -112,7 +88,7 @@ export function SettingsScreen() {
 
         <SectionTitle>{t("Account")}</SectionTitle>
         <Card className="space-y-3">
-          {isSysadmin(session) && (
+          {me.data?.role === "admin" && (
             <Link
               to="/admin"
               className="block rounded-xl2 border border-line px-4 py-3 font-semibold text-ink active:bg-surface-2"
@@ -121,10 +97,8 @@ export function SettingsScreen() {
             </Link>
           )}
           <p className="text-sm text-ink-soft">
-            {session?.user.name}
-            <span className="block text-xs text-muted">
-              {session?.user.email}
-            </span>
+            {me.data?.name}
+            <span className="block text-xs text-muted">{me.data?.email}</span>
           </p>
           <Button
             size="full"

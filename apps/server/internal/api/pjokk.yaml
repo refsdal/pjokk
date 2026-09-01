@@ -1,0 +1,4515 @@
+openapi: 3.0.3
+info:
+  title: Pjokk API
+  description: >-
+    Pjokk is a self-hosted baby tracker for families. This spec is the single
+    source of truth for the Go server's HTTP surface: it drives runtime
+    request validation (kin-openapi nethttp-middleware), the generated
+    strict-server routes and types (oapi-codegen), and the interactive docs
+    served at /api/docs (Scalar, reading /api/openapi.json — this file,
+    converted to JSON at runtime).
+  version: "1.0.0"
+servers:
+  - url: /
+paths:
+  /healthz:
+    get:
+      operationId: healthz
+      summary: Liveness probe. Touches nothing — not even the database pool.
+      tags: [system]
+      responses:
+        "200":
+          description: The process is alive.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+  /readyz:
+    get:
+      operationId: readyz
+      summary: Readiness probe. Runs `SELECT 1` against the database pool.
+      tags: [system]
+      responses:
+        "200":
+          description: The process is ready to serve traffic.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+        "503":
+          description: The database is unreachable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, error]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [false]
+                  error:
+                    type: string
+
+  /api/babies:
+    get:
+      operationId: listBabies
+      summary: Babies in the caller's active family, oldest first.
+      tags: [babies]
+      responses:
+        "200":
+          description: Babies in the active family.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Baby"
+    post:
+      operationId: createBaby
+      summary: Create a baby in the caller's active family. Free — no plan gate.
+      tags: [babies]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBaby"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Baby"
+  /api/babies/{id}:
+    patch:
+      operationId: updateBaby
+      summary: >-
+        Partial update. An empty body is a no-op that returns the baby
+        unchanged.
+      tags: [babies]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBaby"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Baby"
+        "404":
+          description: No baby with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteBaby
+      summary: >-
+        Family-admin only. Deletes the baby and EVERY log for them
+        (cascade).
+      tags: [babies]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "403":
+          description: Family admin only.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No baby with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/family:
+    get:
+      operationId: getFamily
+      summary: The caller's active family.
+      tags: [family]
+      responses:
+        "200":
+          description: The active family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Family"
+        "404":
+          description: Family missing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/family/members:
+    get:
+      operationId: listFamilyMembers
+      summary: Caretakers in the caller's active family.
+      tags: [family]
+      responses:
+        "200":
+          description: Caretakers in the family.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Member"
+  /api/family/members/{memberId}:
+    delete:
+      operationId: deleteFamilyMember
+      summary: Remove a member from the caller's active family. Family-admin only.
+      tags: [family]
+      parameters:
+        - $ref: "#/components/parameters/memberIdPath"
+      responses:
+        "200":
+          description: Removed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "400":
+          description: Cannot remove the last admin.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Family admin only.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such member in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/family/members/{memberId}/role:
+    post:
+      operationId: setFamilyMemberRole
+      summary: Change a member's role in the caller's active family. Family-admin only.
+      tags: [family]
+      parameters:
+        - $ref: "#/components/parameters/memberIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetMemberRole"
+      responses:
+        "200":
+          description: Role changed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "400":
+          description: Cannot demote the last admin.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Family admin only.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such member in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/feeds:
+    get:
+      operationId: listFeeds
+      summary: Feed logs in the caller's active family, newest first.
+      tags: [feeds]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Feed logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FeedLog"
+    post:
+      operationId: createFeed
+      summary: Log a feed for a baby in the caller's active family.
+      tags: [feeds]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFeed"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/feeds/{id}:
+    patch:
+      operationId: updateFeed
+      summary: >-
+        Partial update. A field sent as `null` clears the column; an
+        omitted field is left unchanged; an empty body is a no-op that
+        returns the feed unchanged. `time`/`type` are not nullable — only
+        settable or omitted. See internal/api/feeds.go for how this
+        endpoint tells "omitted" apart from "null" (the generated request
+        type alone cannot).
+      tags: [feeds]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFeed"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedLog"
+        "404":
+          description: No feed with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteFeed
+      summary: Delete a feed log.
+      tags: [feeds]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No feed with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/diapers:
+    get:
+      operationId: listDiapers
+      summary: Diaper logs in the caller's active family, newest first.
+      tags: [diapers]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Diaper logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DiaperLog"
+    post:
+      operationId: createDiaper
+      summary: Log a diaper change for a baby in the caller's active family.
+      tags: [diapers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDiaper"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiaperLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/diapers/{id}:
+    patch:
+      operationId: updateDiaper
+      summary: >-
+        Partial update. A field sent as `null` clears the column; an
+        omitted field is left unchanged; an empty body is a no-op that
+        returns the diaper log unchanged. `time`/`type` are not nullable —
+        only settable or omitted. See internal/api/feeds.go for how this
+        endpoint tells "omitted" apart from "null" (the generated request
+        type alone cannot).
+      tags: [diapers]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDiaper"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiaperLog"
+        "404":
+          description: No diaper log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteDiaper
+      summary: Delete a diaper log.
+      tags: [diapers]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No diaper log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/sleep:
+    get:
+      operationId: listSleeps
+      summary: Sleep logs in the caller's active family, newest first (by startTime).
+      tags: [sleep]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Sleep logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SleepLog"
+    post:
+      operationId: createSleep
+      summary: >-
+        Create a sleep log. Omit endTime to start an active session; a baby
+        can only have one active session at a time — enforced by a partial
+        unique index (see internal/api/sleep.go), not just the pre-check
+        this endpoint also does.
+      tags: [sleep]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSleep"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SleepLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Baby already has an active session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/sleep/active:
+    get:
+      operationId: getActiveSleep
+      summary: The active sleep session for a baby, or null.
+      tags: [sleep]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+      responses:
+        "200":
+          description: The active sleep session, or null.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SleepLog"
+                nullable: true
+  /api/sleep/{id}/wake:
+    post:
+      operationId: wakeSleep
+      summary: End the active session for a sleep log. endTime defaults to now.
+      tags: [sleep]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Wake"
+      responses:
+        "200":
+          description: Session ended.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SleepLog"
+        "404":
+          description: No such active session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/sleep/{id}:
+    patch:
+      operationId: updateSleep
+      summary: >-
+        Partial update. `endTime` sent as `null` CLEARS it, reopening the
+        session — subject to the same one-active-session-per-baby
+        constraint as create, so this can also 409. `location`/`notes` may
+        also be sent as `null` to clear them; `startTime` is not nullable —
+        only settable or omitted. See internal/api/feeds.go for the
+        omitted-vs-null presence-detection pattern this endpoint needs.
+      tags: [sleep]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSleep"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SleepLog"
+        "404":
+          description: No sleep log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: >-
+            Clearing endTime would reopen a session while another is
+            already active for this baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteSleep
+      summary: Delete a sleep log.
+      tags: [sleep]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No sleep log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/sleep-locations:
+    get:
+      operationId: listSleepLocations
+      summary: Custom sleep-location chips for the caller's active family.
+      tags: [sleep-locations]
+      responses:
+        "200":
+          description: Custom sleep locations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SleepLocation"
+    post:
+      operationId: createSleepLocation
+      summary: >-
+        Family-admin only; not available to API keys. Rejects a name that
+        duplicates a default chip or an existing custom one
+        (case-insensitive), and caps custom locations at 20 per family.
+      tags: [sleep-locations]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSleepLocation"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SleepLocation"
+        "400":
+          description: Name is empty once whitespace is trimmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Family admin only, or an API key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Duplicate name or limit reached.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/sleep-locations/{id}:
+    delete:
+      operationId: deleteSleepLocation
+      summary: Family-admin only; not available to API keys.
+      tags: [sleep-locations]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "403":
+          description: Family admin only, or an API key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such location in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/summary:
+    get:
+      operationId: getSummary
+      summary: >-
+        Everything the home screen needs in one call: last feed, last
+        diaper, active + last sleep, active play, and today's local-day
+        totals.
+      tags: [summary]
+      parameters:
+        - name: babyId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: tz
+          in: query
+          required: false
+          description: >-
+            The requester's Date.getTimezoneOffset() (minutes,
+            UTC-minus-local). The `today` block follows the caretaker's
+            clock, not the server's. Defaults to 0 (UTC) when omitted.
+          schema:
+            type: integer
+            minimum: -840
+            maximum: 840
+            default: 0
+      responses:
+        "200":
+          description: Status summary for a baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Summary"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/medicine:
+    get:
+      operationId: listMedicine
+      summary: Medicine logs in the caller's active family, newest first.
+      tags: [medicine]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Medicine logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MedicineLog"
+    post:
+      operationId: createMedicine
+      summary: Log a medicine dose for a baby in the caller's active family.
+      tags: [medicine]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMedicine"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicineLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/medicine/{id}:
+    patch:
+      operationId: updateMedicine
+      summary: >-
+        Partial update. `amount`, `unit` and `notes` may be sent as `null`
+        to CLEAR that column; `time`/`name` are not nullable — only settable
+        or omitted. An empty body is a no-op. See internal/api/feeds.go for
+        the omitted-vs-null presence-detection pattern this endpoint needs.
+      tags: [medicine]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMedicine"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicineLog"
+        "404":
+          description: No medicine log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteMedicine
+      summary: Delete a medicine log.
+      tags: [medicine]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No medicine log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/baths:
+    get:
+      operationId: listBaths
+      summary: Bath logs in the caller's active family, newest first.
+      tags: [baths]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Bath logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BathLog"
+    post:
+      operationId: createBath
+      summary: Log a bath for a baby in the caller's active family.
+      tags: [baths]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBath"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BathLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/baths/{id}:
+    patch:
+      operationId: updateBath
+      summary: >-
+        Partial update. `notes` may be sent as `null` to CLEAR it; `time`
+        is not nullable — only settable or omitted. An empty body is a
+        no-op. See internal/api/feeds.go for the omitted-vs-null
+        presence-detection pattern this endpoint needs.
+      tags: [baths]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBath"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BathLog"
+        "404":
+          description: No bath log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteBath
+      summary: Delete a bath log.
+      tags: [baths]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No bath log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/notes:
+    get:
+      operationId: listNotes
+      summary: Note logs in the caller's active family, newest first.
+      tags: [notes]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Note logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NoteLog"
+    post:
+      operationId: createNote
+      summary: Log a note for a baby in the caller's active family.
+      tags: [notes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNote"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoteLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/notes/{id}:
+    patch:
+      operationId: updateNote
+      summary: >-
+        Partial update. `notes` may be sent as `null` to CLEAR it; `time`
+        and `content` are not nullable — only settable or omitted. An empty
+        body is a no-op. See internal/api/feeds.go for the omitted-vs-null
+        presence-detection pattern this endpoint needs.
+      tags: [notes]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNote"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoteLog"
+        "404":
+          description: No note log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteNote
+      summary: Delete a note log.
+      tags: [notes]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No note log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/milestones:
+    get:
+      operationId: listMilestones
+      summary: Milestone logs in the caller's active family, newest first.
+      tags: [milestones]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Milestone logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MilestoneLog"
+    post:
+      operationId: createMilestone
+      summary: Log a milestone for a baby in the caller's active family.
+      tags: [milestones]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMilestone"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MilestoneLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/milestones/{id}:
+    patch:
+      operationId: updateMilestone
+      summary: >-
+        Partial update. `notes` may be sent as `null` to CLEAR it; `time`
+        and `title` are not nullable — only settable or omitted. An empty
+        body is a no-op. See internal/api/feeds.go for the omitted-vs-null
+        presence-detection pattern this endpoint needs.
+      tags: [milestones]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMilestone"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MilestoneLog"
+        "404":
+          description: No milestone log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteMilestone
+      summary: Delete a milestone log.
+      tags: [milestones]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No milestone log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/measurements:
+    get:
+      operationId: listMeasurements
+      summary: Measurement logs in the caller's active family, newest first.
+      tags: [measurements]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Measurement logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MeasurementLog"
+    post:
+      operationId: createMeasurement
+      summary: Log a measurement for a baby in the caller's active family.
+      tags: [measurements]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMeasurement"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeasurementLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/measurements/{id}:
+    patch:
+      operationId: updateMeasurement
+      summary: >-
+        Partial update. `notes` may be sent as `null` to CLEAR it;
+        `time`/`type`/`value` are not nullable — only settable or omitted.
+        An empty body is a no-op. See internal/api/feeds.go for the
+        omitted-vs-null presence-detection pattern this endpoint needs.
+      tags: [measurements]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMeasurement"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeasurementLog"
+        "404":
+          description: No measurement log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteMeasurement
+      summary: Delete a measurement log.
+      tags: [measurements]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No measurement log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/pumps:
+    get:
+      operationId: listPumps
+      summary: Pump logs in the caller's active family, newest first.
+      tags: [pumps]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Pump logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PumpLog"
+    post:
+      operationId: createPump
+      summary: Log a pumping session for a baby in the caller's active family.
+      tags: [pumps]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePump"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PumpLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/pumps/{id}:
+    patch:
+      operationId: updatePump
+      summary: >-
+        Partial update. `side`, `amountMl`, `durationMin` and `notes` may
+        be sent as `null` to CLEAR that column; `time` is not nullable —
+        only settable or omitted. An empty body is a no-op. See
+        internal/api/feeds.go for the omitted-vs-null presence-detection
+        pattern this endpoint needs.
+      tags: [pumps]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePump"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PumpLog"
+        "404":
+          description: No pump log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deletePump
+      summary: Delete a pump log.
+      tags: [pumps]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No pump log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/play:
+    get:
+      operationId: listPlays
+      summary: Play logs in the caller's active family, newest first (by startTime).
+      tags: [play]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Play logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlayLog"
+    post:
+      operationId: createPlay
+      summary: >-
+        Create a play log. Omit endTime to start a running session; a baby
+        can only have one running activity at a time — enforced by a
+        partial unique index (see internal/api/play.go), not just the
+        pre-check this endpoint also does. Free (no plan gate).
+      tags: [play]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePlay"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Baby already has a running activity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/play/active:
+    get:
+      operationId: getActivePlay
+      summary: The running play session for a baby, or null.
+      tags: [play]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+      responses:
+        "200":
+          description: The running play session, or null.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PlayLog"
+                nullable: true
+  /api/play/{id}/stop:
+    post:
+      operationId: stopPlay
+      summary: End the running session for a play log. endTime defaults to now.
+      tags: [play]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StopPlay"
+      responses:
+        "200":
+          description: Session ended.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayLog"
+        "404":
+          description: No such running session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/play/{id}:
+    patch:
+      operationId: updatePlay
+      summary: >-
+        Partial update. `endTime` sent as `null` CLEARS it, reopening the
+        session — subject to the same one-running-session-per-baby
+        constraint as create, so this can also 409. `notes` may also be
+        sent as `null` to clear it; `type`/`startTime` are not nullable —
+        only settable or omitted. See internal/api/feeds.go for the
+        omitted-vs-null presence-detection pattern this endpoint needs.
+      tags: [play]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePlay"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayLog"
+        "404":
+          description: No play log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: >-
+            Clearing endTime would reopen a session while another is
+            already running for this baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deletePlay
+      summary: Delete a play log.
+      tags: [play]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No play log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/vaccines/dismissals:
+    get:
+      operationId: listVaccineDismissals
+      summary: >-
+        Programme slots waved away for one baby (or every baby in the
+        family when babyId is omitted). Free, like the vaccine log itself.
+      tags: [vaccines]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+      responses:
+        "200":
+          description: Dismissed programme slots.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VaccineDismissal"
+    post:
+      operationId: createVaccineDismissal
+      summary: >-
+        Hide a programme slot for one baby. Idempotent on the
+        (babyId,slotKey) unique index: dismissing an already-dismissed slot
+        returns the existing row rather than erroring (see
+        internal/api/vaccines.go).
+      tags: [vaccines]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVaccineDismissal"
+      responses:
+        "201":
+          description: Dismissed (or already was — same row either way).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaccineDismissal"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/vaccines/dismissals/{id}:
+    delete:
+      operationId: deleteVaccineDismissal
+      summary: Restore a dismissed slot.
+      tags: [vaccines]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Restored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No dismissal with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/vaccines:
+    get:
+      operationId: listVaccines
+      summary: >-
+        Vaccine logs in the caller's active family, newest first. Each
+        entry's `documents` array carries `url: "/api/files/{docId}"` for
+        any attached file (see internal/api/files.go — uploading is
+        disabled today, but existing documents still stream).
+      tags: [vaccines]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Vaccines, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VaccineLog"
+    post:
+      operationId: createVaccine
+      summary: Log a vaccine. Free — never plan-gated (only document upload is).
+      tags: [vaccines]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVaccine"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaccineLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/vaccines/{id}:
+    patch:
+      operationId: updateVaccine
+      summary: >-
+        Partial update. `doseNumber`, `scheduleSlot` and `notes` may be
+        sent as `null` to CLEAR that column; `time`/`name` are not
+        nullable — only settable or omitted.
+      tags: [vaccines]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVaccine"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaccineLog"
+        "404":
+          description: No vaccine log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteVaccine
+      summary: >-
+        Delete a vaccine log and every document attached to it. The DB row
+        cascades; the stored objects behind it do not, so
+        internal/api/vaccines.go deletes them from Storage after the row
+        is gone (a failure there leaks an orphan object rather than
+        leaving a document row pointing at nothing).
+      tags: [vaccines]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No vaccine log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/calendar/events:
+    get:
+      operationId: listCalendarEvents
+      summary: >-
+        Family-wide planned events starting in [from, to). Free (no plan
+        gate — creation was premium in the TS predecessor; this port
+        removes that gate, see internal/api/calendar.go).
+      tags: [calendar]
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: Inclusive range start, RFC3339 with an explicit offset.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: true
+          description: >-
+            Exclusive range end. Must be after `from`, and the span must not
+            exceed 366 days.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Events in [from, to), ascending by startTime.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalendarEvent"
+        "400":
+          description: to <= from, or the span exceeds 366 days.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      operationId: createCalendarEvent
+      summary: >-
+        Create a family-wide (or baby-specific) event. babyIds/
+        assigneeUserIds must belong to the caller's family — see
+        internal/api/calendar.go's refsValid. Duplicate ids are deduped
+        before insert.
+      tags: [calendar]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCalendarEvent"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarEvent"
+        "400":
+          description: Unknown baby or family member reference.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/calendar/events/{id}:
+    patch:
+      operationId: updateCalendarEvent
+      summary: >-
+        Partial update. `description`/`location`/`durationMin`/
+        `remindMinutesBefore` may be sent as `null` to CLEAR that column;
+        `title`/`category`/`startTime`/`allDay` are not nullable — only
+        settable or omitted. An event that IS (or becomes, via this same
+        PATCH) all-day always has durationMin cleared. Changing `startTime`
+        or `remindMinutesBefore` re-arms the reminder sweep (clears
+        remindedAt). `babyIds`/`assigneeUserIds`, when present, REPLACE the
+        link set; omitted leaves it untouched.
+      tags: [calendar]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCalendarEvent"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarEvent"
+        "400":
+          description: Unknown baby or family member reference.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No event with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteCalendarEvent
+      summary: Delete an event; its link rows cascade.
+      tags: [calendar]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No event with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/contacts:
+    get:
+      operationId: listContacts
+      summary: >-
+        The family's address book, by name. Zero linked babies means a
+        contact the whole family shares. Free (no plan gate — see
+        internal/api/contacts.go).
+      tags: [contacts]
+      responses:
+        "200":
+          description: Contacts, by name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contact"
+    post:
+      operationId: createContact
+      summary: >-
+        Create a contact. babyIds must belong to the caller's family — see
+        internal/api/contacts.go's refsValid. Duplicate ids are deduped
+        before insert.
+      tags: [contacts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateContact"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+        "400":
+          description: Unknown baby reference.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/contacts/{id}:
+    patch:
+      operationId: updateContact
+      summary: >-
+        Partial update. `role`/`icon`/`phone`/`email`/`website`/`notes` may
+        be sent as `null` to CLEAR that column; `name` is not nullable —
+        only settable or omitted. `babyIds`, when present, REPLACES the
+        link set; omitted leaves it untouched.
+      tags: [contacts]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateContact"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+        "400":
+          description: Unknown baby reference.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No contact with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteContact
+      summary: Delete a contact; its link rows cascade.
+      tags: [contacts]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No contact with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/timeline:
+    get:
+      operationId: listTimeline
+      summary: >-
+        The merged feed of everything, newest first. Sleep and play entries
+        sort by their startTime (active sessions have endTime null); every
+        other kind sorts by time. filter=other selects the eight non-core
+        kinds (medicine, bath, note, milestone, measurement, pump, play,
+        vaccine) together; omitting filter returns all eleven.
+      tags: [timeline]
+      parameters:
+        - name: babyId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: before
+          in: query
+          required: false
+          description: >-
+            Opaque keyset cursor from a previous page's nextCursor
+            ("<epochMs>|<id>"). The id tiebreak keeps pagination lossless
+            across equal timestamps.
+          schema:
+            type: string
+            pattern: ^\d{1,15}\|.{1,64}$
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: filter
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [feeds, diapers, sleep, other]
+      responses:
+        "200":
+          description: Timeline page.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Timeline"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/stats:
+    get:
+      operationId: getStats
+      summary: >-
+        Per-day sleep/intake/counts plus averages for the window, and the
+        latest weight with its predecessor. Sleep sessions are split across
+        local midnights. Free for any window up to 90 days — the TS
+        predecessor's statsMonth premium gate on days>7 is removed.
+      tags: [stats]
+      parameters:
+        - name: babyId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: days
+          in: query
+          required: false
+          description: Window length in local days, today included.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 90
+            default: 7
+        - name: tz
+          in: query
+          required: false
+          description: >-
+            The requester's Date.getTimezoneOffset() (minutes,
+            UTC-minus-local). Day buckets follow the caretaker's clock, not
+            the server's. Defaults to 0 (UTC) when omitted.
+          schema:
+            type: integer
+            minimum: -840
+            maximum: 840
+            default: 0
+      responses:
+        "200":
+          description: Stats for the window.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stats"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/me:
+    get:
+      operationId: getMe
+      summary: >-
+        Session info for the SPA shell. Requires a session but NOT an
+        active family — the family/member/plan fields are null when the
+        caller has none.
+      tags: [me]
+      responses:
+        "200":
+          description: The caller's session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+
+  /api/push/config:
+    get:
+      operationId: getPushConfig
+      summary: >-
+        The VAPID public key the frontend needs to create a browser push
+        subscription. Never available to API keys (device/session-bound —
+        see internal/api/middleware's RejectAPIKey).
+      tags: [push]
+      responses:
+        "200":
+          description: VAPID public key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushConfig"
+
+  /api/push/subscribe:
+    post:
+      operationId: subscribePush
+      summary: >-
+        Register this browser's push subscription for the signed-in
+        caretaker. Upserts by endpoint: re-subscribing the SAME endpoint
+        rebinds it to the calling user/family and refreshes its keys rather
+        than failing a uniqueness check. Rejects an endpoint whose host
+        isn't one of the recognized push services, or that isn't https — see
+        internal/api/push.go's isAllowedPushEndpoint (SSRF guard: the
+        scheduler later POSTs to stored endpoints unattended).
+      tags: [push]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Subscribe"
+      responses:
+        "200":
+          description: Stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "400":
+          description: Not a recognized push service endpoint.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/push/unsubscribe:
+    post:
+      operationId: unsubscribePush
+      summary: >-
+        Remove a subscription. Scoped to the caller's OWN rows — deleting by
+        endpoint alone would let one caretaker remove another's
+        subscription just by knowing the endpoint URL. Removing an endpoint
+        that isn't the caller's (or doesn't exist) is still a 200: this is a
+        set-membership operation, not a lookup.
+      tags: [push]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Unsubscribe"
+      responses:
+        "200":
+          description: Removed (if it was the caller's).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+
+  /api/push/prefs:
+    get:
+      operationId: getPushPrefs
+      summary: >-
+        The caller's feed-reminder preference for the active family.
+        Defaults to 0 (off) when no preference row exists yet.
+      tags: [push]
+      responses:
+        "200":
+          description: Notification preferences.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushPrefs"
+    put:
+      operationId: updatePushPrefs
+      summary: >-
+        Set the caller's feed-reminder preference. Resets the reminder
+        cooldown (last_reminded_at set to NULL) so a new setting starts a
+        fresh observation window instead of firing immediately off the old
+        one's state.
+      tags: [push]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushPrefs"
+      responses:
+        "200":
+          description: Updated preferences.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushPrefs"
+
+  /api/push/test:
+    post:
+      operationId: testPush
+      summary: >-
+        Send a test notification to every device the caller has subscribed,
+        via Deps.Push.ToUser. Returns how many deliveries succeeded.
+      tags: [push]
+      responses:
+        "200":
+          description: Delivery count.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushTestResult"
+
+  /api/keys:
+    get:
+      operationId: listApiKeys
+      summary: >-
+        Bearer API keys for the family, newest first. The full key is never
+        included — only createApiKey's response ever carries it. Family
+        admin only; refused for API-key callers (Task 19).
+      tags: [api-keys]
+      responses:
+        "200":
+          description: Keys for the family, key material omitted.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApiKey"
+    post:
+      operationId: createApiKey
+      summary: >-
+        Create a bearer API key for integrations (Home Assistant, Grafana).
+        The full key is returned ONCE and never again — use it as
+        `Authorization: Bearer pjk_…`. Free (no plan gate — the TypeScript
+        predecessor's apiKeys 402 is removed). Family admin only; refused
+        for API-key callers.
+      tags: [api-keys]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApiKey"
+      responses:
+        "201":
+          description: Created — copy the key now, it is never shown again.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyCreated"
+  /api/keys/{id}:
+    delete:
+      operationId: revokeApiKey
+      summary: >-
+        Revoke a key: sets revoked_at rather than deleting the row, so a
+        revoked key becomes indistinguishable from one that never existed to
+        APIKeyAuth (which filters on revoked_at IS NULL) while its audit
+        trail (name, createdBy, createdAt) survives. Family admin only;
+        refused for API-key callers.
+      tags: [api-keys]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No key with this id in the caller's family, or already revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/invites:
+    get:
+      operationId: listInvites
+      summary: >-
+        Invite codes ever issued for the family, newest first — used and
+        revoked ones included. Family admin only.
+      tags: [invites]
+      responses:
+        "200":
+          description: Invites for the family.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invite"
+    post:
+      operationId: createInvite
+      summary: >-
+        Mint an invite code (QR-at-Sunday-dinner grain: codes are shared
+        aloud or by QR, not email-addressed like Limen's own organization
+        invitations). Family admin only.
+      tags: [invites]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInvite"
+      responses:
+        "201":
+          description: Created invite code.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invite"
+  /api/invites/{code}:
+    delete:
+      operationId: revokeInvite
+      summary: >-
+        Revoke a code (sets revokedAt) so it can no longer be redeemed.
+        Family admin only.
+      tags: [invites]
+      parameters:
+        - $ref: "#/components/parameters/codePath"
+      responses:
+        "200":
+          description: Revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No such code in the caller's family, or already revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/invites/info/{code}:
+    get:
+      operationId: getInviteInfo
+      summary: >-
+        What the /join page shows before sign-in: which family, which
+        role, still valid? No session required. Codes are credentials, so
+        this is rate-limited: 30/10min per client plus a 500/10min global
+        backstop against distributed guessing.
+      tags: [invites]
+      parameters:
+        - $ref: "#/components/parameters/codePath"
+      responses:
+        "200":
+          description: Invite status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteInfo"
+  /api/invites/redeem:
+    post:
+      operationId: redeemInvite
+      summary: >-
+        Join a family with an invite code. Requires a signed-in session —
+        no active family required, since this IS how one is acquired.
+        Membership and the code's use-count are written atomically in one
+        transaction. Rate-limited: 10/10min per client plus a 200/10min
+        global backstop.
+      tags: [invites]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Redeem"
+      responses:
+        "200":
+          description: Joined (or already a member).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RedeemResult"
+        "400":
+          description: Invalid, expired, exhausted, or revoked code.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not signed in.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # --- System-admin console (Task 21; REF §A1 admin.ts) -------------------
+  # Every operation below runs behind RequireSysadmin (users.role ==
+  # "admin", a column of ours unrelated to the per-family admin role) and
+  # is refused outright for API-key callers — EXCEPT
+  # /api/admin/stop-impersonating, which is deliberately session-level;
+  # see its own summary.
+  /api/admin/stats:
+    get:
+      operationId: getAdminStats
+      summary: >-
+        Platform totals for the /admin dashboard. coreLogs is feeds +
+        diapers + sleeps; usersLast7d counts accounts created in the last
+        seven days. System admin only.
+      tags: [admin]
+      responses:
+        "200":
+          description: Platform totals.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+  /api/admin/families:
+    get:
+      operationId: listAdminFamilies
+      summary: >-
+        Every family on the platform, newest first, with member and baby
+        counts and the timestamp of its most recent feed (null when it has
+        never logged one). System admin only.
+      tags: [admin]
+      responses:
+        "200":
+          description: All families.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminFamily"
+  /api/admin/families/{id}:
+    delete:
+      operationId: deleteAdminFamily
+      summary: >-
+        Delete a family and ALL its data — members, babies, invites, keys
+        and every log cascade with the organization row. Audited as
+        `family.delete` before the delete runs. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No family with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users:
+    get:
+      operationId: listAdminUsers
+      summary: >-
+        Accounts on the platform, newest first. `query` filters on name or
+        email (case-insensitive substring). NEW in Go — replaces the
+        better-auth admin plugin's client-side listUsers call. System admin
+        only.
+      tags: [admin]
+      parameters:
+        - name: query
+          in: query
+          description: Case-insensitive substring match on name or email.
+          required: false
+          schema:
+            type: string
+            maxLength: 200
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Matching accounts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminUser"
+  /api/admin/users/{id}/delete:
+    post:
+      operationId: deleteAdminUser
+      summary: >-
+        Delete an account safely. Every non-cascading reference to the user
+        (log attribution on all eleven log kinds, vaccine documents and
+        dismissals, invites, API keys, calendar events and audit rows) is
+        reassigned to the tombstone "Deleted user" in ONE transaction,
+        calendar assignments are dropped, the user's API keys are revoked,
+        and only then is the account removed
+        (sessions, memberships and push subscriptions cascade). POST rather
+        than DELETE, matching the TypeScript predecessor's route. Audited
+        as `user.delete`. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "400":
+          description: Refused — the caller's own account, or the tombstone.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No user with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users/{id}/ban:
+    post:
+      operationId: banAdminUser
+      summary: >-
+        Ban an account: sets banned + ban_reason AND revokes every session
+        the user holds, so the ban is enforced by absence rather than by
+        every reader remembering to check a flag. Their API keys stop
+        authenticating too (GetAPIKeyByHash joins on a non-banned creator).
+        Audited as `user.ban`. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BanUser"
+      responses:
+        "200":
+          description: Banned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "400":
+          description: Refused — an admin may not ban their own account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No user with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users/{id}/unban:
+    post:
+      operationId: unbanAdminUser
+      summary: >-
+        Lift a ban: clears banned + ban_reason. Sessions revoked by the ban
+        stay revoked — the user signs in again. Audited as `user.unban`.
+        System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Unbanned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No user with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users/{id}/password:
+    post:
+      operationId: setAdminUserPassword
+      summary: >-
+        Set a user's password (support flow — also establishes a first
+        password for an account created through the invite flow with no
+        credential). The password itself is NEVER written to the audit
+        trail; the row records only the user id. Audited as
+        `user.password.set`. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetUserPassword"
+      responses:
+        "200":
+          description: Password set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "400":
+          description: >-
+            The password does not meet the credential policy. `minLength`
+            below is checked before the handler runs; the rest of the
+            policy (an uppercase letter and a number, per Limen's
+            configured defaults) cannot be expressed as a JSON-Schema
+            constraint and is reported here, with the same VALIDATION code.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No user with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users/{id}/sessions/revoke:
+    post:
+      operationId: revokeAdminUserSessions
+      summary: >-
+        Sign a user out everywhere. Audited as `user.sessions.revoke`.
+        System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Sessions revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No user with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users/{id}/impersonate:
+    post:
+      operationId: impersonateAdminUser
+      summary: >-
+        Sign in as another user for support. Mints a session for the target
+        carrying the admin's id in its metadata (the in-app banner reads
+        it) and swaps the session cookie over; the admin's own session is
+        kept, and POST /api/admin/stop-impersonating restores it. Refused
+        for the caller's own account and for banned targets. Audited as
+        `user.impersonate` against the REAL admin. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Impersonating — the response carries the target's session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "400":
+          description: >-
+            Refused — the caller's own account, a banned target, or a
+            caller who is themselves being impersonated (impersonation
+            cannot be chained).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No user with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/stop-impersonating:
+    post:
+      operationId: stopImpersonating
+      summary: >-
+        End an impersonation and restore the admin's own session cookie.
+        Deliberately session-level, NOT system-admin-gated: while
+        impersonating an ordinary user the current session IS that user's,
+        so a sysadmin gate would trap the operator inside the impersonated
+        session. A caller who is not impersonating gets 400
+        NOT_IMPERSONATING — which is all an ordinary user can ever reach
+        here. Audited as `impersonation.stop` against the real admin.
+      tags: [admin]
+      responses:
+        "200":
+          description: Impersonation ended — the response restores the admin's cookie.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "400":
+          description: This session is not impersonating anyone.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/audit:
+    get:
+      operationId: listAdminAudit
+      summary: >-
+        The 100 most recent entries in the append-only system-admin trail,
+        newest first. System admin only.
+      tags: [admin]
+      responses:
+        "200":
+          description: Recent admin actions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEntry"
+    post:
+      operationId: createAdminAuditNote
+      summary: >-
+        Append an entry to the trail by hand, for an admin action performed
+        outside these routes. System admin only.
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuditNote"
+      responses:
+        "200":
+          description: Recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+
+components:
+  parameters:
+    babyIdQuery:
+      name: babyId
+      in: query
+      description: Restrict the result to one baby in the caller's family.
+      required: false
+      schema:
+        type: string
+    limitQuery:
+      name: limit
+      in: query
+      description: Maximum number of rows to return.
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+    idPath:
+      name: id
+      in: path
+      description: Resource id.
+      required: true
+      schema:
+        type: string
+    memberIdPath:
+      name: memberId
+      in: path
+      description: The family-membership row id (NOT the user id).
+      required: true
+      schema:
+        type: string
+    codePath:
+      name: code
+      in: path
+      description: An invite code.
+      required: true
+      schema:
+        type: string
+  schemas:
+    Ok:
+      type: object
+      description: The standard `{ok:true}` success body for actions with no other payload.
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+    Baby:
+      type: object
+      required: [id, name, birthDate, sex]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        birthDate:
+          type: string
+          format: date-time
+        sex:
+          type: string
+          enum: [girl, boy]
+          nullable: true
+      x-go-name: Baby
+    CreateBaby:
+      type: object
+      required: [name, birthDate]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        birthDate:
+          type: string
+          format: date-time
+        sex:
+          type: string
+          enum: [girl, boy]
+    UpdateBaby:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `sex` may also
+        be sent as `null`, which — like omitting it — leaves the baby's sex
+        unchanged (Go's JSON decoding cannot tell "absent" from "null" for a
+        nullable-optional field without a bespoke wrapper type, and no
+        caller needs to clear sex back to unknown today; see
+        internal/api/babies.go).
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        birthDate:
+          type: string
+          format: date-time
+        sex:
+          type: string
+          enum: [girl, boy]
+          nullable: true
+    Member:
+      type: object
+      required: [memberId, userId, name, email, role, image]
+      properties:
+        memberId:
+          type: string
+          description: The family-membership row id (NOT the user id).
+        userId:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        image:
+          type: string
+          nullable: true
+    Family:
+      type: object
+      required: [id, name, slug, plan]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        plan:
+          type: string
+    SetMemberRole:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [admin, member]
+    Me:
+      type: object
+      description: >-
+        familyId/memberRole/plan/impersonatedBy are null when the caller has
+        no active family (or, for impersonatedBy, is not impersonated).
+      required:
+        [userId, name, email, role, familyId, memberRole, plan, impersonatedBy]
+      properties:
+        userId:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          nullable: true
+          description: Ours, system-admin role. "admin" or null.
+        familyId:
+          type: string
+          nullable: true
+        memberRole:
+          type: string
+          nullable: true
+        plan:
+          type: string
+          nullable: true
+        impersonatedBy:
+          type: string
+          nullable: true
+    FeedLog:
+      type: object
+      required:
+        - id
+        - babyId
+        - caretakerId
+        - caretakerName
+        - notes
+        - time
+        - type
+        - amountMl
+        - side
+        - durationMin
+        - leftMin
+        - rightMin
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [bottle, breast, solids]
+        amountMl:
+          type: integer
+          format: int32
+          nullable: true
+        side:
+          type: string
+          enum: [left, right, both]
+          nullable: true
+        durationMin:
+          type: integer
+          format: int32
+          nullable: true
+        leftMin:
+          type: integer
+          format: int32
+          nullable: true
+        rightMin:
+          type: integer
+          format: int32
+          nullable: true
+    CreateFeed:
+      type: object
+      required: [babyId, time, type]
+      properties:
+        babyId:
+          type: string
+        time:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [bottle, breast, solids]
+        amountMl:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+        side:
+          type: string
+          enum: [left, right, both]
+        durationMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+        leftMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+          nullable: true
+        rightMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+          nullable: true
+        notes:
+          type: string
+          maxLength: 1000
+    UpdateFeed:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `amountMl`,
+        `side`, `durationMin`, `leftMin`, `rightMin` and `notes` may also be
+        sent as `null` to CLEAR that column; `time`/`type` are not nullable
+        — only settable or omitted (see internal/api/feeds.go for the
+        omitted-vs-null presence-detection pattern this endpoint needs,
+        which the generated request type alone cannot provide).
+      properties:
+        time:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [bottle, breast, solids]
+        amountMl:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+          nullable: true
+        side:
+          type: string
+          enum: [left, right, both]
+          nullable: true
+        durationMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+          nullable: true
+        leftMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+          nullable: true
+        rightMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+          nullable: true
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+    DiaperLog:
+      type: object
+      required: [id, babyId, caretakerId, caretakerName, notes, time, type]
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [wet, dirty, both]
+    CreateDiaper:
+      type: object
+      required: [babyId, time, type]
+      properties:
+        babyId:
+          type: string
+        time:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [wet, dirty, both]
+        notes:
+          type: string
+          maxLength: 1000
+    UpdateDiaper:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `notes` may
+        also be sent as `null` to CLEAR it; `time`/`type` are not nullable —
+        only settable or omitted (see internal/api/feeds.go for the
+        presence-detection pattern this endpoint shares with UpdateFeed).
+      properties:
+        time:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [wet, dirty, both]
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+    SleepLog:
+      type: object
+      required:
+        - id
+        - babyId
+        - caretakerId
+        - caretakerName
+        - notes
+        - startTime
+        - endTime
+        - location
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+          description: null while the session is active.
+        location:
+          type: string
+          nullable: true
+    CreateSleep:
+      type: object
+      required: [babyId, startTime]
+      properties:
+        babyId:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          description: Omit to start an active sleep session.
+        location:
+          type: string
+          maxLength: 100
+        notes:
+          type: string
+          maxLength: 1000
+    UpdateSleep:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `endTime`,
+        `location` and `notes` may also be sent as `null` to CLEAR that
+        column — clearing `endTime` reopens the session and can 409 if
+        another session for the same baby is already active (see
+        internal/api/sleep.go). `startTime` is not nullable — only settable
+        or omitted.
+      properties:
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+        location:
+          type: string
+          maxLength: 100
+          nullable: true
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+    Wake:
+      type: object
+      description: Defaults endTime to now on the server when omitted.
+      properties:
+        endTime:
+          type: string
+          format: date-time
+    SleepLocation:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+    CreateSleepLocation:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+    PlayLog:
+      type: object
+      description: >-
+        Timed activities (tummy time, walks, free play) — same session shape
+        as SleepLog: startTime + nullable endTime, null meaning "still
+        running". Free (no plan gate).
+      required:
+        - id
+        - babyId
+        - caretakerId
+        - caretakerName
+        - notes
+        - type
+        - startTime
+        - endTime
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: [tummy, walk, play]
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+          description: null while the activity is running.
+    CreatePlay:
+      type: object
+      required: [babyId, type, startTime]
+      properties:
+        babyId:
+          type: string
+        type:
+          type: string
+          enum: [tummy, walk, play]
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+          description: Omit to start a running session.
+        notes:
+          type: string
+          maxLength: 2000
+    UpdatePlay:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `endTime` and
+        `notes` may also be sent as `null` to CLEAR that column — clearing
+        `endTime` reopens the session and can 409 if another session for
+        the same baby is already running (see internal/api/play.go).
+        `type`/`startTime` are not nullable — only settable or omitted.
+      properties:
+        type:
+          type: string
+          enum: [tummy, walk, play]
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          maxLength: 2000
+          nullable: true
+    StopPlay:
+      type: object
+      description: Defaults endTime to now on the server when omitted.
+      properties:
+        endTime:
+          type: string
+          format: date-time
+    VaccineDocument:
+      type: object
+      description: >-
+        One file attached to a vaccine log. Fetch through
+        `/api/files/{id}` — the object store is never public.
+      required: [id, filename, contentType, size, url]
+      properties:
+        id:
+          type: string
+        filename:
+          type: string
+        contentType:
+          type: string
+        size:
+          type: integer
+        url:
+          type: string
+    VaccineLog:
+      type: object
+      description: >-
+        What was given, and when. Free — never plan-gated (only attaching
+        a document is; see internal/api/files.go).
+      required:
+        - id
+        - babyId
+        - caretakerId
+        - caretakerName
+        - notes
+        - time
+        - name
+        - doseNumber
+        - scheduleSlot
+        - documents
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
+        name:
+          type: string
+        doseNumber:
+          type: integer
+          nullable: true
+        scheduleSlot:
+          type: string
+          nullable: true
+          description: >-
+            Slot key from the bundled programme ("mmr:1"), or null for an
+            off-programme dose.
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/VaccineDocument"
+    VaccineDismissal:
+      type: object
+      description: >-
+        A programme slot waved away for one baby. slotKey is a key into
+        the bundled programme, deliberately not validated against it — the
+        programme is data that can change without an API change.
+      required: [id, babyId, slotKey]
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        slotKey:
+          type: string
+    CreateVaccineDismissal:
+      type: object
+      required: [babyId, slotKey]
+      properties:
+        babyId:
+          type: string
+        slotKey:
+          type: string
+          minLength: 1
+          maxLength: 60
+    CreateVaccine:
+      type: object
+      required: [babyId, time, name]
+      properties:
+        babyId:
+          type: string
+        time:
+          type: string
+          format: date-time
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        doseNumber:
+          type: integer
+          minimum: 1
+          maximum: 20
+        scheduleSlot:
+          type: string
+          maxLength: 60
+        notes:
+          type: string
+          maxLength: 1000
+    UpdateVaccine:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `doseNumber`,
+        `scheduleSlot` and `notes` may also be sent as `null` to CLEAR that
+        column; `time`/`name` are not nullable — only settable or omitted
+        (see internal/api/feeds.go for the omitted-vs-null
+        presence-detection pattern this endpoint needs).
+      properties:
+        time:
+          type: string
+          format: date-time
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        doseNumber:
+          type: integer
+          minimum: 1
+          maximum: 20
+          nullable: true
+        scheduleSlot:
+          type: string
+          maxLength: 60
+          nullable: true
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+    TimelineEntry:
+      type: object
+      description: >-
+        One row in the merged timeline. `kind`, `id`, `babyId`,
+        `caretakerId`, `caretakerName` and `notes` are present on every
+        entry regardless of kind; everything else is kind-specific and only
+        present for the kinds that have it (e.g. `startTime`/`endTime` on
+        sleep and play, `time` on the other nine, `documents` only on
+        vaccine) — see internal/api/timeline.go's per-kind entry builders,
+        ported field-for-field from apps/api/src/routes/timeline.ts's merge.
+        Modeled as an open object (kind + a handful of always-present fields
+        typed, everything else additionalProperties) rather than a oneOf
+        discriminated union: oapi-codegen has no clean Go representation for
+        eleven structurally different variants sharing one JSON shape.
+      required: [kind, id, babyId, caretakerId, caretakerName, notes]
+      properties:
+        kind:
+          type: string
+          enum:
+            - feed
+            - diaper
+            - sleep
+            - medicine
+            - bath
+            - note
+            - milestone
+            - measurement
+            - pump
+            - play
+            - vaccine
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+      additionalProperties: true
+    StatsDay:
+      type: object
+      required: [date, sleepMin, intakeMl, feeds, diapers]
+      properties:
+        date:
+          type: string
+          description: YYYY-MM-DD in the requester's local time.
+        sleepMin:
+          type: integer
+          format: int32
+        intakeMl:
+          type: integer
+          format: int32
+        feeds:
+          type: integer
+          format: int32
+        diapers:
+          type: integer
+          format: int32
+    StatsWeight:
+      type: object
+      required: [value, time, prevValue, prevTime]
+      properties:
+        value:
+          type: number
+          format: double
+        time:
+          type: string
+          format: date-time
+        prevValue:
+          type: number
+          format: double
+          nullable: true
+        prevTime:
+          type: string
+          format: date-time
+          nullable: true
+    Stats:
+      type: object
+      required: [days, avgSleepMin, avgIntakeMl, avgFeeds, avgDiapers, weight]
+      properties:
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/StatsDay"
+        avgSleepMin:
+          type: integer
+          format: int32
+        avgIntakeMl:
+          type: integer
+          format: int32
+        avgFeeds:
+          type: number
+          format: double
+        avgDiapers:
+          type: number
+          format: double
+        weight:
+          allOf:
+            - $ref: "#/components/schemas/StatsWeight"
+          nullable: true
+    Timeline:
+      type: object
+      required: [entries, nextCursor]
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimelineEntry"
+        nextCursor:
+          type: string
+          nullable: true
+          description: >-
+            Opaque keyset cursor ("<epochMs>|<id>"); pass back as ?before=
+            for the next (older) page. Null when there is no further page.
+    Summary:
+      type: object
+      required:
+        - lastFeed
+        - lastDiaper
+        - activeSleep
+        - lastSleep
+        - activePlay
+        - today
+      properties:
+        lastFeed:
+          allOf:
+            - $ref: "#/components/schemas/FeedLog"
+          nullable: true
+        lastDiaper:
+          allOf:
+            - $ref: "#/components/schemas/DiaperLog"
+          nullable: true
+        activeSleep:
+          allOf:
+            - $ref: "#/components/schemas/SleepLog"
+          nullable: true
+        lastSleep:
+          allOf:
+            - $ref: "#/components/schemas/SleepLog"
+          nullable: true
+        activePlay:
+          allOf:
+            - $ref: "#/components/schemas/PlayLog"
+          nullable: true
+        today:
+          type: object
+          required: [feeds, intakeMl, solidsG, wet, dirty, both, sleepMin]
+          properties:
+            feeds:
+              type: integer
+              format: int32
+            intakeMl:
+              type: integer
+              format: int32
+            solidsG:
+              type: integer
+              format: int32
+            wet:
+              type: integer
+              format: int32
+            dirty:
+              type: integer
+              format: int32
+            both:
+              type: integer
+              format: int32
+            sleepMin:
+              type: integer
+              format: int32
+    MedicineLog:
+      type: object
+      required:
+        - id
+        - babyId
+        - caretakerId
+        - caretakerName
+        - notes
+        - time
+        - name
+        - amount
+        - unit
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
+        name:
+          type: string
+        amount:
+          type: number
+          format: double
+          nullable: true
+        unit:
+          type: string
+          enum: [ml, mg, drops, dose]
+          nullable: true
+    CreateMedicine:
+      type: object
+      required: [babyId, time, name]
+      properties:
+        babyId:
+          type: string
+        time:
+          type: string
+          format: date-time
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        amount:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1000
+        unit:
+          type: string
+          enum: [ml, mg, drops, dose]
+        notes:
+          type: string
+          maxLength: 1000
+    UpdateMedicine:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `amount`,
+        `unit` and `notes` may also be sent as `null` to CLEAR that column;
+        `time`/`name` are not nullable — only settable or omitted (see
+        internal/api/feeds.go for the omitted-vs-null presence-detection
+        pattern this endpoint needs).
+      properties:
+        time:
+          type: string
+          format: date-time
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        amount:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1000
+          nullable: true
+        unit:
+          type: string
+          enum: [ml, mg, drops, dose]
+          nullable: true
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+    BathLog:
+      type: object
+      required: [id, babyId, caretakerId, caretakerName, notes, time]
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
+    CreateBath:
+      type: object
+      required: [babyId, time]
+      properties:
+        babyId:
+          type: string
+        time:
+          type: string
+          format: date-time
+        notes:
+          type: string
+          maxLength: 1000
+    UpdateBath:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `notes` may
+        also be sent as `null` to CLEAR it; `time` is not nullable — only
+        settable or omitted (see internal/api/feeds.go for the
+        omitted-vs-null presence-detection pattern this endpoint needs).
+      properties:
+        time:
+          type: string
+          format: date-time
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+    NoteLog:
+      type: object
+      required:
+        [id, babyId, caretakerId, caretakerName, notes, time, content]
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
+        content:
+          type: string
+    CreateNote:
+      type: object
+      required: [babyId, time, content]
+      properties:
+        babyId:
+          type: string
+        time:
+          type: string
+          format: date-time
+        content:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        notes:
+          type: string
+          maxLength: 1000
+    UpdateNote:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `notes` may
+        also be sent as `null` to CLEAR it; `time`/`content` are not
+        nullable — only settable or omitted (see internal/api/feeds.go for
+        the omitted-vs-null presence-detection pattern this endpoint
+        needs).
+      properties:
+        time:
+          type: string
+          format: date-time
+        content:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+    MilestoneLog:
+      type: object
+      required:
+        [id, babyId, caretakerId, caretakerName, notes, time, title]
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
+        title:
+          type: string
+    CreateMilestone:
+      type: object
+      required: [babyId, time, title]
+      properties:
+        babyId:
+          type: string
+        time:
+          type: string
+          format: date-time
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        notes:
+          type: string
+          maxLength: 1000
+    UpdateMilestone:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `notes` may
+        also be sent as `null` to CLEAR it; `time`/`title` are not
+        nullable — only settable or omitted (see internal/api/feeds.go for
+        the omitted-vs-null presence-detection pattern this endpoint
+        needs).
+      properties:
+        time:
+          type: string
+          format: date-time
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+    MeasurementLog:
+      type: object
+      required:
+        [id, babyId, caretakerId, caretakerName, notes, time, type, value]
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [weight, length, head]
+        value:
+          type: number
+          format: double
+    CreateMeasurement:
+      type: object
+      required: [babyId, time, type, value]
+      properties:
+        babyId:
+          type: string
+        time:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [weight, length, head]
+        value:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 200
+        notes:
+          type: string
+          maxLength: 1000
+    UpdateMeasurement:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `notes` may
+        also be sent as `null` to CLEAR it; `time`/`type`/`value` are not
+        nullable — only settable or omitted (see internal/api/feeds.go for
+        the omitted-vs-null presence-detection pattern this endpoint
+        needs).
+      properties:
+        time:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [weight, length, head]
+        value:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 200
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+    PumpLog:
+      type: object
+      required:
+        - id
+        - babyId
+        - caretakerId
+        - caretakerName
+        - notes
+        - time
+        - side
+        - amountMl
+        - durationMin
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
+        side:
+          type: string
+          enum: [left, right, both]
+          nullable: true
+        amountMl:
+          type: integer
+          format: int32
+          nullable: true
+        durationMin:
+          type: integer
+          format: int32
+          nullable: true
+    CreatePump:
+      type: object
+      required: [babyId, time]
+      properties:
+        babyId:
+          type: string
+        time:
+          type: string
+          format: date-time
+        side:
+          type: string
+          enum: [left, right, both]
+        amountMl:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+        durationMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+        notes:
+          type: string
+          maxLength: 1000
+    UpdatePump:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `side`,
+        `amountMl`, `durationMin` and `notes` may also be sent as `null`
+        to CLEAR that column; `time` is not nullable — only settable or
+        omitted (see internal/api/feeds.go for the omitted-vs-null
+        presence-detection pattern this endpoint needs).
+      properties:
+        time:
+          type: string
+          format: date-time
+        side:
+          type: string
+          enum: [left, right, both]
+          nullable: true
+        amountMl:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+          nullable: true
+        durationMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+          nullable: true
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+    CalendarEvent:
+      type: object
+      description: >-
+        A family-wide (or baby-specific) planned event. Free (no plan
+        gate — creation was premium in the TS predecessor; this port
+        removes that gate).
+      required:
+        - id
+        - title
+        - description
+        - location
+        - category
+        - startTime
+        - allDay
+        - durationMin
+        - remindMinutesBefore
+        - createdBy
+        - createdByName
+        - babies
+        - assignees
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        category:
+          type: string
+          enum: [doctor, vaccination, babysitting, family, other]
+        startTime:
+          type: string
+          format: date-time
+        allDay:
+          type: boolean
+        durationMin:
+          type: integer
+          format: int32
+          nullable: true
+        remindMinutesBefore:
+          type: integer
+          format: int32
+          nullable: true
+        createdBy:
+          type: string
+        createdByName:
+          type: string
+        babies:
+          type: array
+          description: Zero babies = family-wide event.
+          items:
+            type: object
+            required: [id, name]
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+        assignees:
+          type: array
+          items:
+            type: object
+            required: [userId, name]
+            properties:
+              userId:
+                type: string
+              name:
+                type: string
+    CreateCalendarEvent:
+      type: object
+      required: [title, startTime]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+        location:
+          type: string
+          maxLength: 200
+        category:
+          type: string
+          enum: [doctor, vaccination, babysitting, family, other]
+          default: other
+        startTime:
+          type: string
+          format: date-time
+        allDay:
+          type: boolean
+          default: false
+          description: All-day events are single-day; the server nulls durationMin when set.
+        durationMin:
+          type: integer
+          format: int32
+          minimum: 5
+          maximum: 1440
+        remindMinutesBefore:
+          type: integer
+          format: int32
+          minimum: 15
+          maximum: 10080
+        babyIds:
+          type: array
+          maxItems: 10
+          default: []
+          items:
+            type: string
+        assigneeUserIds:
+          type: array
+          maxItems: 20
+          default: []
+          items:
+            type: string
+    UpdateCalendarEvent:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op.
+        `description`/`location`/`durationMin`/`remindMinutesBefore` may
+        also be sent as `null` to CLEAR that column; `title`/`category`/
+        `startTime`/`allDay` are not nullable — only settable or omitted.
+        `babyIds`/`assigneeUserIds`, when present, REPLACE the link set;
+        omitted leaves it untouched (see internal/api/calendar.go).
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+          nullable: true
+        location:
+          type: string
+          maxLength: 200
+          nullable: true
+        category:
+          type: string
+          enum: [doctor, vaccination, babysitting, family, other]
+        startTime:
+          type: string
+          format: date-time
+        allDay:
+          type: boolean
+        durationMin:
+          type: integer
+          format: int32
+          minimum: 5
+          maximum: 1440
+          nullable: true
+        remindMinutesBefore:
+          type: integer
+          format: int32
+          minimum: 15
+          maximum: 10080
+          nullable: true
+        babyIds:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+        assigneeUserIds:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+    Contact:
+      type: object
+      description: >-
+        One entry in the family's address book. Zero linked babies means
+        the contact belongs to the whole family. Free (no plan gate — see
+        internal/api/contacts.go).
+      required:
+        - id
+        - name
+        - role
+        - icon
+        - phone
+        - email
+        - website
+        - notes
+        - babies
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          nullable: true
+        icon:
+          type: string
+          enum:
+            [
+              user,
+              doctor,
+              nurse,
+              hospital,
+              dental,
+              family,
+              grandparent,
+              daycare,
+              friend,
+              phone,
+            ]
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        website:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        babies:
+          type: array
+          description: Zero babies = a contact the whole family shares.
+          items:
+            type: object
+            required: [id, name]
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+    CreateContact:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        role:
+          type: string
+          maxLength: 60
+        icon:
+          type: string
+          enum:
+            [
+              user,
+              doctor,
+              nurse,
+              hospital,
+              dental,
+              family,
+              grandparent,
+              daycare,
+              friend,
+              phone,
+            ]
+        phone:
+          type: string
+          maxLength: 40
+        email:
+          type: string
+          format: email
+          maxLength: 200
+        website:
+          type: string
+          maxLength: 200
+          description: >-
+            Free text, deliberately not validated as a URL — people type
+            "legesenteret.no" and saving matters more than being right
+            about URL shape.
+        notes:
+          type: string
+          maxLength: 2000
+        babyIds:
+          type: array
+          maxItems: 10
+          default: []
+          items:
+            type: string
+    UpdateContact:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op.
+        `role`/`icon`/`phone`/`email`/`website`/`notes` may also be sent as
+        `null` to CLEAR that column; `name` is not nullable — only settable
+        or omitted. `babyIds`, when present, REPLACES the link set; omitted
+        leaves it untouched.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        role:
+          type: string
+          maxLength: 60
+          nullable: true
+        icon:
+          type: string
+          enum:
+            [
+              user,
+              doctor,
+              nurse,
+              hospital,
+              dental,
+              family,
+              grandparent,
+              daycare,
+              friend,
+              phone,
+            ]
+          nullable: true
+        phone:
+          type: string
+          maxLength: 40
+          nullable: true
+        email:
+          type: string
+          format: email
+          maxLength: 200
+          nullable: true
+        website:
+          type: string
+          maxLength: 200
+          nullable: true
+        notes:
+          type: string
+          maxLength: 2000
+          nullable: true
+        babyIds:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+    PushConfig:
+      type: object
+      required: [publicKey]
+      properties:
+        publicKey:
+          type: string
+    Subscribe:
+      type: object
+      required: [endpoint, p256dh, auth]
+      properties:
+        endpoint:
+          type: string
+          format: uri
+          maxLength: 1000
+        p256dh:
+          type: string
+          minLength: 1
+          maxLength: 300
+        auth:
+          type: string
+          minLength: 1
+          maxLength: 100
+    Unsubscribe:
+      type: object
+      required: [endpoint]
+      properties:
+        endpoint:
+          type: string
+          maxLength: 1000
+    PushPrefs:
+      type: object
+      description: >-
+        feedReminderHours is off (0) or a lead time in hours before a
+        reminder fires; the enum matches the frontend's fixed picker
+        (off/3/4/6).
+      required: [feedReminderHours]
+      properties:
+        feedReminderHours:
+          type: integer
+          enum: [0, 3, 4, 6]
+          default: 0
+    PushTestResult:
+      type: object
+      required: [sent]
+      properties:
+        sent:
+          type: integer
+    ApiKey:
+      type: object
+      description: >-
+        One bearer API key, key material never included (see ApiKeyCreated
+        for the one response that carries it).
+      required:
+        - id
+        - name
+        - prefix
+        - createdAt
+        - lastUsedAt
+        - revokedAt
+        - expiresAt
+        - readOnly
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        prefix:
+          type: string
+          description: The displayable head of the full key (`pjk_` + 8 more chars).
+        createdAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        readOnly:
+          type: boolean
+    CreateApiKey:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+        expiresInDays:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 3650
+          description: Omitted means the key never expires.
+        readOnly:
+          type: boolean
+          default: false
+    ApiKeyCreated:
+      allOf:
+        - $ref: "#/components/schemas/ApiKey"
+        - type: object
+          required: [key]
+          properties:
+            key:
+              type: string
+              description: >-
+                The full bearer token (`pjk_…`). Shown exactly once — this
+                response is the only place it ever appears.
+    Invite:
+      type: object
+      required:
+        - code
+        - familyId
+        - role
+        - expiresAt
+        - maxUses
+        - usedCount
+        - revokedAt
+        - url
+      properties:
+        code:
+          type: string
+        familyId:
+          type: string
+        role:
+          type: string
+          enum: [admin, member]
+        expiresAt:
+          type: string
+          format: date-time
+        maxUses:
+          type: integer
+        usedCount:
+          type: integer
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+        url:
+          type: string
+          description: "`{AppURL}/join/{code}`, ready to render as a QR code."
+    CreateInvite:
+      type: object
+      description: Every field is optional; an empty (or absent) body uses every default.
+      properties:
+        role:
+          type: string
+          enum: [admin, member]
+          default: member
+        expiresInHours:
+          type: integer
+          minimum: 1
+          maximum: 720
+          default: 72
+        maxUses:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 5
+    InviteInfo:
+      type: object
+      required: [valid, familyName, role, reason]
+      properties:
+        valid:
+          type: boolean
+        familyName:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [admin, member]
+          nullable: true
+        reason:
+          type: string
+          enum: [revoked, expired, exhausted, not_found]
+          nullable: true
+    Redeem:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 64
+    RedeemResult:
+      type: object
+      required: [familyId, familyName, role, alreadyMember]
+      properties:
+        familyId:
+          type: string
+        familyName:
+          type: string
+        role:
+          type: string
+          enum: [admin, member]
+        alreadyMember:
+          type: boolean
+
+    # --- System-admin console (Task 21) ---------------------------------
+    AdminStats:
+      type: object
+      description: >-
+        Platform totals. Every count is a plain integer — the underlying
+        COUNT(*) is bigint and must be cast (`::int`) in SQL, or the driver
+        hands it back as a string (CLAUDE.md's Postgres notes).
+      required:
+        [families, users, babies, coreLogs, pushSubscriptions, usersLast7d]
+      properties:
+        families:
+          type: integer
+        users:
+          type: integer
+          description: >-
+            Every row in `users`, the "Deleted user" tombstone included —
+            the TypeScript predecessor counted it the same way once it had
+            been created.
+        babies:
+          type: integer
+        coreLogs:
+          type: integer
+          description: Feeds + diapers + sleeps.
+        pushSubscriptions:
+          type: integer
+        usersLast7d:
+          type: integer
+    AdminFamily:
+      type: object
+      required:
+        [id, name, slug, plan, createdAt, members, babies, lastFeedAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        plan:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        members:
+          type: integer
+        babies:
+          type: integer
+        lastFeedAt:
+          type: string
+          format: date-time
+          nullable: true
+    AdminUser:
+      type: object
+      required: [id, name, email, role, banned, banReason, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          nullable: true
+          description: Ours, system-admin role. "admin" or null.
+        banned:
+          type: boolean
+        banReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    BanUser:
+      type: object
+      description: Every field is optional; an absent body bans with no stated reason.
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+    SetUserPassword:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+    AuditEntry:
+      type: object
+      required: [id, adminId, adminName, action, target, detail, createdAt]
+      properties:
+        id:
+          type: string
+        adminId:
+          type: string
+        adminName:
+          type: string
+        action:
+          type: string
+        target:
+          type: string
+        detail:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    AuditNote:
+      type: object
+      required: [action, target]
+      properties:
+        action:
+          type: string
+          minLength: 1
+          maxLength: 60
+        target:
+          type: string
+          minLength: 1
+          maxLength: 200
+        detail:
+          type: string
+          maxLength: 500
+    Error:
+      type: object
+      description: >-
+        The error envelope used by every non-2xx JSON response in the API
+        (CLAUDE.md: "{error: string, code: string}" everywhere).
+      required: [error, code]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        issues:
+          type: array
+          description: >-
+            Optional per-field validation issues. The frontend only reads
+            error/code today; issues exist for future, more specific UI.
+          items:
+            type: object
+            required: [path, message]
+            properties:
+              path:
+                type: string
+              message:
+                type: string

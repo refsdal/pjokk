@@ -20,13 +20,12 @@ export function LoginScreen({ redirectTo = "/home" }: { redirectTo?: string }) {
     return <Navigate to={redirectTo} />;
   }
 
+  // Limen's OAuth flow hands the browser to Google and comes back to
+  // `redirectTo`; there is no promise to await past the navigation, so the
+  // only failure this can report is the authorize call itself.
   const google = async () => {
     try {
-      const { error } = await signIn.social({
-        provider: "google",
-        callbackURL: redirectTo,
-      });
-      if (error) throw new Error(error.message ?? t("Sign-in failed"));
+      await signIn.google(redirectTo);
     } catch (err) {
       toast(err instanceof Error ? err.message : t("Sign-in failed"), "error");
     }
@@ -34,13 +33,14 @@ export function LoginScreen({ redirectTo = "/home" }: { redirectTo?: string }) {
 
   const emailSignIn = async () => {
     setBusy(true);
-    const { error } = await signIn.email({ email, password });
-    setBusy(false);
-    if (error) {
-      toast(error.message ?? t("Sign-in failed"), "error");
-      return;
+    try {
+      await signIn.password(email, password);
+      void navigate({ to: redirectTo });
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t("Sign-in failed"), "error");
+    } finally {
+      setBusy(false);
     }
-    void navigate({ to: redirectTo });
   };
 
   return (
