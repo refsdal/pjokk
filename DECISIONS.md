@@ -1228,3 +1228,24 @@ edited, per this file's append-only convention.
   join. A seed that produces an unusable password is worse than no seed. The
   documented dev bootstrap is `OPEN_SIGNUP=1`, which is also what a
   self-hoster does — so it is the path that stays exercised.
+
+## 2026-09-01 — image build: native artifacts, COPY-only Dockerfile, distroless base
+
+The multi-stage Dockerfile (bun stage → go stage → scratch) is gone. The SPA
+and both server binaries are built natively by `scripts/build-artifacts.sh`
+(`dist/server/pjokk-linux-{amd64,arm64}`, SPA embedded via go:embed before
+compiling), and the Dockerfile only COPYs the binary matching `TARGETARCH`.
+Multi-arch assembly went from minutes of per-platform builds to seconds of
+file copying, nothing runs under QEMU, and native builds reuse the local /
+CI Go and Vite caches. Cost: `docker build .` alone no longer works — the
+artifact script must run first (the Dockerfile and compose say so). The base
+moved from `scratch` to `gcr.io/distroless/static-debian12:nonroot`
+(digest-pinned, Dependabot-bumped): same no-shell/no-libc surface, but the
+CA bundle, tzdata and the 65532 `nonroot` user are maintained upstream
+instead of hand-rolled. `/data` is still pre-created image-side — Docker
+copies image-dir ownership onto a fresh named volume, which remains the only
+root-free way to give a nonroot process a writable volume. This layout is
+also exactly what GoReleaser's `dockers` block expects, if bare-binary
+GitHub Releases ever become worth adopting it for. Releases are now
+genuinely multi-arch (the old release workflow never passed `platforms:`
+and silently published amd64-only).

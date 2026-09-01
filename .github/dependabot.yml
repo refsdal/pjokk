@@ -31,3 +31,9 @@ updates:
       js-minor-patch:
         update-types: [minor, patch]
         patterns: ["*"]
+
+  # The distroless base image is pinned by digest in the Dockerfile.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
