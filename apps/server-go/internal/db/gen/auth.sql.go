@@ -30,6 +30,45 @@ func (q *Queries) ClearActiveFamilyForUser(ctx context.Context, arg ClearActiveF
 	return err
 }
 
+const countFamilyMembership = `-- name: CountFamilyMembership :one
+SELECT COUNT(*)::int
+FROM "organization_members"
+WHERE "organization_id" = $1 AND "user_id" = $2
+`
+
+type CountFamilyMembershipParams struct {
+	OrganizationID string
+	UserID         string
+}
+
+// The membership guard for SetActiveFamily. A bare count, not GetMembership:
+// the caller only needs "is this user in this family", and a session must
+// never be pointed at a family whose data its owner may not read.
+func (q *Queries) CountFamilyMembership(ctx context.Context, arg CountFamilyMembershipParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countFamilyMembership, arg.OrganizationID, arg.UserID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const createImpersonation = `-- name: CreateImpersonation :exec
+INSERT INTO "impersonation" ("impersonated_token", "admin_token", "admin_id")
+VALUES ($1, $2, $3)
+`
+
+type CreateImpersonationParams struct {
+	ImpersonatedToken string
+	AdminToken        string
+	AdminID           string
+}
+
+// Server-only: the admin's session token never goes into session metadata,
+// which its owner can read back (see 00003_impersonation.sql).
+func (q *Queries) CreateImpersonation(ctx context.Context, arg CreateImpersonationParams) error {
+	_, err := q.db.Exec(ctx, createImpersonation, arg.ImpersonatedToken, arg.AdminToken, arg.AdminID)
+	return err
+}
+
 const deleteFamilyMember = `-- name: DeleteFamilyMember :exec
 DELETE FROM "organization_members"
 WHERE "organization_id" = $1 AND "id" = $2
@@ -57,6 +96,16 @@ type DeleteFamilyMemberRolesParams struct {
 
 func (q *Queries) DeleteFamilyMemberRoles(ctx context.Context, arg DeleteFamilyMemberRolesParams) error {
 	_, err := q.db.Exec(ctx, deleteFamilyMemberRoles, arg.OrganizationID, arg.MemberID)
+	return err
+}
+
+const deleteImpersonation = `-- name: DeleteImpersonation :exec
+DELETE FROM "impersonation"
+WHERE "impersonated_token" = $1
+`
+
+func (q *Queries) DeleteImpersonation(ctx context.Context, impersonatedToken string) error {
+	_, err := q.db.Exec(ctx, deleteImpersonation, impersonatedToken)
 	return err
 }
 
@@ -135,8 +184,27 @@ func (q *Queries) GetFamilyMember(ctx context.Context, arg GetFamilyMemberParams
 	return i, err
 }
 
+const getImpersonation = `-- name: GetImpersonation :one
+SELECT "admin_token", "admin_id"
+FROM "impersonation"
+WHERE "impersonated_token" = $1
+`
+
+type GetImpersonationRow struct {
+	AdminToken string
+	AdminID    string
+}
+
+func (q *Queries) GetImpersonation(ctx context.Context, impersonatedToken string) (GetImpersonationRow, error) {
+	row := q.db.QueryRow(ctx, getImpersonation, impersonatedToken)
+	var i GetImpersonationRow
+	err := row.Scan(&i.AdminToken, &i.AdminID)
+	return i, err
+}
+
 const getSessionRecord = `-- name: GetSessionRecord :one
 SELECT
+    "user_id" AS user_id,
     COALESCE("metadata", '') AS metadata,
     "expires_at" AS expires_at
 FROM "sessions"
@@ -144,17 +212,18 @@ WHERE "token" = $1
 `
 
 type GetSessionRecordRow struct {
+	UserID    string
 	Metadata  string
 	ExpiresAt pgtype.Timestamptz
 }
 
-// Impersonation bookkeeping: the metadata blob (JSON in a text column, the
-// shape Limen's SessionSchema serialises) and the expiry used to size the
-// restored admin cookie.
+// The session's owner, its metadata blob (JSON in a text column, the shape
+// Limen's SessionSchema serialises) and the expiry used to size the restored
+// admin cookie.
 func (q *Queries) GetSessionRecord(ctx context.Context, token string) (GetSessionRecordRow, error) {
 	row := q.db.QueryRow(ctx, getSessionRecord, token)
 	var i GetSessionRecordRow
-	err := row.Scan(&i.Metadata, &i.ExpiresAt)
+	err := row.Scan(&i.UserID, &i.Metadata, &i.ExpiresAt)
 	return i, err
 }
 
@@ -172,4 +241,21 @@ type InsertFamilyMemberRoleParams struct {
 func (q *Queries) InsertFamilyMemberRole(ctx context.Context, arg InsertFamilyMemberRoleParams) error {
 	_, err := q.db.Exec(ctx, insertFamilyMemberRole, arg.MemberID, arg.OrganizationID, arg.Role)
 	return err
+}
+
+const isSessionUserBanned = `-- name: IsSessionUserBanned :one
+SELECT u."banned"
+FROM "sessions" s
+JOIN "users" u ON u."id" = s."user_id"
+WHERE s."token" = $1
+`
+
+// The banned guard in front of Limen's own routes. Keyed on the raw token so
+// the guard costs one round trip and has no session-validation side effects
+// (Limen's ValidateSession can extend a session's expiry as it goes).
+func (q *Queries) IsSessionUserBanned(ctx context.Context, token string) (bool, error) {
+	row := q.db.QueryRow(ctx, isSessionUserBanned, token)
+	var banned bool
+	err := row.Scan(&banned)
+	return banned, err
 }

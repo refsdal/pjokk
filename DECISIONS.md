@@ -1068,13 +1068,45 @@ edited, per this file's append-only convention.
   and the `rate_limits` table stays empty unless someone switches the store;
   the session metadata, however, is persisted, and sessions live seven days.
   Storing addresses next to Article 9 health data is exactly what the privacy
-  policy promises we do not do, so `internal/auth` passes the same
-  SHA-256-of-RemoteAddr extractor to both
-  (`limen.WithSessionIPAddressExtractor`, and
-  `WithHTTPRateLimiter(WithRateLimiterKeyGenerator(...))`). Limen's limiter is
+  policy promises we do not do, so `internal/auth` passes the same keyed
+  extractor to both (`limen.WithSessionIPAddressExtractor`, and
+  `WithHTTPRateLimiter(WithRateLimiterKeyGenerator(...))`). It is an
+  **HMAC-SHA-256**, not a bare digest: the IPv4 address space is small
+  enough to enumerate, so an unkeyed hash of an address is reversible with
+  a rainbow table in seconds and would not be pseudonymisation at all. The
+  key is derived from `AUTH_SECRET` with its own domain separator
+  (`:client-ip`) so it can never be the same bytes as the signing secret,
+  and it is instance-local — the right scope, since the digest only needs
+  to be comparable within one deployment. Limen's limiter is
   left ENABLED rather than replaced with a no-op: it protects the auth routes
   in-process with sensible per-route rules (5 sign-ins / 10 s), our own
   `rate_limit` table covers the app's routes, and a hashed key gives up
   nothing we wanted. A test asserts the persisted metadata contains a 64-char
   digest and not the address (`TestSessionMetadataStoresNoRawAddress`) —
   the guarantee is behavioural, so it is checked behaviourally.
+- **Limen's HTTP surface is an allowlist, not a denylist.** Registering the
+  credential, oauth and organization plugins mounts roughly forty routes, most
+  of which duplicate or contradict Pjokk's own API — Limen's invitations are
+  email-addressed (wrong grain; `family_invite` is the real mechanism), its
+  member and role routes apply Limen's permission model rather than ours, and
+  `GET /auth/sessions` serialises a session's own token and metadata back to
+  its owner. Every route left on is one we have implicitly accepted
+  responsibility for, so `internal/auth` computes the disabled set as
+  "everything known, minus a short allowlist": credential sign-in, Google
+  authorize + callback, signout, the session read, and organization
+  create/list/switch (plus signup when `OPEN_SIGNUP=1`). `knownRouteIDs` is
+  hand-maintained and must be revisited on every Limen upgrade — a route added
+  upstream and not listed there would be silently enabled — which is why
+  `TestLimenRouteAllowlist` probes twenty concrete paths rather than asserting
+  something about the list itself. That test was verified non-vacuous by
+  temporarily widening the allowlist and watching all twenty become reachable.
+- **A ban is enforced by revocation, not by a flag every reader must
+  remember.** `users.banned` is checked in two places — `SessionFromRequest`
+  (which reports a banned user as signed out, covering our own routes) and a
+  guard wrapping Limen's router (which Limen never asks about, so a banned
+  account could otherwise still read `/api/auth/me` or switch families with a
+  pre-ban cookie). Signout stays reachable, or a banned user's browser keeps a
+  cookie it cannot clear. Neither check is a substitute for revocation: the
+  `Service` interface documents that whatever sets `banned` MUST also call
+  `RevokeAllSessions`, because a live bearer token that merely fails two
+  specific checks is one forgotten check away from working again.

@@ -9,20 +9,24 @@ import (
 	"time"
 
 	"github.com/thecodearcher/limen"
+
+	"github.com/refsdal/pjokk/server/internal/db/gen"
 )
 
 // pjokkPluginName identifies our one custom Limen plugin. It must not collide
 // with a plugin Limen or its official plugins register.
 const pjokkPluginName limen.PluginName = "pjokk-core"
 
-// Metadata keys written onto an impersonated session. They live in the
-// session row's JSON metadata column, which is exactly where an
-// impersonation marker belongs: it dies with the session, and it cannot be
-// forged by a client because the column is server-side only.
-const (
-	metaImpersonatedBy = "impersonated_by"
-	metaAdminToken     = "admin_token"
-)
+// metaImpersonatedBy marks an impersonated session in its JSON metadata.
+//
+// ONLY the admin's user id lives here, never their session token. Limen's
+// own ListSessions hands a session's Token and Metadata back to the session
+// owner, so anything in metadata must be safe for the impersonated user to
+// read; a user id is (they see the banner naming the admin anyway), a live
+// admin session token is a straight privilege escalation. The token lives in
+// the server-only `impersonation` table instead — see 00003_impersonation.sql
+// — and the ListSessions route is disabled on top of that.
+const metaImpersonatedBy = "impersonated_by"
 
 // corePlugin exists for one reason: *limen.LimenCore is not reachable from
 // the *limen.Limen handle that limen.New returns, but every plugin is handed
@@ -53,8 +57,14 @@ func (p *corePlugin) PluginHTTPConfig() limen.PluginHTTPConfig {
 func (p *corePlugin) RegisterRoutes(*limen.LimenHTTPCore, *limen.RouteBuilder) {}
 
 // Impersonate signs the caller in as targetUserID: it mints a second session
-// for the target user, stamps it with who is really driving it and with the
-// admin's own session token, and swaps the response cookie over to it.
+// for the target user, records who is really driving it, and swaps the
+// response cookie over to it.
+//
+// The record is split on purpose. The admin's USER ID goes into the
+// impersonated session's metadata, where SessionFromRequest reads it for the
+// banner. The admin's SESSION TOKEN goes into the server-only
+// `impersonation` table, which nothing outside this package reads — see
+// 00003_impersonation.sql for what happens when it does not.
 //
 // The admin's session is deliberately NOT revoked — StopImpersonating puts
 // its token straight back into the cookie, so an interrupted impersonation
@@ -85,65 +95,94 @@ func (s *service) Impersonate(ctx context.Context, w http.ResponseWriter, r *htt
 	}
 
 	// Merge rather than replace: CreateSession already stored the session's
-	// own metadata (hashed IP, user agent) and dropping it would lose the
-	// audit value of the impersonated session itself.
+	// own metadata (address digest, user agent) and dropping it would lose
+	// the audit value of the impersonated session itself.
 	metadata, err := s.sessionMetadata(ctx, result.Token)
 	if err == nil {
 		metadata[metaImpersonatedBy] = adminSession.UserID
-		metadata[metaAdminToken] = adminSession.Token
 		err = s.writeSessionMetadata(ctx, result.Token, metadata)
 	}
+	if err == nil {
+		err = s.q.CreateImpersonation(ctx, gen.CreateImpersonationParams{
+			ImpersonatedToken: result.Token,
+			AdminToken:        adminSession.Token,
+			AdminID:           adminSession.UserID,
+		})
+		if err != nil {
+			err = fmt.Errorf("auth: record impersonation: %w", err)
+		}
+	}
 	if err != nil {
-		// The session exists but carries no marker, which would make it
-		// indistinguishable from the target signing in themselves. Revoke it
-		// rather than leave an unattributable session behind.
+		// A half-recorded impersonation is worse than none: the session
+		// exists and would be indistinguishable from the target signing in
+		// themselves, or unstoppable because nothing knows how to get back.
+		// Revoke it (which cascades the impersonation row away) and fail.
 		_ = s.limen.RevokeSession(ctx, result.Token)
 		return err
 	}
 
 	if err := s.core.Cookies().SetSessionCookie(w, result); err != nil {
+		_ = s.limen.RevokeSession(ctx, result.Token)
 		return fmt.Errorf("auth: set impersonated session cookie: %w", err)
 	}
 	return nil
 }
 
 // StopImpersonating reverses Impersonate: it restores the admin's own session
-// cookie from the marker written at impersonation time, then revokes the
-// impersonated session so the token cannot be replayed.
+// cookie from the server-only record written at impersonation time, then
+// revokes the impersonated session so the token cannot be replayed.
 //
-// The admin token is read back from the database rather than carried on the
-// Session value, so a StopImpersonating call cannot be talked into restoring
-// a session the caller merely claims to own.
+// The admin token is read from the `impersonation` table, never from the
+// caller-supplied Session, so this cannot be talked into restoring a session
+// the caller merely claims to own.
+//
+// EVERY exit is terminal: whatever went wrong, the operator must not be left
+// holding a live session as the target. If the admin session cannot be
+// restored (revoked, expired, the record is gone), the impersonated session
+// is revoked and its cookie cleared anyway, and the error explains that they
+// need to sign in again. Failing "safely" by leaving the impersonation
+// running is the one outcome that is not acceptable.
 func (s *service) StopImpersonating(ctx context.Context, w http.ResponseWriter, _ *http.Request, session *Session) error {
 	if session == nil || session.ImpersonatedBy == "" {
 		return ErrNotImpersonating
 	}
 
-	metadata, err := s.sessionMetadata(ctx, session.Token)
+	record, err := s.q.GetImpersonation(ctx, session.Token)
 	if err != nil {
-		return err
+		return s.endImpersonation(ctx, w, session.Token,
+			fmt.Errorf("auth: no impersonation record for this session, signed out instead: %w", err))
 	}
 
-	adminToken, _ := metadata[metaAdminToken].(string)
-	if adminToken == "" {
-		return errors.New("auth: impersonated session carries no admin token")
-	}
-
-	admin, err := s.q.GetSessionRecord(ctx, adminToken)
+	admin, err := s.q.GetSessionRecord(ctx, record.AdminToken)
 	if err != nil {
-		return fmt.Errorf("auth: the admin session to restore is gone: %w", err)
+		return s.endImpersonation(ctx, w, session.Token,
+			fmt.Errorf("auth: the admin session to restore is gone, signed out instead: %w", err))
 	}
 
 	maxAge := int(time.Until(admin.ExpiresAt.Time).Seconds())
 	if maxAge <= 0 {
-		return errors.New("auth: the admin session to restore has expired")
+		return s.endImpersonation(ctx, w, session.Token,
+			errors.New("auth: the admin session to restore has expired, signed out instead"))
 	}
-	s.core.Cookies().Set(w, sessionCookieName, adminToken, maxAge)
 
+	s.core.Cookies().Set(w, sessionCookieName, record.AdminToken, maxAge)
+
+	// Revoking the impersonated session cascades its impersonation row away
+	// (00003), so there is nothing else to clean up.
 	if err := s.limen.RevokeSession(ctx, session.Token); err != nil {
 		return fmt.Errorf("auth: revoke impersonated session: %w", err)
 	}
 	return nil
+}
+
+// endImpersonation is the terminal fallback: revoke the impersonated session
+// and clear the cookie, then report why the admin's own session could not be
+// restored. The caller is signed out rather than left as the target.
+func (s *service) endImpersonation(ctx context.Context, w http.ResponseWriter, token string, cause error) error {
+	_ = s.q.DeleteImpersonation(ctx, token)
+	_ = s.limen.RevokeSession(ctx, token)
+	s.core.Cookies().DeleteSessionCookie(w)
+	return cause
 }
 
 // sessionMetadata reads a session's metadata blob. Limen stores it as JSON in

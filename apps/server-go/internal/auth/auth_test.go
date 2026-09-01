@@ -3,6 +3,7 @@ package auth_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -62,6 +63,35 @@ func (f *fixture) post(path, body string) *httptest.ResponseRecorder {
 	rec := httptest.NewRecorder()
 	f.mux.ServeHTTP(rec, req)
 	return rec
+}
+
+// get sends a GET through the mounted handler, optionally signed in.
+func (f *fixture) get(path string, cookie *http.Cookie) *httptest.ResponseRecorder {
+	f.tabs.Helper()
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	if cookie != nil {
+		req.AddCookie(cookie)
+	}
+	rec := httptest.NewRecorder()
+	f.mux.ServeHTTP(rec, req)
+	return rec
+}
+
+// ban flips users.banned, the way the admin console will.
+func (f *fixture) ban(userID string) {
+	f.tabs.Helper()
+	if _, err := f.rig.Pool.Exec(f.ctx, `UPDATE "users" SET "banned" = true WHERE "id" = $1`, userID); err != nil {
+		f.tabs.Fatalf("ban user: %v", err)
+	}
+}
+
+// promote makes a user a system administrator, the way the admin console
+// will.
+func (f *fixture) promote(userID string) {
+	f.tabs.Helper()
+	if _, err := f.rig.Pool.Exec(f.ctx, `UPDATE "users" SET "role" = 'admin' WHERE "id" = $1`, userID); err != nil {
+		f.tabs.Fatalf("promote to system admin: %v", err)
+	}
 }
 
 // sessionCookie extracts the session cookie a response set, failing the test
@@ -237,10 +267,7 @@ func TestBannedUserHasNoSession(t *testing.T) {
 	f := newFixture(t, false)
 
 	userID, cookie := f.signIn("Banned Person", "banned@example.com")
-
-	if _, err := f.rig.Pool.Exec(f.ctx, `UPDATE "users" SET "banned" = true WHERE "id" = $1`, userID); err != nil {
-		t.Fatalf("ban user: %v", err)
-	}
+	f.ban(userID)
 
 	session, err := f.svc.SessionFromRequest(signedInRequest(cookie))
 	if err != nil {
@@ -248,6 +275,121 @@ func TestBannedUserHasNoSession(t *testing.T) {
 	}
 	if session != nil {
 		t.Fatalf("banned user must read as signed out, got %+v", session)
+	}
+}
+
+// SessionFromRequest guards our own routes; Limen's routes never ask us, so
+// the Handler has to reject a banned session itself. Signing out stays open,
+// or a banned user's browser keeps a cookie it can never clear.
+func TestBannedUserRejectedOnLimenRoutes(t *testing.T) {
+	f := newFixture(t, false)
+
+	userID, cookie := f.signIn("Banned Person", "banned@example.com")
+
+	// Before the ban the route answers normally, so the assertion below is
+	// about the ban and not about the route being broken.
+	if rec := f.get(auth.BasePath+"/me", cookie); rec.Code != http.StatusOK {
+		t.Fatalf("precondition: /me before ban = %d, body %s", rec.Code, rec.Body.String())
+	}
+
+	f.ban(userID)
+
+	if rec := f.get(auth.BasePath+"/me", cookie); rec.Code != http.StatusUnauthorized {
+		t.Errorf("/me after ban = %d, want 401; body %s", rec.Code, rec.Body.String())
+	}
+	if rec := f.get(auth.BasePath+"/organizations", cookie); rec.Code != http.StatusUnauthorized {
+		t.Errorf("organizations list after ban = %d, want 401; body %s", rec.Code, rec.Body.String())
+	}
+
+	// Signout is the one route a banned session may still reach.
+	req := httptest.NewRequest(http.MethodPost, auth.BasePath+"/signout", strings.NewReader("{}"))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	f.mux.ServeHTTP(rec, req)
+	if rec.Code == http.StatusUnauthorized {
+		t.Errorf("signout must stay reachable for a banned session, got 401: %s", rec.Body.String())
+	}
+}
+
+// An anonymous request is Limen's business, not the guard's.
+func TestBannedGuardIgnoresAnonymousRequests(t *testing.T) {
+	f := newFixture(t, false)
+
+	rec := f.get(auth.BasePath+"/me", nil)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("/me anonymous = %d, want Limen's own 401", rec.Code)
+	}
+	if strings.Contains(rec.Body.String(), "account suspended") {
+		t.Fatalf("the banned guard answered an anonymous request: %s", rec.Body.String())
+	}
+}
+
+// Limen mounts a large default API. Only the routes the SPA needs may be
+// reachable; everything else has to be off, not merely undocumented.
+func TestLimenRouteAllowlist(t *testing.T) {
+	f := newFixture(t, false)
+
+	_, cookie := f.signIn("Kari", "kari@example.com")
+
+	disabled := []struct{ method, path string }{
+		{http.MethodGet, auth.BasePath + "/sessions"},
+		{http.MethodPost, auth.BasePath + "/revoke-sessions"},
+		{http.MethodGet, auth.BasePath + "/organizations/members"},
+		{http.MethodGet, auth.BasePath + "/organizations/active"},
+		{http.MethodPost, auth.BasePath + "/organizations/leave"},
+		{http.MethodPost, auth.BasePath + "/organizations/check-slug"},
+		{http.MethodPost, auth.BasePath + "/organizations/invitations"},
+		{http.MethodPost, auth.BasePath + "/organizations/invitations/respond"},
+		{http.MethodPost, auth.BasePath + "/organizations/invitations/cancel"},
+		{http.MethodGet, auth.BasePath + "/organizations/invitations"},
+		{http.MethodDelete, auth.BasePath + "/organizations/members/m1"},
+		{http.MethodPost, auth.BasePath + "/organizations/members/m1/roles/assign"},
+		{http.MethodPost, auth.BasePath + "/organizations/members/m1/roles/revoke"},
+		{http.MethodPatch, auth.BasePath + "/organizations/o1"},
+		{http.MethodDelete, auth.BasePath + "/organizations/o1"},
+		{http.MethodPost, auth.BasePath + "/passwords/request-reset"},
+		{http.MethodPost, auth.BasePath + "/passwords/reset"},
+		{http.MethodPost, auth.BasePath + "/passwords/change"},
+		{http.MethodPut, auth.BasePath + "/passwords"},
+		{http.MethodPost, auth.BasePath + "/usernames/check"},
+	}
+	for _, route := range disabled {
+		req := httptest.NewRequest(route.method, route.path, strings.NewReader("{}"))
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(cookie)
+		rec := httptest.NewRecorder()
+		f.mux.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNotFound && rec.Code != http.StatusMethodNotAllowed {
+			t.Errorf("%s %s is reachable (%d): %s", route.method, route.path, rec.Code, rec.Body.String())
+		}
+	}
+
+	// The kept routes must still answer — an allowlist that turns everything
+	// off is not a safer allowlist, it is a broken app.
+	kept := []struct{ method, path string }{
+		{http.MethodGet, auth.BasePath + "/me"},
+		{http.MethodGet, auth.BasePath + "/organizations"},
+	}
+	for _, route := range kept {
+		rec := f.get(route.path, cookie)
+		if rec.Code == http.StatusNotFound || rec.Code == http.StatusMethodNotAllowed {
+			t.Errorf("%s %s should be reachable, got %d", route.method, route.path, rec.Code)
+		}
+	}
+
+	// POST routes the SPA needs: reached, therefore answered by a handler.
+	for _, path := range []string{auth.BasePath + "/organizations", auth.BasePath + "/organizations/switch"} {
+		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"name":"Nordmann"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(cookie)
+		rec := httptest.NewRecorder()
+		f.mux.ServeHTTP(rec, req)
+
+		if rec.Code == http.StatusNotFound || rec.Code == http.StatusMethodNotAllowed {
+			t.Errorf("POST %s should be reachable, got %d", path, rec.Code)
+		}
 	}
 }
 
@@ -330,6 +472,80 @@ func TestFamilyLifecycleReachesSession(t *testing.T) {
 	}
 }
 
+// The tenancy middleware trusts active_organization_id as the family scope
+// for every subsequent query, so pointing a session at a family the user is
+// not in would be a straight cross-tenant read.
+func TestSetActiveFamilyRejectsNonMember(t *testing.T) {
+	f := newFixture(t, false)
+
+	ownerID, _ := f.signIn("Owner", "owner@example.com")
+	outsiderID, outsiderCookie := f.signIn("Outsider", "outsider@example.com")
+
+	familyID, err := f.svc.CreateFamily(f.ctx, ownerID, "Nordmann")
+	if err != nil {
+		t.Fatalf("CreateFamily: %v", err)
+	}
+	// The outsider has a family of their own, so this is "not a member of
+	// THIS family" rather than "has no families at all".
+	ownFamilyID, err := f.svc.CreateFamily(f.ctx, outsiderID, "Hansen")
+	if err != nil {
+		t.Fatalf("CreateFamily (outsider): %v", err)
+	}
+
+	outsider, err := f.svc.SessionFromRequest(signedInRequest(outsiderCookie))
+	if err != nil {
+		t.Fatalf("SessionFromRequest: %v", err)
+	}
+	if err := f.svc.SetActiveFamily(f.ctx, outsider.Token, ownFamilyID); err != nil {
+		t.Fatalf("SetActiveFamily on own family: %v", err)
+	}
+
+	err = f.svc.SetActiveFamily(f.ctx, outsider.Token, familyID)
+	if !errors.Is(err, auth.ErrNotFamilyMember) {
+		t.Fatalf("SetActiveFamily to a foreign family: err = %v, want ErrNotFamilyMember", err)
+	}
+
+	// And the session still points where it did.
+	after, err := f.svc.SessionFromRequest(signedInRequest(outsiderCookie))
+	if err != nil {
+		t.Fatalf("SessionFromRequest after rejection: %v", err)
+	}
+	if after.ActiveFamilyID != ownFamilyID {
+		t.Fatalf("ActiveFamilyID = %q, want it unchanged at %q", after.ActiveFamilyID, ownFamilyID)
+	}
+}
+
+// Family names repeat constantly. Two families with the same name must both
+// be creatable — through our API and through Limen's own create route, which
+// the allowlist keeps open for the SPA.
+func TestFamilyNamesMayRepeat(t *testing.T) {
+	f := newFixture(t, false)
+
+	oneID, _ := f.signIn("One", "one@example.com")
+	twoID, cookie := f.signIn("Two", "two@example.com")
+
+	first, err := f.svc.CreateFamily(f.ctx, oneID, "Hansen")
+	if err != nil {
+		t.Fatalf("CreateFamily: %v", err)
+	}
+	second, err := f.svc.CreateFamily(f.ctx, twoID, "Hansen")
+	if err != nil {
+		t.Fatalf("second family with the same name: %v", err)
+	}
+	if first == second {
+		t.Fatal("both families got the same id")
+	}
+
+	req := httptest.NewRequest(http.MethodPost, auth.BasePath+"/organizations", strings.NewReader(`{"name":"Hansen"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	f.mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("Limen's create route rejected a repeated family name: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestSetMemberRoleRejectsUnknownRole(t *testing.T) {
 	f := newFixture(t, false)
 
@@ -378,9 +594,7 @@ func TestImpersonateAndStopImpersonating(t *testing.T) {
 	adminID, adminCookie := f.signIn("Sysadmin", "admin@example.com")
 	targetID, _ := f.signIn("Target", "target@example.com")
 
-	if _, err := f.rig.Pool.Exec(f.ctx, `UPDATE "users" SET "role" = 'admin' WHERE "id" = $1`, adminID); err != nil {
-		t.Fatalf("promote to system admin: %v", err)
-	}
+	f.promote(adminID)
 
 	adminSession, err := f.svc.SessionFromRequest(signedInRequest(adminCookie))
 	if err != nil {
@@ -450,6 +664,137 @@ func TestImpersonateAndStopImpersonating(t *testing.T) {
 	}
 	if revoked != nil {
 		t.Fatalf("impersonated session still valid after StopImpersonating: %+v", revoked)
+	}
+}
+
+// The admin's session token must never be reachable from the impersonated
+// session: metadata is served back to its own owner by Limen's ListSessions,
+// so a token there is a privilege escalation. Only the marker belongs in
+// metadata; the token lives in the server-only impersonation table.
+func TestImpersonatedSessionMetadataHoldsNoAdminToken(t *testing.T) {
+	f := newFixture(t, false)
+
+	adminID, adminCookie := f.signIn("Sysadmin", "admin@example.com")
+	targetID, _ := f.signIn("Target", "target@example.com")
+	f.promote(adminID)
+
+	adminSession, err := f.svc.SessionFromRequest(signedInRequest(adminCookie))
+	if err != nil {
+		t.Fatalf("SessionFromRequest: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	if err := f.svc.Impersonate(f.ctx, rec, signedInRequest(adminCookie), adminSession, targetID); err != nil {
+		t.Fatalf("Impersonate: %v", err)
+	}
+	impersonated := f.sessionCookie(rec)
+
+	var metadata string
+	if err := f.rig.Pool.QueryRow(f.ctx,
+		`SELECT COALESCE("metadata", '') FROM "sessions" WHERE "token" = $1`, impersonated.Value,
+	).Scan(&metadata); err != nil {
+		t.Fatalf("read impersonated session metadata: %v", err)
+	}
+	if strings.Contains(metadata, adminCookie.Value) {
+		t.Fatalf("the admin's session token is readable from the impersonated session: %s", metadata)
+	}
+	if strings.Contains(metadata, "admin_token") {
+		t.Fatalf("session metadata still carries an admin_token key: %s", metadata)
+	}
+
+	// It is in the server-only table instead.
+	var stored string
+	if err := f.rig.Pool.QueryRow(f.ctx,
+		`SELECT "admin_token" FROM "impersonation" WHERE "impersonated_token" = $1`, impersonated.Value,
+	).Scan(&stored); err != nil {
+		t.Fatalf("read impersonation record: %v", err)
+	}
+	if stored != adminCookie.Value {
+		t.Fatalf("impersonation record holds %q, want the admin token", stored)
+	}
+}
+
+// Revoking either session takes the impersonation record with it, so no code
+// path has to remember to tidy up.
+func TestImpersonationRecordCascadesWithTheSession(t *testing.T) {
+	f := newFixture(t, false)
+
+	adminID, adminCookie := f.signIn("Sysadmin", "admin@example.com")
+	targetID, _ := f.signIn("Target", "target@example.com")
+	f.promote(adminID)
+
+	adminSession, err := f.svc.SessionFromRequest(signedInRequest(adminCookie))
+	if err != nil {
+		t.Fatalf("SessionFromRequest: %v", err)
+	}
+	rec := httptest.NewRecorder()
+	if err := f.svc.Impersonate(f.ctx, rec, signedInRequest(adminCookie), adminSession, targetID); err != nil {
+		t.Fatalf("Impersonate: %v", err)
+	}
+
+	if err := f.svc.RevokeAllSessions(f.ctx, adminID); err != nil {
+		t.Fatalf("RevokeAllSessions: %v", err)
+	}
+
+	var n int
+	if err := f.rig.Pool.QueryRow(f.ctx, `SELECT COUNT(*)::int FROM "impersonation"`).Scan(&n); err != nil {
+		t.Fatalf("count impersonation rows: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("impersonation record survived revoking the admin's session (%d rows)", n)
+	}
+}
+
+// If the admin's own session is gone, stopping must still end the
+// impersonation rather than strand the operator as the target.
+func TestStopImpersonatingIsTerminalWhenAdminSessionIsGone(t *testing.T) {
+	f := newFixture(t, false)
+
+	adminID, adminCookie := f.signIn("Sysadmin", "admin@example.com")
+	targetID, _ := f.signIn("Target", "target@example.com")
+	f.promote(adminID)
+
+	adminSession, err := f.svc.SessionFromRequest(signedInRequest(adminCookie))
+	if err != nil {
+		t.Fatalf("SessionFromRequest: %v", err)
+	}
+	rec := httptest.NewRecorder()
+	if err := f.svc.Impersonate(f.ctx, rec, signedInRequest(adminCookie), adminSession, targetID); err != nil {
+		t.Fatalf("Impersonate: %v", err)
+	}
+	impersonatedCookie := f.sessionCookie(rec)
+	impersonated, err := f.svc.SessionFromRequest(signedInRequest(impersonatedCookie))
+	if err != nil {
+		t.Fatalf("SessionFromRequest (impersonated): %v", err)
+	}
+
+	// The admin's own session disappears mid-impersonation (signed out
+	// elsewhere, expiry cleanup, another admin revoking them).
+	if _, err := f.rig.Pool.Exec(f.ctx, `DELETE FROM "sessions" WHERE "token" = $1`, adminCookie.Value); err != nil {
+		t.Fatalf("delete admin session: %v", err)
+	}
+
+	stopRec := httptest.NewRecorder()
+	if err := f.svc.StopImpersonating(f.ctx, stopRec, signedInRequest(impersonatedCookie), impersonated); err == nil {
+		t.Fatal("StopImpersonating should report that the admin session could not be restored")
+	}
+
+	// Terminal: the impersonated session is dead and the cookie cleared.
+	after, err := f.svc.SessionFromRequest(signedInRequest(impersonatedCookie))
+	if err != nil {
+		t.Fatalf("SessionFromRequest after failed stop: %v", err)
+	}
+	if after != nil {
+		t.Fatalf("operator is still signed in as the target: %+v", after)
+	}
+	cleared := false
+	for _, c := range stopRec.Result().Cookies() {
+		if c.Name == "limen_session" && c.Value == "" && c.MaxAge < 0 {
+			cleared = true
+		}
+	}
+	if !cleared {
+		t.Error("the session cookie was not cleared on a failed stop")
 	}
 }
 

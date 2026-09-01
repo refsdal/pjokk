@@ -85,21 +85,37 @@ func Setup(t *testing.T) *Rig {
 }
 
 // ensureMigrated probes for the migrated schema and applies migrations when
-// it is absent. The probe runs on every Setup call — cheap (one catalog
-// lookup) and, unlike a once-per-binary guard, immune to another test in the
-// same binary dropping the schema after we migrated it. `baby` stands in for
-// "the whole schema": it is created by the same single migration as every
-// other table, so it is either all there or none of it is.
+// it is absent OR out of date. The probe runs on every Setup call — cheap
+// (one lookup) and, unlike a once-per-binary guard, immune to another test in
+// the same binary dropping the schema after we migrated it.
+//
+// It compares goose_db_version against the highest embedded migration rather
+// than checking that some table exists: a table probe only ever answers
+// "migration 1 ran", so the first developer to add a second migration gets a
+// confusing failure in an unrelated package instead of a migrated database.
 func ensureMigrated(ctx context.Context, url string, pool *pgxpool.Pool) error {
 	migrateMu.Lock()
 	defer migrateMu.Unlock()
 
+	latest, err := db.LatestMigrationVersion()
+	if err != nil {
+		return err
+	}
+
 	var reg *string
-	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.baby')::text`).Scan(&reg); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.goose_db_version')::text`).Scan(&reg); err != nil {
 		return fmt.Errorf("testrig: probe schema: %w", err)
 	}
 	if reg != nil {
-		return nil
+		var applied int64
+		if err := pool.QueryRow(ctx,
+			`SELECT COALESCE(MAX("version_id"), 0) FROM "goose_db_version" WHERE "is_applied"`,
+		).Scan(&applied); err != nil {
+			return fmt.Errorf("testrig: read applied migration version: %w", err)
+		}
+		if applied >= latest {
+			return nil
+		}
 	}
 	return db.ApplyMigrations(ctx, url)
 }

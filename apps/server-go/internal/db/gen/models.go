@@ -148,6 +148,13 @@ type FeedLog struct {
 	CreatedAt   pgtype.Timestamptz
 }
 
+type Impersonation struct {
+	ImpersonatedToken string
+	AdminToken        string
+	AdminID           string
+	CreatedAt         pgtype.Timestamptz
+}
+
 type MeasurementLog struct {
 	ID          string
 	FamilyID    string

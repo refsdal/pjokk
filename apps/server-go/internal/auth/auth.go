@@ -15,9 +15,11 @@ package auth
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -78,6 +80,14 @@ var (
 	ErrMemberNotInFamily = errors.New("auth: member does not belong to this family")
 	// ErrEmailTaken is returned when an account already exists for an email.
 	ErrEmailTaken = errors.New("auth: an account already exists for this email")
+	// ErrNotFamilyMember is returned by SetActiveFamily when the session's
+	// user is not a member of the family they asked to switch to. Callers
+	// should map it to 403 — it is an authorization failure, not a 404: the
+	// family exists, this user simply may not enter it.
+	ErrNotFamilyMember = errors.New("auth: user is not a member of this family")
+	// ErrSessionNotFound is returned when a supplied session token has no
+	// live session behind it.
+	ErrSessionNotFound = errors.New("auth: session not found")
 )
 
 // Session is what the rest of the app knows about the caller. It is
@@ -93,6 +103,13 @@ type Session struct {
 }
 
 // Service is the entire auth surface the rest of the app may use.
+//
+// Banning: setting users.banned is NOT by itself a revocation. Existing
+// sessions stay in the database; SessionFromRequest reports them as signed
+// out and Handler rejects them on Limen's own routes, but a bearer token
+// still exists and the row still counts. Whatever bans an account MUST also
+// call RevokeAllSessions for that user, so the ban is enforced by absence
+// rather than by every reader remembering to check a flag.
 type Service interface {
 	Handler() http.Handler                                // mount at /api/auth/
 	SessionFromRequest(r *http.Request) (*Session, error) // nil,nil when no session
@@ -166,6 +183,18 @@ func New(cfg Config) (Service, error) {
 			// rather than Limen's default "owner" — Pjokk's vocabulary has
 			// exactly two family roles and "owner" is not one of them.
 			organization.WithCreatorRole(RoleAdmin),
+			// One slug rule for both entry points. Limen's own
+			// POST /organizations route stays enabled for the SPA, and its
+			// default generator derives the slug from the name alone — so
+			// the second family called "Hansen" would fail to be created.
+			// familySlug appends a random suffix; routing both paths through
+			// it means CreateFamily and the HTTP route cannot disagree.
+			organization.WithSlugGenerator(func(name, provided string) string {
+				if provided != "" {
+					return provided
+				}
+				return familySlug(name)
+			}),
 		),
 		core,
 	}
@@ -177,6 +206,10 @@ func New(cfg Config) (Service, error) {
 	// of at least 32. Hashing gives a stable 32-byte key from any valid
 	// secret without asking operators to count characters.
 	secret := sha256.Sum256([]byte(cfg.Secret))
+
+	// A separate key, domain-separated from the signing secret, for the
+	// client-address digests below.
+	ipDigest := clientIPDigest(sha256.Sum256([]byte(cfg.Secret + ipDigestDomain)))
 
 	instance, err := limen.New(&limen.Config{
 		BaseURL:  cfg.AppURL,
@@ -194,9 +227,9 @@ func New(cfg Config) (Service, error) {
 			// Limen stores the client IP in the session's metadata by
 			// default. Article 9 health data plus raw addresses is exactly
 			// what the privacy policy promises not to do, so sessions record
-			// a SHA-256 of the address instead — enough to tell two devices
-			// apart, useless for locating anyone.
-			limen.WithSessionIPAddressExtractor(hashedClientIP),
+			// a keyed digest of the address instead — enough to tell two
+			// devices apart, useless for locating anyone.
+			limen.WithSessionIPAddressExtractor(ipDigest),
 		),
 		HTTP: limen.NewDefaultHTTPConfig(
 			limen.WithHTTPBasePath(BasePath),
@@ -204,15 +237,22 @@ func New(cfg Config) (Service, error) {
 			// A self-hosted instance behind plain HTTP (or a dev machine)
 			// would silently never receive a Secure cookie.
 			limen.WithHTTPCookieSecure(strings.HasPrefix(cfg.AppURL, "https://")),
-			limen.WithHTTPDisabledPaths(disabledPaths(cfg.OpenSignup)),
+			limen.WithHTTPDisabledPaths(disabledRouteIDs(cfg.OpenSignup)),
 			// Same reasoning as the session extractor: the built-in limiter
 			// keys its buckets on the raw remote address.
-			limen.WithHTTPRateLimiter(limen.WithRateLimiterKeyGenerator(hashedClientIP)),
+			limen.WithHTTPRateLimiter(limen.WithRateLimiterKeyGenerator(ipDigest)),
 		),
 		Plugins: plugins,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("auth: build limen: %w", err)
+	}
+
+	// Limen hands the core to every plugin's Initialize; if that never
+	// happened, impersonation would nil-panic on the first admin action
+	// instead of failing here, at startup, where it is obvious.
+	if core.core == nil {
+		return nil, errors.New("auth: limen did not initialize the core plugin")
 	}
 
 	return &service{
@@ -258,18 +298,177 @@ func googlePlugin(cfg Config) limen.Plugin {
 	return oauth.New(opts...)
 }
 
-// disabledPaths turns off the credential signup route when signup is closed.
-// The value matches on Limen's route ID, so it survives a path change in the
-// plugin. A disabled route is simply never registered: requests to it fall
-// through to the router's not-found handler.
-func disabledPaths(openSignup bool) []string {
-	if openSignup {
-		return nil
-	}
-	return []string{"signup"}
+// knownRouteIDs is every route the registered Limen plugins can mount, as of
+// the pinned versions. It exists so the HTTP surface can be expressed as an
+// ALLOWLIST: Limen registers a large, capable API by default, most of which
+// duplicates or contradicts Pjokk's own — and every route we do not turn off
+// is a route we have implicitly accepted responsibility for.
+//
+// This list must be revisited whenever a Limen module is upgraded: a route
+// added upstream and not named here would be silently enabled. The route
+// tests below exist to make that concrete rather than aspirational.
+var knownRouteIDs = []string{
+	// core (limen_handlers.go)
+	"me", "list-sessions", "signout", "revoke-sessions",
+	"verify-email", "email-verifications",
+	// credential-password
+	"signin", "signup",
+	"passwords-request-reset", "passwords-reset", "passwords-change",
+	"passwords-set", "usernames-check",
+	// oauth
+	"oauth-authorize", "oauth-callback", "oauth-callback-post",
+	"oauth-link-authorize", "oauth-list-accounts", "oauth-unlink-account",
+	"oauth-get-tokens", "oauth-refresh-tokens",
+	// organization
+	"organizations:create", "organizations:list", "organizations:check-slug",
+	"organizations:update", "organizations:delete",
+	"organizations:members-list", "organizations:member-get",
+	"organizations:get-active", "organizations:switch",
+	"organizations:leave-organization",
+	"organizations:invite-member", "organizations:respond-to-invitation",
+	"organizations:get-invitation-by-token",
+	"organizations:cancel-pending-invitation", "organizations:list-invitations",
+	"organizations:revoke-member-role", "organizations:assign-member-role",
+	"organizations:remove-member",
+	"organizations:create-role", "organizations:list-roles",
+	"organizations:update-role", "organizations:delete-role",
 }
 
-func (s *service) Handler() http.Handler { return s.limen.Handler() }
+// allowedRouteIDs is the only part of Limen's HTTP surface the SPA reaches.
+// Everything else is turned off, for these reasons:
+//
+//   - list-sessions / revoke-sessions: ListSessions serialises a session's
+//     Token AND Metadata back to its owner. Nothing in Pjokk needs a device
+//     list, and handing a session's own token back to it is exactly the
+//     shape of bug that made 00003 necessary.
+//   - ALL invitation routes: Limen's invitations are email-addressed, which
+//     is the wrong grain for a QR code at Sunday dinner. The real invite
+//     mechanism is our own family_invite table (CLAUDE.md); a second,
+//     unaudited join path into a family is a tenancy hole waiting to happen.
+//   - member list/remove/role assign/revoke, organization update/delete,
+//     leave: family and member management goes through our own API, which
+//     applies our roles, our entitlement gates, and our audit trail.
+//   - passwords-*: email/password is the dev/demo sign-IN path only; no
+//     mailer is configured, so a reset flow could only half-work.
+//   - usernames-check, oauth account link/unlink/tokens: features we do not
+//     ship.
+//   - verify-email / email-verifications: same, no mailer.
+//
+// Kept: credential sign-in, Google authorize + callback, signout, the
+// session read, and the three organization routes the family switcher uses
+// (create, list, switch). Signup is kept only when signup is open.
+func allowedRouteIDs(openSignup bool) []string {
+	allowed := []string{
+		"signin",
+		"signout",
+		"me",
+		"oauth-authorize",
+		"oauth-callback",
+		"oauth-callback-post",
+		"organizations:create",
+		"organizations:list",
+		"organizations:switch",
+	}
+	if openSignup {
+		allowed = append(allowed, "signup")
+	}
+	return allowed
+}
+
+// disabledRouteIDs is the allowlist's complement. Limen matches these against
+// a route's ID (or its path), and a disabled route is never registered at
+// all: requests fall through to the router's not-found handler.
+func disabledRouteIDs(openSignup bool) []string {
+	allowed := make(map[string]struct{}, len(allowedRouteIDs(openSignup)))
+	for _, id := range allowedRouteIDs(openSignup) {
+		allowed[id] = struct{}{}
+	}
+
+	disabled := make([]string, 0, len(knownRouteIDs))
+	for _, id := range knownRouteIDs {
+		if _, ok := allowed[id]; !ok {
+			disabled = append(disabled, id)
+		}
+	}
+	return disabled
+}
+
+// Handler returns Limen's router behind the banned guard.
+//
+// SessionFromRequest already reports a banned user as signed out, which
+// covers our own routes — but Limen's routes never ask us. Without this, a
+// banned account could still read /api/auth/me, list its organizations, or
+// switch families with a cookie issued before the ban. Signing out is the
+// one thing it is still allowed to do.
+func (s *service) Handler() http.Handler {
+	return s.bannedGuard(s.limen.Handler())
+}
+
+// bannedGuard rejects requests carrying a session whose user is banned.
+//
+// It reads the token straight off the request and asks the database once,
+// rather than calling GetSession: session validation has side effects (it
+// can extend a session's expiry), and this guard runs ahead of Limen's own
+// validation on every auth route.
+//
+// A request with no token, or a token with no row, is left alone — Limen's
+// own handlers decide what an anonymous or stale request means. A database
+// failure denies the request rather than falling open.
+func (s *service) bannedGuard(next http.Handler) http.Handler {
+	signoutPath := BasePath + "/signout"
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == signoutPath {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		token := sessionToken(r)
+		if token == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		banned, err := s.q.IsSessionUserBanned(r.Context(), token)
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			next.ServeHTTP(w, r)
+			return
+		case err != nil:
+			writeAuthError(w, http.StatusInternalServerError, "session lookup failed")
+			return
+		case banned:
+			writeAuthError(w, http.StatusUnauthorized, "account suspended")
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// sessionToken mirrors Limen's own token extraction: cookie first, then a
+// bearer header (which the bearer plugin accepts for a future native shell).
+func sessionToken(r *http.Request) string {
+	if cookie, err := r.Cookie(sessionCookieName); err == nil {
+		if token := strings.TrimSpace(cookie.Value); token != "" {
+			return token
+		}
+	}
+	scheme, token, found := strings.Cut(r.Header.Get("Authorization"), " ")
+	if found && strings.EqualFold(scheme, "bearer") {
+		return strings.TrimSpace(token)
+	}
+	return ""
+}
+
+// writeAuthError matches the shape Limen's own Responder emits ({"message":
+// …}), so a client cannot tell our guard from a Limen rejection and needs no
+// special case for it.
+func writeAuthError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{"message": message})
+}
 
 // CreateUser creates an account, optionally without a usable password.
 //
@@ -331,9 +530,11 @@ func (s *service) CreateFamily(ctx context.Context, userID, name string) (string
 		return "", fmt.Errorf("auth: load family creator: %w", err)
 	}
 
+	// Slug left empty on purpose: the configured slug generator (see New)
+	// derives it, so this path and Limen's own create route produce the same
+	// shape of slug.
 	family, err := s.org.CreateOrganization(ctx, user, &organization.CreateOrganizationRequest{
 		Name: name,
-		Slug: familySlug(name),
 	})
 	if err != nil {
 		return "", fmt.Errorf("auth: create family: %w", err)
@@ -438,7 +639,16 @@ func (s *service) SetMemberRole(ctx context.Context, familyID, memberID, role st
 
 // SetActiveFamily points a session at a family; an empty familyID clears it.
 //
-// The organization plugin returns a *limen.SessionResult here because a
+// It checks membership FIRST. Limen's SetActiveOrganization is the unchecked
+// variant — it writes the column and nothing else — and its checked sibling
+// SwitchOrganization derives the user from session.UserID, which a
+// token-only call does not have. Since the tenancy middleware trusts
+// active_organization_id as the family scope for every subsequent query,
+// writing it without a membership check would let any signed-in user read
+// any family's data by naming its id. The guard is the whole point of this
+// method existing rather than exposing Limen's route.
+//
+// The organization plugin returns a *limen.SessionResult because a
 // client-visible session backend (JWT) would have to re-issue the token. Ours
 // is the database store, which updates the row in place and returns nil, so
 // there is nothing to deliver back to the client — which is why this method
@@ -451,6 +661,25 @@ func (s *service) SetActiveFamily(ctx context.Context, sessionToken, familyID st
 			return fmt.Errorf("auth: clear active family: %w", err)
 		}
 		return nil
+	}
+
+	record, err := s.q.GetSessionRecord(ctx, sessionToken)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrSessionNotFound
+		}
+		return fmt.Errorf("auth: load session: %w", err)
+	}
+
+	members, err := s.q.CountFamilyMembership(ctx, gen.CountFamilyMembershipParams{
+		OrganizationID: familyID,
+		UserID:         record.UserID,
+	})
+	if err != nil {
+		return fmt.Errorf("auth: check family membership: %w", err)
+	}
+	if members == 0 {
+		return fmt.Errorf("%w: %s", ErrNotFamilyMember, familyID)
 	}
 
 	family, err := s.org.GetOrganization(ctx, familyID)
@@ -538,18 +767,34 @@ func familySlug(name string) string {
 	return slug + "-" + randomHex(4)
 }
 
-// hashedClientIP is the key both Limen's rate limiter and its session
-// metadata use in place of the raw client address. It reads RemoteAddr only:
-// proxy-header handling (TRUSTED_PROXY_HOPS) belongs to the HTTP server that
-// sets RemoteAddr, not here, and guessing at X-Forwarded-For inside the auth
-// layer is how a limiter silently degrades to one shared bucket.
-func hashedClientIP(r *http.Request) string {
-	address := r.RemoteAddr
-	if host, _, err := net.SplitHostPort(address); err == nil {
-		address = host
+// ipDigestDomain separates the client-address key from the signing secret,
+// so the two can never be the same bytes even though both derive from
+// AUTH_SECRET.
+const ipDigestDomain = ":client-ip"
+
+// clientIPDigest builds the extractor both Limen's rate limiter and its
+// session metadata use in place of the raw client address.
+//
+// HMAC rather than a bare hash: the address space is small enough to
+// enumerate (a bare SHA-256 of an IPv4 address is reversible with a rainbow
+// table in seconds), so the digest is only unlinkable if it is keyed. The
+// key is instance-local, which is the right scope — the digest only ever
+// needs to be comparable within one deployment.
+//
+// It reads RemoteAddr only: proxy-header handling (TRUSTED_PROXY_HOPS)
+// belongs to the HTTP server that sets RemoteAddr, not here, and guessing at
+// X-Forwarded-For inside the auth layer is how a limiter silently degrades
+// to one shared bucket.
+func clientIPDigest(key [32]byte) func(*http.Request) string {
+	return func(r *http.Request) string {
+		address := r.RemoteAddr
+		if host, _, err := net.SplitHostPort(address); err == nil {
+			address = host
+		}
+		mac := hmac.New(sha256.New, key[:])
+		mac.Write([]byte(address))
+		return hex.EncodeToString(mac.Sum(nil))
 	}
-	sum := sha256.Sum256([]byte(address))
-	return hex.EncodeToString(sum[:])
 }
 
 // uuidGenerator supplies the text primary keys our schema declares. Limen
