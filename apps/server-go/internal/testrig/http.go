@@ -12,6 +12,8 @@ package testrig
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -340,6 +342,30 @@ func (a *AppRig) NewBaby(familyID, name string) string {
 		a.t.Fatalf("testrig: NewBaby(%q, %q): %v", familyID, name, err)
 	}
 	return baby.ID
+}
+
+// CreateAPIKey inserts a live, read-write, never-expiring api_key row
+// attributed to userID in familyID and returns its plaintext bearer token
+// (only its SHA-256 is stored, mirroring middleware.APIKeyAuth's own hash).
+// For route tests proving a tierFamilyNoAPIKey (or tierAdmin) operation
+// answers 403 FORBIDDEN to key auth — see push_test.go — not for exercising
+// APIKeyAuth's own edge cases (expiry, revocation, read-only), which
+// internal/api/middleware's own fixture.createAPIKey already covers in
+// isolation.
+func (a *AppRig) CreateAPIKey(familyID, userID string) string {
+	a.t.Helper()
+	token := "pjk_" + familyID + "-" + userID
+	sum := sha256.Sum256([]byte(token))
+	_, err := a.Rig.Pool.Exec(context.Background(), `
+		INSERT INTO "api_key"
+			("family_id", "name", "key_hash", "prefix", "created_by", "read_only")
+		VALUES ($1, 'test key', $2, 'pjk_', $3, false)`,
+		familyID, hex.EncodeToString(sum[:]), userID,
+	)
+	if err != nil {
+		a.t.Fatalf("testrig: CreateAPIKey(%q, %q): %v", familyID, userID, err)
+	}
+	return token
 }
 
 // Result is one HTTP response, decoded eagerly so assertions read like plain

@@ -157,6 +157,16 @@ const (
 	// tierAdmin is tierFamily plus middleware.RequireAdmin — the
 	// family-admin-only surface (member management, deleting a baby).
 	tierAdmin
+	// tierFamilyNoAPIKey is tierFamily plus middleware.RejectAPIKey: a
+	// caller (and family) must resolve exactly as tierFamily requires, but
+	// a pjk_ bearer is then refused anyway. This is for endpoints bound to
+	// a human, session-carrying browser rather than a programmatic caller —
+	// push subscriptions today (REF §A5 item 6; apps/api/src/app.ts's
+	// domainBase.use("/api/push/*", rejectApiKey), mounted AFTER
+	// requireFamily, which is exactly this tier's ordering). Distinct from
+	// tierAdmin: RejectAPIKey has nothing to do with the caller's role,
+	// only how they authenticated.
+	tierFamilyNoAPIKey
 )
 
 // operationAuthTiers maps every generated operationID (== the
@@ -285,6 +295,16 @@ var operationAuthTiers = map[string]authTier{
 	// familyChain rather than authChain's operationID dispatch.
 	"GetStats": tierFamily,
 
+	// Push (Task 18; REF §A1 push.ts). Device/session-bound: every
+	// operation is tierFamilyNoAPIKey, not plain tierFamily — see that
+	// tier's doc comment and internal/api/push.go's package doc comment.
+	"GetPushConfig":   tierFamilyNoAPIKey,
+	"SubscribePush":   tierFamilyNoAPIKey,
+	"UnsubscribePush": tierFamilyNoAPIKey,
+	"GetPushPrefs":    tierFamilyNoAPIKey,
+	"UpdatePushPrefs": tierFamilyNoAPIKey,
+	"TestPush":        tierFamilyNoAPIKey,
+
 	"DeleteBaby":          tierAdmin,
 	"DeleteFamilyMember":  tierAdmin,
 	"SetFamilyMemberRole": tierAdmin,
@@ -361,6 +381,7 @@ func authChain(d Deps) gen.StrictMiddlewareFunc {
 	requireSession := middleware.RequireSession()
 	family := middleware.RequireFamily(mwDeps)
 	admin := middleware.RequireAdmin()
+	rejectAPIKey := middleware.RejectAPIKey()
 
 	return func(f gen.StrictHandlerFunc, operationID string) gen.StrictHandlerFunc {
 		tier, ok := operationAuthTiers[operationID]
@@ -381,6 +402,8 @@ func authChain(d Deps) gen.StrictMiddlewareFunc {
 			chain = func(h http.Handler) http.Handler { return apiKey(session(family(h))) }
 		case tierAdmin:
 			chain = func(h http.Handler) http.Handler { return apiKey(session(family(admin(h)))) }
+		case tierFamilyNoAPIKey:
+			chain = func(h http.Handler) http.Handler { return apiKey(session(family(rejectAPIKey(h)))) }
 		default:
 			panic(fmt.Sprintf("api: unknown authTier %d for operation %q", tier, operationID))
 		}

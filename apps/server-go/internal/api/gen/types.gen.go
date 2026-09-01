@@ -500,6 +500,30 @@ func (e PumpLogSide) Valid() bool {
 	}
 }
 
+// Defines values for PushPrefsFeedReminderHours.
+const (
+	N0 PushPrefsFeedReminderHours = 0
+	N3 PushPrefsFeedReminderHours = 3
+	N4 PushPrefsFeedReminderHours = 4
+	N6 PushPrefsFeedReminderHours = 6
+)
+
+// Valid indicates whether the value is a known member of the PushPrefsFeedReminderHours enum.
+func (e PushPrefsFeedReminderHours) Valid() bool {
+	switch e {
+	case N0:
+		return true
+	case N3:
+		return true
+	case N4:
+		return true
+	case N6:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SetMemberRoleRole.
 const (
 	SetMemberRoleRoleAdmin  SetMemberRoleRole = "admin"
@@ -1296,6 +1320,24 @@ type PumpLog struct {
 // PumpLogSide defines model for PumpLog.Side.
 type PumpLogSide string
 
+// PushConfig defines model for PushConfig.
+type PushConfig struct {
+	PublicKey string `json:"publicKey"`
+}
+
+// PushPrefs feedReminderHours is off (0) or a lead time in hours before a reminder fires; the enum matches the frontend's fixed picker (off/3/4/6).
+type PushPrefs struct {
+	FeedReminderHours PushPrefsFeedReminderHours `json:"feedReminderHours"`
+}
+
+// PushPrefsFeedReminderHours defines model for PushPrefs.FeedReminderHours.
+type PushPrefsFeedReminderHours int
+
+// PushTestResult defines model for PushTestResult.
+type PushTestResult struct {
+	Sent int `json:"sent"`
+}
+
 // SetMemberRole defines model for SetMemberRole.
 type SetMemberRole struct {
 	Role SetMemberRoleRole `json:"role"`
@@ -1357,6 +1399,13 @@ type StopPlay struct {
 	EndTime *time.Time `json:"endTime,omitempty"`
 }
 
+// Subscribe defines model for Subscribe.
+type Subscribe struct {
+	Auth     string `json:"auth"`
+	Endpoint string `json:"endpoint"`
+	P256dh   string `json:"p256dh"`
+}
+
 // Summary defines model for Summary.
 type Summary struct {
 	ActivePlay  *PlayLog   `json:"activePlay"`
@@ -1396,6 +1445,11 @@ type TimelineEntry struct {
 
 // TimelineEntryKind defines model for TimelineEntry.Kind.
 type TimelineEntryKind string
+
+// Unsubscribe defines model for Unsubscribe.
+type Unsubscribe struct {
+	Endpoint string `json:"endpoint"`
+}
 
 // UpdateBaby Every field is optional; an empty object is a no-op. `sex` may also be sent as `null`, which — like omitting it — leaves the baby's sex unchanged (Go's JSON decoding cannot tell "absent" from "null" for a nullable-optional field without a bespoke wrapper type, and no caller needs to clear sex back to unknown today; see internal/api/babies.go).
 type UpdateBaby struct {
@@ -1843,6 +1897,15 @@ type CreatePumpJSONRequestBody = CreatePump
 
 // UpdatePumpJSONRequestBody defines body for UpdatePump for application/json ContentType.
 type UpdatePumpJSONRequestBody = UpdatePump
+
+// UpdatePushPrefsJSONRequestBody defines body for UpdatePushPrefs for application/json ContentType.
+type UpdatePushPrefsJSONRequestBody = PushPrefs
+
+// SubscribePushJSONRequestBody defines body for SubscribePush for application/json ContentType.
+type SubscribePushJSONRequestBody = Subscribe
+
+// UnsubscribePushJSONRequestBody defines body for UnsubscribePush for application/json ContentType.
+type UnsubscribePushJSONRequestBody = Unsubscribe
 
 // CreateSleepJSONRequestBody defines body for CreateSleep for application/json ContentType.
 type CreateSleepJSONRequestBody = CreateSleep

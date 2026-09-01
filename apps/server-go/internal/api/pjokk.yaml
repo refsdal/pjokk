@@ -1888,6 +1888,129 @@ paths:
               schema:
                 $ref: "#/components/schemas/Me"
 
+  /api/push/config:
+    get:
+      operationId: getPushConfig
+      summary: >-
+        The VAPID public key the frontend needs to create a browser push
+        subscription. Never available to API keys (device/session-bound —
+        see internal/api/middleware's RejectAPIKey).
+      tags: [push]
+      responses:
+        "200":
+          description: VAPID public key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushConfig"
+
+  /api/push/subscribe:
+    post:
+      operationId: subscribePush
+      summary: >-
+        Register this browser's push subscription for the signed-in
+        caretaker. Upserts by endpoint: re-subscribing the SAME endpoint
+        rebinds it to the calling user/family and refreshes its keys rather
+        than failing a uniqueness check. Rejects an endpoint whose host
+        isn't one of the recognized push services, or that isn't https — see
+        internal/api/push.go's isAllowedPushEndpoint (SSRF guard: the
+        scheduler later POSTs to stored endpoints unattended).
+      tags: [push]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Subscribe"
+      responses:
+        "200":
+          description: Stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "400":
+          description: Not a recognized push service endpoint.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/push/unsubscribe:
+    post:
+      operationId: unsubscribePush
+      summary: >-
+        Remove a subscription. Scoped to the caller's OWN rows — deleting by
+        endpoint alone would let one caretaker remove another's
+        subscription just by knowing the endpoint URL. Removing an endpoint
+        that isn't the caller's (or doesn't exist) is still a 200: this is a
+        set-membership operation, not a lookup.
+      tags: [push]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Unsubscribe"
+      responses:
+        "200":
+          description: Removed (if it was the caller's).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+
+  /api/push/prefs:
+    get:
+      operationId: getPushPrefs
+      summary: >-
+        The caller's feed-reminder preference for the active family.
+        Defaults to 0 (off) when no preference row exists yet.
+      tags: [push]
+      responses:
+        "200":
+          description: Notification preferences.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushPrefs"
+    put:
+      operationId: updatePushPrefs
+      summary: >-
+        Set the caller's feed-reminder preference. Resets the reminder
+        cooldown (last_reminded_at set to NULL) so a new setting starts a
+        fresh observation window instead of firing immediately off the old
+        one's state.
+      tags: [push]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushPrefs"
+      responses:
+        "200":
+          description: Updated preferences.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushPrefs"
+
+  /api/push/test:
+    post:
+      operationId: testPush
+      summary: >-
+        Send a test notification to every device the caller has subscribed,
+        via Deps.Push.ToUser. Returns how many deliveries succeeded.
+      tags: [push]
+      responses:
+        "200":
+          description: Delivery count.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushTestResult"
+
 components:
   parameters:
     babyIdQuery:
@@ -3495,6 +3618,53 @@ components:
           maxItems: 10
           items:
             type: string
+    PushConfig:
+      type: object
+      required: [publicKey]
+      properties:
+        publicKey:
+          type: string
+    Subscribe:
+      type: object
+      required: [endpoint, p256dh, auth]
+      properties:
+        endpoint:
+          type: string
+          format: uri
+          maxLength: 1000
+        p256dh:
+          type: string
+          minLength: 1
+          maxLength: 300
+        auth:
+          type: string
+          minLength: 1
+          maxLength: 100
+    Unsubscribe:
+      type: object
+      required: [endpoint]
+      properties:
+        endpoint:
+          type: string
+          maxLength: 1000
+    PushPrefs:
+      type: object
+      description: >-
+        feedReminderHours is off (0) or a lead time in hours before a
+        reminder fires; the enum matches the frontend's fixed picker
+        (off/3/4/6).
+      required: [feedReminderHours]
+      properties:
+        feedReminderHours:
+          type: integer
+          enum: [0, 3, 4, 6]
+          default: 0
+    PushTestResult:
+      type: object
+      required: [sent]
+      properties:
+        sent:
+          type: integer
     Error:
       type: object
       description: >-

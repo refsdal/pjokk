@@ -184,6 +184,24 @@ type ServerInterface interface {
 	// UpdatePump Partial update. `side`, `amountMl`, `durationMin` and `notes` may be sent as `null` to CLEAR that column; `time` is not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
 	// (PATCH /api/pumps/{id})
 	UpdatePump(w http.ResponseWriter, r *http.Request, id IdPath)
+	// GetPushConfig The VAPID public key the frontend needs to create a browser push subscription. Never available to API keys (device/session-bound — see internal/api/middleware's RejectAPIKey).
+	// (GET /api/push/config)
+	GetPushConfig(w http.ResponseWriter, r *http.Request)
+	// GetPushPrefs The caller's feed-reminder preference for the active family. Defaults to 0 (off) when no preference row exists yet.
+	// (GET /api/push/prefs)
+	GetPushPrefs(w http.ResponseWriter, r *http.Request)
+	// UpdatePushPrefs Set the caller's feed-reminder preference. Resets the reminder cooldown (last_reminded_at set to NULL) so a new setting starts a fresh observation window instead of firing immediately off the old one's state.
+	// (PUT /api/push/prefs)
+	UpdatePushPrefs(w http.ResponseWriter, r *http.Request)
+	// SubscribePush Register this browser's push subscription for the signed-in caretaker. Upserts by endpoint: re-subscribing the SAME endpoint rebinds it to the calling user/family and refreshes its keys rather than failing a uniqueness check. Rejects an endpoint whose host isn't one of the recognized push services, or that isn't https — see internal/api/push.go's isAllowedPushEndpoint (SSRF guard: the scheduler later POSTs to stored endpoints unattended).
+	// (POST /api/push/subscribe)
+	SubscribePush(w http.ResponseWriter, r *http.Request)
+	// TestPush Send a test notification to every device the caller has subscribed, via Deps.Push.ToUser. Returns how many deliveries succeeded.
+	// (POST /api/push/test)
+	TestPush(w http.ResponseWriter, r *http.Request)
+	// UnsubscribePush Remove a subscription. Scoped to the caller's OWN rows — deleting by endpoint alone would let one caretaker remove another's subscription just by knowing the endpoint URL. Removing an endpoint that isn't the caller's (or doesn't exist) is still a 200: this is a set-membership operation, not a lookup.
+	// (POST /api/push/unsubscribe)
+	UnsubscribePush(w http.ResponseWriter, r *http.Request)
 	// ListSleeps Sleep logs in the caller's active family, newest first (by startTime).
 	// (GET /api/sleep)
 	ListSleeps(w http.ResponseWriter, r *http.Request, params ListSleepsParams)
@@ -1691,6 +1709,90 @@ func (siw *ServerInterfaceWrapper) UpdatePump(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// GetPushConfig operation middleware
+func (siw *ServerInterfaceWrapper) GetPushConfig(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPushConfig(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPushPrefs operation middleware
+func (siw *ServerInterfaceWrapper) GetPushPrefs(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPushPrefs(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdatePushPrefs operation middleware
+func (siw *ServerInterfaceWrapper) UpdatePushPrefs(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdatePushPrefs(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SubscribePush operation middleware
+func (siw *ServerInterfaceWrapper) SubscribePush(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SubscribePush(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TestPush operation middleware
+func (siw *ServerInterfaceWrapper) TestPush(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TestPush(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnsubscribePush operation middleware
+func (siw *ServerInterfaceWrapper) UnsubscribePush(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnsubscribePush(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListSleeps operation middleware
 func (siw *ServerInterfaceWrapper) ListSleeps(w http.ResponseWriter, r *http.Request) {
 
@@ -2502,6 +2604,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/timeline", wrapper.ListTimeline)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/stats", wrapper.GetStats)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/me", wrapper.GetMe)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/push/config", wrapper.GetPushConfig)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/push/subscribe", wrapper.SubscribePush)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/push/unsubscribe", wrapper.UnsubscribePush)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/push/prefs", wrapper.GetPushPrefs)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/push/prefs", wrapper.UpdatePushPrefs)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/push/test", wrapper.TestPush)
 
 	return m
 }
@@ -4383,6 +4491,149 @@ func (response UpdatePump404JSONResponse) VisitUpdatePumpResponse(w http.Respons
 	return err
 }
 
+type GetPushConfigRequestObject struct {
+}
+
+type GetPushConfigResponseObject interface {
+	VisitGetPushConfigResponse(w http.ResponseWriter) error
+}
+
+type GetPushConfig200JSONResponse PushConfig
+
+func (response GetPushConfig200JSONResponse) VisitGetPushConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPushPrefsRequestObject struct {
+}
+
+type GetPushPrefsResponseObject interface {
+	VisitGetPushPrefsResponse(w http.ResponseWriter) error
+}
+
+type GetPushPrefs200JSONResponse PushPrefs
+
+func (response GetPushPrefs200JSONResponse) VisitGetPushPrefsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdatePushPrefsRequestObject struct {
+	Body *UpdatePushPrefsJSONRequestBody
+}
+
+type UpdatePushPrefsResponseObject interface {
+	VisitUpdatePushPrefsResponse(w http.ResponseWriter) error
+}
+
+type UpdatePushPrefs200JSONResponse PushPrefs
+
+func (response UpdatePushPrefs200JSONResponse) VisitUpdatePushPrefsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubscribePushRequestObject struct {
+	Body *SubscribePushJSONRequestBody
+}
+
+type SubscribePushResponseObject interface {
+	VisitSubscribePushResponse(w http.ResponseWriter) error
+}
+
+type SubscribePush200JSONResponse Ok
+
+func (response SubscribePush200JSONResponse) VisitSubscribePushResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubscribePush400JSONResponse Error
+
+func (response SubscribePush400JSONResponse) VisitSubscribePushResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestPushRequestObject struct {
+}
+
+type TestPushResponseObject interface {
+	VisitTestPushResponse(w http.ResponseWriter) error
+}
+
+type TestPush200JSONResponse PushTestResult
+
+func (response TestPush200JSONResponse) VisitTestPushResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnsubscribePushRequestObject struct {
+	Body *UnsubscribePushJSONRequestBody
+}
+
+type UnsubscribePushResponseObject interface {
+	VisitUnsubscribePushResponse(w http.ResponseWriter) error
+}
+
+type UnsubscribePush200JSONResponse Ok
+
+func (response UnsubscribePush200JSONResponse) VisitUnsubscribePushResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListSleepsRequestObject struct {
 	Params ListSleepsParams
 }
@@ -5285,6 +5536,24 @@ type StrictServerInterface interface {
 	// UpdatePump Partial update. `side`, `amountMl`, `durationMin` and `notes` may be sent as `null` to CLEAR that column; `time` is not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
 	// (PATCH /api/pumps/{id})
 	UpdatePump(ctx context.Context, request UpdatePumpRequestObject) (UpdatePumpResponseObject, error)
+	// GetPushConfig The VAPID public key the frontend needs to create a browser push subscription. Never available to API keys (device/session-bound — see internal/api/middleware's RejectAPIKey).
+	// (GET /api/push/config)
+	GetPushConfig(ctx context.Context, request GetPushConfigRequestObject) (GetPushConfigResponseObject, error)
+	// GetPushPrefs The caller's feed-reminder preference for the active family. Defaults to 0 (off) when no preference row exists yet.
+	// (GET /api/push/prefs)
+	GetPushPrefs(ctx context.Context, request GetPushPrefsRequestObject) (GetPushPrefsResponseObject, error)
+	// UpdatePushPrefs Set the caller's feed-reminder preference. Resets the reminder cooldown (last_reminded_at set to NULL) so a new setting starts a fresh observation window instead of firing immediately off the old one's state.
+	// (PUT /api/push/prefs)
+	UpdatePushPrefs(ctx context.Context, request UpdatePushPrefsRequestObject) (UpdatePushPrefsResponseObject, error)
+	// SubscribePush Register this browser's push subscription for the signed-in caretaker. Upserts by endpoint: re-subscribing the SAME endpoint rebinds it to the calling user/family and refreshes its keys rather than failing a uniqueness check. Rejects an endpoint whose host isn't one of the recognized push services, or that isn't https — see internal/api/push.go's isAllowedPushEndpoint (SSRF guard: the scheduler later POSTs to stored endpoints unattended).
+	// (POST /api/push/subscribe)
+	SubscribePush(ctx context.Context, request SubscribePushRequestObject) (SubscribePushResponseObject, error)
+	// TestPush Send a test notification to every device the caller has subscribed, via Deps.Push.ToUser. Returns how many deliveries succeeded.
+	// (POST /api/push/test)
+	TestPush(ctx context.Context, request TestPushRequestObject) (TestPushResponseObject, error)
+	// UnsubscribePush Remove a subscription. Scoped to the caller's OWN rows — deleting by endpoint alone would let one caretaker remove another's subscription just by knowing the endpoint URL. Removing an endpoint that isn't the caller's (or doesn't exist) is still a 200: this is a set-membership operation, not a lookup.
+	// (POST /api/push/unsubscribe)
+	UnsubscribePush(ctx context.Context, request UnsubscribePushRequestObject) (UnsubscribePushResponseObject, error)
 	// ListSleeps Sleep logs in the caller's active family, newest first (by startTime).
 	// (GET /api/sleep)
 	ListSleeps(ctx context.Context, request ListSleepsRequestObject) (ListSleepsResponseObject, error)
@@ -6963,6 +7232,171 @@ func (sh *strictHandler) UpdatePump(w http.ResponseWriter, r *http.Request, id I
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdatePumpResponseObject); ok {
 		if err := validResponse.VisitUpdatePumpResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPushConfig operation middleware
+func (sh *strictHandler) GetPushConfig(w http.ResponseWriter, r *http.Request) {
+	var request GetPushConfigRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPushConfig(ctx, request.(GetPushConfigRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPushConfig")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPushConfigResponseObject); ok {
+		if err := validResponse.VisitGetPushConfigResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPushPrefs operation middleware
+func (sh *strictHandler) GetPushPrefs(w http.ResponseWriter, r *http.Request) {
+	var request GetPushPrefsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPushPrefs(ctx, request.(GetPushPrefsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPushPrefs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPushPrefsResponseObject); ok {
+		if err := validResponse.VisitGetPushPrefsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdatePushPrefs operation middleware
+func (sh *strictHandler) UpdatePushPrefs(w http.ResponseWriter, r *http.Request) {
+	var request UpdatePushPrefsRequestObject
+
+	var body UpdatePushPrefsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdatePushPrefs(ctx, request.(UpdatePushPrefsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdatePushPrefs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdatePushPrefsResponseObject); ok {
+		if err := validResponse.VisitUpdatePushPrefsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SubscribePush operation middleware
+func (sh *strictHandler) SubscribePush(w http.ResponseWriter, r *http.Request) {
+	var request SubscribePushRequestObject
+
+	var body SubscribePushJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SubscribePush(ctx, request.(SubscribePushRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SubscribePush")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SubscribePushResponseObject); ok {
+		if err := validResponse.VisitSubscribePushResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TestPush operation middleware
+func (sh *strictHandler) TestPush(w http.ResponseWriter, r *http.Request) {
+	var request TestPushRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TestPush(ctx, request.(TestPushRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TestPush")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TestPushResponseObject); ok {
+		if err := validResponse.VisitTestPushResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UnsubscribePush operation middleware
+func (sh *strictHandler) UnsubscribePush(w http.ResponseWriter, r *http.Request) {
+	var request UnsubscribePushRequestObject
+
+	var body UnsubscribePushJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UnsubscribePush(ctx, request.(UnsubscribePushRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnsubscribePush")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UnsubscribePushResponseObject); ok {
+		if err := validResponse.VisitUnsubscribePushResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
