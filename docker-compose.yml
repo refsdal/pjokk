@@ -1,13 +1,21 @@
-# Pjokk, whole stack, one command:
+# Pjokk, whole stack, one command — builds from source:
 #
-#   cp .env.example .env    # then set BETTER_AUTH_SECRET at minimum
+#   cp .env.example .env    # then set AUTH_SECRET at minimum
 #   docker compose up
 #
-# Postgres holds the data, MinIO stands in for S3 (vaccine documents and the
-# nightly backups), and the app runs in its default mode: it migrates itself
-# under a Postgres advisory lock at startup, then serves with its in-process
+# Postgres holds the data and the app writes files (vaccine documents and the
+# nightly backups) to a local volume via STORAGE_DRIVER=fs. That is the whole
+# stack: no object store, no third container. Prefer S3/MinIO? Add the
+# overlay, which swaps the driver and brings MinIO with it:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.s3.yml up
+#
+# The app runs in its default dispatch mode: it migrates itself under a
+# Postgres advisory lock at startup, then serves with its in-process
 # scheduler running — the right shape for a single container, which has no
-# orchestrator to drive migrations or cron separately.
+# orchestrator to drive migrations or cron separately. Run migrations
+# explicitly instead (before a rollout, say) with the `migrate` service
+# below.
 
 name: pjokk
 
@@ -23,67 +31,37 @@ services:
       - db-data:/var/lib/postgresql/data
     healthcheck:
       # -d as well as -U: without the database name pg_isready reports ready
-      # while the init scripts are still creating it, and the migration job
-      # then fails on a database that does not exist yet.
+      # while the init scripts are still creating it, and the migration then
+      # fails on a database that does not exist yet.
       test: ["CMD-SHELL", "pg_isready -U pjokk -d pjokk"]
       interval: 5s
       timeout: 5s
       retries: 20
 
-  minio:
-    image: quay.io/minio/minio:latest
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-pjokkdev}
-      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-pjokkdevsecret}
-    volumes:
-      - minio-data:/data
-    ports:
-      # Console only, for poking at the bucket. The app reaches MinIO over the
-      # compose network, so the API port needs no host binding.
-      - "127.0.0.1:9001:9001"
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-
-  # Creates the bucket, then exits. MinIO has no "create bucket on boot"
-  # setting, and the app deliberately does not create buckets itself: an app
-  # that can create a bucket can also create the wrong one, in the wrong
-  # region, and nobody notices until the data is somewhere unintended.
-  minio-init:
-    image: quay.io/minio/mc:latest
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      sh -c "
-      mc alias set local http://minio:9000
-      '${S3_ACCESS_KEY_ID:-pjokkdev}' '${S3_SECRET_ACCESS_KEY:-pjokkdevsecret}' &&
-      mc mb --ignore-existing local/${S3_BUCKET:-pjokk-files} &&
-      echo 'bucket ready'
-      "
-
   app:
     build: .
+    # Named so the one-off services below share the built image instead of
+    # each triggering their own build of the same context.
+    image: pjokk:local
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
     ports:
       - "${PORT:-3000}:3000"
-    environment:
+    volumes:
+      # STORAGE_DRIVER=fs writes here. The image creates /data owned by uid
+      # 65532 (the container's unprivileged `pjokk` user), and Docker copies
+      # that ownership onto a fresh named volume — which is the only reason
+      # an image with no shell and no chown can write to it at all.
+      - pjokk-data:/data
+    environment: &app-env
       DATABASE_URL: postgres://pjokk:${POSTGRES_PASSWORD:-pjokk}@db:5432/pjokk
       APP_URL: ${APP_URL:-http://localhost:3000}
-      BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}"
-      S3_BUCKET: ${S3_BUCKET:-pjokk-files}
-      S3_ENDPOINT: http://minio:9000
-      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-pjokkdev}
-      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-pjokkdevsecret}
+      AUTH_SECRET: "${AUTH_SECRET:?set AUTH_SECRET in .env — at least 32 bytes}"
+
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-fs}
+      STORAGE_FS_PATH: /data
 
       OPEN_SIGNUP: ${OPEN_SIGNUP:-0}
 
@@ -93,17 +71,56 @@ services:
       TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-0}
 
       # Optional subsystems. Absent means the feature is simply off; the app
-      # logs which ones at startup.
+      # names the disabled ones in its boot log.
+      SITE_URL: ${SITE_URL:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
-      STRIPE_PRICE_PREMIUM_MONTHLY: ${STRIPE_PRICE_PREMIUM_MONTHLY:-}
-      STRIPE_PRICE_PREMIUM_YEARLY: ${STRIPE_PRICE_PREMIUM_YEARLY:-}
-      STRIPE_PRICE_PREMIUM_LIFETIME: ${STRIPE_PRICE_PREMIUM_LIFETIME:-}
+
+  # One-off: apply migrations and exit.
+  #
+  #   docker compose run --rm migrate
+  #
+  # The default mode already migrates at startup, so a single-container
+  # deployment never needs this. It exists for the orchestrated case
+  # (Kubernetes, several `server` replicas) where migrations must land before
+  # any replica depending on the new schema starts. Safe to run concurrently
+  # with a booting app container: both take the same Postgres advisory lock.
+  #
+  # Behind a profile so `docker compose up` does not start it.
+  migrate:
+    build: .
+    image: pjokk:local
+    profiles: ["tools"]
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["migrate"]
+    environment: *app-env
+    volumes:
+      - pjokk-data:/data
+
+  # One-off: run a single scheduled job and exit.
+  #
+  #   docker compose run --rm cron nightly
+  #   docker compose run --rm cron frequent
+  #
+  # Same image, same configuration, so a Kubernetes CronJob runs exactly what
+  # is already deployed. Not needed alongside the default mode either — its
+  # in-process scheduler drives both jobs.
+  cron:
+    build: .
+    image: pjokk:local
+    profiles: ["tools"]
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["/app/pjokk", "cron"]
+    environment: *app-env
+    volumes:
+      - pjokk-data:/data
 
 volumes:
   db-data:
-  minio-data:
+  pjokk-data:
