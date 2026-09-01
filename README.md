@@ -81,8 +81,19 @@ one-off).
 
 ## Self-hosting
 
-The image is `ghcr.io/refsdal/pjokk` — `:latest`, `:<version>`, or
-`:sha-<sha>` to pin exactly, built for `linux/amd64` and `linux/arm64`. It
+The image is `ghcr.io/refsdal/pjokk`, built for `linux/amd64` and
+`linux/arm64`. The tags are a pinning ladder — pick how much you want to
+move on upgrade day:
+
+| Tag | Moves | Risk appetite |
+|---|---|---|
+| `:0.1.0` | never | pin exactly, upgrade deliberately |
+| `:0.1` | with patch releases | fixes only |
+| `:0` | with minor releases | pre-1.0 minors may break — read release notes |
+| `:latest` | every release | living on the edge |
+| `:sha-<commit>` / `@sha256:…` | never | byte-exact, provenance via cosign |
+
+It
 runs anywhere a container does, as one process serving both the SPA and the
 API.
 
@@ -309,7 +320,7 @@ Generated code is committed; neither CI nor the image runs a code generator.
 
 `docker-compose.yml` runs the locally built image and is the contributor's
 stack — run `bash scripts/build-artifacts.sh` first (the Dockerfile is
-COPY-only and expects `dist/server/pjokk-linux-<arch>` to exist);
+COPY-only and expects `dist/server/linux/<arch>/pjokk` to exist);
 `docker-compose.selfhost.yml` pulls the published image and is the
 self-hoster's. They are deliberately separate so a self-hoster never needs the
 repository. Both default to `STORAGE_DRIVER=fs`; add the overlay to swap in
@@ -326,15 +337,17 @@ profile, so `up` does not start them).
 ### Versioning and images
 
 Versions are computed from [Conventional Commits](https://www.conventionalcommits.org)
-since the last `v*` tag — nobody types a version number:
+since the last `v*` tag by [svu](https://github.com/caarlos0/svu) — nobody
+types a version number:
 
 ```sh
-bun scripts/next-version.mjs        # what would the next release be, and why
+mise x -- svu next --v0             # what the next release would be
 ```
 
 `feat` bumps the minor, `fix`/`perf` the patch, `!`/`BREAKING CHANGE` the
-major. While the major is 0 a breaking change bumps the minor instead, so
-reaching 1.0 stays a decision rather than a side effect of a commit message.
+major. `--v0` keeps a breaking change bumping the minor while the major is
+0, so reaching 1.0 stays a decision (the Release workflow's `allow_major`
+input) rather than a side effect of a commit message.
 
 CI publishes a **preview** image for every branch and PR — after the smoke
 test passes, never before:
@@ -344,10 +357,15 @@ ghcr.io/refsdal/pjokk:<next-version>-preview.<sha>
 ghcr.io/refsdal/pjokk:branch-<branch>
 ```
 
-The **Release** workflow (manual dispatch, `dry_run` on by default) builds,
-pushes `:<version>`, `:latest` and `:sha-<sha>`, then creates the git tag — in
-that order, so a failed push never leaves a tag pointing at an image that does
-not exist.
+The **Release** workflow (manual dispatch, `dry_run` on by default) computes
+the version with svu, runs the full test suite, creates the tag, and hands
+everything downstream to [GoReleaser](https://goreleaser.com): binary
+archives with checksums and SPDX SBOMs on a GitHub Release with a generated
+changelog, the multi-arch image (`:<version>`, `:latest`, `:sha-<sha>`), and
+keyless [cosign](https://github.com/sigstore/cosign) signatures over both.
+A failed publish deletes the tag again, so a tag never points at a release
+that does not exist. `mise run snapshot` runs the same pipeline locally with
+nothing pushed or signed.
 
 Images are multi-arch (`linux/amd64` + `linux/arm64`). Building one locally:
 
@@ -366,6 +384,40 @@ Dockerfile — based on distroless `static` for the CA bundle, tzdata and the
 assemble costs seconds. A multi-platform result is a manifest list, which the
 local image store cannot hold, which is why the two-arch build without
 `PUSH=1` verifies and discards.
+
+### Running without Docker
+
+Every release ships the bare binaries too — the SPA, migrations and tzdata
+are embedded, so one file plus Postgres is a complete deployment:
+
+```sh
+curl -LO https://github.com/refsdal/pjokk/releases/latest/download/pjokk_<version>_linux_amd64.tar.gz
+tar xzf pjokk_<version>_linux_amd64.tar.gz
+DATABASE_URL=... APP_URL=... AUTH_SECRET=... STORAGE_DRIVER=fs STORAGE_FS_PATH=/var/lib/pjokk \
+  ./pjokk    # migrates itself, serves, schedules — same dispatch modes as the image
+```
+
+### Verifying a release
+
+Releases are signed with keyless cosign via GitHub's OIDC — the signature
+proves the artifacts came out of this repository's release workflow.
+
+```sh
+# 1. The checksum file's signature (covers every archive transitively):
+cosign verify-blob \
+  --certificate checksums.txt.pem --signature checksums.txt.sig \
+  --certificate-identity-regexp 'https://github.com/refsdal/pjokk/\.github/workflows/release\.yml@.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  checksums.txt
+
+# 2. Your download against the verified checksums:
+sha256sum --check --ignore-missing checksums.txt
+
+# 3. Or the container image directly:
+cosign verify ghcr.io/refsdal/pjokk:<version> \
+  --certificate-identity-regexp 'https://github.com/refsdal/pjokk/\.github/workflows/release\.yml@.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
 
 ## Repository layout
 

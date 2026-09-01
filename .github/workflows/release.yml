@@ -8,12 +8,16 @@ name: Release
 # GitHub Pro/Team, add required reviewers to the "production" environment and
 # this workflow picks the gate up unchanged.
 #
-# The version is NOT typed in by hand. It is computed from Conventional
-# Commits since the last v* tag (scripts/next-version.mjs), which is why
-# CLAUDE.md mandates the commit format — the changelog and the version number
-# are downstream of it.
+# The version is NOT typed in by hand. svu computes it from Conventional
+# Commits since the last v* tag, which is why CLAUDE.md mandates the commit
+# format — the changelog (GoReleaser) and the version number (svu) are both
+# downstream of it.
 #
-# This workflow BUILDS, TAGS AND PUBLISHES. It does not roll out: where the
+# This workflow TAGS, then GoReleaser BUILDS AND PUBLISHES everything from
+# the tag: binaries, archives, checksums, SBOMs, cosign signatures, the
+# multi-arch image, and the GitHub Release with changelog. The tag comes
+# FIRST because GoReleaser releases from a tag; a failed publish deletes it
+# again (the old flow tagged last for the same never-a-dangling-tag goal). It does not roll out: where the
 # container runs is deployment infrastructure this repo does not own. Rolling
 # out means, in order:
 #
@@ -50,7 +54,6 @@ jobs:
     outputs:
       version: ${{ steps.v.outputs.version }}
       tag: ${{ steps.v.outputs.tag }}
-      bump: ${{ steps.v.outputs.bump }}
       releasable: ${{ steps.v.outputs.releasable }}
     steps:
       # Tags and full history are the inputs to the calculation.
@@ -60,14 +63,31 @@ jobs:
 
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          install_args: bun
+          install_args: "aqua:caarlos0/svu"
 
+      # svu reads Conventional Commits since the last v* tag. --v0 keeps
+      # breaking changes bumping the minor while the major is 0; the
+      # allow_major input drops it to permit 1.0.0.
       - name: Compute version
         id: v
         run: |
-          bun scripts/next-version.mjs \
-            ${{ inputs.allow_major && '--allow-major' || '' }} \
-            | tee "$GITHUB_STEP_SUMMARY"
+          current=$(svu current)
+          if [ "${{ inputs.allow_major }}" = "true" ]; then
+            tag=$(svu next)
+          else
+            tag=$(svu next --v0)
+          fi
+          version="${tag#v}"
+          releasable=true
+          if [ "$tag" = "$current" ]; then releasable=false; fi
+          {
+            echo "tag=$tag"; echo "version=$version"; echo "releasable=$releasable"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Version"
+            echo "- current: \`$current\`"
+            echo "- next:    \`$tag\` (releasable: $releasable)"
+          } | tee "$GITHUB_STEP_SUMMARY"
 
       # Releasing "the same version again" is the mistake worth blocking: it
       # means nothing since the last tag actually warranted a release.
@@ -142,8 +162,9 @@ jobs:
       # the app — not the static landing site on the apex.
       url: https://app.pjokk.no
     permissions:
-      contents: write   # creating the git tag
-      packages: write
+      contents: write   # the git tag + the GitHub Release
+      packages: write   # ghcr.io
+      id-token: write   # keyless cosign signing (GitHub OIDC)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -151,7 +172,7 @@ jobs:
 
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          install_args: go bun
+          install_args: "go bun aqua:goreleaser/goreleaser aqua:sigstore/cosign aqua:anchore/syft"
 
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -161,16 +182,9 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('apps/server/go.sum') }}
           restore-keys: ${{ runner.os }}-go-
 
+      # GoReleaser's before hook builds the SPA; that needs node_modules.
       - name: Install
         run: bun install --frozen-lockfile
-
-      # Compiled natively — the Dockerfile is COPY-only, which is also what
-      # makes the multi-arch push below cost seconds instead of a second
-      # emulated build.
-      - name: Build artifacts (SPA + both server binaries)
-        run: bash scripts/build-artifacts.sh
-
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - name: Log in to the container registry
         if: ${{ !inputs.dry_run }}
@@ -180,32 +194,40 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # A moving `latest` plus the immutable version and sha tags:
-      # deployments should pin one of the latter, so a rollback is naming an
-      # older tag rather than rebuilding and hoping. Both architectures in
-      # one manifest — previously the release was amd64-only.
-      - name: Build and push (multi-arch)
+      # Dry run: the full pipeline (binaries, archives, SBOMs, image build)
+      # with nothing pushed, tagged or signed.
+      - name: GoReleaser (snapshot)
+        if: ${{ inputs.dry_run }}
         run: |
-          args=(--platform linux/amd64,linux/arm64
-            -t "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}"
-            -t "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-            -t "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}")
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            docker buildx build "${args[@]}" .
-          else
-            docker buildx build "${args[@]}" --push .
-          fi
+          trap 'bash scripts/restore-embed-overlay.sh' EXIT
+          goreleaser release --snapshot --clean --skip=sign
 
-      # After the push, so a failed publish never leaves a tag pointing at a
-      # release that does not exist in the registry.
+      # The real thing. GoReleaser releases FROM a tag, so the tag is
+      # created first — and deleted again below if anything after it fails,
+      # preserving the old flow's "never a tag without a release" property.
       - name: Tag the release
         if: ${{ !inputs.dry_run }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "${{ needs.version.outputs.tag }}" \
-            -m "${{ needs.version.outputs.tag }} (${{ needs.version.outputs.bump }})"
+          git tag -a "${{ needs.version.outputs.tag }}" -m "${{ needs.version.outputs.tag }}"
           git push origin "${{ needs.version.outputs.tag }}"
+
+      - name: GoReleaser (publish)
+        if: ${{ !inputs.dry_run }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          trap 'bash scripts/restore-embed-overlay.sh' EXIT
+          goreleaser release --clean
+
+      - name: Delete the tag on failure
+        if: ${{ failure() && !inputs.dry_run }}
+        run: |
+          gh release delete "${{ needs.version.outputs.tag }}" --yes || true
+          git push --delete origin "${{ needs.version.outputs.tag }}" || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Summary
         run: |
@@ -216,6 +238,7 @@ jobs:
               echo "### Released ${{ needs.version.outputs.tag }}"
             fi
             echo
-            echo "- version: \`${{ needs.version.outputs.version }}\` (bump: ${{ needs.version.outputs.bump }})"
-            echo "- image:   \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}\`"
+            echo "- version: \`${{ needs.version.outputs.version }}\`"
+            echo "- image:   \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}\` (amd64+arm64, cosign-signed)"
+            echo "- release: binaries, checksums, SBOMs and signatures on the GitHub Release"
           } >> "$GITHUB_STEP_SUMMARY"

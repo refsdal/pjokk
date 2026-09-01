@@ -23,7 +23,7 @@ cd "$(dirname "$0")/.."
 TAG="${TAG:-pjokk:dev}"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 
-if [ "${SKIP_ARTIFACTS:-0}" != "1" ] || [ ! -e dist/server/pjokk-linux-amd64 ]; then
+if [ "${SKIP_ARTIFACTS:-0}" != "1" ] || [ ! -e dist/server/linux/amd64/pjokk ]; then
   bash scripts/build-artifacts.sh
 fi
 

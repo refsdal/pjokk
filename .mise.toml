@@ -11,3 +11,36 @@ bun = "1.4"
 "go:github.com/sqlc-dev/sqlc/cmd/sqlc" = "1.31.1"
 "go:github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen" = "2.8.0"
 "go:github.com/pressly/goose/v3/cmd/goose" = "3.27.3"
+"aqua:goreleaser/goreleaser" = "2.18.0"
+"aqua:caarlos0/svu" = "3.4.1"
+"aqua:sigstore/cosign" = "3.1.3"
+"aqua:anchore/syft" = "1.51.1"
+
+# ─── Tasks ────────────────────────────────────────────────────────────────
+# `mise run <task>` — runs with the pinned toolchain above, always.
+
+[tasks.test]
+description = "Full suite: Go (real Postgres from docker-compose.test.yml) + frontend/landing"
+run = [
+  "cd apps/server && go vet ./... && go test -p 1 -count=1 ./...",
+  "bun run test",
+]
+
+[tasks.check]
+description = "Lint, typecheck, i18n coverage, goreleaser config"
+run = ["bun run check", "goreleaser check"]
+
+[tasks.artifacts]
+description = "SPA + both server binaries → dist/server/linux/<arch>/pjokk"
+run = "bash scripts/build-artifacts.sh"
+
+[tasks.image]
+description = "Multi-arch image via buildx (runs artifacts first)"
+run = "bash scripts/build-image.sh"
+
+[tasks.snapshot]
+description = "Full GoReleaser dry run: archives, SBOMs, local image (no publish, no signing)"
+run = """
+trap 'bash scripts/restore-embed-overlay.sh' EXIT
+goreleaser release --snapshot --clean --skip=sign
+"""

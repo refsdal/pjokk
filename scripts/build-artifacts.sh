@@ -1,53 +1,40 @@
 #!/usr/bin/env bash
 # Builds everything the container image COPYs, natively — no compilation
-# happens inside Docker any more. Output:
+# happens inside Docker. Output:
 #
-#   dist/server/pjokk-linux-amd64
-#   dist/server/pjokk-linux-arm64
+#   dist/server/linux/amd64/pjokk
+#   dist/server/linux/arm64/pjokk
 #
 # The SPA is not a separate artifact: it is embedded into both binaries via
-# go:embed, which is why this script briefly overlays the real Vite build
-# into apps/server/internal/web/dist (where a committed placeholder
-# index.html normally sits so plain `go build`/`go test` work without a
-# frontend build). The overlay is restored afterwards — even on failure —
-# so the working tree stays clean.
+# go:embed (scripts/spa-embed-overlay.sh), and the overlay is restored
+# afterwards — even on failure — so the working tree stays clean.
 #
-# Arch names follow Docker's TARGETARCH values (amd64/arm64) so the
-# Dockerfile can COPY dist/server/pjokk-linux-${TARGETARCH} directly.
+# The layout mirrors GoReleaser's dockers_v2 build context
+# (linux/<TARGETARCH>/pjokk), so ONE Dockerfile COPY line serves both this
+# script (BINARY_ROOT=dist/server, the default) and GoReleaser
+# (BINARY_ROOT=.).
+#
+# Releases do not use this script — GoReleaser drives the same overlay and
+# equivalent go build flags itself (.goreleaser.yaml). This is the dev/CI
+# path for compose and the preview image.
 #
 # Prerequisites: `mise install` (Go + Bun) and `bun install`.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-EMBED_DIR=apps/server/internal/web/dist
+trap 'bash scripts/restore-embed-overlay.sh' EXIT
 
-restore_embed_dir() {
-  # Drop the overlaid SPA and put the committed placeholder back. Guarded so
-  # a checkout without git (e.g. an exported tarball) still builds — it just
-  # keeps the overlay.
-  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    git clean -qfd "$EMBED_DIR"
-    git checkout -q -- "$EMBED_DIR"
-  fi
-}
-trap restore_embed_dir EXIT
-
-echo "==> SPA (vite)"
-(cd apps/frontend && bun run build)   # writes dist/client at the repo root
-
-echo "==> embed overlay"
-rm -rf "$EMBED_DIR"
-mkdir -p "$EMBED_DIR"
-cp -R dist/client/. "$EMBED_DIR/"
+bash scripts/spa-embed-overlay.sh
 
 echo "==> server binaries"
 rm -rf dist/server
 mkdir -p dist/server
 for arch in amd64 arm64; do
+  mkdir -p "dist/server/linux/$arch"
   (cd apps/server && CGO_ENABLED=0 GOOS=linux GOARCH="$arch" \
     go build -trimpath -ldflags="-s -w" \
-    -o "../../dist/server/pjokk-linux-$arch" ./cmd/pjokk)
-  echo "    dist/server/pjokk-linux-$arch"
+    -o "../../dist/server/linux/$arch/pjokk" ./cmd/pjokk)
+  echo "    dist/server/linux/$arch/pjokk"
 done
 
-ls -lh dist/server/
+ls -lh dist/server/linux/*/

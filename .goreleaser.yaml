@@ -1,0 +1,144 @@
+# GoReleaser owns everything downstream of a version tag: binaries,
+# archives, checksums, SBOMs, cosign signatures, per-arch images + the
+# multi-arch manifest, and the GitHub Release with a Conventional-Commits
+# changelog. The version DECISION stays outside (svu, in release.yml) —
+# GoReleaser releases *from* the tag it finds.
+#
+# Local dry run: `mise run snapshot` (wraps
+#   goreleaser release --snapshot --clean --skip=sign,sbom
+# and restores the SPA embed overlay afterwards). Signing is skipped
+# locally because keyless cosign needs an OIDC identity (GitHub Actions).
+version: 2
+
+project_name: pjokk
+
+# Not the default ./dist: the repo's own build outputs live there
+# (dist/client from Vite, dist/server from build-artifacts.sh), and the
+# before hook below writes into it — which would trip GoReleaser's
+# dist-must-be-empty check even under --clean.
+dist: dist/goreleaser
+
+before:
+  hooks:
+    # The SPA must sit in the go:embed directory before the builds run.
+    # Callers restore the overlay afterwards (scripts/restore-embed-overlay.sh)
+    # — GoReleaser OSS has no global after-hooks.
+    - bash scripts/spa-embed-overlay.sh
+
+builds:
+  - id: pjokk
+    dir: apps/server
+    main: ./cmd/pjokk
+    binary: pjokk
+    env:
+      - CGO_ENABLED=0
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w"]
+
+archives:
+  - formats: [tar.gz]
+    # pjokk_0.1.0_linux_amd64.tar.gz — binary only; the SPA, spec,
+    # migrations and tzdata are embedded in it.
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+
+checksum:
+  name_template: checksums.txt
+
+# One SBOM per archive (syft, SPDX JSON) — uploaded to the release.
+sboms:
+  - artifacts: archive
+
+# Keyless cosign signature over the checksum file: verifying it plus the
+# checksums transitively verifies every archive. README documents the
+# `cosign verify-blob` invocation.
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    output: true
+    certificate: "${artifact}.pem"
+    args:
+      - sign-blob
+      - --yes
+      - --output-signature=${signature}
+      - --output-certificate=${certificate}
+      - ${artifact}
+
+# Multi-platform image from the same COPY-only Dockerfile the rest of the
+# repo uses. GoReleaser's build context holds the binaries at
+# linux/<arch>/pjokk, hence BINARY_ROOT=. (the Dockerfile's default serves
+# the scripts/build-artifacts.sh layout). data-skel must ride along
+# explicitly — the context is a temp dir, not the repo. buildx builds and
+# pushes the manifest in one run at publish time; image SBOMs are on by
+# default here.
+dockers_v2:
+  - images:
+      - ghcr.io/refsdal/pjokk
+    # A pinning ladder: the full version never moves (re-releasing it is
+    # structurally impossible — the git tag already exists), major.minor
+    # moves with patches, major with minors (risky pre-1.0: minors carry
+    # breaking changes under the --v0 rule), latest with every release.
+    # sha-<commit> and @digest stay for byte-exact pinning.
+    tags:
+      - "{{ .Version }}"
+      - "{{ .Major }}.{{ .Minor }}"
+      - "{{ .Major }}"
+      - latest
+      - sha-{{ .FullCommit }}
+    dockerfile: Dockerfile
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    build_args:
+      BINARY_ROOT: "."
+    extra_files:
+      - docker/data-skel
+
+# Keyless cosign signatures on the pushed images/manifests.
+docker_signs:
+  - cmd: cosign
+    artifacts: all
+    output: true
+    args:
+      - sign
+      - --yes
+      - "${artifact}@${digest}"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs"
+      - "^test"
+      - "^chore"
+      - "^ci"
+      - "^style"
+      - "merge conflict"
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: Performance
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Other
+      order: 999
+
+release:
+  github:
+    owner: refsdal
+    name: pjokk
+  footer: |
+    **Container image:** `ghcr.io/refsdal/pjokk:{{ .Version }}` (linux/amd64 + linux/arm64, cosign-signed)
+
+    **Verify a download:** see the "Verifying a release" section of the README.
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot.{{ .ShortCommit }}"
