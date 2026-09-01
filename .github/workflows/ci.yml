@@ -1,105 +1,37 @@
 name: CI
 
+# The PR gate: "is this change good?" — the full suite (test.yml), then the
+# image built once from native artifacts, smoke-tested, and pushed as a
+# semver-prerelease preview. Pushes to main are release.yml's business:
+# merging IS releasing.
+
 on:
-  push:
-    branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
+# A force-push to a PR obsoletes the running check — cancel it instead of
+# letting it burn minutes to report on a commit nobody can merge.
+concurrency:
+  group: ci-${{ github.head_ref }}
+  cancel-in-progress: true
+
 jobs:
-  ci:
-    runs-on: ubuntu-latest
+  test:
+    uses: ./.github/workflows/test.yml
+    permissions:
+      contents: read
 
-    services:
-      # The suite runs against a real Postgres — the whole point, given the
-      # app's dialect moved. Object storage is not here: tests substitute an
-      # in-memory Storage.
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: pjokk
-          POSTGRES_PASSWORD: pjokk
-          POSTGRES_DB: pjokk_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U pjokk -d pjokk_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-
-    env:
-      # docker-compose.test.yml publishes 55432 locally; the service container
-      # above is reachable on the standard port.
-      TEST_DATABASE_URL: postgres://pjokk:pjokk@127.0.0.1:5432/pjokk_test
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      # Toolchain from .mise.toml — the same pins developers get from
-      # `mise install`. Only go and bun here: the codegen tools in that file
-      # are compiled from source and CI never runs `go generate`.
-      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
-        with:
-          install_args: "go bun aqua:goreleaser/goreleaser"
-
-      # setup-go used to provide this cache (and could not find go.sum at the
-      # repo root anyway); mise does not cache Go modules, so do it directly.
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles('apps/server/go.sum') }}
-          restore-keys: ${{ runner.os }}-go-
-
-      - name: Install
-        run: bun install --frozen-lockfile
-
-      - name: Lint + typecheck
-        run: bun run check
-
-      # The release pipeline's config is code too — a broken .goreleaser.yaml
-      # should fail here, not during a release.
-      - name: GoReleaser config check
-        run: goreleaser check
-
-      - name: Tests
-        run: bun run test
-
-      # apps/server is the backend: a Go module, outside the bun workspace,
-      # so the steps above never touch it. Same TEST_DATABASE_URL, same
-      # Postgres service — -p 1 because several Go test packages truncate
-      # shared tables between tests and are not safe to run as concurrent
-      # packages against one database.
-      - name: Go vet
-        run: cd apps/server && go vet ./...
-
-      - name: Go tests
-        run: cd apps/server && go test -p 1 -count=1 ./...
-
-      - name: Build
-        run: bun run build
-
-      # apps/landing is a separate deploy target (the static site on the
-      # apex) with nothing to publish it automatically yet — see README.md.
-      # Uploading the artifact here means a maintainer can grab a built,
-      # commit-pinned copy without a local build.
-      - name: Upload landing site artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: landing-dist
-          path: apps/landing/dist
-          if-no-files-found: error
-
-  # The image has to build and RUN, not merely typecheck — and it is published
-  # as a preview so the publish path itself is exercised on every change
-  # rather than being first tried during a release.
+  # The image has to build and RUN, not merely typecheck — and it is
+  # published as a preview so the publish path is exercised on every change
+  # rather than first tried during a release.
   #
-  # Preview tags are prerelease-versioned (0.2.0-preview.abc1234) so they sort
-  # below the real release and can never be mistaken for one. The release
-  # workflow is what produces a bare version tag and `latest`.
+  # Preview tags are semver prereleases of the release they precede
+  # (0.2.0-pr.123 sorts below 0.2.0), so they can never be mistaken for a
+  # release. release.yml is what produces bare version tags and `latest`.
   image:
-    needs: ci
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -108,8 +40,9 @@ jobs:
       REGISTRY: ghcr.io
       IMAGE_NAME: ${{ github.repository }}
     steps:
-      # Full history and tags: the version is computed from Conventional
-      # Commits since the last v* tag, and a shallow clone has neither.
+      # Full history and tags: svu computes the upcoming version from
+      # Conventional Commits since the last v* tag, and a shallow clone has
+      # neither.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -129,9 +62,8 @@ jobs:
       - name: Install
         run: bun install --frozen-lockfile
 
-      # svu computes what the next release WOULD be (same rule as
-      # release.yml's default, breaking-stays-minor while major is 0) so
-      # preview tags sort below it.
+      # What the next release WOULD be (same --v0 rule as release.yml), so
+      # the preview tags sort below it as prereleases of it.
       - name: Compute version
         id: version
         run: |
@@ -152,7 +84,7 @@ jobs:
       - name: Can this run push?
         id: gate
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ] &&              [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
+          if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
             echo "push=false" >> "$GITHUB_OUTPUT"
           else
             echo "push=true" >> "$GITHUB_OUTPUT"
@@ -208,11 +140,10 @@ jobs:
             "${env_args[@]}" pjokk:ci
 
           # It must actually serve, not merely start. /readyz proves it
-          # reached Postgres; "/" proves the SPA shell wins there now that
-          # "/" IS the app (the landing page moved to apps/landing on the
-          # separate apex deploy) — still pure route ordering, and just as
-          # easy to break the other way if a health or API route ever stops
-          # taking priority over the static-file fallback.
+          # reached Postgres; "/" proves the SPA shell wins there — pure
+          # route ordering, and just as easy to break the other way if a
+          # health or API route ever stops taking priority over the
+          # static-file fallback.
           for i in $(seq 1 30); do
             curl -fsS http://localhost:3000/healthz && break
             sleep 1
@@ -221,7 +152,7 @@ jobs:
           curl -fsS http://localhost:3000/ | grep -qi '<title>Pjokk'
           curl -fsS http://localhost:3000/robots.txt | grep -q 'Disallow: /'
 
-          # The server is a compiled Go binary in a scratch image, and
+          # The server is a compiled Go binary in a shell-less image, and
           # `go test` runs against source — so this probe is the only thing
           # standing between a build/link regression and production. It
           # needs no fixtures.
@@ -250,25 +181,29 @@ jobs:
 
       # Only after the smoke test: an image that does not serve must never
       # reach the registry, not even as a preview.
+      #
+      # Two tags per push: <next>-pr.<n> moves with the PR (grab the PR's
+      # current state), <next>-pr.<n>.<sha> never moves. Both are valid
+      # semver prereleases of the release they precede.
       - name: Push preview image (multi-arch)
         if: steps.gate.outputs.push == 'true'
         run: |
-          short=$(git rev-parse --short HEAD)
-          branch=$(echo "${{ github.head_ref || github.ref_name }}" | tr '/' '-' | tr -cd '[:alnum:]._-')
-          preview="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}-preview.${short}"
-          moving="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:branch-${branch}"
+          short=$(echo "${{ github.event.pull_request.head.sha }}" | cut -c1-7)
+          pr="${{ github.event.pull_request.number }}"
+          moving="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}-pr.${pr}"
+          pinned="${moving}.${short}"
           # The same context the smoke-tested image came from; buildx just
           # re-runs the COPYs per platform and pushes the manifest list.
           docker buildx build --platform linux/amd64,linux/arm64 \
-            -t "$preview" -t "$moving" --push .
+            -t "$moving" -t "$pinned" --push .
           {
             echo "### Preview image"
             echo
             echo '```'
-            echo "docker pull $preview"
+            echo "docker pull $moving"
             echo '```'
             echo
-            echo "Also tagged \`$moving\` (moves with the branch)."
+            echo "Also tagged \`$pinned\` (immutable)."
             echo "Next release would be **${{ steps.version.outputs.tag }}**."
           } >> "$GITHUB_STEP_SUMMARY"
 

@@ -1,0 +1,102 @@
+name: Tests
+
+# The single definition of "the suite is green": lint, typecheck, the
+# GoReleaser config lint, frontend/landing tests, Go vet + tests against a
+# real Postgres, and the landing-site artifact. Reusable — called by ci.yml
+# (every PR) and release.yml (every push to main), so the quality gate is
+# defined once and cannot drift between the two.
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    services:
+      # The suite runs against a real Postgres — the whole point, given the
+      # app's dialect moved. Object storage is not here: tests substitute an
+      # in-memory Storage.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: pjokk
+          POSTGRES_PASSWORD: pjokk
+          POSTGRES_DB: pjokk_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pjokk -d pjokk_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      # docker-compose.test.yml publishes 55432 locally; the service container
+      # above is reachable on the standard port.
+      TEST_DATABASE_URL: postgres://pjokk:pjokk@127.0.0.1:5432/pjokk_test
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Toolchain from .mise.toml — the same pins developers get from
+      # `mise install`. Only what this job runs: the codegen tools in that
+      # file are compiled from source and CI never runs `go generate`.
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          install_args: "go bun aqua:goreleaser/goreleaser"
+
+      # mise does not cache Go modules; do it directly, keyed on the module
+      # that actually owns go.sum.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('apps/server/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Lint + typecheck
+        run: bun run check
+
+      # The release pipeline's config is code too — a broken .goreleaser.yaml
+      # should fail here, not during a release.
+      - name: GoReleaser config check
+        run: goreleaser check
+
+      - name: Frontend and landing tests
+        run: bun run test
+
+      # apps/server is the backend: a Go module, outside the bun workspace,
+      # so the steps above never touch it. Same TEST_DATABASE_URL, same
+      # Postgres service — -p 1 because several Go test packages truncate
+      # shared tables between tests and are not safe to run as concurrent
+      # packages against one database.
+      - name: Go vet
+        run: cd apps/server && go vet ./...
+
+      - name: Go tests
+        run: cd apps/server && go test -p 1 -count=1 ./...
+
+      # The SPA build is exercised by ci.yml's image job (build-artifacts)
+      # and by GoReleaser's before hook on release — only the landing site
+      # needs building here.
+      - name: Build landing site
+        run: bun run build:landing
+
+      # apps/landing is a separate deploy target (the static site on the
+      # apex) with nothing to publish it automatically yet — see README.md.
+      # Uploading the artifact means a maintainer can grab a built,
+      # commit-pinned copy without a local build.
+      - name: Upload landing site artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: landing-dist
+          path: apps/landing/dist
+          if-no-files-found: error
