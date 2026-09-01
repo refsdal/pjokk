@@ -156,8 +156,13 @@ jobs:
           docker run -d --name pg --network pjokk-ci \
             -e POSTGRES_USER=pjokk -e POSTGRES_PASSWORD=pjokk -e POSTGRES_DB=pjokk \
             postgres:17-alpine
+          # -h 127.0.0.1 forces the probe over TCP. Without it pg_isready
+          # checks the Unix socket, which already accepts during initdb's
+          # socket-only first start — before the restart that opens TCP —
+          # so the migrate one-off below could race a "ready" Postgres that
+          # refused TCP connections.
           for i in $(seq 1 30); do
-            docker exec pg pg_isready -U pjokk -d pjokk && break
+            docker exec pg pg_isready -h 127.0.0.1 -U pjokk -d pjokk && break
             sleep 1
           done
 
