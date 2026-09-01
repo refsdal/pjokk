@@ -25,15 +25,51 @@ import (
 // a banned user. A banned account is treated exactly like a signed-out one so
 // no caller has to remember to check the flag.
 func (s *service) SessionFromRequest(r *http.Request) (*Session, error) {
+	session, _, err := s.resolveSession(r)
+	return session, err
+}
+
+// SessionFromRequestRefreshing resolves the caller exactly like
+// SessionFromRequest, and additionally re-issues the session cookie when
+// Limen extended the session's lifetime while validating it.
+//
+// Limen's sessions are sliding: validation extends a session whose expiry is
+// within UpdateAge (1 day of a 7-day life) and hands back a refreshed
+// SessionResult carrying a cookie with the new Max-Age. Limen's own
+// MiddlewareRequireSession writes that cookie; nothing else does. Pjokk does
+// not use that middleware — the session gate is ours, so it can populate our
+// context and never reject — which means without this method the extension
+// lands in the database and never reaches the browser, and the cookie
+// expires under a user who has been active the whole time.
+//
+// SessionFromRequest is kept for the callers that genuinely have no writer
+// (jobs, the banned guard's siblings); every HTTP request should come through
+// here. Limen types stay behind this package's boundary: the refreshed
+// SessionResult never leaves.
+func (s *service) SessionFromRequestRefreshing(w http.ResponseWriter, r *http.Request) (*Session, error) {
+	session, refreshed, err := s.resolveSession(r)
+	if err != nil || session == nil || refreshed == nil {
+		return session, err
+	}
+	if err := s.core.Cookies().SetSessionCookie(w, refreshed); err != nil {
+		return nil, fmt.Errorf("auth: write refreshed session cookie: %w", err)
+	}
+	return session, nil
+}
+
+// resolveSession is the shared body of the two methods above. The second
+// return value is Limen's refreshed session (nil unless validation extended
+// the session), which only SessionFromRequestRefreshing acts on.
+func (s *service) resolveSession(r *http.Request) (*Session, *limen.SessionResult, error) {
 	validated, err := s.limen.GetSession(r)
 	if err != nil {
 		if isSignedOut(err) {
-			return nil, nil
+			return nil, nil, nil
 		}
-		return nil, fmt.Errorf("auth: validate session: %w", err)
+		return nil, nil, fmt.Errorf("auth: validate session: %w", err)
 	}
 	if validated == nil || validated.User == nil || validated.Session == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	row, err := s.q.GetAuthSession(r.Context(), gen.GetAuthSessionParams{
@@ -42,12 +78,12 @@ func (s *service) SessionFromRequest(r *http.Request) (*Session, error) {
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
+			return nil, nil, nil
 		}
-		return nil, fmt.Errorf("auth: load session context: %w", err)
+		return nil, nil, fmt.Errorf("auth: load session context: %w", err)
 	}
 	if row.Banned {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	session := &Session{
@@ -62,7 +98,7 @@ func (s *service) SessionFromRequest(r *http.Request) (*Session, error) {
 	if by, ok := validated.Session.Metadata[metaImpersonatedBy].(string); ok {
 		session.ImpersonatedBy = by
 	}
-	return session, nil
+	return session, validated.Refreshed, nil
 }
 
 // isSignedOut reports whether err means "no valid session" rather than "the

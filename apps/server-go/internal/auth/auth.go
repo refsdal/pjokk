@@ -114,6 +114,11 @@ type Service interface {
 	Handler() http.Handler                                // mount at /api/auth/
 	SessionFromRequest(r *http.Request) (*Session, error) // nil,nil when no session
 
+	// SessionFromRequestRefreshing is SessionFromRequest plus the sliding-
+	// session cookie write, and is what every HTTP path should call. See its
+	// doc comment in session.go for why a resolver needs a ResponseWriter.
+	SessionFromRequestRefreshing(w http.ResponseWriter, r *http.Request) (*Session, error)
+
 	// CreateUser creates an account. An empty password creates a user with
 	// no usable credential — the invite-redeem path, where the account is
 	// provisioned first and the person signs in with Google afterwards.

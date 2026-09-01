@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/refsdal/pjokk/server/internal/auth"
 	"github.com/refsdal/pjokk/server/internal/db/gen"
@@ -247,6 +248,81 @@ func TestSignInThenSessionFromRequest(t *testing.T) {
 	}
 	if session.ImpersonatedBy != "" {
 		t.Errorf("ImpersonatedBy = %q, want empty", session.ImpersonatedBy)
+	}
+}
+
+// Limen's sessions slide: validating one whose expiry is within UpdateAge
+// (1 day of a 7-day life) extends it in the database AND hands back a
+// refreshed cookie. Only Limen's own middleware writes that cookie, and Pjokk
+// does not use it — so the resolver has to, or an active user's cookie
+// eventually expires under them while the row keeps being extended.
+//
+// The near-expiry state is produced by ageing the session two days: Limen
+// derives "when was this last extended" as expires_at minus the session
+// duration, so a session created two days ago and expiring in five is one day
+// past its update age. created_at moves with it because Limen reads a session
+// whose (expires_at - created_at) is under the full duration as a short,
+// deliberately non-extending "remember me was unchecked" session.
+func TestSessionFromRequestRefreshingReissuesTheCookie(t *testing.T) {
+	f := newFixture(t, false)
+
+	_, cookie := f.signIn("Refresh Me", "refresh@example.com")
+	if _, err := f.rig.Pool.Exec(f.ctx, `
+		UPDATE "sessions"
+		SET "created_at" = now() - interval '2 days',
+		    "expires_at" = now() + interval '5 days'
+		WHERE "token" = $1`,
+		cookie.Value,
+	); err != nil {
+		t.Fatalf("age the session: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	session, err := f.svc.SessionFromRequestRefreshing(rec, signedInRequest(cookie))
+	if err != nil {
+		t.Fatalf("SessionFromRequestRefreshing: %v", err)
+	}
+	if session == nil {
+		t.Fatal("no session for a valid, near-expiry cookie")
+	}
+
+	refreshed := f.sessionCookie(rec)
+	if refreshed.Value != cookie.Value {
+		t.Errorf("refreshed cookie value = %q, want the same token %q", refreshed.Value, cookie.Value)
+	}
+	if refreshed.MaxAge <= 0 {
+		t.Errorf("refreshed cookie Max-Age = %d, want a fresh positive lifetime", refreshed.MaxAge)
+	}
+
+	// The extension is persisted too, not just announced to the browser.
+	var expiresAt time.Time
+	if err := f.rig.Pool.QueryRow(f.ctx,
+		`SELECT "expires_at" FROM "sessions" WHERE "token" = $1`, cookie.Value,
+	).Scan(&expiresAt); err != nil {
+		t.Fatalf("read session expiry: %v", err)
+	}
+	if time.Until(expiresAt) < 6*24*time.Hour {
+		t.Errorf("session expires in %s, want the full duration back", time.Until(expiresAt))
+	}
+}
+
+// The other half of the contract: a session nowhere near its refresh window
+// must not have its cookie rewritten on every request.
+func TestSessionFromRequestRefreshingLeavesFreshSessionsAlone(t *testing.T) {
+	f := newFixture(t, false)
+
+	_, cookie := f.signIn("Fresh", "fresh@example.com")
+
+	rec := httptest.NewRecorder()
+	session, err := f.svc.SessionFromRequestRefreshing(rec, signedInRequest(cookie))
+	if err != nil {
+		t.Fatalf("SessionFromRequestRefreshing: %v", err)
+	}
+	if session == nil {
+		t.Fatal("no session for a fresh cookie")
+	}
+	if got := rec.Result().Cookies(); len(got) != 0 {
+		t.Errorf("a fresh session set %d cookies, want none", len(got))
 	}
 }
 

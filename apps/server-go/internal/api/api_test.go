@@ -12,6 +12,7 @@ import (
 	"github.com/refsdal/pjokk/server/internal/api"
 	"github.com/refsdal/pjokk/server/internal/auth"
 	"github.com/refsdal/pjokk/server/internal/db"
+	"github.com/refsdal/pjokk/server/internal/ratelimit"
 	"github.com/refsdal/pjokk/server/internal/testrig"
 )
 
@@ -32,7 +33,65 @@ func newDeps(t *testing.T) (api.Deps, *testrig.Rig) {
 	if err != nil {
 		t.Fatalf("auth.New: %v", err)
 	}
-	return api.Deps{Pool: rig.Pool, Q: rig.Q, Auth: svc}, rig
+	return api.Deps{
+		Pool:      rig.Pool,
+		Q:         rig.Q,
+		Auth:      svc,
+		RateLimit: ratelimit.NewPostgres(rig.Q),
+	}, rig
+}
+
+// The credential sign-in route is the one auth route NewHandler puts behind
+// our own limiter (REF §A5's rate-limit points: auth-signin, 20 per 10
+// minutes per client). The brake sits in FRONT of Limen's handler, so a wrong
+// password still costs an attempt.
+//
+// Limen has a limiter of its own, with a tighter default, so several of the
+// attempts below are already refused by it — with Limen's `{"message": …}`
+// body. Ours is identified by the envelope code, not by the status: the point
+// of the Postgres-backed limiter is that it is shared across replicas, where
+// Limen's is per-process.
+func TestCredentialSignInIsRateLimited(t *testing.T) {
+	deps, _ := newDeps(t)
+	handler := api.NewHandler(deps)
+
+	signIn := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, auth.BasePath+"/signin/credential",
+			strings.NewReader(`{"credential":"nobody@example.com","password":"Wrongpass123"}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec
+	}
+	limitedByUs := func(rec *httptest.ResponseRecorder) bool {
+		var body map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			return false
+		}
+		return rec.Code == http.StatusTooManyRequests && body["code"] == "RATE_LIMITED"
+	}
+
+	for i := 1; i <= 20; i++ {
+		if rec := signIn(); limitedByUs(rec) {
+			t.Fatalf("attempt %d hit the auth-signin limiter; the limit is 20", i)
+		}
+	}
+
+	rec := signIn()
+	if !limitedByUs(rec) {
+		t.Fatalf("attempt 21 = %d %s, want 429 with code RATE_LIMITED", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Content-Type"); !strings.HasPrefix(got, "application/json") {
+		t.Errorf("Content-Type = %q, want the JSON error envelope", got)
+	}
+
+	// Only that one route is behind our limiter: another auth route must not
+	// answer with our envelope.
+	other := httptest.NewRecorder()
+	handler.ServeHTTP(other, httptest.NewRequest(http.MethodGet, auth.BasePath+"/me", nil))
+	if limitedByUs(other) {
+		t.Error("an unrelated auth route answered with the auth-signin envelope")
+	}
 }
 
 func TestHealthzDoesNotTouchTheDatabase(t *testing.T) {

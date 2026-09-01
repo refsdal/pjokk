@@ -22,6 +22,8 @@ import (
 	nethttpmiddleware "github.com/oapi-codegen/nethttp-middleware"
 
 	"github.com/refsdal/pjokk/server/internal/api/gen"
+	"github.com/refsdal/pjokk/server/internal/api/middleware"
+	"github.com/refsdal/pjokk/server/internal/api/respond"
 	"github.com/refsdal/pjokk/server/internal/auth"
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
 	"github.com/refsdal/pjokk/server/internal/push"
@@ -127,37 +129,41 @@ func withSpecValidation(spec *openapi3.T, next http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			writeError(w, http.StatusBadRequest, "Invalid request", "VALIDATION")
+			respond.Error(w, http.StatusBadRequest, "Invalid request", "VALIDATION")
 		},
 	})
 	return validate(next)
 }
 
-// requireSession runs auth.Service.SessionFromRequest and writes the
-// standard envelope on failure. It reports whether the caller should
-// continue serving the request.
+// requireSession resolves the caller and writes the standard envelope on
+// failure. It reports whether the caller should continue serving the request.
 //
-// This is the FULL tenancy check /api/docs and /api/openapi.json get in
-// this task: a session must exist, nothing more (no family/role check —
-// Task 6 builds that middleware for the rest of /api/*).
+// This is the FULL tenancy check /api/docs and /api/openapi.json get: a
+// session must exist, nothing more (no family or role check — those routes
+// are documentation, not data). Everything else in /api/* sits behind
+// package middleware's chain.
 func requireSession(d Deps, w http.ResponseWriter, r *http.Request) bool {
-	session, err := d.Auth.SessionFromRequest(r)
+	session, err := d.Auth.SessionFromRequestRefreshing(w, r)
 	switch {
 	case err != nil:
-		writeError(w, http.StatusInternalServerError, "session lookup failed", "INTERNAL")
+		respond.Error(w, http.StatusInternalServerError, "session lookup failed", "INTERNAL")
 		return false
 	case session == nil:
-		writeError(w, http.StatusUnauthorized, "Not signed in", "UNAUTHENTICATED")
+		respond.Error(w, http.StatusUnauthorized, "Not signed in", "UNAUTHENTICATED")
 		return false
 	default:
 		return true
 	}
 }
 
-// NewHandler builds the /api/* handler: the auth handler, the session-gated
-// docs routes, spec-validated routes for everything else in the spec
-// (currently just /healthz and /readyz, mounted here too since the
-// generated router owns them), and a JSON 404 for anything unmatched.
+// NewHandler builds the /api/* handler: the auth handler (behind the
+// credential sign-in rate limit), the session-gated docs routes,
+// spec-validated routes for everything else in the spec (currently just
+// /healthz and /readyz, mounted here too since the generated router owns
+// them), and a JSON 404 for anything unmatched.
+//
+// The whole thing is wrapped in middleware.TrustedProxy — see the comment at
+// the return statement for why that wrapper has to be outermost.
 func NewHandler(d Deps) http.Handler {
 	spec := loadSpec()
 	specJSON, err := spec.MarshalJSON()
@@ -170,15 +176,26 @@ func NewHandler(d Deps) http.Handler {
 	mux := http.NewServeMux()
 
 	// The auth handler is mounted directly, never behind spec validation.
+	authHandler := d.Auth.Handler()
+	mux.Handle(auth.BasePath+"/", authHandler)
+
+	// Credential brute-force brake (REF §A5's rate-limit points): Limen's own
+	// limiter is fine, but this one is Postgres-backed and therefore shared
+	// across replicas. 20 attempts per 10 minutes per client is generous for
+	// a human and hopeless for guessing.
 	//
-	// A future middleware that must see EVERY request before Limen does —
-	// proxy-hop RemoteAddr rewriting (Task 6), which Limen's rate limiter
-	// and session IP digest both depend on via net/http's r.RemoteAddr —
-	// has to wrap the http.Handler this function RETURNS, not be inserted
-	// at this mount point: net/http sets RemoteAddr on the request before
-	// ANY handler runs, this one included, so wrapping only the mux here
-	// would still leave Limen reading the untranslated address.
-	mux.Handle(auth.BasePath+"/", d.Auth.Handler())
+	// Registered as its own, more specific pattern rather than as a wrapper
+	// around authHandler: net/http's ServeMux dispatches by specificity, so
+	// this claims exactly the credential sign-in POST and every other auth
+	// route reaches Limen untouched.
+	//
+	// Skipped when no store was supplied. A Deps without one is a test or a
+	// half-built composition root, and a nil store would panic at startup;
+	// the real composition root always supplies it.
+	if d.RateLimit != nil {
+		mux.Handle("POST "+auth.BasePath+"/signin/credential",
+			middleware.RateLimit(d.RateLimit, "auth-signin", 20, 600, false, d.TrustedProxyHops)(authHandler))
+	}
 
 	mux.HandleFunc("GET /api/openapi.json", func(w http.ResponseWriter, r *http.Request) {
 		if !requireSession(d, w, r) {
@@ -207,11 +224,18 @@ func NewHandler(d Deps) http.Handler {
 	strictHandler := gen.NewStrictHandler(d, nil)
 	gen.HandlerWithOptions(strictHandler, gen.StdHTTPServerOptions{BaseRouter: mux})
 
-	return mux
+	// Outermost, deliberately. net/http sets RemoteAddr from the socket
+	// before ANY handler runs, so the proxy-hop rewrite has to wrap the
+	// handler this function RETURNS rather than sit at one of the mount
+	// points above: Limen's own sign-in limiter and its session client-address
+	// digest read RemoteAddr, and behind an ingress an untranslated address
+	// collapses both into one shared bucket. With TRUSTED_PROXY_HOPS at its
+	// default 0 the wrapper is a no-op and returns the mux unchanged.
+	return middleware.TrustedProxy(d.TrustedProxyHops)(mux)
 }
 
 // handleAPINotFound is the terminal handler for any /api/* request no
 // earlier pattern claimed.
 func handleAPINotFound(w http.ResponseWriter, _ *http.Request) {
-	writeError(w, http.StatusNotFound, "Not found", "NOT_FOUND")
+	respond.Error(w, http.StatusNotFound, "Not found", "NOT_FOUND")
 }
