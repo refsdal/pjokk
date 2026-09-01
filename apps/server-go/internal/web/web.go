@@ -58,12 +58,32 @@ func securityHeaders(h http.Header) {
 	h.Set("Content-Security-Policy", csp)
 }
 
-// Handler wraps apiHandler with static asset serving, the SPA fallback, and
-// REF §A9's headers on everything that is not /api/*.
+// probePaths are the two top-level health endpoints package api registers
+// outside the /api/ namespace (REF §A1 items 3 and 4: `GET /healthz` and
+// `GET /readyz`, exactly where the TypeScript app mounted them). They need an
+// exact-match escape hatch here because this handler otherwise dispatches to
+// the API by /api/ prefix alone — without it both probes fall through to the
+// SPA fallback and answer `200 text/html`, giving a liveness probe that
+// passes unconditionally and a readiness probe with no connection to the
+// database whatsoever. It is a silent failure: `curl -o /dev/null -w
+// '%{http_code}'` reports 200 either way, which is how it survived a
+// status-code-only smoke test.
 //
-// Requests under /api/ are handed to apiHandler UNTOUCHED — no headers are
-// added here, matching REF §A1 item 5 ("No CSP on API"); package api owns
-// whatever headers its own responses need.
+// A path set rather than a second implementation of the probes: package api
+// stays the single source of truth for what they actually do.
+var probePaths = map[string]bool{
+	"/healthz": true,
+	"/readyz":  true,
+}
+
+// Handler wraps apiHandler with static asset serving, the SPA fallback, and
+// REF §A9's headers on everything that is not an API path.
+//
+// Requests under /api/, and the two top-level probes, are handed to
+// apiHandler UNTOUCHED — no headers are added here, matching REF §A1 item 5
+// ("No CSP on API") and the TypeScript mount order, where the probes were
+// registered ahead of the header middleware and so never received them
+// either. Package api owns whatever headers its own responses need.
 func Handler(apiHandler http.Handler) http.Handler {
 	assets, err := fs.Sub(distFS, "dist")
 	if err != nil {
@@ -75,7 +95,7 @@ func Handler(apiHandler http.Handler) http.Handler {
 	assetServer := http.FileServer(http.FS(assets))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/api" {
+		if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/api" || probePaths[r.URL.Path] {
 			apiHandler.ServeHTTP(w, r)
 			return
 		}

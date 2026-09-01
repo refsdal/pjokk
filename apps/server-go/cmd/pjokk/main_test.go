@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"syscall"
 	"testing"
 )
 
@@ -101,6 +102,23 @@ func TestHealthcheckModeUnreachablePortIsUnhealthy(t *testing.T) {
 
 	if got := healthcheckMode(port); got != 1 {
 		t.Errorf("healthcheckMode on a closed port = %d, want 1", got)
+	}
+}
+
+// The drain log line names the signal, so "was this a rollout or somebody's
+// Ctrl-C?" is answered by the log. os.Signal.String() would answer
+// "terminated" / "interrupt" instead, which is neither what apps/server
+// logged nor what anyone greps for.
+func TestSignalName(t *testing.T) {
+	if got := signalName(syscall.SIGTERM); got != "SIGTERM" {
+		t.Errorf("signalName(SIGTERM) = %q, want \"SIGTERM\"", got)
+	}
+	if got := signalName(syscall.SIGINT); got != "SIGINT" {
+		t.Errorf("signalName(SIGINT) = %q, want \"SIGINT\"", got)
+	}
+	// Anything else falls back to the stdlib rendering rather than "unknown".
+	if got := signalName(syscall.SIGHUP); got == "" {
+		t.Error("signalName(SIGHUP) = \"\", want the stdlib description")
 	}
 }
 

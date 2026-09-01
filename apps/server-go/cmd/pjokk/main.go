@@ -283,8 +283,8 @@ func serveMode(migrate, scheduler bool) int {
 		return 1
 	}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	defer cancel()
+	sig, stopSignals := notifyShutdown()
+	defer stopSignals()
 
 	if migrate {
 		// Guarded by a Postgres advisory lock, so several containers booting
@@ -328,7 +328,7 @@ func serveMode(migrate, scheduler bool) int {
 		stopScheduler = cron.StartScheduler(cronDeps(deps))
 	}
 
-	return serveUntilSignal(ctx, srv, stopScheduler)
+	return serveUntilSignal(sig, srv, stopScheduler)
 }
 
 // --- worker -----------------------------------------------------------
@@ -352,8 +352,8 @@ func workerMode() int {
 		return 1
 	}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	defer cancel()
+	sig, stopSignals := notifyShutdown()
+	defer stopSignals()
 
 	deps, closeDeps, err := buildDeps(context.Background(), cfg)
 	if err != nil {
@@ -380,7 +380,7 @@ func workerMode() int {
 
 	stopScheduler := cron.StartScheduler(cronDeps(deps))
 
-	return serveUntilSignal(ctx, srv, stopScheduler)
+	return serveUntilSignal(sig, srv, stopScheduler)
 }
 
 // --- shared plumbing --------------------------------------------------
@@ -397,11 +397,42 @@ func logStartupConfig(cfg *config.Config) {
 	}
 }
 
-// serveUntilSignal runs srv until it fails or ctx is cancelled by SIGTERM /
-// SIGINT, then stops the scheduler (if any) and drains in-flight requests.
-// The scheduler stops FIRST: draining while new job runs are still being
+// notifyShutdown subscribes to SIGTERM and SIGINT and returns the channel
+// they arrive on, plus an unsubscribe func.
+//
+// A channel rather than signal.NotifyContext because the channel hands back
+// WHICH signal arrived, and the log line names it — apps/server/src/main.ts's
+// `${signal} received, shutting down`. "Was this an orchestrated rollout or
+// did somebody Ctrl-C the container?" is the first question a shutdown log
+// should answer, and a context can only say that something happened.
+func notifyShutdown() (<-chan os.Signal, func()) {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT)
+	return ch, func() { signal.Stop(ch) }
+}
+
+// signalName renders a signal the way an operator greps for it. os.Signal's
+// own String() gives the DESCRIPTION — SIGTERM stringifies as "terminated"
+// and SIGINT as "interrupt" — so logging the value directly produces
+// "terminated received, shutting down", which matches neither
+// apps/server/src/main.ts's `${signal} received, shutting down` nor what
+// anyone searches a log for.
+func signalName(s os.Signal) string {
+	switch s {
+	case syscall.SIGTERM:
+		return "SIGTERM"
+	case syscall.SIGINT:
+		return "SIGINT"
+	default:
+		return s.String()
+	}
+}
+
+// serveUntilSignal runs srv until it fails or a shutdown signal arrives on
+// sig, then stops the scheduler (if any) and drains in-flight requests. The
+// scheduler stops FIRST: draining while new job runs are still being
 // scheduled would be a race against ourselves.
-func serveUntilSignal(ctx context.Context, srv *http.Server, stopScheduler func()) int {
+func serveUntilSignal(sig <-chan os.Signal, srv *http.Server, stopScheduler func()) int {
 	errc := make(chan error, 1)
 	go func() {
 		errc <- srv.ListenAndServe()
@@ -421,8 +452,8 @@ func serveUntilSignal(ctx context.Context, srv *http.Server, stopScheduler func(
 		}
 		return 0
 
-	case <-ctx.Done():
-		log.Print("shutdown signal received, draining")
+	case s := <-sig:
+		log.Printf("%s received, shutting down", signalName(s))
 		if stopScheduler != nil {
 			stopScheduler()
 		}
