@@ -1822,6 +1822,56 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/stats:
+    get:
+      operationId: getStats
+      summary: >-
+        Per-day sleep/intake/counts plus averages for the window, and the
+        latest weight with its predecessor. Sleep sessions are split across
+        local midnights. Free for any window up to 90 days — the TS
+        predecessor's statsMonth premium gate on days>7 is removed.
+      tags: [stats]
+      parameters:
+        - name: babyId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: days
+          in: query
+          required: false
+          description: Window length in local days, today included.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 90
+            default: 7
+        - name: tz
+          in: query
+          required: false
+          description: >-
+            The requester's Date.getTimezoneOffset() (minutes,
+            UTC-minus-local). Day buckets follow the caretaker's clock, not
+            the server's. Defaults to 0 (UTC) when omitted.
+          schema:
+            type: integer
+            minimum: -840
+            maximum: 840
+            default: 0
+      responses:
+        "200":
+          description: Stats for the window.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stats"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/me:
     get:
       operationId: getMe
@@ -2562,6 +2612,67 @@ components:
           type: string
           nullable: true
       additionalProperties: true
+    StatsDay:
+      type: object
+      required: [date, sleepMin, intakeMl, feeds, diapers]
+      properties:
+        date:
+          type: string
+          description: YYYY-MM-DD in the requester's local time.
+        sleepMin:
+          type: integer
+          format: int32
+        intakeMl:
+          type: integer
+          format: int32
+        feeds:
+          type: integer
+          format: int32
+        diapers:
+          type: integer
+          format: int32
+    StatsWeight:
+      type: object
+      required: [value, time, prevValue, prevTime]
+      properties:
+        value:
+          type: number
+          format: double
+        time:
+          type: string
+          format: date-time
+        prevValue:
+          type: number
+          format: double
+          nullable: true
+        prevTime:
+          type: string
+          format: date-time
+          nullable: true
+    Stats:
+      type: object
+      required: [days, avgSleepMin, avgIntakeMl, avgFeeds, avgDiapers, weight]
+      properties:
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/StatsDay"
+        avgSleepMin:
+          type: integer
+          format: int32
+        avgIntakeMl:
+          type: integer
+          format: int32
+        avgFeeds:
+          type: number
+          format: double
+        avgDiapers:
+          type: number
+          format: double
+        weight:
+          allOf:
+            - $ref: "#/components/schemas/StatsWeight"
+          nullable: true
     Timeline:
       type: object
       required: [entries, nextCursor]

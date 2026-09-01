@@ -211,6 +211,9 @@ type ServerInterface interface {
 	// WakeSleep End the active session for a sleep log. endTime defaults to now.
 	// (POST /api/sleep/{id}/wake)
 	WakeSleep(w http.ResponseWriter, r *http.Request, id IdPath)
+	// GetStats Per-day sleep/intake/counts plus averages for the window, and the latest weight with its predecessor. Sleep sessions are split across local midnights. Free for any window up to 90 days — the TS predecessor's statsMonth premium gate on days>7 is removed.
+	// (GET /api/stats)
+	GetStats(w http.ResponseWriter, r *http.Request, params GetStatsParams)
 	// GetSummary Everything the home screen needs in one call: last feed, last diaper, active + last sleep, active play, and today's local-day totals.
 	// (GET /api/summary)
 	GetSummary(w http.ResponseWriter, r *http.Request, params GetSummaryParams)
@@ -1913,6 +1916,65 @@ func (siw *ServerInterfaceWrapper) WakeSleep(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// GetStats operation middleware
+func (siw *ServerInterfaceWrapper) GetStats(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetStatsParams
+
+	// ------------- Required query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "days" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "days", r.URL.Query(), &params.Days, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "days"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "days", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "tz" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "tz", r.URL.Query(), &params.Tz, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "tz"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tz", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetStats(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetSummary operation middleware
 func (siw *ServerInterfaceWrapper) GetSummary(w http.ResponseWriter, r *http.Request) {
 
@@ -2438,6 +2500,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/contacts/{id}", wrapper.DeleteContact)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/contacts/{id}", wrapper.UpdateContact)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/timeline", wrapper.ListTimeline)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/stats", wrapper.GetStats)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/me", wrapper.GetMe)
 
 	return m
@@ -4659,6 +4722,42 @@ func (response WakeSleep404JSONResponse) VisitWakeSleepResponse(w http.ResponseW
 	return err
 }
 
+type GetStatsRequestObject struct {
+	Params GetStatsParams
+}
+
+type GetStatsResponseObject interface {
+	VisitGetStatsResponse(w http.ResponseWriter) error
+}
+
+type GetStats200JSONResponse Stats
+
+func (response GetStats200JSONResponse) VisitGetStatsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetStats404JSONResponse Error
+
+func (response GetStats404JSONResponse) VisitGetStatsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetSummaryRequestObject struct {
 	Params GetSummaryParams
 }
@@ -5213,6 +5312,9 @@ type StrictServerInterface interface {
 	// WakeSleep End the active session for a sleep log. endTime defaults to now.
 	// (POST /api/sleep/{id}/wake)
 	WakeSleep(ctx context.Context, request WakeSleepRequestObject) (WakeSleepResponseObject, error)
+	// GetStats Per-day sleep/intake/counts plus averages for the window, and the latest weight with its predecessor. Sleep sessions are split across local midnights. Free for any window up to 90 days — the TS predecessor's statsMonth premium gate on days>7 is removed.
+	// (GET /api/stats)
+	GetStats(ctx context.Context, request GetStatsRequestObject) (GetStatsResponseObject, error)
 	// GetSummary Everything the home screen needs in one call: last feed, last diaper, active + last sleep, active play, and today's local-day totals.
 	// (GET /api/summary)
 	GetSummary(ctx context.Context, request GetSummaryRequestObject) (GetSummaryResponseObject, error)
@@ -7120,6 +7222,32 @@ func (sh *strictHandler) WakeSleep(w http.ResponseWriter, r *http.Request, id Id
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(WakeSleepResponseObject); ok {
 		if err := validResponse.VisitWakeSleepResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetStats operation middleware
+func (sh *strictHandler) GetStats(w http.ResponseWriter, r *http.Request, params GetStatsParams) {
+	var request GetStatsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetStats(ctx, request.(GetStatsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetStats")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetStatsResponseObject); ok {
+		if err := validResponse.VisitGetStatsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -1324,6 +1324,34 @@ type SleepLog struct {
 	StartTime time.Time  `json:"startTime"`
 }
 
+// Stats defines model for Stats.
+type Stats struct {
+	AvgDiapers  float64      `json:"avgDiapers"`
+	AvgFeeds    float64      `json:"avgFeeds"`
+	AvgIntakeMl int32        `json:"avgIntakeMl"`
+	AvgSleepMin int32        `json:"avgSleepMin"`
+	Days        []StatsDay   `json:"days"`
+	Weight      *StatsWeight `json:"weight"`
+}
+
+// StatsDay defines model for StatsDay.
+type StatsDay struct {
+	// Date YYYY-MM-DD in the requester's local time.
+	Date     string `json:"date"`
+	Diapers  int32  `json:"diapers"`
+	Feeds    int32  `json:"feeds"`
+	IntakeMl int32  `json:"intakeMl"`
+	SleepMin int32  `json:"sleepMin"`
+}
+
+// StatsWeight defines model for StatsWeight.
+type StatsWeight struct {
+	PrevTime  *time.Time `json:"prevTime"`
+	PrevValue *float64   `json:"prevValue"`
+	Time      time.Time  `json:"time"`
+	Value     float64    `json:"value"`
+}
+
 // StopPlay Defaults endTime to now on the server when omitted.
 type StopPlay struct {
 	EndTime *time.Time `json:"endTime,omitempty"`
@@ -1680,6 +1708,17 @@ type ListSleepsParams struct {
 type GetActiveSleepParams struct {
 	// BabyId Restrict the result to one baby in the caller's family.
 	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+}
+
+// GetStatsParams defines parameters for GetStats.
+type GetStatsParams struct {
+	BabyId string `form:"babyId" json:"babyId"`
+
+	// Days Window length in local days, today included.
+	Days *int `form:"days,omitempty" json:"days,omitempty"`
+
+	// Tz The requester's Date.getTimezoneOffset() (minutes, UTC-minus-local). Day buckets follow the caretaker's clock, not the server's. Defaults to 0 (UTC) when omitted.
+	Tz *int `form:"tz,omitempty" json:"tz,omitempty"`
 }
 
 // GetSummaryParams defines parameters for GetSummary.

@@ -277,6 +277,14 @@ var operationAuthTiers = map[string]authTier{
 	"UpdateContact":       tierFamily,
 	"DeleteContact":       tierFamily,
 
+	// Stats (Task 17; REF §A1 stats.ts). The TS predecessor's statsMonth
+	// premium gate (402 when days>7) is removed — every window up to the
+	// spec's 90-day cap is ordinary tierFamily. CSV export
+	// (GET /api/export.csv) sits outside this map entirely: it is
+	// hand-routed (internal/api/export.go), same as /api/files, behind
+	// familyChain rather than authChain's operationID dispatch.
+	"GetStats": tierFamily,
+
 	"DeleteBaby":          tierAdmin,
 	"DeleteFamilyMember":  tierAdmin,
 	"SetFamilyMemberRole": tierAdmin,
@@ -542,6 +550,13 @@ func NewHandler(d Deps) http.Handler {
 	// apps/api/src/app.ts's filesApp sits behind the identical "/api/*"
 	// apiKeyAuth middleware every other route does, so this port must too.
 	d.mountFileRoutes(mux, familyChain(d))
+
+	// CSV export (internal/api/export.go's package doc comment): same
+	// reasoning as the files routes above — a text/csv streamed body has
+	// no place in the JSON-only strict-server tree — mounted behind the
+	// identical familyChain (no admin check, no plan gate, API keys
+	// allowed), matching apps/api/src/app.ts's exportApp mount.
+	d.mountExportRoutes(mux, familyChain(d))
 
 	if d.ExtraRoutes != nil {
 		mwDeps := middleware.Deps{Auth: d.Auth, Q: d.Q, RateLimit: d.RateLimit, Now: d.Now}
