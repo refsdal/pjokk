@@ -35,9 +35,6 @@ export function AdminOverview() {
       ) : (
         <p className="py-10 text-center text-sm text-muted">Loading…</p>
       )}
-      <p className="pt-4 text-center text-xs text-muted">
-        Billing metrics arrive with the Stripe phase.
-      </p>
     </div>
   );
 }
