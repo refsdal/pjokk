@@ -147,7 +147,7 @@ func requireSession(d Deps, w http.ResponseWriter, r *http.Request) bool {
 		writeError(w, http.StatusInternalServerError, "session lookup failed", "INTERNAL")
 		return false
 	case session == nil:
-		writeError(w, http.StatusUnauthorized, "Authentication required", "UNAUTHENTICATED")
+		writeError(w, http.StatusUnauthorized, "Not signed in", "UNAUTHENTICATED")
 		return false
 	default:
 		return true
