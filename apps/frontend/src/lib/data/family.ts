@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Baby, Family, Invite, Member } from "@pjokk/shared";
+import type { components } from "../api-schema";
 import { client, unwrap } from "../api";
 
 // Who the caller is, according to the server. This replaces every read the
@@ -9,19 +10,10 @@ import { client, unwrap } from "../api";
 // impersonation banner's `impersonatedBy`. Limen's own session payload
 // carries none of that: the Go server registers no user additional-fields
 // schema, so /api/auth/me is id + email only. One request, server truth.
-export interface Me {
-  userId: string;
-  name: string;
-  email: string;
-  /** System-admin role — "admin" or null. NOT the family role. */
-  role: string | null;
-  familyId: string | null;
-  /** Role inside the active family — "admin"/"owner"/"member", or null. */
-  memberRole: string | null;
-  plan: string | null;
-  /** The real admin's user id while this session is impersonating. */
-  impersonatedBy: string | null;
-}
+// `Me` has no `@pjokk/shared` counterpart (unlike Baby/Family/Invite/Member
+// below) — it's a Go-only endpoint, so its type comes straight off the
+// generated OpenAPI schema rather than being hand-maintained here.
+export type Me = components["schemas"]["Me"];
 
 export function useMe() {
   return useQuery({
