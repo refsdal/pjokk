@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -29,6 +30,18 @@ type ServerInterface interface {
 	// UpdateBaby Partial update. An empty body is a no-op that returns the baby unchanged.
 	// (PATCH /api/babies/{id})
 	UpdateBaby(w http.ResponseWriter, r *http.Request, id IdPath)
+	// ListDiapers Diaper logs in the caller's active family, newest first.
+	// (GET /api/diapers)
+	ListDiapers(w http.ResponseWriter, r *http.Request, params ListDiapersParams)
+	// CreateDiaper Log a diaper change for a baby in the caller's active family.
+	// (POST /api/diapers)
+	CreateDiaper(w http.ResponseWriter, r *http.Request)
+	// DeleteDiaper Delete a diaper log.
+	// (DELETE /api/diapers/{id})
+	DeleteDiaper(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdateDiaper Partial update. A field sent as `null` clears the column; an omitted field is left unchanged; an empty body is a no-op that returns the diaper log unchanged. `time`/`type` are not nullable — only settable or omitted. See internal/api/feeds.go for how this endpoint tells "omitted" apart from "null" (the generated request type alone cannot).
+	// (PATCH /api/diapers/{id})
+	UpdateDiaper(w http.ResponseWriter, r *http.Request, id IdPath)
 	// GetFamily The caller's active family.
 	// (GET /api/family)
 	GetFamily(w http.ResponseWriter, r *http.Request)
@@ -41,6 +54,18 @@ type ServerInterface interface {
 	// SetFamilyMemberRole Change a member's role in the caller's active family. Family-admin only.
 	// (POST /api/family/members/{memberId}/role)
 	SetFamilyMemberRole(w http.ResponseWriter, r *http.Request, memberId MemberIdPath)
+	// ListFeeds Feed logs in the caller's active family, newest first.
+	// (GET /api/feeds)
+	ListFeeds(w http.ResponseWriter, r *http.Request, params ListFeedsParams)
+	// CreateFeed Log a feed for a baby in the caller's active family.
+	// (POST /api/feeds)
+	CreateFeed(w http.ResponseWriter, r *http.Request)
+	// DeleteFeed Delete a feed log.
+	// (DELETE /api/feeds/{id})
+	DeleteFeed(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdateFeed Partial update. A field sent as `null` clears the column; an omitted field is left unchanged; an empty body is a no-op that returns the feed unchanged. `time`/`type` are not nullable — only settable or omitted. See internal/api/feeds.go for how this endpoint tells "omitted" apart from "null" (the generated request type alone cannot).
+	// (PATCH /api/feeds/{id})
+	UpdateFeed(w http.ResponseWriter, r *http.Request, id IdPath)
 	// GetMe Session info for the SPA shell. Requires a session but NOT an active family — the family/member/plan fields are null when the caller has none.
 	// (GET /api/me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -141,6 +166,118 @@ func (siw *ServerInterfaceWrapper) UpdateBaby(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ListDiapers operation middleware
+func (siw *ServerInterfaceWrapper) ListDiapers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListDiapersParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDiapers(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateDiaper operation middleware
+func (siw *ServerInterfaceWrapper) CreateDiaper(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateDiaper(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteDiaper operation middleware
+func (siw *ServerInterfaceWrapper) DeleteDiaper(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteDiaper(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateDiaper operation middleware
+func (siw *ServerInterfaceWrapper) UpdateDiaper(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateDiaper(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetFamily operation middleware
 func (siw *ServerInterfaceWrapper) GetFamily(w http.ResponseWriter, r *http.Request) {
 
@@ -212,6 +349,118 @@ func (siw *ServerInterfaceWrapper) SetFamilyMemberRole(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetFamilyMemberRole(w, r, memberId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListFeeds operation middleware
+func (siw *ServerInterfaceWrapper) ListFeeds(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListFeedsParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListFeeds(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateFeed operation middleware
+func (siw *ServerInterfaceWrapper) CreateFeed(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateFeed(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteFeed operation middleware
+func (siw *ServerInterfaceWrapper) DeleteFeed(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteFeed(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateFeed operation middleware
+func (siw *ServerInterfaceWrapper) UpdateFeed(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateFeed(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -393,6 +642,14 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/family/members", wrapper.ListFamilyMembers)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/family/members/{memberId}", wrapper.DeleteFamilyMember)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/family/members/{memberId}/role", wrapper.SetFamilyMemberRole)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/feeds", wrapper.ListFeeds)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/feeds", wrapper.CreateFeed)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/feeds/{id}", wrapper.DeleteFeed)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/feeds/{id}", wrapper.UpdateFeed)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/diapers", wrapper.ListDiapers)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/diapers", wrapper.CreateDiaper)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/diapers/{id}", wrapper.DeleteDiaper)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/diapers/{id}", wrapper.UpdateDiaper)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/me", wrapper.GetMe)
 
 	return m
@@ -517,6 +774,137 @@ func (response UpdateBaby200JSONResponse) VisitUpdateBabyResponse(w http.Respons
 type UpdateBaby404JSONResponse Error
 
 func (response UpdateBaby404JSONResponse) VisitUpdateBabyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDiapersRequestObject struct {
+	Params ListDiapersParams
+}
+
+type ListDiapersResponseObject interface {
+	VisitListDiapersResponse(w http.ResponseWriter) error
+}
+
+type ListDiapers200JSONResponse []DiaperLog
+
+func (response ListDiapers200JSONResponse) VisitListDiapersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDiaperRequestObject struct {
+	Body *CreateDiaperJSONRequestBody
+}
+
+type CreateDiaperResponseObject interface {
+	VisitCreateDiaperResponse(w http.ResponseWriter) error
+}
+
+type CreateDiaper201JSONResponse DiaperLog
+
+func (response CreateDiaper201JSONResponse) VisitCreateDiaperResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDiaper404JSONResponse Error
+
+func (response CreateDiaper404JSONResponse) VisitCreateDiaperResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteDiaperRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteDiaperResponseObject interface {
+	VisitDeleteDiaperResponse(w http.ResponseWriter) error
+}
+
+type DeleteDiaper200JSONResponse Ok
+
+func (response DeleteDiaper200JSONResponse) VisitDeleteDiaperResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteDiaper404JSONResponse Error
+
+func (response DeleteDiaper404JSONResponse) VisitDeleteDiaperResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDiaperRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdateDiaperJSONRequestBody
+}
+
+type UpdateDiaperResponseObject interface {
+	VisitUpdateDiaperResponse(w http.ResponseWriter) error
+}
+
+type UpdateDiaper200JSONResponse DiaperLog
+
+func (response UpdateDiaper200JSONResponse) VisitUpdateDiaperResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDiaper404JSONResponse Error
+
+func (response UpdateDiaper404JSONResponse) VisitUpdateDiaperResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -685,6 +1073,137 @@ func (response SetFamilyMemberRole404JSONResponse) VisitSetFamilyMemberRoleRespo
 	return err
 }
 
+type ListFeedsRequestObject struct {
+	Params ListFeedsParams
+}
+
+type ListFeedsResponseObject interface {
+	VisitListFeedsResponse(w http.ResponseWriter) error
+}
+
+type ListFeeds200JSONResponse []FeedLog
+
+func (response ListFeeds200JSONResponse) VisitListFeedsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateFeedRequestObject struct {
+	Body *CreateFeedJSONRequestBody
+}
+
+type CreateFeedResponseObject interface {
+	VisitCreateFeedResponse(w http.ResponseWriter) error
+}
+
+type CreateFeed201JSONResponse FeedLog
+
+func (response CreateFeed201JSONResponse) VisitCreateFeedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateFeed404JSONResponse Error
+
+func (response CreateFeed404JSONResponse) VisitCreateFeedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFeedRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteFeedResponseObject interface {
+	VisitDeleteFeedResponse(w http.ResponseWriter) error
+}
+
+type DeleteFeed200JSONResponse Ok
+
+func (response DeleteFeed200JSONResponse) VisitDeleteFeedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFeed404JSONResponse Error
+
+func (response DeleteFeed404JSONResponse) VisitDeleteFeedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateFeedRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdateFeedJSONRequestBody
+}
+
+type UpdateFeedResponseObject interface {
+	VisitUpdateFeedResponse(w http.ResponseWriter) error
+}
+
+type UpdateFeed200JSONResponse FeedLog
+
+func (response UpdateFeed200JSONResponse) VisitUpdateFeedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateFeed404JSONResponse Error
+
+func (response UpdateFeed404JSONResponse) VisitUpdateFeedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMeRequestObject struct {
 }
 
@@ -783,6 +1302,18 @@ type StrictServerInterface interface {
 	// UpdateBaby Partial update. An empty body is a no-op that returns the baby unchanged.
 	// (PATCH /api/babies/{id})
 	UpdateBaby(ctx context.Context, request UpdateBabyRequestObject) (UpdateBabyResponseObject, error)
+	// ListDiapers Diaper logs in the caller's active family, newest first.
+	// (GET /api/diapers)
+	ListDiapers(ctx context.Context, request ListDiapersRequestObject) (ListDiapersResponseObject, error)
+	// CreateDiaper Log a diaper change for a baby in the caller's active family.
+	// (POST /api/diapers)
+	CreateDiaper(ctx context.Context, request CreateDiaperRequestObject) (CreateDiaperResponseObject, error)
+	// DeleteDiaper Delete a diaper log.
+	// (DELETE /api/diapers/{id})
+	DeleteDiaper(ctx context.Context, request DeleteDiaperRequestObject) (DeleteDiaperResponseObject, error)
+	// UpdateDiaper Partial update. A field sent as `null` clears the column; an omitted field is left unchanged; an empty body is a no-op that returns the diaper log unchanged. `time`/`type` are not nullable — only settable or omitted. See internal/api/feeds.go for how this endpoint tells "omitted" apart from "null" (the generated request type alone cannot).
+	// (PATCH /api/diapers/{id})
+	UpdateDiaper(ctx context.Context, request UpdateDiaperRequestObject) (UpdateDiaperResponseObject, error)
 	// GetFamily The caller's active family.
 	// (GET /api/family)
 	GetFamily(ctx context.Context, request GetFamilyRequestObject) (GetFamilyResponseObject, error)
@@ -795,6 +1326,18 @@ type StrictServerInterface interface {
 	// SetFamilyMemberRole Change a member's role in the caller's active family. Family-admin only.
 	// (POST /api/family/members/{memberId}/role)
 	SetFamilyMemberRole(ctx context.Context, request SetFamilyMemberRoleRequestObject) (SetFamilyMemberRoleResponseObject, error)
+	// ListFeeds Feed logs in the caller's active family, newest first.
+	// (GET /api/feeds)
+	ListFeeds(ctx context.Context, request ListFeedsRequestObject) (ListFeedsResponseObject, error)
+	// CreateFeed Log a feed for a baby in the caller's active family.
+	// (POST /api/feeds)
+	CreateFeed(ctx context.Context, request CreateFeedRequestObject) (CreateFeedResponseObject, error)
+	// DeleteFeed Delete a feed log.
+	// (DELETE /api/feeds/{id})
+	DeleteFeed(ctx context.Context, request DeleteFeedRequestObject) (DeleteFeedResponseObject, error)
+	// UpdateFeed Partial update. A field sent as `null` clears the column; an omitted field is left unchanged; an empty body is a no-op that returns the feed unchanged. `time`/`type` are not nullable — only settable or omitted. See internal/api/feeds.go for how this endpoint tells "omitted" apart from "null" (the generated request type alone cannot).
+	// (PATCH /api/feeds/{id})
+	UpdateFeed(ctx context.Context, request UpdateFeedRequestObject) (UpdateFeedResponseObject, error)
 	// GetMe Session info for the SPA shell. Requires a session but NOT an active family — the family/member/plan fields are null when the caller has none.
 	// (GET /api/me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -959,6 +1502,122 @@ func (sh *strictHandler) UpdateBaby(w http.ResponseWriter, r *http.Request, id I
 	}
 }
 
+// ListDiapers operation middleware
+func (sh *strictHandler) ListDiapers(w http.ResponseWriter, r *http.Request, params ListDiapersParams) {
+	var request ListDiapersRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDiapers(ctx, request.(ListDiapersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDiapers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDiapersResponseObject); ok {
+		if err := validResponse.VisitListDiapersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateDiaper operation middleware
+func (sh *strictHandler) CreateDiaper(w http.ResponseWriter, r *http.Request) {
+	var request CreateDiaperRequestObject
+
+	var body CreateDiaperJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateDiaper(ctx, request.(CreateDiaperRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateDiaper")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateDiaperResponseObject); ok {
+		if err := validResponse.VisitCreateDiaperResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteDiaper operation middleware
+func (sh *strictHandler) DeleteDiaper(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteDiaperRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteDiaper(ctx, request.(DeleteDiaperRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteDiaper")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteDiaperResponseObject); ok {
+		if err := validResponse.VisitDeleteDiaperResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateDiaper operation middleware
+func (sh *strictHandler) UpdateDiaper(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdateDiaperRequestObject
+
+	request.Id = id
+
+	var body UpdateDiaperJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateDiaper(ctx, request.(UpdateDiaperRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateDiaper")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateDiaperResponseObject); ok {
+		if err := validResponse.VisitUpdateDiaperResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetFamily operation middleware
 func (sh *strictHandler) GetFamily(w http.ResponseWriter, r *http.Request) {
 	var request GetFamilyRequestObject
@@ -1059,6 +1718,122 @@ func (sh *strictHandler) SetFamilyMemberRole(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetFamilyMemberRoleResponseObject); ok {
 		if err := validResponse.VisitSetFamilyMemberRoleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListFeeds operation middleware
+func (sh *strictHandler) ListFeeds(w http.ResponseWriter, r *http.Request, params ListFeedsParams) {
+	var request ListFeedsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListFeeds(ctx, request.(ListFeedsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListFeeds")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListFeedsResponseObject); ok {
+		if err := validResponse.VisitListFeedsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateFeed operation middleware
+func (sh *strictHandler) CreateFeed(w http.ResponseWriter, r *http.Request) {
+	var request CreateFeedRequestObject
+
+	var body CreateFeedJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateFeed(ctx, request.(CreateFeedRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateFeed")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateFeedResponseObject); ok {
+		if err := validResponse.VisitCreateFeedResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteFeed operation middleware
+func (sh *strictHandler) DeleteFeed(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteFeedRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteFeed(ctx, request.(DeleteFeedRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteFeed")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteFeedResponseObject); ok {
+		if err := validResponse.VisitDeleteFeedResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateFeed operation middleware
+func (sh *strictHandler) UpdateFeed(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdateFeedRequestObject
+
+	request.Id = id
+
+	var body UpdateFeedJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateFeed(ctx, request.(UpdateFeedRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateFeed")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateFeedResponseObject); ok {
+		if err := validResponse.VisitUpdateFeedResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

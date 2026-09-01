@@ -43,6 +43,132 @@ func (e CreateBabySex) Valid() bool {
 	}
 }
 
+// Defines values for CreateDiaperType.
+const (
+	CreateDiaperTypeBoth  CreateDiaperType = "both"
+	CreateDiaperTypeDirty CreateDiaperType = "dirty"
+	CreateDiaperTypeWet   CreateDiaperType = "wet"
+)
+
+// Valid indicates whether the value is a known member of the CreateDiaperType enum.
+func (e CreateDiaperType) Valid() bool {
+	switch e {
+	case CreateDiaperTypeBoth:
+		return true
+	case CreateDiaperTypeDirty:
+		return true
+	case CreateDiaperTypeWet:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateFeedSide.
+const (
+	CreateFeedSideBoth  CreateFeedSide = "both"
+	CreateFeedSideLeft  CreateFeedSide = "left"
+	CreateFeedSideRight CreateFeedSide = "right"
+)
+
+// Valid indicates whether the value is a known member of the CreateFeedSide enum.
+func (e CreateFeedSide) Valid() bool {
+	switch e {
+	case CreateFeedSideBoth:
+		return true
+	case CreateFeedSideLeft:
+		return true
+	case CreateFeedSideRight:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateFeedType.
+const (
+	CreateFeedTypeBottle CreateFeedType = "bottle"
+	CreateFeedTypeBreast CreateFeedType = "breast"
+	CreateFeedTypeSolids CreateFeedType = "solids"
+)
+
+// Valid indicates whether the value is a known member of the CreateFeedType enum.
+func (e CreateFeedType) Valid() bool {
+	switch e {
+	case CreateFeedTypeBottle:
+		return true
+	case CreateFeedTypeBreast:
+		return true
+	case CreateFeedTypeSolids:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DiaperLogType.
+const (
+	DiaperLogTypeBoth  DiaperLogType = "both"
+	DiaperLogTypeDirty DiaperLogType = "dirty"
+	DiaperLogTypeWet   DiaperLogType = "wet"
+)
+
+// Valid indicates whether the value is a known member of the DiaperLogType enum.
+func (e DiaperLogType) Valid() bool {
+	switch e {
+	case DiaperLogTypeBoth:
+		return true
+	case DiaperLogTypeDirty:
+		return true
+	case DiaperLogTypeWet:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FeedLogSide.
+const (
+	FeedLogSideBoth  FeedLogSide = "both"
+	FeedLogSideLeft  FeedLogSide = "left"
+	FeedLogSideRight FeedLogSide = "right"
+)
+
+// Valid indicates whether the value is a known member of the FeedLogSide enum.
+func (e FeedLogSide) Valid() bool {
+	switch e {
+	case FeedLogSideBoth:
+		return true
+	case FeedLogSideLeft:
+		return true
+	case FeedLogSideRight:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FeedLogType.
+const (
+	FeedLogTypeBottle FeedLogType = "bottle"
+	FeedLogTypeBreast FeedLogType = "breast"
+	FeedLogTypeSolids FeedLogType = "solids"
+)
+
+// Valid indicates whether the value is a known member of the FeedLogType enum.
+func (e FeedLogType) Valid() bool {
+	switch e {
+	case FeedLogTypeBottle:
+		return true
+	case FeedLogTypeBreast:
+		return true
+	case FeedLogTypeSolids:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OkOk.
 const (
 	OkOkTrue OkOk = true
@@ -88,6 +214,69 @@ func (e UpdateBabySex) Valid() bool {
 	case UpdateBabySexBoy:
 		return true
 	case UpdateBabySexGirl:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateDiaperType.
+const (
+	UpdateDiaperTypeBoth  UpdateDiaperType = "both"
+	UpdateDiaperTypeDirty UpdateDiaperType = "dirty"
+	UpdateDiaperTypeWet   UpdateDiaperType = "wet"
+)
+
+// Valid indicates whether the value is a known member of the UpdateDiaperType enum.
+func (e UpdateDiaperType) Valid() bool {
+	switch e {
+	case UpdateDiaperTypeBoth:
+		return true
+	case UpdateDiaperTypeDirty:
+		return true
+	case UpdateDiaperTypeWet:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateFeedSide.
+const (
+	UpdateFeedSideBoth  UpdateFeedSide = "both"
+	UpdateFeedSideLeft  UpdateFeedSide = "left"
+	UpdateFeedSideRight UpdateFeedSide = "right"
+)
+
+// Valid indicates whether the value is a known member of the UpdateFeedSide enum.
+func (e UpdateFeedSide) Valid() bool {
+	switch e {
+	case UpdateFeedSideBoth:
+		return true
+	case UpdateFeedSideLeft:
+		return true
+	case UpdateFeedSideRight:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateFeedType.
+const (
+	UpdateFeedTypeBottle UpdateFeedType = "bottle"
+	UpdateFeedTypeBreast UpdateFeedType = "breast"
+	UpdateFeedTypeSolids UpdateFeedType = "solids"
+)
+
+// Valid indicates whether the value is a known member of the UpdateFeedType enum.
+func (e UpdateFeedType) Valid() bool {
+	switch e {
+	case UpdateFeedTypeBottle:
+		return true
+	case UpdateFeedTypeBreast:
+		return true
+	case UpdateFeedTypeSolids:
 		return true
 	default:
 		return false
@@ -160,6 +349,50 @@ type CreateBaby struct {
 // CreateBabySex defines model for CreateBaby.Sex.
 type CreateBabySex string
 
+// CreateDiaper defines model for CreateDiaper.
+type CreateDiaper struct {
+	BabyId string           `json:"babyId"`
+	Notes  *string          `json:"notes,omitempty"`
+	Time   time.Time        `json:"time"`
+	Type   CreateDiaperType `json:"type"`
+}
+
+// CreateDiaperType defines model for CreateDiaper.Type.
+type CreateDiaperType string
+
+// CreateFeed defines model for CreateFeed.
+type CreateFeed struct {
+	AmountMl    *int32          `json:"amountMl,omitempty"`
+	BabyId      string          `json:"babyId"`
+	DurationMin *int32          `json:"durationMin,omitempty"`
+	LeftMin     *int32          `json:"leftMin,omitempty"`
+	Notes       *string         `json:"notes,omitempty"`
+	RightMin    *int32          `json:"rightMin,omitempty"`
+	Side        *CreateFeedSide `json:"side,omitempty"`
+	Time        time.Time       `json:"time"`
+	Type        CreateFeedType  `json:"type"`
+}
+
+// CreateFeedSide defines model for CreateFeed.Side.
+type CreateFeedSide string
+
+// CreateFeedType defines model for CreateFeed.Type.
+type CreateFeedType string
+
+// DiaperLog defines model for DiaperLog.
+type DiaperLog struct {
+	BabyId        string        `json:"babyId"`
+	CaretakerId   string        `json:"caretakerId"`
+	CaretakerName string        `json:"caretakerName"`
+	Id            string        `json:"id"`
+	Notes         *string       `json:"notes"`
+	Time          time.Time     `json:"time"`
+	Type          DiaperLogType `json:"type"`
+}
+
+// DiaperLogType defines model for DiaperLog.Type.
+type DiaperLogType string
+
 // Error The error envelope used by every non-2xx JSON response in the API (CLAUDE.md: "{error: string, code: string}" everywhere).
 type Error struct {
 	Code  string `json:"code"`
@@ -179,6 +412,28 @@ type Family struct {
 	Plan string `json:"plan"`
 	Slug string `json:"slug"`
 }
+
+// FeedLog defines model for FeedLog.
+type FeedLog struct {
+	AmountMl      *int32       `json:"amountMl"`
+	BabyId        string       `json:"babyId"`
+	CaretakerId   string       `json:"caretakerId"`
+	CaretakerName string       `json:"caretakerName"`
+	DurationMin   *int32       `json:"durationMin"`
+	Id            string       `json:"id"`
+	LeftMin       *int32       `json:"leftMin"`
+	Notes         *string      `json:"notes"`
+	RightMin      *int32       `json:"rightMin"`
+	Side          *FeedLogSide `json:"side"`
+	Time          time.Time    `json:"time"`
+	Type          FeedLogType  `json:"type"`
+}
+
+// FeedLogSide defines model for FeedLog.Side.
+type FeedLogSide string
+
+// FeedLogType defines model for FeedLog.Type.
+type FeedLogType string
 
 // Me familyId/memberRole/plan/impersonatedBy are null when the caller has no active family (or, for impersonatedBy, is not impersonated).
 type Me struct {
@@ -232,6 +487,34 @@ type UpdateBaby struct {
 // UpdateBabySex defines model for UpdateBaby.Sex.
 type UpdateBabySex string
 
+// UpdateDiaper Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time`/`type` are not nullable — only settable or omitted (see internal/api/feeds.go for the presence-detection pattern this endpoint shares with UpdateFeed).
+type UpdateDiaper struct {
+	Notes *string           `json:"notes,omitempty"`
+	Time  *time.Time        `json:"time,omitempty"`
+	Type  *UpdateDiaperType `json:"type,omitempty"`
+}
+
+// UpdateDiaperType defines model for UpdateDiaper.Type.
+type UpdateDiaperType string
+
+// UpdateFeed Every field is optional; an empty object is a no-op. `amountMl`, `side`, `durationMin`, `leftMin`, `rightMin` and `notes` may also be sent as `null` to CLEAR that column; `time`/`type` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs, which the generated request type alone cannot provide).
+type UpdateFeed struct {
+	AmountMl    *int32          `json:"amountMl,omitempty"`
+	DurationMin *int32          `json:"durationMin,omitempty"`
+	LeftMin     *int32          `json:"leftMin,omitempty"`
+	Notes       *string         `json:"notes,omitempty"`
+	RightMin    *int32          `json:"rightMin,omitempty"`
+	Side        *UpdateFeedSide `json:"side,omitempty"`
+	Time        *time.Time      `json:"time,omitempty"`
+	Type        *UpdateFeedType `json:"type,omitempty"`
+}
+
+// UpdateFeedSide defines model for UpdateFeed.Side.
+type UpdateFeedSide string
+
+// UpdateFeedType defines model for UpdateFeed.Type.
+type UpdateFeedType string
+
 // BabyIdQuery defines model for babyIdQuery.
 type BabyIdQuery = string
 
@@ -243,6 +526,24 @@ type LimitQuery = int
 
 // MemberIdPath defines model for memberIdPath.
 type MemberIdPath = string
+
+// ListDiapersParams defines parameters for ListDiapers.
+type ListDiapersParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+
+	// Limit Maximum number of rows to return.
+	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListFeedsParams defines parameters for ListFeeds.
+type ListFeedsParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+
+	// Limit Maximum number of rows to return.
+	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
+}
 
 // Healthz200JSONResponseBodyOk defines parameters for Healthz.
 type Healthz200JSONResponseBodyOk bool
@@ -259,5 +560,17 @@ type CreateBabyJSONRequestBody = CreateBaby
 // UpdateBabyJSONRequestBody defines body for UpdateBaby for application/json ContentType.
 type UpdateBabyJSONRequestBody = UpdateBaby
 
+// CreateDiaperJSONRequestBody defines body for CreateDiaper for application/json ContentType.
+type CreateDiaperJSONRequestBody = CreateDiaper
+
+// UpdateDiaperJSONRequestBody defines body for UpdateDiaper for application/json ContentType.
+type UpdateDiaperJSONRequestBody = UpdateDiaper
+
 // SetFamilyMemberRoleJSONRequestBody defines body for SetFamilyMemberRole for application/json ContentType.
 type SetFamilyMemberRoleJSONRequestBody = SetMemberRole
+
+// CreateFeedJSONRequestBody defines body for CreateFeed for application/json ContentType.
+type CreateFeedJSONRequestBody = CreateFeed
+
+// UpdateFeedJSONRequestBody defines body for UpdateFeed for application/json ContentType.
+type UpdateFeedJSONRequestBody = UpdateFeed

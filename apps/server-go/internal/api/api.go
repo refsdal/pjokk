@@ -175,6 +175,15 @@ var operationAuthTiers = map[string]authTier{
 	"GetFamily":         tierFamily,
 	"ListFamilyMembers": tierFamily,
 
+	"ListFeeds":    tierFamily,
+	"CreateFeed":   tierFamily,
+	"UpdateFeed":   tierFamily,
+	"DeleteFeed":   tierFamily,
+	"ListDiapers":  tierFamily,
+	"CreateDiaper": tierFamily,
+	"UpdateDiaper": tierFamily,
+	"DeleteDiaper": tierFamily,
+
 	"DeleteBaby":          tierAdmin,
 	"DeleteFamilyMember":  tierAdmin,
 	"SetFamilyMemberRole": tierAdmin,
@@ -455,8 +464,16 @@ func NewHandler(d Deps) http.Handler {
 	)
 	gen.HandlerWithOptions(strictHandler, gen.StdHTTPServerOptions{
 		BaseRouter: mux,
+		// Order matters: ServerInterfaceWrapper (server.gen.go) builds
+		// handler := base then, for each entry here in order, handler =
+		// entry(handler) — so the LAST entry ends up OUTERMOST (runs
+		// first) and the FIRST entry innermost (runs last, right before
+		// the strict handler's own body decode). withRawBody must run
+		// before anything else touches the body, so it is listed last.
+		// See patch.go's package doc comment for why it exists.
 		Middlewares: []gen.MiddlewareFunc{
 			func(next http.Handler) http.Handler { return withSpecValidation(spec, next) },
+			withRawBody,
 		},
 	})
 

@@ -238,6 +238,190 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/feeds:
+    get:
+      operationId: listFeeds
+      summary: Feed logs in the caller's active family, newest first.
+      tags: [feeds]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Feed logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FeedLog"
+    post:
+      operationId: createFeed
+      summary: Log a feed for a baby in the caller's active family.
+      tags: [feeds]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFeed"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/feeds/{id}:
+    patch:
+      operationId: updateFeed
+      summary: >-
+        Partial update. A field sent as `null` clears the column; an
+        omitted field is left unchanged; an empty body is a no-op that
+        returns the feed unchanged. `time`/`type` are not nullable — only
+        settable or omitted. See internal/api/feeds.go for how this
+        endpoint tells "omitted" apart from "null" (the generated request
+        type alone cannot).
+      tags: [feeds]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFeed"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedLog"
+        "404":
+          description: No feed with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteFeed
+      summary: Delete a feed log.
+      tags: [feeds]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No feed with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/diapers:
+    get:
+      operationId: listDiapers
+      summary: Diaper logs in the caller's active family, newest first.
+      tags: [diapers]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Diaper logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DiaperLog"
+    post:
+      operationId: createDiaper
+      summary: Log a diaper change for a baby in the caller's active family.
+      tags: [diapers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDiaper"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiaperLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/diapers/{id}:
+    patch:
+      operationId: updateDiaper
+      summary: >-
+        Partial update. A field sent as `null` clears the column; an
+        omitted field is left unchanged; an empty body is a no-op that
+        returns the diaper log unchanged. `time`/`type` are not nullable —
+        only settable or omitted. See internal/api/feeds.go for how this
+        endpoint tells "omitted" apart from "null" (the generated request
+        type alone cannot).
+      tags: [diapers]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDiaper"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiaperLog"
+        "404":
+          description: No diaper log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteDiaper
+      summary: Delete a diaper log.
+      tags: [diapers]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No diaper log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/me:
     get:
       operationId: getMe
@@ -412,6 +596,201 @@ components:
           nullable: true
         impersonatedBy:
           type: string
+          nullable: true
+    FeedLog:
+      type: object
+      required:
+        - id
+        - babyId
+        - caretakerId
+        - caretakerName
+        - notes
+        - time
+        - type
+        - amountMl
+        - side
+        - durationMin
+        - leftMin
+        - rightMin
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [bottle, breast, solids]
+        amountMl:
+          type: integer
+          format: int32
+          nullable: true
+        side:
+          type: string
+          enum: [left, right, both]
+          nullable: true
+        durationMin:
+          type: integer
+          format: int32
+          nullable: true
+        leftMin:
+          type: integer
+          format: int32
+          nullable: true
+        rightMin:
+          type: integer
+          format: int32
+          nullable: true
+    CreateFeed:
+      type: object
+      required: [babyId, time, type]
+      properties:
+        babyId:
+          type: string
+        time:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [bottle, breast, solids]
+        amountMl:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+        side:
+          type: string
+          enum: [left, right, both]
+        durationMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+        leftMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+          nullable: true
+        rightMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+          nullable: true
+        notes:
+          type: string
+          maxLength: 1000
+    UpdateFeed:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `amountMl`,
+        `side`, `durationMin`, `leftMin`, `rightMin` and `notes` may also be
+        sent as `null` to CLEAR that column; `time`/`type` are not nullable
+        — only settable or omitted (see internal/api/feeds.go for the
+        omitted-vs-null presence-detection pattern this endpoint needs,
+        which the generated request type alone cannot provide).
+      properties:
+        time:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [bottle, breast, solids]
+        amountMl:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+          nullable: true
+        side:
+          type: string
+          enum: [left, right, both]
+          nullable: true
+        durationMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+          nullable: true
+        leftMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+          nullable: true
+        rightMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+          nullable: true
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+    DiaperLog:
+      type: object
+      required: [id, babyId, caretakerId, caretakerName, notes, time, type]
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [wet, dirty, both]
+    CreateDiaper:
+      type: object
+      required: [babyId, time, type]
+      properties:
+        babyId:
+          type: string
+        time:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [wet, dirty, both]
+        notes:
+          type: string
+          maxLength: 1000
+    UpdateDiaper:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `notes` may
+        also be sent as `null` to CLEAR it; `time`/`type` are not nullable —
+        only settable or omitted (see internal/api/feeds.go for the
+        presence-detection pattern this endpoint shares with UpdateFeed).
+      properties:
+        time:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [wet, dirty, both]
+        notes:
+          type: string
+          maxLength: 1000
           nullable: true
     Error:
       type: object
