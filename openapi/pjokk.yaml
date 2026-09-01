@@ -2011,6 +2011,71 @@ paths:
               schema:
                 $ref: "#/components/schemas/PushTestResult"
 
+  /api/keys:
+    get:
+      operationId: listApiKeys
+      summary: >-
+        Bearer API keys for the family, newest first. The full key is never
+        included — only createApiKey's response ever carries it. Family
+        admin only; refused for API-key callers (Task 19).
+      tags: [api-keys]
+      responses:
+        "200":
+          description: Keys for the family, key material omitted.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApiKey"
+    post:
+      operationId: createApiKey
+      summary: >-
+        Create a bearer API key for integrations (Home Assistant, Grafana).
+        The full key is returned ONCE and never again — use it as
+        `Authorization: Bearer pjk_…`. Free (no plan gate — the TypeScript
+        predecessor's apiKeys 402 is removed). Family admin only; refused
+        for API-key callers.
+      tags: [api-keys]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApiKey"
+      responses:
+        "201":
+          description: Created — copy the key now, it is never shown again.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyCreated"
+  /api/keys/{id}:
+    delete:
+      operationId: revokeApiKey
+      summary: >-
+        Revoke a key: sets revoked_at rather than deleting the row, so a
+        revoked key becomes indistinguishable from one that never existed to
+        APIKeyAuth (which filters on revoked_at IS NULL) while its audit
+        trail (name, createdBy, createdAt) survives. Family admin only;
+        refused for API-key callers.
+      tags: [api-keys]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No key with this id in the caller's family, or already revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   parameters:
     babyIdQuery:
@@ -3665,6 +3730,73 @@ components:
       properties:
         sent:
           type: integer
+    ApiKey:
+      type: object
+      description: >-
+        One bearer API key, key material never included (see ApiKeyCreated
+        for the one response that carries it).
+      required:
+        - id
+        - name
+        - prefix
+        - createdAt
+        - lastUsedAt
+        - revokedAt
+        - expiresAt
+        - readOnly
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        prefix:
+          type: string
+          description: The displayable head of the full key (`pjk_` + 8 more chars).
+        createdAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        readOnly:
+          type: boolean
+    CreateApiKey:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+        expiresInDays:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 3650
+          description: Omitted means the key never expires.
+        readOnly:
+          type: boolean
+          default: false
+    ApiKeyCreated:
+      allOf:
+        - $ref: "#/components/schemas/ApiKey"
+        - type: object
+          required: [key]
+          properties:
+            key:
+              type: string
+              description: >-
+                The full bearer token (`pjk_…`). Shown exactly once — this
+                response is the only place it ever appears.
     Error:
       type: object
       description: >-

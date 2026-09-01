@@ -308,6 +308,18 @@ var operationAuthTiers = map[string]authTier{
 	"DeleteBaby":          tierAdmin,
 	"DeleteFamilyMember":  tierAdmin,
 	"SetFamilyMemberRole": tierAdmin,
+
+	// API keys (Task 19; REF §A1 keys.ts). Family-admin-only, same as
+	// member management above: apps/api/src/app.ts mounts requireAdmin on
+	// /api/keys/*, and requireAdmin itself already answers "Not available
+	// to API keys"/FORBIDDEN before the role check (a key can never mint or
+	// revoke another key) — see internal/api/keys.go. The TypeScript
+	// predecessor's canUse(family, "apiKeys") 402 gate on create is removed
+	// (this port's free-tier policy, matching every other Task 16-18 gate
+	// removal).
+	"ListApiKeys":  tierAdmin,
+	"CreateApiKey": tierAdmin,
+	"RevokeApiKey": tierAdmin,
 }
 
 // assertOperationAuthCoverage panics unless operationAuthTiers has exactly

@@ -893,6 +893,37 @@ func (e Readyz503JSONResponseBodyOk) Valid() bool {
 	}
 }
 
+// ApiKey One bearer API key, key material never included (see ApiKeyCreated for the one response that carries it).
+type ApiKey struct {
+	CreatedAt  time.Time  `json:"createdAt"`
+	ExpiresAt  *time.Time `json:"expiresAt"`
+	Id         string     `json:"id"`
+	LastUsedAt *time.Time `json:"lastUsedAt"`
+	Name       string     `json:"name"`
+
+	// Prefix The displayable head of the full key (`pjk_` + 8 more chars).
+	Prefix    string     `json:"prefix"`
+	ReadOnly  bool       `json:"readOnly"`
+	RevokedAt *time.Time `json:"revokedAt"`
+}
+
+// ApiKeyCreated defines model for ApiKeyCreated.
+type ApiKeyCreated struct {
+	CreatedAt time.Time  `json:"createdAt"`
+	ExpiresAt *time.Time `json:"expiresAt"`
+	Id        string     `json:"id"`
+
+	// Key The full bearer token (`pjk_…`). Shown exactly once — this response is the only place it ever appears.
+	Key        string     `json:"key"`
+	LastUsedAt *time.Time `json:"lastUsedAt"`
+	Name       string     `json:"name"`
+
+	// Prefix The displayable head of the full key (`pjk_` + 8 more chars).
+	Prefix    string     `json:"prefix"`
+	ReadOnly  bool       `json:"readOnly"`
+	RevokedAt *time.Time `json:"revokedAt"`
+}
+
 // Baby defines model for Baby.
 type Baby struct {
 	BirthDate time.Time `json:"birthDate"`
@@ -961,6 +992,14 @@ type Contact struct {
 
 // ContactIcon defines model for Contact.Icon.
 type ContactIcon string
+
+// CreateApiKey defines model for CreateApiKey.
+type CreateApiKey struct {
+	// ExpiresInDays Omitted means the key never expires.
+	ExpiresInDays *int32 `json:"expiresInDays,omitempty"`
+	Name          string `json:"name"`
+	ReadOnly      *bool  `json:"readOnly,omitempty"`
+}
 
 // CreateBaby defines model for CreateBaby.
 type CreateBaby struct {
@@ -1858,6 +1897,9 @@ type CreateFeedJSONRequestBody = CreateFeed
 
 // UpdateFeedJSONRequestBody defines body for UpdateFeed for application/json ContentType.
 type UpdateFeedJSONRequestBody = UpdateFeed
+
+// CreateApiKeyJSONRequestBody defines body for CreateApiKey for application/json ContentType.
+type CreateApiKeyJSONRequestBody = CreateApiKey
 
 // CreateMeasurementJSONRequestBody defines body for CreateMeasurement for application/json ContentType.
 type CreateMeasurementJSONRequestBody = CreateMeasurement
