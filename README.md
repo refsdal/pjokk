@@ -81,8 +81,19 @@ one-off).
 
 ## Self-hosting
 
-The image is `ghcr.io/refsdal/pjokk` — `:latest`, `:<version>`, or
-`:sha-<sha>` to pin exactly, built for `linux/amd64` and `linux/arm64`. It
+The image is `ghcr.io/refsdal/pjokk`, built for `linux/amd64` and
+`linux/arm64`. The tags are a pinning ladder — pick how much you want to
+move on upgrade day:
+
+| Tag | Moves | Risk appetite |
+|---|---|---|
+| `:0.1.0` | never | pin exactly, upgrade deliberately |
+| `:0.1` | with patch releases | fixes only |
+| `:0` | with minor releases | pre-1.0 minors may break — read release notes |
+| `:latest` | every release | living on the edge |
+| `:sha-<commit>` / `@sha256:…` | never | byte-exact, provenance via cosign |
+
+It
 runs anywhere a container does, as one process serving both the SPA and the
 API.
 

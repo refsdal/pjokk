@@ -76,8 +76,15 @@ signs:
 dockers_v2:
   - images:
       - ghcr.io/refsdal/pjokk
+    # A pinning ladder: the full version never moves (re-releasing it is
+    # structurally impossible — the git tag already exists), major.minor
+    # moves with patches, major with minors (risky pre-1.0: minors carry
+    # breaking changes under the --v0 rule), latest with every release.
+    # sha-<commit> and @digest stay for byte-exact pinning.
     tags:
       - "{{ .Version }}"
+      - "{{ .Major }}.{{ .Minor }}"
+      - "{{ .Major }}"
       - latest
       - sha-{{ .FullCommit }}
     dockerfile: Dockerfile
