@@ -125,6 +125,61 @@ func TestSignupRouteEnabledWhenSignupOpen(t *testing.T) {
 	}
 }
 
+// Google sign-in is optional. When it is configured, the plugin has to come
+// up (its token encryption needs a 32-byte key, which it borrows from
+// Config.Secret — a mismatch fails at limen.New, not at first use) and mount
+// under our base path, so the callback URL registered with Google
+// ({APP_URL}/api/auth/oauth/google/callback) actually resolves.
+func TestGoogleOAuthRoutesMountUnderBasePath(t *testing.T) {
+	rig := testrig.Setup(t)
+	svc, err := auth.New(auth.Config{
+		AppURL:             "http://localhost:3000",
+		Secret:             testSecret,
+		GoogleClientID:     "test-client-id",
+		GoogleClientSecret: "test-client-secret",
+		Pool:               rig.Pool,
+	})
+	if err != nil {
+		t.Fatalf("auth.New with Google credentials: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle(auth.BasePath+"/", svc.Handler())
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, auth.BasePath+"/oauth/google/authorize", nil))
+
+	if rec.Code == http.StatusNotFound {
+		t.Fatalf("the Google authorize route did not mount under %s", auth.BasePath)
+	}
+	// The handler answers with the authorization URL rather than a 302, so
+	// the SPA can decide how to navigate. The URL is what matters: it proves
+	// the plugin is live AND that the callback Google must be configured
+	// with is the one this base path produces.
+	body := rec.Body.String()
+	if !strings.Contains(body, "accounts.google.com") {
+		t.Fatalf("authorize did not produce a Google URL: %d %s", rec.Code, body)
+	}
+	const callback = "http%3A%2F%2Flocalhost%3A3000%2Fapi%2Fauth%2Foauth%2Fgoogle%2Fcallback"
+	if !strings.Contains(body, callback) {
+		t.Fatalf("authorize used an unexpected callback URL: %s", body)
+	}
+}
+
+// Without credentials the OAuth plugin is not registered at all, so a
+// self-hoster who never set up Google still gets a working instance rather
+// than a route that 500s halfway through a redirect.
+func TestGoogleOAuthAbsentWithoutCredentials(t *testing.T) {
+	f := newFixture(t, false)
+
+	rec := httptest.NewRecorder()
+	f.mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, auth.BasePath+"/oauth/google/authorize", nil))
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("want 404 for the Google route with no credentials configured, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 // (b) CreateUser + sign-in over HTTP yields a cookie SessionFromRequest
 // resolves back to the user, with our own columns attached.
 func TestSignInThenSessionFromRequest(t *testing.T) {

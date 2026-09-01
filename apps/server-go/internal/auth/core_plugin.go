@@ -88,13 +88,16 @@ func (s *service) Impersonate(ctx context.Context, w http.ResponseWriter, r *htt
 	// own metadata (hashed IP, user agent) and dropping it would lose the
 	// audit value of the impersonated session itself.
 	metadata, err := s.sessionMetadata(ctx, result.Token)
-	if err != nil {
-		return err
+	if err == nil {
+		metadata[metaImpersonatedBy] = adminSession.UserID
+		metadata[metaAdminToken] = adminSession.Token
+		err = s.writeSessionMetadata(ctx, result.Token, metadata)
 	}
-	metadata[metaImpersonatedBy] = adminSession.UserID
-	metadata[metaAdminToken] = adminSession.Token
-
-	if err := s.writeSessionMetadata(ctx, result.Token, metadata); err != nil {
+	if err != nil {
+		// The session exists but carries no marker, which would make it
+		// indistinguishable from the target signing in themselves. Revoke it
+		// rather than leave an unattributable session behind.
+		_ = s.limen.RevokeSession(ctx, result.Token)
 		return err
 	}
 
