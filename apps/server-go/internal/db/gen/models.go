@@ -199,16 +199,21 @@ type OrganizationInvitations struct {
 	ID             string
 	OrganizationID string
 	Email          string
-	Role           *string
 	Status         string
 	ExpiresAt      pgtype.Timestamptz
-	InviterID      string
+	InviterID      *string
 	CreatedAt      pgtype.Timestamptz
+	Roles          *string
+	Token          string
+	UpdatedAt      pgtype.Timestamptz
 }
 
 type OrganizationMemberRoles struct {
-	OrganizationMemberID string
-	OrganizationRoleID   string
+	ID             string
+	MemberID       string
+	OrganizationID string
+	Role           *string
+	CreatedAt      pgtype.Timestamptz
 }
 
 type OrganizationMembers struct {
@@ -216,19 +221,12 @@ type OrganizationMembers struct {
 	OrganizationID string
 	UserID         string
 	CreatedAt      pgtype.Timestamptz
-}
-
-type OrganizationRoles struct {
-	ID             string
-	OrganizationID string
-	Name           string
-	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
 }
 
 type Organizations struct {
 	ID        string
 	Name      string
-	UserID    string
 	Slug      string
 	Logo      *string
 	Metadata  *string
@@ -286,10 +284,10 @@ type RateLimit struct {
 }
 
 type RateLimits struct {
-	ID        string
-	Key       string
-	Count     int32
-	ExpiresAt pgtype.Timestamptz
+	ID            string
+	Key           string
+	Count         int32
+	LastRequestAt int64
 }
 
 type Sessions struct {
@@ -375,10 +373,10 @@ type VaccineLog struct {
 }
 
 type Verifications struct {
-	ID         string
-	Identifier string
-	Value      string
-	ExpiresAt  pgtype.Timestamptz
-	CreatedAt  pgtype.Timestamptz
-	UpdatedAt  pgtype.Timestamptz
+	ID        string
+	Subject   string
+	Value     string
+	ExpiresAt pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
 }

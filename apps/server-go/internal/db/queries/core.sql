@@ -35,21 +35,22 @@ SELECT "id", "name", "slug", "plan" FROM "organizations"
 WHERE "id" = $1;
 
 -- name: GetMembership :one
--- organization_members carries no role column: role assignment lives in the
--- join table organization_member_roles -> organization_roles (a member can
--- hold zero or more named roles). Aggregate role names into an array so
--- callers get one row per (family, user) membership, same grain as before.
+-- organization_members carries no role column: Limen stores the role NAME on
+-- organization_member_roles, one row per role a member holds (00002 aligned
+-- that table to Limen's real shape — the organization_roles catalogue this
+-- query used to join only exists when custom roles are enabled, which they
+-- are not). Aggregate role names into an array so callers get one row per
+-- (family, user) membership.
 SELECT
     om."id",
     om."organization_id",
     om."user_id",
     om."created_at",
     o."plan",
-    COALESCE(array_agg(orr."name") FILTER (WHERE orr."name" IS NOT NULL), '{}')::text[] AS roles
+    COALESCE(array_agg(omr."role") FILTER (WHERE omr."role" IS NOT NULL), '{}')::text[] AS roles
 FROM "organization_members" om
 JOIN "organizations" o ON o."id" = om."organization_id"
-LEFT JOIN "organization_member_roles" omr ON omr."organization_member_id" = om."id"
-LEFT JOIN "organization_roles" orr ON orr."id" = omr."organization_role_id"
+LEFT JOIN "organization_member_roles" omr ON omr."member_id" = om."id"
 WHERE om."organization_id" = $1 AND om."user_id" = $2
 GROUP BY om."id", om."organization_id", om."user_id", om."created_at", o."plan";
 

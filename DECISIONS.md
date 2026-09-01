@@ -1057,3 +1057,24 @@ edited, per this file's append-only convention.
   `Bun.serve` that answers `/healthz` with `{"ok":true}` and 404s everything
   else, just enough to keep the existing probe meaningful without giving
   `worker` any of the app's real routes.
+- **Limen's built-in rate limiter and its session metadata both keyed on the
+  raw client IP; both are now hashed.** Two places in Limen v0.2.1 record an
+  address by default, and neither is obvious from the outside.
+  `NewDefaultRateLimiterConfig` sets `KeyGenerator: ipExtractorFromRemoteAddr`
+  and — more surprising — `opaqueSessionManager.storeSession` writes
+  `{"ip_address": <raw address>, "user_agent": …}` into every session row's
+  JSON `metadata` column on every sign-in. The limiter's default store is
+  in-process memory (`StoreTypeCache`), so its keys never reach the database
+  and the `rate_limits` table stays empty unless someone switches the store;
+  the session metadata, however, is persisted, and sessions live seven days.
+  Storing addresses next to Article 9 health data is exactly what the privacy
+  policy promises we do not do, so `internal/auth` passes the same
+  SHA-256-of-RemoteAddr extractor to both
+  (`limen.WithSessionIPAddressExtractor`, and
+  `WithHTTPRateLimiter(WithRateLimiterKeyGenerator(...))`). Limen's limiter is
+  left ENABLED rather than replaced with a no-op: it protects the auth routes
+  in-process with sensible per-route rules (5 sign-ins / 10 s), our own
+  `rate_limit` table covers the app's routes, and a hashed key gives up
+  nothing we wanted. A test asserts the persisted metadata contains a 64-char
+  digest and not the address (`TestSessionMetadataStoresNoRawAddress`) —
+  the guarantee is behavioural, so it is checked behaviourally.

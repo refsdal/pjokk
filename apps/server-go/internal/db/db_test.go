@@ -13,14 +13,16 @@ import (
 )
 
 // insertFamily inserts a minimal organizations row directly (sqlc has no
-// CreateFamily query yet — Task 3 only needed read/membership queries) so
-// tests have a family to hang family-scoped rows off. Owned by the
-// tombstone user, which testrig.Setup guarantees exists.
+// CreateFamily query — families are created through internal/auth, which
+// owns Limen's organization tables) so tests have a family to hang
+// family-scoped rows off. Ownership is expressed by organization_members,
+// not a column on organizations: 00002 dropped the guessed user_id column
+// that Limen never writes.
 func insertFamily(t *testing.T, ctx context.Context, rig *testrig.Rig, id, slug string) {
 	t.Helper()
 	_, err := rig.Pool.Exec(ctx,
-		`INSERT INTO "organizations" ("id", "name", "user_id", "slug") VALUES ($1, $2, $3, $4)`,
-		id, "Test Family "+id, db.TombstoneID, slug,
+		`INSERT INTO "organizations" ("id", "name", "slug") VALUES ($1, $2, $3)`,
+		id, "Test Family "+id, slug,
 	)
 	if err != nil {
 		t.Fatalf("insertFamily: %v", err)
@@ -77,8 +79,8 @@ func TestIsUniqueViolation_TrueOnDuplicateSlug(t *testing.T) {
 	insertFamily(t, ctx, rig, "fam-dup-slug-1", "dup-slug")
 
 	_, err := rig.Pool.Exec(ctx,
-		`INSERT INTO "organizations" ("id", "name", "user_id", "slug") VALUES ($1, $2, $3, $4)`,
-		"fam-dup-slug-2", "Test Family fam-dup-slug-2", db.TombstoneID, "dup-slug",
+		`INSERT INTO "organizations" ("id", "name", "slug") VALUES ($1, $2, $3)`,
+		"fam-dup-slug-2", "Test Family fam-dup-slug-2", "dup-slug",
 	)
 	if err == nil {
 		t.Fatalf("expected a duplicate-slug insert to fail")
