@@ -21,9 +21,9 @@ import (
 // 00002_limen_align.sql drops it, since Pjokk only ever uses the built-in
 // admin/member roles — so it is NOT listed, and `organization_member_roles`
 // (Limen's actual role-assignment table, recreated in that same migration)
-// and `impersonation` (00003_impersonation.sql, server-only bookkeeping) are
-// added in its place. `passkey` and `subscription` are gone entirely —
+// is added in its place. `passkey` and `subscription` are gone entirely —
 // billing and the passkey UI never shipped in this port (REF §A1).
+// `impersonation` is NOT listed either — see DeliberatelyExcluded.
 //
 // BackupTablesTest (backup_tables_test.go) asserts this list against the
 // LIVE schema in both directions: every pg_tables row must be covered by
@@ -39,7 +39,6 @@ var BackupTables = []string{
 	"organization_members",
 	"organization_member_roles",
 	"organization_invitations",
-	"impersonation",
 	// Domain.
 	"baby",
 	"feed_log",
@@ -77,10 +76,20 @@ var BackupTables = []string{
 //     the limiter.
 //   - rate_limits: Limen's own rate limiter table, same reasoning.
 //   - goose_db_version: migration bookkeeping, not application data.
+//   - impersonation: server-only bookkeeping (00003_impersonation.sql) that
+//     is pure risk to carry and meaningless to restore. Its rows ARE live
+//     credentials: impersonated_token and admin_token are verbatim session
+//     tokens (the impersonated session's and the impersonating sysadmin's),
+//     scoped to sessions that exist right now — a restored row would either
+//     dangle (its FK target long gone) or, worse, still resolve to a live
+//     session and hand out sysadmin-level access from a 30-day-old JSON
+//     file. Nulling columns is the right redaction for a table worth
+//     keeping (accounts, sessions); this table isn't worth keeping at all.
 var DeliberatelyExcluded = map[string]bool{
 	"rate_limit":       true,
 	"rate_limits":      true,
 	"goose_db_version": true,
+	"impersonation":    true,
 }
 
 // backupRetentionDays is BACKUP_RETENTION_DAYS: backups hold every table,
@@ -107,13 +116,29 @@ type backupSnapshot struct {
 //
 // Secrets are nulled before they reach the snapshot — a deliberate
 // improvement over a byte-for-byte port, not an oversight: the TypeScript
-// original only ever had a dev-only `account.password` to strip. Limen's
-// `accounts` table instead carries real OAuth tokens (access_token,
-// refresh_token, id_token), and those are credentials that simply do not
-// belong in a JSON file sitting in object storage — a restore loses the
-// ability to silently reuse a stolen token, never the ability to sign in
-// (the user just re-authorizes with the provider). `users.password` is
-// nulled for the same reason the TypeScript job nulled `account.password`.
+// original only ever had a dev-only `account.password` to strip. This port
+// also nulls two live-credential columns the TypeScript predecessor never
+// had to think about:
+//
+//   - accounts.access_token / refresh_token / id_token: Limen's `accounts`
+//     table carries real OAuth tokens. A restore loses the ability to
+//     silently reuse a stolen token, never the ability to sign in (the
+//     user just re-authorizes with the provider).
+//   - sessions.token: the literal cookie credential for every signed-in
+//     user, sitting unencrypted in the sessions table. Backups are
+//     retained BACKUP_RETENTION_DAYS (30) days in object storage — thirty
+//     days of "here is a valid session cookie for every user who was
+//     signed in on this date" is a standing credential leak, not an
+//     acceptable trade like the OAuth tokens above (which at least require
+//     the provider's cooperation to exploit). A session row without its
+//     token is still useful for backup/audit purposes (who existed, when
+//     they last used the app); the token itself never is.
+//
+// `users.password` is nulled for the same reason the TypeScript job nulled
+// `account.password`. The `impersonation` table — ALSO live session
+// tokens, for both the impersonator and the impersonated — isn't nulled
+// column-by-column because there is nothing else in that table worth
+// keeping; see DeliberatelyExcluded.
 func RunBackup(ctx context.Context, d Deps, now time.Time) (string, error) {
 	dump := make(map[string][]map[string]any, len(BackupTables))
 
@@ -144,6 +169,10 @@ func RunBackup(ctx context.Context, d Deps, now time.Time) (string, error) {
 				r["access_token"] = nil
 				r["refresh_token"] = nil
 				r["id_token"] = nil
+			}
+		case "sessions":
+			for _, r := range records {
+				r["token"] = nil
 			}
 		}
 
