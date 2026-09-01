@@ -422,6 +422,271 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/sleep:
+    get:
+      operationId: listSleeps
+      summary: Sleep logs in the caller's active family, newest first (by startTime).
+      tags: [sleep]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Sleep logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SleepLog"
+    post:
+      operationId: createSleep
+      summary: >-
+        Create a sleep log. Omit endTime to start an active session; a baby
+        can only have one active session at a time — enforced by a partial
+        unique index (see internal/api/sleep.go), not just the pre-check
+        this endpoint also does.
+      tags: [sleep]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSleep"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SleepLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Baby already has an active session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/sleep/active:
+    get:
+      operationId: getActiveSleep
+      summary: The active sleep session for a baby, or null.
+      tags: [sleep]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+      responses:
+        "200":
+          description: The active sleep session, or null.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SleepLog"
+                nullable: true
+  /api/sleep/{id}/wake:
+    post:
+      operationId: wakeSleep
+      summary: End the active session for a sleep log. endTime defaults to now.
+      tags: [sleep]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Wake"
+      responses:
+        "200":
+          description: Session ended.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SleepLog"
+        "404":
+          description: No such active session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/sleep/{id}:
+    patch:
+      operationId: updateSleep
+      summary: >-
+        Partial update. `endTime` sent as `null` CLEARS it, reopening the
+        session — subject to the same one-active-session-per-baby
+        constraint as create, so this can also 409. `location`/`notes` may
+        also be sent as `null` to clear them; `startTime` is not nullable —
+        only settable or omitted. See internal/api/feeds.go for the
+        omitted-vs-null presence-detection pattern this endpoint needs.
+      tags: [sleep]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSleep"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SleepLog"
+        "404":
+          description: No sleep log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: >-
+            Clearing endTime would reopen a session while another is
+            already active for this baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteSleep
+      summary: Delete a sleep log.
+      tags: [sleep]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No sleep log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/sleep-locations:
+    get:
+      operationId: listSleepLocations
+      summary: Custom sleep-location chips for the caller's active family.
+      tags: [sleep-locations]
+      responses:
+        "200":
+          description: Custom sleep locations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SleepLocation"
+    post:
+      operationId: createSleepLocation
+      summary: >-
+        Family-admin only; not available to API keys. Rejects a name that
+        duplicates a default chip or an existing custom one
+        (case-insensitive), and caps custom locations at 20 per family.
+      tags: [sleep-locations]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSleepLocation"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SleepLocation"
+        "403":
+          description: Family admin only, or an API key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Duplicate name or limit reached.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/sleep-locations/{id}:
+    delete:
+      operationId: deleteSleepLocation
+      summary: Family-admin only; not available to API keys.
+      tags: [sleep-locations]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "403":
+          description: Family admin only, or an API key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such location in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/summary:
+    get:
+      operationId: getSummary
+      summary: >-
+        Everything the home screen needs in one call: last feed, last
+        diaper, active + last sleep, active play, and today's local-day
+        totals.
+      tags: [summary]
+      parameters:
+        - name: babyId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: tz
+          in: query
+          required: false
+          description: >-
+            The requester's Date.getTimezoneOffset() (minutes,
+            UTC-minus-local). The `today` block follows the caretaker's
+            clock, not the server's. Defaults to 0 (UTC) when omitted.
+          schema:
+            type: integer
+            minimum: -840
+            maximum: 840
+            default: 0
+      responses:
+        "200":
+          description: Status summary for a baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Summary"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/me:
     get:
       operationId: getMe
@@ -792,6 +1057,201 @@ components:
           type: string
           maxLength: 1000
           nullable: true
+    SleepLog:
+      type: object
+      required:
+        - id
+        - babyId
+        - caretakerId
+        - caretakerName
+        - notes
+        - startTime
+        - endTime
+        - location
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+          description: null while the session is active.
+        location:
+          type: string
+          nullable: true
+    CreateSleep:
+      type: object
+      required: [babyId, startTime]
+      properties:
+        babyId:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          description: Omit to start an active sleep session.
+        location:
+          type: string
+          maxLength: 100
+        notes:
+          type: string
+          maxLength: 1000
+    UpdateSleep:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `endTime`,
+        `location` and `notes` may also be sent as `null` to CLEAR that
+        column — clearing `endTime` reopens the session and can 409 if
+        another session for the same baby is already active (see
+        internal/api/sleep.go). `startTime` is not nullable — only settable
+        or omitted.
+      properties:
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+        location:
+          type: string
+          maxLength: 100
+          nullable: true
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+    Wake:
+      type: object
+      description: Defaults endTime to now on the server when omitted.
+      properties:
+        endTime:
+          type: string
+          format: date-time
+    SleepLocation:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+    CreateSleepLocation:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+    PlayLog:
+      type: object
+      description: >-
+        The Task 13 route surface (play.ts's port) isn't built yet; this
+        schema exists only so /api/summary's activePlay field has a
+        documented shape — the play_log table itself already exists in the
+        schema (Task 3).
+      required:
+        - id
+        - babyId
+        - caretakerId
+        - caretakerName
+        - notes
+        - type
+        - startTime
+        - endTime
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: [tummy, walk, play]
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+          description: null while the activity is running.
+    Summary:
+      type: object
+      required:
+        - lastFeed
+        - lastDiaper
+        - activeSleep
+        - lastSleep
+        - activePlay
+        - today
+      properties:
+        lastFeed:
+          allOf:
+            - $ref: "#/components/schemas/FeedLog"
+          nullable: true
+        lastDiaper:
+          allOf:
+            - $ref: "#/components/schemas/DiaperLog"
+          nullable: true
+        activeSleep:
+          allOf:
+            - $ref: "#/components/schemas/SleepLog"
+          nullable: true
+        lastSleep:
+          allOf:
+            - $ref: "#/components/schemas/SleepLog"
+          nullable: true
+        activePlay:
+          allOf:
+            - $ref: "#/components/schemas/PlayLog"
+          nullable: true
+        today:
+          type: object
+          required: [feeds, intakeMl, solidsG, wet, dirty, both, sleepMin]
+          properties:
+            feeds:
+              type: integer
+              format: int32
+            intakeMl:
+              type: integer
+              format: int32
+            solidsG:
+              type: integer
+              format: int32
+            wet:
+              type: integer
+              format: int32
+            dirty:
+              type: integer
+              format: int32
+            both:
+              type: integer
+              format: int32
+            sleepMin:
+              type: integer
+              format: int32
     Error:
       type: object
       description: >-

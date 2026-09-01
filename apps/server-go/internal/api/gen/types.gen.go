@@ -184,6 +184,27 @@ func (e OkOk) Valid() bool {
 	}
 }
 
+// Defines values for PlayLogType.
+const (
+	Play  PlayLogType = "play"
+	Tummy PlayLogType = "tummy"
+	Walk  PlayLogType = "walk"
+)
+
+// Valid indicates whether the value is a known member of the PlayLogType enum.
+func (e PlayLogType) Valid() bool {
+	switch e {
+	case Play:
+		return true
+	case Tummy:
+		return true
+	case Walk:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SetMemberRoleRole.
 const (
 	SetMemberRoleRoleAdmin  SetMemberRoleRole = "admin"
@@ -379,6 +400,22 @@ type CreateFeedSide string
 // CreateFeedType defines model for CreateFeed.Type.
 type CreateFeedType string
 
+// CreateSleep defines model for CreateSleep.
+type CreateSleep struct {
+	BabyId string `json:"babyId"`
+
+	// EndTime Omit to start an active sleep session.
+	EndTime   *time.Time `json:"endTime,omitempty"`
+	Location  *string    `json:"location,omitempty"`
+	Notes     *string    `json:"notes,omitempty"`
+	StartTime time.Time  `json:"startTime"`
+}
+
+// CreateSleepLocation defines model for CreateSleepLocation.
+type CreateSleepLocation struct {
+	Name string `json:"name"`
+}
+
 // DiaperLog defines model for DiaperLog.
 type DiaperLog struct {
 	BabyId        string        `json:"babyId"`
@@ -469,6 +506,23 @@ type Ok struct {
 // OkOk defines model for Ok.Ok.
 type OkOk bool
 
+// PlayLog The Task 13 route surface (play.ts's port) isn't built yet; this schema exists only so /api/summary's activePlay field has a documented shape — the play_log table itself already exists in the schema (Task 3).
+type PlayLog struct {
+	BabyId        string `json:"babyId"`
+	CaretakerId   string `json:"caretakerId"`
+	CaretakerName string `json:"caretakerName"`
+
+	// EndTime null while the activity is running.
+	EndTime   *time.Time  `json:"endTime"`
+	Id        string      `json:"id"`
+	Notes     *string     `json:"notes"`
+	StartTime time.Time   `json:"startTime"`
+	Type      PlayLogType `json:"type"`
+}
+
+// PlayLogType defines model for PlayLog.Type.
+type PlayLogType string
+
 // SetMemberRole defines model for SetMemberRole.
 type SetMemberRole struct {
 	Role SetMemberRoleRole `json:"role"`
@@ -476,6 +530,44 @@ type SetMemberRole struct {
 
 // SetMemberRoleRole defines model for SetMemberRole.Role.
 type SetMemberRoleRole string
+
+// SleepLocation defines model for SleepLocation.
+type SleepLocation struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// SleepLog defines model for SleepLog.
+type SleepLog struct {
+	BabyId        string `json:"babyId"`
+	CaretakerId   string `json:"caretakerId"`
+	CaretakerName string `json:"caretakerName"`
+
+	// EndTime null while the session is active.
+	EndTime   *time.Time `json:"endTime"`
+	Id        string     `json:"id"`
+	Location  *string    `json:"location"`
+	Notes     *string    `json:"notes"`
+	StartTime time.Time  `json:"startTime"`
+}
+
+// Summary defines model for Summary.
+type Summary struct {
+	ActivePlay  *PlayLog   `json:"activePlay"`
+	ActiveSleep *SleepLog  `json:"activeSleep"`
+	LastDiaper  *DiaperLog `json:"lastDiaper"`
+	LastFeed    *FeedLog   `json:"lastFeed"`
+	LastSleep   *SleepLog  `json:"lastSleep"`
+	Today       struct {
+		Both     int32 `json:"both"`
+		Dirty    int32 `json:"dirty"`
+		Feeds    int32 `json:"feeds"`
+		IntakeMl int32 `json:"intakeMl"`
+		SleepMin int32 `json:"sleepMin"`
+		SolidsG  int32 `json:"solidsG"`
+		Wet      int32 `json:"wet"`
+	} `json:"today"`
+}
 
 // UpdateBaby Every field is optional; an empty object is a no-op. `sex` may also be sent as `null`, which — like omitting it — leaves the baby's sex unchanged (Go's JSON decoding cannot tell "absent" from "null" for a nullable-optional field without a bespoke wrapper type, and no caller needs to clear sex back to unknown today; see internal/api/babies.go).
 type UpdateBaby struct {
@@ -515,6 +607,19 @@ type UpdateFeedSide string
 // UpdateFeedType defines model for UpdateFeed.Type.
 type UpdateFeedType string
 
+// UpdateSleep Every field is optional; an empty object is a no-op. `endTime`, `location` and `notes` may also be sent as `null` to CLEAR that column — clearing `endTime` reopens the session and can 409 if another session for the same baby is already active (see internal/api/sleep.go). `startTime` is not nullable — only settable or omitted.
+type UpdateSleep struct {
+	EndTime   *time.Time `json:"endTime,omitempty"`
+	Location  *string    `json:"location,omitempty"`
+	Notes     *string    `json:"notes,omitempty"`
+	StartTime *time.Time `json:"startTime,omitempty"`
+}
+
+// Wake Defaults endTime to now on the server when omitted.
+type Wake struct {
+	EndTime *time.Time `json:"endTime,omitempty"`
+}
+
 // BabyIdQuery defines model for babyIdQuery.
 type BabyIdQuery = string
 
@@ -543,6 +648,29 @@ type ListFeedsParams struct {
 
 	// Limit Maximum number of rows to return.
 	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListSleepsParams defines parameters for ListSleeps.
+type ListSleepsParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+
+	// Limit Maximum number of rows to return.
+	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// GetActiveSleepParams defines parameters for GetActiveSleep.
+type GetActiveSleepParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+}
+
+// GetSummaryParams defines parameters for GetSummary.
+type GetSummaryParams struct {
+	BabyId string `form:"babyId" json:"babyId"`
+
+	// Tz The requester's Date.getTimezoneOffset() (minutes, UTC-minus-local). The `today` block follows the caretaker's clock, not the server's. Defaults to 0 (UTC) when omitted.
+	Tz *int `form:"tz,omitempty" json:"tz,omitempty"`
 }
 
 // Healthz200JSONResponseBodyOk defines parameters for Healthz.
@@ -574,3 +702,15 @@ type CreateFeedJSONRequestBody = CreateFeed
 
 // UpdateFeedJSONRequestBody defines body for UpdateFeed for application/json ContentType.
 type UpdateFeedJSONRequestBody = UpdateFeed
+
+// CreateSleepJSONRequestBody defines body for CreateSleep for application/json ContentType.
+type CreateSleepJSONRequestBody = CreateSleep
+
+// CreateSleepLocationJSONRequestBody defines body for CreateSleepLocation for application/json ContentType.
+type CreateSleepLocationJSONRequestBody = CreateSleepLocation
+
+// UpdateSleepJSONRequestBody defines body for UpdateSleep for application/json ContentType.
+type UpdateSleepJSONRequestBody = UpdateSleep
+
+// WakeSleepJSONRequestBody defines body for WakeSleep for application/json ContentType.
+type WakeSleepJSONRequestBody = Wake

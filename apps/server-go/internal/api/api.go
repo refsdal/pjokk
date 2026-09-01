@@ -184,6 +184,26 @@ var operationAuthTiers = map[string]authTier{
 	"UpdateDiaper": tierFamily,
 	"DeleteDiaper": tierFamily,
 
+	"ListSleeps":     tierFamily,
+	"CreateSleep":    tierFamily,
+	"GetActiveSleep": tierFamily,
+	"WakeSleep":      tierFamily,
+	"UpdateSleep":    tierFamily,
+	"DeleteSleep":    tierFamily,
+
+	"GetSummary": tierFamily,
+
+	// ListSleepLocations is a plain family-scoped read; Create/Delete are
+	// family-admin-only AND rejected for API keys (REF §A1
+	// sleep-locations.ts). middleware.RequireAdmin already answers both
+	// cases — "Not available to API keys"/FORBIDDEN before the role check,
+	// "Admin only"/FORBIDDEN after — so tierAdmin alone reproduces the TS
+	// route's two distinct 403s without any extra logic in
+	// internal/api/sleep_locations.go.
+	"ListSleepLocations":  tierFamily,
+	"CreateSleepLocation": tierAdmin,
+	"DeleteSleepLocation": tierAdmin,
+
 	"DeleteBaby":          tierAdmin,
 	"DeleteFamilyMember":  tierAdmin,
 	"SetFamilyMemberRole": tierAdmin,

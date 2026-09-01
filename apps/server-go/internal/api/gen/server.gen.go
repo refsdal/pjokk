@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/oapi-codegen/runtime"
@@ -69,6 +70,36 @@ type ServerInterface interface {
 	// GetMe Session info for the SPA shell. Requires a session but NOT an active family — the family/member/plan fields are null when the caller has none.
 	// (GET /api/me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// ListSleeps Sleep logs in the caller's active family, newest first (by startTime).
+	// (GET /api/sleep)
+	ListSleeps(w http.ResponseWriter, r *http.Request, params ListSleepsParams)
+	// CreateSleep Create a sleep log. Omit endTime to start an active session; a baby can only have one active session at a time — enforced by a partial unique index (see internal/api/sleep.go), not just the pre-check this endpoint also does.
+	// (POST /api/sleep)
+	CreateSleep(w http.ResponseWriter, r *http.Request)
+	// ListSleepLocations Custom sleep-location chips for the caller's active family.
+	// (GET /api/sleep-locations)
+	ListSleepLocations(w http.ResponseWriter, r *http.Request)
+	// CreateSleepLocation Family-admin only; not available to API keys. Rejects a name that duplicates a default chip or an existing custom one (case-insensitive), and caps custom locations at 20 per family.
+	// (POST /api/sleep-locations)
+	CreateSleepLocation(w http.ResponseWriter, r *http.Request)
+	// DeleteSleepLocation Family-admin only; not available to API keys.
+	// (DELETE /api/sleep-locations/{id})
+	DeleteSleepLocation(w http.ResponseWriter, r *http.Request, id IdPath)
+	// GetActiveSleep The active sleep session for a baby, or null.
+	// (GET /api/sleep/active)
+	GetActiveSleep(w http.ResponseWriter, r *http.Request, params GetActiveSleepParams)
+	// DeleteSleep Delete a sleep log.
+	// (DELETE /api/sleep/{id})
+	DeleteSleep(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdateSleep Partial update. `endTime` sent as `null` CLEARS it, reopening the session — subject to the same one-active-session-per-baby constraint as create, so this can also 409. `location`/`notes` may also be sent as `null` to clear them; `startTime` is not nullable — only settable or omitted. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
+	// (PATCH /api/sleep/{id})
+	UpdateSleep(w http.ResponseWriter, r *http.Request, id IdPath)
+	// WakeSleep End the active session for a sleep log. endTime defaults to now.
+	// (POST /api/sleep/{id}/wake)
+	WakeSleep(w http.ResponseWriter, r *http.Request, id IdPath)
+	// GetSummary Everything the home screen needs in one call: last feed, last diaper, active + last sleep, active play, and today's local-day totals.
+	// (GET /api/summary)
+	GetSummary(w http.ResponseWriter, r *http.Request, params GetSummaryParams)
 	// Healthz Liveness probe. Touches nothing — not even the database pool.
 	// (GET /healthz)
 	Healthz(w http.ResponseWriter, r *http.Request)
@@ -484,6 +515,277 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 	handler.ServeHTTP(w, r)
 }
 
+// ListSleeps operation middleware
+func (siw *ServerInterfaceWrapper) ListSleeps(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListSleepsParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSleeps(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateSleep operation middleware
+func (siw *ServerInterfaceWrapper) CreateSleep(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateSleep(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSleepLocations operation middleware
+func (siw *ServerInterfaceWrapper) ListSleepLocations(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSleepLocations(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateSleepLocation operation middleware
+func (siw *ServerInterfaceWrapper) CreateSleepLocation(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateSleepLocation(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteSleepLocation operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSleepLocation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteSleepLocation(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetActiveSleep operation middleware
+func (siw *ServerInterfaceWrapper) GetActiveSleep(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetActiveSleepParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetActiveSleep(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteSleep operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSleep(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteSleep(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateSleep operation middleware
+func (siw *ServerInterfaceWrapper) UpdateSleep(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateSleep(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// WakeSleep operation middleware
+func (siw *ServerInterfaceWrapper) WakeSleep(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.WakeSleep(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSummary operation middleware
+func (siw *ServerInterfaceWrapper) GetSummary(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetSummaryParams
+
+	// ------------- Required query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "tz" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "tz", r.URL.Query(), &params.Tz, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "tz"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tz", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSummary(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // Healthz operation middleware
 func (siw *ServerInterfaceWrapper) Healthz(w http.ResponseWriter, r *http.Request) {
 
@@ -650,6 +952,16 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/diapers", wrapper.CreateDiaper)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/diapers/{id}", wrapper.DeleteDiaper)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/diapers/{id}", wrapper.UpdateDiaper)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/sleep", wrapper.ListSleeps)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/sleep", wrapper.CreateSleep)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/sleep/active", wrapper.GetActiveSleep)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/sleep/{id}/wake", wrapper.WakeSleep)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/sleep/{id}", wrapper.DeleteSleep)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/sleep/{id}", wrapper.UpdateSleep)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/sleep-locations", wrapper.ListSleepLocations)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/sleep-locations", wrapper.CreateSleepLocation)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/sleep-locations/{id}", wrapper.DeleteSleepLocation)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/summary", wrapper.GetSummary)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/me", wrapper.GetMe)
 
 	return m
@@ -1225,6 +1537,381 @@ func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) e
 	return err
 }
 
+type ListSleepsRequestObject struct {
+	Params ListSleepsParams
+}
+
+type ListSleepsResponseObject interface {
+	VisitListSleepsResponse(w http.ResponseWriter) error
+}
+
+type ListSleeps200JSONResponse []SleepLog
+
+func (response ListSleeps200JSONResponse) VisitListSleepsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSleepRequestObject struct {
+	Body *CreateSleepJSONRequestBody
+}
+
+type CreateSleepResponseObject interface {
+	VisitCreateSleepResponse(w http.ResponseWriter) error
+}
+
+type CreateSleep201JSONResponse SleepLog
+
+func (response CreateSleep201JSONResponse) VisitCreateSleepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSleep404JSONResponse Error
+
+func (response CreateSleep404JSONResponse) VisitCreateSleepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSleep409JSONResponse Error
+
+func (response CreateSleep409JSONResponse) VisitCreateSleepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSleepLocationsRequestObject struct {
+}
+
+type ListSleepLocationsResponseObject interface {
+	VisitListSleepLocationsResponse(w http.ResponseWriter) error
+}
+
+type ListSleepLocations200JSONResponse []SleepLocation
+
+func (response ListSleepLocations200JSONResponse) VisitListSleepLocationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSleepLocationRequestObject struct {
+	Body *CreateSleepLocationJSONRequestBody
+}
+
+type CreateSleepLocationResponseObject interface {
+	VisitCreateSleepLocationResponse(w http.ResponseWriter) error
+}
+
+type CreateSleepLocation201JSONResponse SleepLocation
+
+func (response CreateSleepLocation201JSONResponse) VisitCreateSleepLocationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSleepLocation403JSONResponse Error
+
+func (response CreateSleepLocation403JSONResponse) VisitCreateSleepLocationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSleepLocation409JSONResponse Error
+
+func (response CreateSleepLocation409JSONResponse) VisitCreateSleepLocationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSleepLocationRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteSleepLocationResponseObject interface {
+	VisitDeleteSleepLocationResponse(w http.ResponseWriter) error
+}
+
+type DeleteSleepLocation200JSONResponse Ok
+
+func (response DeleteSleepLocation200JSONResponse) VisitDeleteSleepLocationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSleepLocation403JSONResponse Error
+
+func (response DeleteSleepLocation403JSONResponse) VisitDeleteSleepLocationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSleepLocation404JSONResponse Error
+
+func (response DeleteSleepLocation404JSONResponse) VisitDeleteSleepLocationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetActiveSleepRequestObject struct {
+	Params GetActiveSleepParams
+}
+
+type GetActiveSleepResponseObject interface {
+	VisitGetActiveSleepResponse(w http.ResponseWriter) error
+}
+
+type GetActiveSleep200JSONResponse SleepLog
+
+func (response GetActiveSleep200JSONResponse) VisitGetActiveSleepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSleepRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteSleepResponseObject interface {
+	VisitDeleteSleepResponse(w http.ResponseWriter) error
+}
+
+type DeleteSleep200JSONResponse Ok
+
+func (response DeleteSleep200JSONResponse) VisitDeleteSleepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSleep404JSONResponse Error
+
+func (response DeleteSleep404JSONResponse) VisitDeleteSleepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSleepRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdateSleepJSONRequestBody
+}
+
+type UpdateSleepResponseObject interface {
+	VisitUpdateSleepResponse(w http.ResponseWriter) error
+}
+
+type UpdateSleep200JSONResponse SleepLog
+
+func (response UpdateSleep200JSONResponse) VisitUpdateSleepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSleep404JSONResponse Error
+
+func (response UpdateSleep404JSONResponse) VisitUpdateSleepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSleep409JSONResponse Error
+
+func (response UpdateSleep409JSONResponse) VisitUpdateSleepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WakeSleepRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *WakeSleepJSONRequestBody
+}
+
+type WakeSleepResponseObject interface {
+	VisitWakeSleepResponse(w http.ResponseWriter) error
+}
+
+type WakeSleep200JSONResponse SleepLog
+
+func (response WakeSleep200JSONResponse) VisitWakeSleepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WakeSleep404JSONResponse Error
+
+func (response WakeSleep404JSONResponse) VisitWakeSleepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSummaryRequestObject struct {
+	Params GetSummaryParams
+}
+
+type GetSummaryResponseObject interface {
+	VisitGetSummaryResponse(w http.ResponseWriter) error
+}
+
+type GetSummary200JSONResponse Summary
+
+func (response GetSummary200JSONResponse) VisitGetSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSummary404JSONResponse Error
+
+func (response GetSummary404JSONResponse) VisitGetSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type HealthzRequestObject struct {
 }
 
@@ -1341,6 +2028,36 @@ type StrictServerInterface interface {
 	// GetMe Session info for the SPA shell. Requires a session but NOT an active family — the family/member/plan fields are null when the caller has none.
 	// (GET /api/me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// ListSleeps Sleep logs in the caller's active family, newest first (by startTime).
+	// (GET /api/sleep)
+	ListSleeps(ctx context.Context, request ListSleepsRequestObject) (ListSleepsResponseObject, error)
+	// CreateSleep Create a sleep log. Omit endTime to start an active session; a baby can only have one active session at a time — enforced by a partial unique index (see internal/api/sleep.go), not just the pre-check this endpoint also does.
+	// (POST /api/sleep)
+	CreateSleep(ctx context.Context, request CreateSleepRequestObject) (CreateSleepResponseObject, error)
+	// ListSleepLocations Custom sleep-location chips for the caller's active family.
+	// (GET /api/sleep-locations)
+	ListSleepLocations(ctx context.Context, request ListSleepLocationsRequestObject) (ListSleepLocationsResponseObject, error)
+	// CreateSleepLocation Family-admin only; not available to API keys. Rejects a name that duplicates a default chip or an existing custom one (case-insensitive), and caps custom locations at 20 per family.
+	// (POST /api/sleep-locations)
+	CreateSleepLocation(ctx context.Context, request CreateSleepLocationRequestObject) (CreateSleepLocationResponseObject, error)
+	// DeleteSleepLocation Family-admin only; not available to API keys.
+	// (DELETE /api/sleep-locations/{id})
+	DeleteSleepLocation(ctx context.Context, request DeleteSleepLocationRequestObject) (DeleteSleepLocationResponseObject, error)
+	// GetActiveSleep The active sleep session for a baby, or null.
+	// (GET /api/sleep/active)
+	GetActiveSleep(ctx context.Context, request GetActiveSleepRequestObject) (GetActiveSleepResponseObject, error)
+	// DeleteSleep Delete a sleep log.
+	// (DELETE /api/sleep/{id})
+	DeleteSleep(ctx context.Context, request DeleteSleepRequestObject) (DeleteSleepResponseObject, error)
+	// UpdateSleep Partial update. `endTime` sent as `null` CLEARS it, reopening the session — subject to the same one-active-session-per-baby constraint as create, so this can also 409. `location`/`notes` may also be sent as `null` to clear them; `startTime` is not nullable — only settable or omitted. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
+	// (PATCH /api/sleep/{id})
+	UpdateSleep(ctx context.Context, request UpdateSleepRequestObject) (UpdateSleepResponseObject, error)
+	// WakeSleep End the active session for a sleep log. endTime defaults to now.
+	// (POST /api/sleep/{id}/wake)
+	WakeSleep(ctx context.Context, request WakeSleepRequestObject) (WakeSleepResponseObject, error)
+	// GetSummary Everything the home screen needs in one call: last feed, last diaper, active + last sleep, active play, and today's local-day totals.
+	// (GET /api/summary)
+	GetSummary(ctx context.Context, request GetSummaryRequestObject) (GetSummaryResponseObject, error)
 	// Healthz Liveness probe. Touches nothing — not even the database pool.
 	// (GET /healthz)
 	Healthz(ctx context.Context, request HealthzRequestObject) (HealthzResponseObject, error)
@@ -1858,6 +2575,291 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSleeps operation middleware
+func (sh *strictHandler) ListSleeps(w http.ResponseWriter, r *http.Request, params ListSleepsParams) {
+	var request ListSleepsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSleeps(ctx, request.(ListSleepsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSleeps")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSleepsResponseObject); ok {
+		if err := validResponse.VisitListSleepsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateSleep operation middleware
+func (sh *strictHandler) CreateSleep(w http.ResponseWriter, r *http.Request) {
+	var request CreateSleepRequestObject
+
+	var body CreateSleepJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateSleep(ctx, request.(CreateSleepRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateSleep")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateSleepResponseObject); ok {
+		if err := validResponse.VisitCreateSleepResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSleepLocations operation middleware
+func (sh *strictHandler) ListSleepLocations(w http.ResponseWriter, r *http.Request) {
+	var request ListSleepLocationsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSleepLocations(ctx, request.(ListSleepLocationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSleepLocations")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSleepLocationsResponseObject); ok {
+		if err := validResponse.VisitListSleepLocationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateSleepLocation operation middleware
+func (sh *strictHandler) CreateSleepLocation(w http.ResponseWriter, r *http.Request) {
+	var request CreateSleepLocationRequestObject
+
+	var body CreateSleepLocationJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateSleepLocation(ctx, request.(CreateSleepLocationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateSleepLocation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateSleepLocationResponseObject); ok {
+		if err := validResponse.VisitCreateSleepLocationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteSleepLocation operation middleware
+func (sh *strictHandler) DeleteSleepLocation(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteSleepLocationRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteSleepLocation(ctx, request.(DeleteSleepLocationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteSleepLocation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteSleepLocationResponseObject); ok {
+		if err := validResponse.VisitDeleteSleepLocationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetActiveSleep operation middleware
+func (sh *strictHandler) GetActiveSleep(w http.ResponseWriter, r *http.Request, params GetActiveSleepParams) {
+	var request GetActiveSleepRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetActiveSleep(ctx, request.(GetActiveSleepRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetActiveSleep")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetActiveSleepResponseObject); ok {
+		if err := validResponse.VisitGetActiveSleepResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteSleep operation middleware
+func (sh *strictHandler) DeleteSleep(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteSleepRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteSleep(ctx, request.(DeleteSleepRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteSleep")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteSleepResponseObject); ok {
+		if err := validResponse.VisitDeleteSleepResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateSleep operation middleware
+func (sh *strictHandler) UpdateSleep(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdateSleepRequestObject
+
+	request.Id = id
+
+	var body UpdateSleepJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateSleep(ctx, request.(UpdateSleepRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateSleep")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateSleepResponseObject); ok {
+		if err := validResponse.VisitUpdateSleepResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// WakeSleep operation middleware
+func (sh *strictHandler) WakeSleep(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request WakeSleepRequestObject
+
+	request.Id = id
+
+	var body WakeSleepJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.WakeSleep(ctx, request.(WakeSleepRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "WakeSleep")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(WakeSleepResponseObject); ok {
+		if err := validResponse.VisitWakeSleepResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSummary operation middleware
+func (sh *strictHandler) GetSummary(w http.ResponseWriter, r *http.Request, params GetSummaryParams) {
+	var request GetSummaryRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSummary(ctx, request.(GetSummaryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSummary")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSummaryResponseObject); ok {
+		if err := validResponse.VisitGetSummaryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
