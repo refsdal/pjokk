@@ -130,6 +130,24 @@ type ServerInterface interface {
 	// UpdateNote Partial update. `notes` may be sent as `null` to CLEAR it; `time` and `content` are not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
 	// (PATCH /api/notes/{id})
 	UpdateNote(w http.ResponseWriter, r *http.Request, id IdPath)
+	// ListPlays Play logs in the caller's active family, newest first (by startTime).
+	// (GET /api/play)
+	ListPlays(w http.ResponseWriter, r *http.Request, params ListPlaysParams)
+	// CreatePlay Create a play log. Omit endTime to start a running session; a baby can only have one running activity at a time — enforced by a partial unique index (see internal/api/play.go), not just the pre-check this endpoint also does. Free (no plan gate).
+	// (POST /api/play)
+	CreatePlay(w http.ResponseWriter, r *http.Request)
+	// GetActivePlay The running play session for a baby, or null.
+	// (GET /api/play/active)
+	GetActivePlay(w http.ResponseWriter, r *http.Request, params GetActivePlayParams)
+	// DeletePlay Delete a play log.
+	// (DELETE /api/play/{id})
+	DeletePlay(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdatePlay Partial update. `endTime` sent as `null` CLEARS it, reopening the session — subject to the same one-running-session-per-baby constraint as create, so this can also 409. `notes` may also be sent as `null` to clear it; `type`/`startTime` are not nullable — only settable or omitted. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
+	// (PATCH /api/play/{id})
+	UpdatePlay(w http.ResponseWriter, r *http.Request, id IdPath)
+	// StopPlay End the running session for a play log. endTime defaults to now.
+	// (POST /api/play/{id}/stop)
+	StopPlay(w http.ResponseWriter, r *http.Request, id IdPath)
 	// ListPumps Pump logs in the caller's active family, newest first.
 	// (GET /api/pumps)
 	ListPumps(w http.ResponseWriter, r *http.Request, params ListPumpsParams)
@@ -1147,6 +1165,177 @@ func (siw *ServerInterfaceWrapper) UpdateNote(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ListPlays operation middleware
+func (siw *ServerInterfaceWrapper) ListPlays(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPlaysParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPlays(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreatePlay operation middleware
+func (siw *ServerInterfaceWrapper) CreatePlay(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreatePlay(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetActivePlay operation middleware
+func (siw *ServerInterfaceWrapper) GetActivePlay(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetActivePlayParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetActivePlay(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeletePlay operation middleware
+func (siw *ServerInterfaceWrapper) DeletePlay(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeletePlay(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdatePlay operation middleware
+func (siw *ServerInterfaceWrapper) UpdatePlay(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdatePlay(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StopPlay operation middleware
+func (siw *ServerInterfaceWrapper) StopPlay(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StopPlay(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListPumps operation middleware
 func (siw *ServerInterfaceWrapper) ListPumps(w http.ResponseWriter, r *http.Request) {
 
@@ -1730,6 +1919,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/pumps", wrapper.CreatePump)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/pumps/{id}", wrapper.DeletePump)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/pumps/{id}", wrapper.UpdatePump)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/play", wrapper.ListPlays)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/play", wrapper.CreatePlay)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/play/active", wrapper.GetActivePlay)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/play/{id}/stop", wrapper.StopPlay)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/play/{id}", wrapper.DeletePlay)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/play/{id}", wrapper.UpdatePlay)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/me", wrapper.GetMe)
 
 	return m
@@ -2960,6 +3155,224 @@ func (response UpdateNote404JSONResponse) VisitUpdateNoteResponse(w http.Respons
 	return err
 }
 
+type ListPlaysRequestObject struct {
+	Params ListPlaysParams
+}
+
+type ListPlaysResponseObject interface {
+	VisitListPlaysResponse(w http.ResponseWriter) error
+}
+
+type ListPlays200JSONResponse []PlayLog
+
+func (response ListPlays200JSONResponse) VisitListPlaysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreatePlayRequestObject struct {
+	Body *CreatePlayJSONRequestBody
+}
+
+type CreatePlayResponseObject interface {
+	VisitCreatePlayResponse(w http.ResponseWriter) error
+}
+
+type CreatePlay201JSONResponse PlayLog
+
+func (response CreatePlay201JSONResponse) VisitCreatePlayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreatePlay404JSONResponse Error
+
+func (response CreatePlay404JSONResponse) VisitCreatePlayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreatePlay409JSONResponse Error
+
+func (response CreatePlay409JSONResponse) VisitCreatePlayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetActivePlayRequestObject struct {
+	Params GetActivePlayParams
+}
+
+type GetActivePlayResponseObject interface {
+	VisitGetActivePlayResponse(w http.ResponseWriter) error
+}
+
+type GetActivePlay200JSONResponse PlayLog
+
+func (response GetActivePlay200JSONResponse) VisitGetActivePlayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeletePlayRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeletePlayResponseObject interface {
+	VisitDeletePlayResponse(w http.ResponseWriter) error
+}
+
+type DeletePlay200JSONResponse Ok
+
+func (response DeletePlay200JSONResponse) VisitDeletePlayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeletePlay404JSONResponse Error
+
+func (response DeletePlay404JSONResponse) VisitDeletePlayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdatePlayRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdatePlayJSONRequestBody
+}
+
+type UpdatePlayResponseObject interface {
+	VisitUpdatePlayResponse(w http.ResponseWriter) error
+}
+
+type UpdatePlay200JSONResponse PlayLog
+
+func (response UpdatePlay200JSONResponse) VisitUpdatePlayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdatePlay404JSONResponse Error
+
+func (response UpdatePlay404JSONResponse) VisitUpdatePlayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdatePlay409JSONResponse Error
+
+func (response UpdatePlay409JSONResponse) VisitUpdatePlayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopPlayRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *StopPlayJSONRequestBody
+}
+
+type StopPlayResponseObject interface {
+	VisitStopPlayResponse(w http.ResponseWriter) error
+}
+
+type StopPlay200JSONResponse PlayLog
+
+func (response StopPlay200JSONResponse) VisitStopPlayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopPlay404JSONResponse Error
+
+func (response StopPlay404JSONResponse) VisitStopPlayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListPumpsRequestObject struct {
 	Params ListPumpsParams
 }
@@ -3642,6 +4055,24 @@ type StrictServerInterface interface {
 	// UpdateNote Partial update. `notes` may be sent as `null` to CLEAR it; `time` and `content` are not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
 	// (PATCH /api/notes/{id})
 	UpdateNote(ctx context.Context, request UpdateNoteRequestObject) (UpdateNoteResponseObject, error)
+	// ListPlays Play logs in the caller's active family, newest first (by startTime).
+	// (GET /api/play)
+	ListPlays(ctx context.Context, request ListPlaysRequestObject) (ListPlaysResponseObject, error)
+	// CreatePlay Create a play log. Omit endTime to start a running session; a baby can only have one running activity at a time — enforced by a partial unique index (see internal/api/play.go), not just the pre-check this endpoint also does. Free (no plan gate).
+	// (POST /api/play)
+	CreatePlay(ctx context.Context, request CreatePlayRequestObject) (CreatePlayResponseObject, error)
+	// GetActivePlay The running play session for a baby, or null.
+	// (GET /api/play/active)
+	GetActivePlay(ctx context.Context, request GetActivePlayRequestObject) (GetActivePlayResponseObject, error)
+	// DeletePlay Delete a play log.
+	// (DELETE /api/play/{id})
+	DeletePlay(ctx context.Context, request DeletePlayRequestObject) (DeletePlayResponseObject, error)
+	// UpdatePlay Partial update. `endTime` sent as `null` CLEARS it, reopening the session — subject to the same one-running-session-per-baby constraint as create, so this can also 409. `notes` may also be sent as `null` to clear it; `type`/`startTime` are not nullable — only settable or omitted. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
+	// (PATCH /api/play/{id})
+	UpdatePlay(ctx context.Context, request UpdatePlayRequestObject) (UpdatePlayResponseObject, error)
+	// StopPlay End the running session for a play log. endTime defaults to now.
+	// (POST /api/play/{id}/stop)
+	StopPlay(ctx context.Context, request StopPlayRequestObject) (StopPlayResponseObject, error)
 	// ListPumps Pump logs in the caller's active family, newest first.
 	// (GET /api/pumps)
 	ListPumps(ctx context.Context, request ListPumpsRequestObject) (ListPumpsResponseObject, error)
@@ -4781,6 +5212,184 @@ func (sh *strictHandler) UpdateNote(w http.ResponseWriter, r *http.Request, id I
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateNoteResponseObject); ok {
 		if err := validResponse.VisitUpdateNoteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListPlays operation middleware
+func (sh *strictHandler) ListPlays(w http.ResponseWriter, r *http.Request, params ListPlaysParams) {
+	var request ListPlaysRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPlays(ctx, request.(ListPlaysRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPlays")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPlaysResponseObject); ok {
+		if err := validResponse.VisitListPlaysResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreatePlay operation middleware
+func (sh *strictHandler) CreatePlay(w http.ResponseWriter, r *http.Request) {
+	var request CreatePlayRequestObject
+
+	var body CreatePlayJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreatePlay(ctx, request.(CreatePlayRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreatePlay")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreatePlayResponseObject); ok {
+		if err := validResponse.VisitCreatePlayResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetActivePlay operation middleware
+func (sh *strictHandler) GetActivePlay(w http.ResponseWriter, r *http.Request, params GetActivePlayParams) {
+	var request GetActivePlayRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetActivePlay(ctx, request.(GetActivePlayRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetActivePlay")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetActivePlayResponseObject); ok {
+		if err := validResponse.VisitGetActivePlayResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeletePlay operation middleware
+func (sh *strictHandler) DeletePlay(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeletePlayRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeletePlay(ctx, request.(DeletePlayRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeletePlay")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeletePlayResponseObject); ok {
+		if err := validResponse.VisitDeletePlayResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdatePlay operation middleware
+func (sh *strictHandler) UpdatePlay(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdatePlayRequestObject
+
+	request.Id = id
+
+	var body UpdatePlayJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdatePlay(ctx, request.(UpdatePlayRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdatePlay")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdatePlayResponseObject); ok {
+		if err := validResponse.VisitUpdatePlayResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StopPlay operation middleware
+func (sh *strictHandler) StopPlay(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request StopPlayRequestObject
+
+	request.Id = id
+
+	var body StopPlayJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StopPlay(ctx, request.(StopPlayRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StopPlay")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StopPlayResponseObject); ok {
+		if err := validResponse.VisitStopPlayResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

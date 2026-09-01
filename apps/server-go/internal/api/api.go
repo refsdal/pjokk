@@ -191,6 +191,16 @@ var operationAuthTiers = map[string]authTier{
 	"UpdateSleep":    tierFamily,
 	"DeleteSleep":    tierFamily,
 
+	// Play sessions (Task 13; REF §A1 play.ts). Structurally sleep's
+	// active-session lifecycle one table over; free (no plan gate — see
+	// internal/api/play.go's package doc comment).
+	"ListPlays":     tierFamily,
+	"CreatePlay":    tierFamily,
+	"GetActivePlay": tierFamily,
+	"StopPlay":      tierFamily,
+	"UpdatePlay":    tierFamily,
+	"DeletePlay":    tierFamily,
+
 	"GetSummary": tierFamily,
 
 	// The six Phase 3 activity types (Task 12; REF §A1 "other-logs.ts —

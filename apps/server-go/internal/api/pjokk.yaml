@@ -1228,6 +1228,158 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/play:
+    get:
+      operationId: listPlays
+      summary: Play logs in the caller's active family, newest first (by startTime).
+      tags: [play]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Play logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlayLog"
+    post:
+      operationId: createPlay
+      summary: >-
+        Create a play log. Omit endTime to start a running session; a baby
+        can only have one running activity at a time — enforced by a
+        partial unique index (see internal/api/play.go), not just the
+        pre-check this endpoint also does. Free (no plan gate).
+      tags: [play]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePlay"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Baby already has a running activity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/play/active:
+    get:
+      operationId: getActivePlay
+      summary: The running play session for a baby, or null.
+      tags: [play]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+      responses:
+        "200":
+          description: The running play session, or null.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PlayLog"
+                nullable: true
+  /api/play/{id}/stop:
+    post:
+      operationId: stopPlay
+      summary: End the running session for a play log. endTime defaults to now.
+      tags: [play]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StopPlay"
+      responses:
+        "200":
+          description: Session ended.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayLog"
+        "404":
+          description: No such running session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/play/{id}:
+    patch:
+      operationId: updatePlay
+      summary: >-
+        Partial update. `endTime` sent as `null` CLEARS it, reopening the
+        session — subject to the same one-running-session-per-baby
+        constraint as create, so this can also 409. `notes` may also be
+        sent as `null` to clear it; `type`/`startTime` are not nullable —
+        only settable or omitted. See internal/api/feeds.go for the
+        omitted-vs-null presence-detection pattern this endpoint needs.
+      tags: [play]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePlay"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayLog"
+        "404":
+          description: No play log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: >-
+            Clearing endTime would reopen a session while another is
+            already running for this baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deletePlay
+      summary: Delete a play log.
+      tags: [play]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No play log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/me:
     get:
       operationId: getMe
@@ -1702,10 +1854,9 @@ components:
     PlayLog:
       type: object
       description: >-
-        The Task 13 route surface (play.ts's port) isn't built yet; this
-        schema exists only so /api/summary's activePlay field has a
-        documented shape — the play_log table itself already exists in the
-        schema (Task 3).
+        Timed activities (tummy time, walks, free play) — same session shape
+        as SleepLog: startTime + nullable endTime, null meaning "still
+        running". Free (no plan gate).
       required:
         - id
         - babyId
@@ -1738,6 +1889,56 @@ components:
           format: date-time
           nullable: true
           description: null while the activity is running.
+    CreatePlay:
+      type: object
+      required: [babyId, type, startTime]
+      properties:
+        babyId:
+          type: string
+        type:
+          type: string
+          enum: [tummy, walk, play]
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+          description: Omit to start a running session.
+        notes:
+          type: string
+          maxLength: 2000
+    UpdatePlay:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `endTime` and
+        `notes` may also be sent as `null` to CLEAR that column — clearing
+        `endTime` reopens the session and can 409 if another session for
+        the same baby is already running (see internal/api/play.go).
+        `type`/`startTime` are not nullable — only settable or omitted.
+      properties:
+        type:
+          type: string
+          enum: [tummy, walk, play]
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          maxLength: 2000
+          nullable: true
+    StopPlay:
+      type: object
+      description: Defaults endTime to now on the server when omitted.
+      properties:
+        endTime:
+          type: string
+          format: date-time
     Summary:
       type: object
       required:

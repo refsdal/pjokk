@@ -167,8 +167,9 @@ func TestSummaryTzEdgeChangesTodaysWindow(t *testing.T) {
 	}
 }
 
-// activePlay reads play_log directly (Task 13's play.go doesn't exist yet)
-// — see internal/db/queries/summary.sql's GetActivePlay.
+// activePlay is backed by internal/db/queries/play.sql's ActivePlay; the
+// row is seeded by direct SQL here (rather than through POST /api/play) so
+// this test stays independent of play.go's own route tests.
 func TestSummaryActivePlayField(t *testing.T) {
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")

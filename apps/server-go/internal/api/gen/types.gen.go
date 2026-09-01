@@ -151,6 +151,27 @@ func (e CreateMedicineUnit) Valid() bool {
 	}
 }
 
+// Defines values for CreatePlayType.
+const (
+	CreatePlayTypePlay  CreatePlayType = "play"
+	CreatePlayTypeTummy CreatePlayType = "tummy"
+	CreatePlayTypeWalk  CreatePlayType = "walk"
+)
+
+// Valid indicates whether the value is a known member of the CreatePlayType enum.
+func (e CreatePlayType) Valid() bool {
+	switch e {
+	case CreatePlayTypePlay:
+		return true
+	case CreatePlayTypeTummy:
+		return true
+	case CreatePlayTypeWalk:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreatePumpSide.
 const (
 	CreatePumpSideBoth  CreatePumpSide = "both"
@@ -297,19 +318,19 @@ func (e OkOk) Valid() bool {
 
 // Defines values for PlayLogType.
 const (
-	Play  PlayLogType = "play"
-	Tummy PlayLogType = "tummy"
-	Walk  PlayLogType = "walk"
+	PlayLogTypePlay  PlayLogType = "play"
+	PlayLogTypeTummy PlayLogType = "tummy"
+	PlayLogTypeWalk  PlayLogType = "walk"
 )
 
 // Valid indicates whether the value is a known member of the PlayLogType enum.
 func (e PlayLogType) Valid() bool {
 	switch e {
-	case Play:
+	case PlayLogTypePlay:
 		return true
-	case Tummy:
+	case PlayLogTypeTummy:
 		return true
-	case Walk:
+	case PlayLogTypeWalk:
 		return true
 	default:
 		return false
@@ -475,6 +496,27 @@ func (e UpdateMedicineUnit) Valid() bool {
 	case UpdateMedicineUnitMg:
 		return true
 	case UpdateMedicineUnitMl:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdatePlayType.
+const (
+	UpdatePlayTypePlay  UpdatePlayType = "play"
+	UpdatePlayTypeTummy UpdatePlayType = "tummy"
+	UpdatePlayTypeWalk  UpdatePlayType = "walk"
+)
+
+// Valid indicates whether the value is a known member of the UpdatePlayType enum.
+func (e UpdatePlayType) Valid() bool {
+	switch e {
+	case UpdatePlayTypePlay:
+		return true
+	case UpdatePlayTypeTummy:
+		return true
+	case UpdatePlayTypeWalk:
 		return true
 	default:
 		return false
@@ -656,6 +698,20 @@ type CreateNote struct {
 	Time    time.Time `json:"time"`
 }
 
+// CreatePlay defines model for CreatePlay.
+type CreatePlay struct {
+	BabyId string `json:"babyId"`
+
+	// EndTime Omit to start a running session.
+	EndTime   *time.Time     `json:"endTime,omitempty"`
+	Notes     *string        `json:"notes,omitempty"`
+	StartTime time.Time      `json:"startTime"`
+	Type      CreatePlayType `json:"type"`
+}
+
+// CreatePlayType defines model for CreatePlay.Type.
+type CreatePlayType string
+
 // CreatePump defines model for CreatePump.
 type CreatePump struct {
 	AmountMl    *int32          `json:"amountMl,omitempty"`
@@ -828,7 +884,7 @@ type Ok struct {
 // OkOk defines model for Ok.Ok.
 type OkOk bool
 
-// PlayLog The Task 13 route surface (play.ts's port) isn't built yet; this schema exists only so /api/summary's activePlay field has a documented shape — the play_log table itself already exists in the schema (Task 3).
+// PlayLog Timed activities (tummy time, walks, free play) — same session shape as SleepLog: startTime + nullable endTime, null meaning "still running". Free (no plan gate).
 type PlayLog struct {
 	BabyId        string `json:"babyId"`
 	CaretakerId   string `json:"caretakerId"`
@@ -887,6 +943,11 @@ type SleepLog struct {
 	Location  *string    `json:"location"`
 	Notes     *string    `json:"notes"`
 	StartTime time.Time  `json:"startTime"`
+}
+
+// StopPlay Defaults endTime to now on the server when omitted.
+type StopPlay struct {
+	EndTime *time.Time `json:"endTime,omitempty"`
 }
 
 // Summary defines model for Summary.
@@ -988,6 +1049,17 @@ type UpdateNote struct {
 	Time    *time.Time `json:"time,omitempty"`
 }
 
+// UpdatePlay Every field is optional; an empty object is a no-op. `endTime` and `notes` may also be sent as `null` to CLEAR that column — clearing `endTime` reopens the session and can 409 if another session for the same baby is already running (see internal/api/play.go). `type`/`startTime` are not nullable — only settable or omitted.
+type UpdatePlay struct {
+	EndTime   *time.Time      `json:"endTime,omitempty"`
+	Notes     *string         `json:"notes,omitempty"`
+	StartTime *time.Time      `json:"startTime,omitempty"`
+	Type      *UpdatePlayType `json:"type,omitempty"`
+}
+
+// UpdatePlayType defines model for UpdatePlay.Type.
+type UpdatePlayType string
+
 // UpdatePump Every field is optional; an empty object is a no-op. `side`, `amountMl`, `durationMin` and `notes` may also be sent as `null` to CLEAR that column; `time` is not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
 type UpdatePump struct {
 	AmountMl    *int32          `json:"amountMl,omitempty"`
@@ -1088,6 +1160,21 @@ type ListNotesParams struct {
 	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// ListPlaysParams defines parameters for ListPlays.
+type ListPlaysParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+
+	// Limit Maximum number of rows to return.
+	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// GetActivePlayParams defines parameters for GetActivePlay.
+type GetActivePlayParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+}
+
 // ListPumpsParams defines parameters for ListPumps.
 type ListPumpsParams struct {
 	// BabyId Restrict the result to one baby in the caller's family.
@@ -1179,6 +1266,15 @@ type CreateNoteJSONRequestBody = CreateNote
 
 // UpdateNoteJSONRequestBody defines body for UpdateNote for application/json ContentType.
 type UpdateNoteJSONRequestBody = UpdateNote
+
+// CreatePlayJSONRequestBody defines body for CreatePlay for application/json ContentType.
+type CreatePlayJSONRequestBody = CreatePlay
+
+// UpdatePlayJSONRequestBody defines body for UpdatePlay for application/json ContentType.
+type UpdatePlayJSONRequestBody = UpdatePlay
+
+// StopPlayJSONRequestBody defines body for StopPlay for application/json ContentType.
+type StopPlayJSONRequestBody = StopPlay
 
 // CreatePumpJSONRequestBody defines body for CreatePump for application/json ContentType.
 type CreatePumpJSONRequestBody = CreatePump

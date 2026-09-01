@@ -77,13 +77,10 @@ type FeedsInRangeRow struct {
 }
 
 // Backs GET /api/summary (Task 11; REF §A1 sleep.ts's summary route). The
-// "last X" and "active sleep" halves of the payload reuse existing queries
-// (ListFeeds/ListDiapers with lim=1, sleep.sql's ActiveSleep/ListSleeps) —
-// see internal/api/summary.go — so this file only has the range queries the
-// `today` block needs plus GetActivePlay, which Task 11 needs ahead of
-// Task 13's play.go: play_log already exists (00001_init.sql), the routes
-// don't yet, so /api/summary reads the table directly rather than through a
-// play.go query helper that doesn't exist yet.
+// "last X"/"active X" halves of the payload reuse existing queries
+// (ListFeeds/ListDiapers with lim=1, sleep.sql's ActiveSleep/ListSleeps,
+// play.sql's ActivePlay since Task 13) — see internal/api/summary.go — so
+// this file only has the range queries the `today` block needs.
 // [from, to) — matches apps/api/src/db/scoped.ts's feedsInRange (gte/lt).
 // Named args (sqlc.arg(from_ts)/sqlc.arg(to_ts)) rather than positional $3/$4:
 // letting sqlc infer names from the compared COLUMN produced confusingly
@@ -113,54 +110,6 @@ func (q *Queries) FeedsInRange(ctx context.Context, arg FeedsInRangeParams) ([]F
 		return nil, err
 	}
 	return items, nil
-}
-
-const getActivePlay = `-- name: GetActivePlay :one
-SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
-    p."type", p."start_time", p."end_time", p."notes"
-FROM "play_log" p
-JOIN "users" u ON u."id" = p."caretaker_id"
-WHERE p."family_id" = $1
-  AND ($2::text IS NULL OR p."baby_id" = $2)
-  AND p."end_time" IS NULL
-ORDER BY p."start_time" DESC
-LIMIT 1
-`
-
-type GetActivePlayParams struct {
-	FamilyID string
-	BabyID   *string
-}
-
-type GetActivePlayRow struct {
-	ID            string
-	BabyID        string
-	CaretakerID   string
-	CaretakerName string
-	Type          string
-	StartTime     pgtype.Timestamptz
-	EndTime       pgtype.Timestamptz
-	Notes         *string
-}
-
-// The running activity (end_time IS NULL) for a baby, if any — see this
-// file's header for why summary reads play_log directly instead of going
-// through a play.go query that Task 13 hasn't written yet.
-func (q *Queries) GetActivePlay(ctx context.Context, arg GetActivePlayParams) (GetActivePlayRow, error) {
-	row := q.db.QueryRow(ctx, getActivePlay, arg.FamilyID, arg.BabyID)
-	var i GetActivePlayRow
-	err := row.Scan(
-		&i.ID,
-		&i.BabyID,
-		&i.CaretakerID,
-		&i.CaretakerName,
-		&i.Type,
-		&i.StartTime,
-		&i.EndTime,
-		&i.Notes,
-	)
-	return i, err
 }
 
 const sleepsInRange = `-- name: SleepsInRange :many

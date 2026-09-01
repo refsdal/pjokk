@@ -18,12 +18,11 @@ import (
 // alongside sleep in the TS source, but gets its own file here since it
 // touches feeds/diapers/sleep/play, not just sleep).
 //
-// lastFeed/lastDiaper/activeSleep/lastSleep are each a single-row read
-// reusing the SAME sqlc queries feeds.go/diapers.go/sleep.go already have
-// (ListFeeds/ListDiapers with lim=1, ActiveSleep, ListSleeps with lim=1)
-// rather than duplicating them. activePlay reads play_log directly via
-// queries/summary.sql's GetActivePlay because Task 13's play.go doesn't
-// exist yet — see that query's doc comment.
+// lastFeed/lastDiaper/activeSleep/lastSleep/activePlay are each a
+// single-row read reusing the SAME sqlc queries feeds.go/diapers.go/
+// sleep.go/play.go already have (ListFeeds/ListDiapers with lim=1,
+// ActiveSleep, ListSleeps with lim=1, ActivePlay) rather than duplicating
+// them.
 //
 // The `today` block's day-boundary math is ported EXACTLY from the TS
 // route, not reinvented — it is easy to get subtly wrong. The window is the
@@ -52,19 +51,6 @@ func floorDivInt64(a, b int64) int64 {
 		q--
 	}
 	return q
-}
-
-func serActivePlayRow(row dbgen.GetActivePlayRow) gen.PlayLog {
-	return gen.PlayLog{
-		Id:            row.ID,
-		BabyId:        row.BabyID,
-		CaretakerId:   row.CaretakerID,
-		CaretakerName: row.CaretakerName,
-		Notes:         row.Notes,
-		Type:          gen.PlayLogType(row.Type),
-		StartTime:     row.StartTime.Time,
-		EndTime:       tsPtr(row.EndTime),
-	}
 }
 
 // GetSummary implements GET /api/summary. REF: "{lastFeed, lastDiaper,
@@ -133,7 +119,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 	}
 
 	var activePlay *gen.PlayLog
-	if play, err := d.Q.GetActivePlay(ctx, dbgen.GetActivePlayParams{FamilyID: fam.FamilyID, BabyID: &babyID}); err == nil {
+	if play, err := d.Q.ActivePlay(ctx, dbgen.ActivePlayParams{FamilyID: fam.FamilyID, BabyID: &babyID}); err == nil {
 		v := serActivePlayRow(play)
 		activePlay = &v
 	} else if !errors.Is(err, pgx.ErrNoRows) {
