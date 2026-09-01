@@ -1269,3 +1269,22 @@ the usual reason: standard tools other developers already know, and less of
 our own release plumbing to maintain. Mise gained a task runner section
 (`mise run test|check|artifacts|image|snapshot`) — tasks always run with
 the pinned toolchain.
+
+## 2026-09-01 — CI restructure: merging is releasing, one suite definition
+
+release.yml now triggers on every push to main: releasable merges
+(feat/fix/perf/breaking per svu) tag and publish automatically; docs/chore
+merges end green without releasing; the dispatch remains only for dry_run
+and allow_major. The PR review is the release approval gate. The test
+suite moved into a reusable test.yml called by both ci.yml (PRs) and
+release.yml (main) — one definition, no drift, and a merged feature now
+runs the suite twice (PR head + merge commit) instead of three times, and
+builds artifacts twice instead of three. ci.yml is PR-only, gained a
+cancel-in-progress concurrency group and least-privilege permissions, and
+its preview tags became semver prereleases: <next>-pr.<n> (moves with the
+PR) and <next>-pr.<n>.<sha> (immutable), replacing -preview.<sha> and
+branch-<branch>. Accepted residual: the published image is GoReleaser's
+build while the smoke test runs on the PR's build-artifacts image — same
+Dockerfile, same base digest, same flags; the delta is version-stamping
+ldflags, and dockers_v2 pushes the manifest in the same buildx invocation,
+so pre-push smoking of the literal artifact is not possible.

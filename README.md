@@ -349,23 +349,28 @@ major. `--v0` keeps a breaking change bumping the minor while the major is
 0, so reaching 1.0 stays a decision (the Release workflow's `allow_major`
 input) rather than a side effect of a commit message.
 
-CI publishes a **preview** image for every branch and PR — after the smoke
-test passes, never before:
+CI publishes a **preview** image for every PR — after the smoke test
+passes, never before. Preview tags are semver prereleases of the release
+they precede, so they always sort below it:
 
 ```
-ghcr.io/refsdal/pjokk:<next-version>-preview.<sha>
-ghcr.io/refsdal/pjokk:branch-<branch>
+ghcr.io/refsdal/pjokk:<next-version>-pr.<number>          # moves with the PR
+ghcr.io/refsdal/pjokk:<next-version>-pr.<number>.<sha>    # immutable
 ```
 
-The **Release** workflow (manual dispatch, `dry_run` on by default) computes
-the version with svu, runs the full test suite, creates the tag, and hands
-everything downstream to [GoReleaser](https://goreleaser.com): binary
+**Merging to main is releasing:** every merge with releasable commits
+(`feat`/`fix`/`perf`/breaking since the last tag) computes the version with
+svu, re-runs the full test suite on the merge commit, creates the tag, and
+hands everything downstream to [GoReleaser](https://goreleaser.com): binary
 archives with checksums and SPDX SBOMs on a GitHub Release with a generated
 changelog, the multi-arch image (`:<version>`, `:latest`, `:sha-<sha>`), and
 keyless [cosign](https://github.com/sigstore/cosign) signatures over both.
 A failed publish deletes the tag again, so a tag never points at a release
-that does not exist. `mise run snapshot` runs the same pipeline locally with
-nothing pushed or signed.
+that does not exist. Docs/chore-only merges end green without releasing —
+nothing app-visible changed. The manual dispatch remains for two levers
+only: `dry_run` (the full pipeline as a snapshot, nothing pushed) and
+`allow_major` (1.0 stays a human decision). `mise run snapshot` runs the
+same pipeline locally.
 
 Images are multi-arch (`linux/amd64` + `linux/arm64`). Building one locally:
 
