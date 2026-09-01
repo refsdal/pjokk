@@ -4369,6 +4369,20 @@ func (response DeleteFamilyMember200JSONResponse) VisitDeleteFamilyMemberRespons
 	return err
 }
 
+type DeleteFamilyMember400JSONResponse Error
+
+func (response DeleteFamilyMember400JSONResponse) VisitDeleteFamilyMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type DeleteFamilyMember403JSONResponse Error
 
 func (response DeleteFamilyMember403JSONResponse) VisitDeleteFamilyMemberResponse(w http.ResponseWriter) error {
@@ -4416,6 +4430,20 @@ func (response SetFamilyMemberRole200JSONResponse) VisitSetFamilyMemberRoleRespo
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetFamilyMemberRole400JSONResponse Error
+
+func (response SetFamilyMemberRole400JSONResponse) VisitSetFamilyMemberRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -5957,6 +5985,20 @@ func (response CreateSleepLocation201JSONResponse) VisitCreateSleepLocationRespo
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSleepLocation400JSONResponse Error
+
+func (response CreateSleepLocation400JSONResponse) VisitCreateSleepLocationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
 	_, err := buf.WriteTo(w)
 	return err
 }

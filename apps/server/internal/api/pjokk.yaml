@@ -193,6 +193,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Ok"
+        "400":
+          description: Cannot remove the last admin.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "403":
           description: Family admin only.
           content:
@@ -225,6 +231,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Ok"
+        "400":
+          description: Cannot demote the last admin.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "403":
           description: Family admin only.
           content:
@@ -608,6 +620,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SleepLocation"
+        "400":
+          description: Name is empty once whitespace is trimmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "403":
           description: Family admin only, or an API key.
           content:

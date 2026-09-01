@@ -138,3 +138,26 @@ func TestSleepLocationsMemberDeleteForbiddenAdminDeleteRemovesUnknownIDIs404(t *
 		t.Fatalf("second DELETE status = %d, body %s, want 404", again.Status, again.Raw)
 	}
 }
+
+// A whitespace-only name passes spec validation (kin-openapi only bounds the
+// RAW body, ahead of any trimming) but must not insert an empty ""
+// location — CreateSleepLocation trims first, matching apps/api's
+// z.string().trim().min(1).max(40), and rejects the result with the same
+// 400 VALIDATION envelope api.go's own spec-validation failures use.
+func TestSleepLocationsRejectsWhitespaceOnlyName(t *testing.T) {
+	a := testrig.App(t)
+	_, cookie := a.NewFamily("Hansen", "parent@example.com")
+
+	res := a.Do(http.MethodPost, "/api/sleep-locations", cookie, map[string]any{"name": "   "})
+	if res.Status != http.StatusBadRequest {
+		t.Fatalf("status = %d, body %s, want 400", res.Status, res.Raw)
+	}
+	if res.JSON["error"] != "Invalid request" || res.JSON["code"] != "VALIDATION" {
+		t.Errorf("body = %v, want {error:\"Invalid request\",code:\"VALIDATION\"}", res.JSON)
+	}
+
+	list := a.DoArray(http.MethodGet, "/api/sleep-locations", cookie, nil)
+	if len(list.JSON) != 0 {
+		t.Errorf("list after rejected whitespace-only name = %v, want empty (nothing inserted)", list.JSON)
+	}
+}

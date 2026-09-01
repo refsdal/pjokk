@@ -14,10 +14,11 @@ import (
 // name of only whitespace fails validation there. openapi/pjokk.yaml's
 // CreateSleepLocation (minLength/maxLength) can only bound the RAW body
 // kin-openapi validates, not a trimmed derivative, so a whitespace-only name
-// passes spec validation here and is trimmed to "" below — untested by the
-// ported suite (apps/api/test never exercises that input) and accepted as a
-// minor, deliberate gap rather than adding a bespoke 400 response this
-// endpoint's spec doesn't otherwise need.
+// passes spec validation and reaches the handler still untrimmed.
+// CreateSleepLocation below trims FIRST and then re-checks length itself
+// (mirroring zod's trim-then-min order) rather than inserting a "" name —
+// the 400 VALIDATION envelope this returns matches api.go's own spec-
+// validation failures byte for byte.
 
 // This file ports apps/api/src/routes/sleep-locations.ts. Family-admin-only
 // writes AND the "not available to API keys" rejection are both handled
@@ -54,7 +55,8 @@ func (d Deps) ListSleepLocations(ctx context.Context, _ gen.ListSleepLocationsRe
 }
 
 // CreateSleepLocation implements POST /api/sleep-locations. REF: "{name
-// 1..40 trimmed} → 201; 409 DUPLICATE vs a default or existing custom name
+// 1..40 trimmed} → 201; 400 VALIDATION when the name is empty once
+// whitespace is trimmed; 409 DUPLICATE vs a default or existing custom name
 // (case-insensitive); 409 LIMIT_REACHED at 20 custom locations". Reached
 // only via tierAdmin (api.go), so the caller is already known to be a
 // family admin, not an API key.
@@ -64,6 +66,9 @@ func (d Deps) CreateSleepLocation(ctx context.Context, req gen.CreateSleepLocati
 		return nil, errNoRequestBody("CreateSleepLocation")
 	}
 	name := strings.TrimSpace(req.Body.Name)
+	if name == "" {
+		return gen.CreateSleepLocation400JSONResponse{Error: "Invalid request", Code: "VALIDATION"}, nil
+	}
 
 	existing, err := d.Q.ListSleepLocations(ctx, fam.FamilyID)
 	if err != nil {

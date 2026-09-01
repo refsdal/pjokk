@@ -330,3 +330,138 @@ func TestDeleteFamilyMemberUnknownMemberIs404(t *testing.T) {
 		t.Errorf("body = %v, want {error:\"Not found\",code:\"NOT_FOUND\"}", res.JSON)
 	}
 }
+
+// -----------------------------------------------------------------------
+// Last-admin guard — previously enforced only by the SPA, letting a direct
+// API call demote or remove a family's sole admin/owner and strand it with
+// no one able to manage settings, invites, or deletes. Both mutating
+// endpoints are reached only via RequireAdmin (see the doc comments above
+// DeleteFamilyMember/SetFamilyMemberRole), so the sole-admin scenario is
+// necessarily self-targeting; the two-admin scenario is one admin acting on
+// another.
+// -----------------------------------------------------------------------
+
+func soleAdminMemberID(t *testing.T, a *testrig.AppRig, cookie string) string {
+	t.Helper()
+	members := a.DoArray(http.MethodGet, "/api/family/members", cookie, nil)
+	if len(members.JSON) != 1 {
+		t.Fatalf("members = %v, want exactly 1 (the sole admin)", members.JSON)
+	}
+	id, _ := members.JSON[0].(map[string]any)["memberId"].(string)
+	if id == "" {
+		t.Fatalf("sole admin's memberId is empty: %v", members.JSON)
+	}
+	return id
+}
+
+func TestSetMemberRoleRefusesToDemoteTheSoleAdmin(t *testing.T) {
+	a := testrig.App(t)
+	_, cookie := a.NewFamily("Hansen", "parent@example.com")
+	adminMemberID := soleAdminMemberID(t, a, cookie)
+
+	res := a.Do(http.MethodPost, "/api/family/members/"+adminMemberID+"/role", cookie, map[string]any{"role": "member"})
+	if res.Status != http.StatusBadRequest {
+		t.Fatalf("self-demote status = %d, body %s, want 400", res.Status, res.Raw)
+	}
+	if res.JSON["error"] != "Cannot demote the last admin" || res.JSON["code"] != "LAST_ADMIN" {
+		t.Errorf("body = %v, want {error:\"Cannot demote the last admin\",code:\"LAST_ADMIN\"}", res.JSON)
+	}
+
+	members := a.DoArray(http.MethodGet, "/api/family/members", cookie, nil)
+	if role := members.JSON[0].(map[string]any)["role"]; role != "admin" {
+		t.Errorf("role after refused demotion = %v, want unchanged admin", role)
+	}
+}
+
+func TestDeleteFamilyMemberRefusesToRemoveTheSoleAdmin(t *testing.T) {
+	a := testrig.App(t)
+	_, cookie := a.NewFamily("Hansen", "parent@example.com")
+	adminMemberID := soleAdminMemberID(t, a, cookie)
+
+	res := a.Do(http.MethodDelete, "/api/family/members/"+adminMemberID, cookie, nil)
+	if res.Status != http.StatusBadRequest {
+		t.Fatalf("self-remove status = %d, body %s, want 400", res.Status, res.Raw)
+	}
+	if res.JSON["error"] != "Cannot remove the last admin" || res.JSON["code"] != "LAST_ADMIN" {
+		t.Errorf("body = %v, want {error:\"Cannot remove the last admin\",code:\"LAST_ADMIN\"}", res.JSON)
+	}
+
+	members := a.DoArray(http.MethodGet, "/api/family/members", cookie, nil)
+	if len(members.JSON) != 1 {
+		t.Errorf("members after refused removal = %v, want 1 (the sole admin still present)", members.JSON)
+	}
+}
+
+// twoAdmins seeds a second family member and promotes them to admin,
+// returning both members' ids (first is the family's original creator).
+func twoAdmins(t *testing.T, a *testrig.AppRig, familyID, adminCookie string) (originalAdminMemberID, promotedMemberID string) {
+	t.Helper()
+	otherID := a.SignUp("Co-parent", "co-parent@example.com")
+	_ = a.AddMember(familyID, otherID, auth.RoleMember, "co-parent@example.com")
+
+	members := a.DoArray(http.MethodGet, "/api/family/members", adminCookie, nil)
+	for _, row := range members.JSON {
+		m := row.(map[string]any)
+		if m["userId"] == otherID {
+			promotedMemberID, _ = m["memberId"].(string)
+		} else {
+			originalAdminMemberID, _ = m["memberId"].(string)
+		}
+	}
+	if originalAdminMemberID == "" || promotedMemberID == "" {
+		t.Fatalf("did not find both members in %v", members.JSON)
+	}
+
+	promote := a.Do(http.MethodPost, "/api/family/members/"+promotedMemberID+"/role", adminCookie, map[string]any{"role": "admin"})
+	if promote.Status != http.StatusOK || promote.JSON["ok"] != true {
+		t.Fatalf("promote status = %d body = %v, want 200 {ok:true}", promote.Status, promote.JSON)
+	}
+	return originalAdminMemberID, promotedMemberID
+}
+
+func TestSetMemberRoleAllowsDemotingANonLastAdmin(t *testing.T) {
+	a := testrig.App(t)
+	familyID, adminCookie := a.NewFamily("Hansen", "parent@example.com")
+	originalAdminMemberID, promotedMemberID := twoAdmins(t, a, familyID, adminCookie)
+
+	// Two admins: demoting one succeeds.
+	demoteFirst := a.Do(http.MethodPost, "/api/family/members/"+promotedMemberID+"/role", adminCookie, map[string]any{"role": "member"})
+	if demoteFirst.Status != http.StatusOK || demoteFirst.JSON["ok"] != true {
+		t.Fatalf("demote (2 admins) status = %d body = %v, want 200 {ok:true}", demoteFirst.Status, demoteFirst.JSON)
+	}
+
+	// Back to one admin: demoting the last one is refused.
+	demoteLast := a.Do(http.MethodPost, "/api/family/members/"+originalAdminMemberID+"/role", adminCookie, map[string]any{"role": "member"})
+	if demoteLast.Status != http.StatusBadRequest {
+		t.Fatalf("demote (1 admin left) status = %d, body %s, want 400", demoteLast.Status, demoteLast.Raw)
+	}
+	if demoteLast.JSON["error"] != "Cannot demote the last admin" || demoteLast.JSON["code"] != "LAST_ADMIN" {
+		t.Errorf("body = %v, want {error:\"Cannot demote the last admin\",code:\"LAST_ADMIN\"}", demoteLast.JSON)
+	}
+}
+
+func TestDeleteFamilyMemberAllowsRemovingANonLastAdmin(t *testing.T) {
+	a := testrig.App(t)
+	familyID, adminCookie := a.NewFamily("Hansen", "parent@example.com")
+	originalAdminMemberID, promotedMemberID := twoAdmins(t, a, familyID, adminCookie)
+
+	// Two admins: removing one succeeds.
+	removeFirst := a.Do(http.MethodDelete, "/api/family/members/"+promotedMemberID, adminCookie, nil)
+	if removeFirst.Status != http.StatusOK || removeFirst.JSON["ok"] != true {
+		t.Fatalf("remove (2 admins) status = %d body = %v, want 200 {ok:true}", removeFirst.Status, removeFirst.JSON)
+	}
+
+	// Back to one admin: removing the last one is refused.
+	removeLast := a.Do(http.MethodDelete, "/api/family/members/"+originalAdminMemberID, adminCookie, nil)
+	if removeLast.Status != http.StatusBadRequest {
+		t.Fatalf("remove (1 admin left) status = %d, body %s, want 400", removeLast.Status, removeLast.Raw)
+	}
+	if removeLast.JSON["error"] != "Cannot remove the last admin" || removeLast.JSON["code"] != "LAST_ADMIN" {
+		t.Errorf("body = %v, want {error:\"Cannot remove the last admin\",code:\"LAST_ADMIN\"}", removeLast.JSON)
+	}
+
+	membersAfter := a.DoArray(http.MethodGet, "/api/family/members", adminCookie, nil)
+	if len(membersAfter.JSON) != 1 {
+		t.Errorf("members after refused removal = %v, want 1 (the sole admin still present)", membersAfter.JSON)
+	}
+}

@@ -108,8 +108,8 @@ RUN mkdir -p /skel/data /skel/tmp
 # ---------- runtime ----------
 FROM scratch
 
-# Outbound TLS — Google OAuth, Stripe, S3, web push — verifies against this
-# one file. Without it every HTTPS call fails with "certificate signed by
+# Outbound TLS — Google OAuth, S3, web push — verifies against this one
+# file. Without it every HTTPS call fails with "certificate signed by
 # unknown authority" and nothing else in the image hints why.
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 

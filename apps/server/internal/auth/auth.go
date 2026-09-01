@@ -58,6 +58,20 @@ const (
 	RoleMember = "member"
 )
 
+// roleOwner mirrors middleware.roleOwner: Limen's organization plugin can
+// still assign its default "owner" role even though Pjokk's own creation
+// path always uses RoleAdmin (see New's WithCreatorRole) — accepted for
+// reading here too, same as middleware.RequireAdmin, so the last-admin
+// guard below treats an "owner" exactly like an "admin".
+const roleOwner = "owner"
+
+// isPrivilegedRole reports whether role is one of the two values that count
+// as "runs the family" for the last-admin guard (RemoveMember,
+// SetMemberRole): admin, or Limen's "owner".
+func isPrivilegedRole(role string) bool {
+	return role == RoleAdmin || role == roleOwner
+}
+
 // RoleSystemAdmin is the value of Session.Role that opens the /admin console.
 // It comes from our own users.role column and has nothing to do with the
 // family roles above.
@@ -78,6 +92,15 @@ var (
 	// the family it was addressed under — the tenancy guard for the two
 	// member-mutating methods.
 	ErrMemberNotInFamily = errors.New("auth: member does not belong to this family")
+	// ErrLastAdmin is returned by RemoveMember and SetMemberRole when the
+	// write would leave the family with no admin/owner at all: removing the
+	// sole admin, or demoting them to a plain member. It is a business-rule
+	// rejection depending on the family's current membership, not a tenancy
+	// or not-found failure — callers map it to a 400, never a 403/404. Only
+	// the SPA enforced this before; any direct API call (or a second admin
+	// acting on the first) could otherwise strand a family with a role no
+	// one holds.
+	ErrLastAdmin = errors.New("auth: cannot remove or demote the family's last admin")
 	// ErrEmailTaken is returned when an account already exists for an email.
 	ErrEmailTaken = errors.New("auth: an account already exists for this email")
 	// ErrNotFamilyMember is returned by SetActiveFamily when the session's
@@ -642,6 +665,19 @@ func (s *service) RemoveMember(ctx context.Context, familyID, memberID string) e
 			return fmt.Errorf("auth: load member: %w", err)
 		}
 
+		// Removing a non-admin never needs the count query at all — this
+		// short-circuits the common case (a parent removing a plain member)
+		// without an extra round trip.
+		if isPrivilegedRole(member.Role) {
+			admins, err := q.CountFamilyAdmins(ctx, familyID)
+			if err != nil {
+				return fmt.Errorf("auth: count family admins: %w", err)
+			}
+			if admins <= 1 {
+				return ErrLastAdmin
+			}
+		}
+
 		if err := q.ClearActiveFamilyForUser(ctx, gen.ClearActiveFamilyForUserParams{
 			ActiveOrganizationID: &familyID,
 			UserID:               member.UserID,
@@ -675,14 +711,28 @@ func (s *service) SetMemberRole(ctx context.Context, familyID, memberID, role st
 		return err
 	}
 	return s.inTx(ctx, func(q *gen.Queries) error {
-		if _, err := q.GetFamilyMember(ctx, gen.GetFamilyMemberParams{
+		member, err := q.GetFamilyMember(ctx, gen.GetFamilyMemberParams{
 			OrganizationID: familyID,
 			ID:             memberID,
-		}); err != nil {
+		})
+		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrMemberNotInFamily
 			}
 			return fmt.Errorf("auth: load member: %w", err)
+		}
+
+		// Only a change AWAY from admin is a demotion — re-setting an
+		// existing admin to "admin", or promoting a plain member, never
+		// shrinks the admin count, so neither needs the guard.
+		if isPrivilegedRole(member.Role) && role != RoleAdmin {
+			admins, err := q.CountFamilyAdmins(ctx, familyID)
+			if err != nil {
+				return fmt.Errorf("auth: count family admins: %w", err)
+			}
+			if admins <= 1 {
+				return ErrLastAdmin
+			}
 		}
 
 		if err := q.DeleteFamilyMemberRoles(ctx, gen.DeleteFamilyMemberRolesParams{

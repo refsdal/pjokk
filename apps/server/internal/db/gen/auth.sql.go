@@ -30,6 +30,36 @@ func (q *Queries) ClearActiveFamilyForUser(ctx context.Context, arg ClearActiveF
 	return err
 }
 
+const countFamilyAdmins = `-- name: CountFamilyAdmins :one
+SELECT COUNT(*)::int
+FROM "organization_members" om
+JOIN LATERAL (
+    SELECT omr."role"
+    FROM "organization_member_roles" omr
+    WHERE omr."member_id" = om."id"
+    ORDER BY CASE omr."role"
+        WHEN 'admin' THEN 0
+        WHEN 'owner' THEN 1
+        ELSE 2
+    END, omr."role"
+    LIMIT 1
+) r ON true
+WHERE om."organization_id" = $1 AND r."role" IN ('admin', 'owner')
+`
+
+// How many members in this family currently hold the admin/owner
+// privilege level (same CASE order as GetFamilyMember above). Backs the
+// last-admin guard in RemoveMember/SetMemberRole: removing or demoting the
+// sole admin/owner would leave a family that cannot manage its own
+// settings, invites, or deletes — a server-side mirror of the guard the
+// SPA already applies client-side.
+func (q *Queries) CountFamilyAdmins(ctx context.Context, organizationID string) (int32, error) {
+	row := q.db.QueryRow(ctx, countFamilyAdmins, organizationID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countFamilyMembership = `-- name: CountFamilyMembership :one
 SELECT COUNT(*)::int
 FROM "organization_members"
@@ -175,9 +205,24 @@ func (q *Queries) GetAuthSession(ctx context.Context, arg GetAuthSessionParams) 
 }
 
 const getFamilyMember = `-- name: GetFamilyMember :one
-SELECT "id", "organization_id", "user_id"
-FROM "organization_members"
-WHERE "organization_id" = $1 AND "id" = $2
+SELECT
+    om."id",
+    om."organization_id",
+    om."user_id",
+    COALESCE(r."role", '') AS role
+FROM "organization_members" om
+LEFT JOIN LATERAL (
+    SELECT omr."role"
+    FROM "organization_member_roles" omr
+    WHERE omr."member_id" = om."id"
+    ORDER BY CASE omr."role"
+        WHEN 'admin' THEN 0
+        WHEN 'owner' THEN 1
+        ELSE 2
+    END, omr."role"
+    LIMIT 1
+) r ON true
+WHERE om."organization_id" = $1 AND om."id" = $2
 `
 
 type GetFamilyMemberParams struct {
@@ -189,12 +234,25 @@ type GetFamilyMemberRow struct {
 	ID             string
 	OrganizationID string
 	UserID         string
+	Role           string
 }
 
+// The member's own most-privileged role rides along in the same row, via
+// the same explicit admin/owner/other CASE order GetFamilyMembershipRole
+// (middleware.sql) and ListFamilyMembers (family.sql) use rather than a
+// lexicographic sort. RemoveMember/SetMemberRole need it for the
+// last-admin guard (see CountFamilyAdmins below) and would otherwise cost
+// a second round trip just to learn whether the target member is even a
+// candidate for that check.
 func (q *Queries) GetFamilyMember(ctx context.Context, arg GetFamilyMemberParams) (GetFamilyMemberRow, error) {
 	row := q.db.QueryRow(ctx, getFamilyMember, arg.OrganizationID, arg.ID)
 	var i GetFamilyMemberRow
-	err := row.Scan(&i.ID, &i.OrganizationID, &i.UserID)
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.UserID,
+		&i.Role,
+	)
 	return i, err
 }
 

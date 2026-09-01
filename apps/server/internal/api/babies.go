@@ -250,12 +250,20 @@ func (d Deps) ListFamilyMembers(ctx context.Context, _ gen.ListFamilyMembersRequ
 // wrapper over auth.Service.RemoveMember, which already does the
 // membership-row lookup, session-detach and role-row/membership-row
 // deletes in one transaction (see internal/auth/auth.go's doc comment on
-// why it doesn't use Limen's actor-checked RemoveMember directly).
+// why it doesn't use Limen's actor-checked RemoveMember directly), and now
+// also the last-admin guard: previously only the SPA refused to let a
+// family remove its sole admin, so a direct API call (or curl) could
+// strand a family with no one able to manage it. RemoveMember returning
+// auth.ErrLastAdmin maps here to 400 LAST_ADMIN rather than the generic
+// 500 an unmapped error would produce.
 func (d Deps) DeleteFamilyMember(ctx context.Context, req gen.DeleteFamilyMemberRequestObject) (gen.DeleteFamilyMemberResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	if err := d.Auth.RemoveMember(ctx, fam.FamilyID, req.MemberId); err != nil {
 		if errors.Is(err, auth.ErrMemberNotInFamily) {
 			return gen.DeleteFamilyMember404JSONResponse(notFound()), nil
+		}
+		if errors.Is(err, auth.ErrLastAdmin) {
+			return gen.DeleteFamilyMember400JSONResponse{Error: "Cannot remove the last admin", Code: "LAST_ADMIN"}, nil
 		}
 		return nil, err
 	}
@@ -267,13 +275,18 @@ func (d Deps) DeleteFamilyMember(ctx context.Context, req gen.DeleteFamilyMember
 // requireAdmin; 404". The role's admin|member shape is already enforced by
 // spec validation before this method runs; auth.Service.SetMemberRole
 // re-validates it too (validRole), which is fine — defense in depth, not a
-// second source of truth.
+// second source of truth. Same last-admin guard as DeleteFamilyMember:
+// demoting the sole admin/owner to member maps auth.ErrLastAdmin to 400
+// LAST_ADMIN.
 func (d Deps) SetFamilyMemberRole(ctx context.Context, req gen.SetFamilyMemberRoleRequestObject) (gen.SetFamilyMemberRoleResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	role := string(req.Body.Role)
 	if err := d.Auth.SetMemberRole(ctx, fam.FamilyID, req.MemberId, role); err != nil {
 		if errors.Is(err, auth.ErrMemberNotInFamily) {
 			return gen.SetFamilyMemberRole404JSONResponse(notFound()), nil
+		}
+		if errors.Is(err, auth.ErrLastAdmin) {
+			return gen.SetFamilyMemberRole400JSONResponse{Error: "Cannot demote the last admin", Code: "LAST_ADMIN"}, nil
 		}
 		return nil, err
 	}
