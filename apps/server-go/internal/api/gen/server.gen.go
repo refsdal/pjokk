@@ -31,6 +31,18 @@ type ServerInterface interface {
 	// UpdateBaby Partial update. An empty body is a no-op that returns the baby unchanged.
 	// (PATCH /api/babies/{id})
 	UpdateBaby(w http.ResponseWriter, r *http.Request, id IdPath)
+	// ListBaths Bath logs in the caller's active family, newest first.
+	// (GET /api/baths)
+	ListBaths(w http.ResponseWriter, r *http.Request, params ListBathsParams)
+	// CreateBath Log a bath for a baby in the caller's active family.
+	// (POST /api/baths)
+	CreateBath(w http.ResponseWriter, r *http.Request)
+	// DeleteBath Delete a bath log.
+	// (DELETE /api/baths/{id})
+	DeleteBath(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdateBath Partial update. `notes` may be sent as `null` to CLEAR it; `time` is not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
+	// (PATCH /api/baths/{id})
+	UpdateBath(w http.ResponseWriter, r *http.Request, id IdPath)
 	// ListDiapers Diaper logs in the caller's active family, newest first.
 	// (GET /api/diapers)
 	ListDiapers(w http.ResponseWriter, r *http.Request, params ListDiapersParams)
@@ -70,6 +82,66 @@ type ServerInterface interface {
 	// GetMe Session info for the SPA shell. Requires a session but NOT an active family — the family/member/plan fields are null when the caller has none.
 	// (GET /api/me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// ListMeasurements Measurement logs in the caller's active family, newest first.
+	// (GET /api/measurements)
+	ListMeasurements(w http.ResponseWriter, r *http.Request, params ListMeasurementsParams)
+	// CreateMeasurement Log a measurement for a baby in the caller's active family.
+	// (POST /api/measurements)
+	CreateMeasurement(w http.ResponseWriter, r *http.Request)
+	// DeleteMeasurement Delete a measurement log.
+	// (DELETE /api/measurements/{id})
+	DeleteMeasurement(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdateMeasurement Partial update. `notes` may be sent as `null` to CLEAR it; `time`/`type`/`value` are not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
+	// (PATCH /api/measurements/{id})
+	UpdateMeasurement(w http.ResponseWriter, r *http.Request, id IdPath)
+	// ListMedicine Medicine logs in the caller's active family, newest first.
+	// (GET /api/medicine)
+	ListMedicine(w http.ResponseWriter, r *http.Request, params ListMedicineParams)
+	// CreateMedicine Log a medicine dose for a baby in the caller's active family.
+	// (POST /api/medicine)
+	CreateMedicine(w http.ResponseWriter, r *http.Request)
+	// DeleteMedicine Delete a medicine log.
+	// (DELETE /api/medicine/{id})
+	DeleteMedicine(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdateMedicine Partial update. `amount`, `unit` and `notes` may be sent as `null` to CLEAR that column; `time`/`name` are not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
+	// (PATCH /api/medicine/{id})
+	UpdateMedicine(w http.ResponseWriter, r *http.Request, id IdPath)
+	// ListMilestones Milestone logs in the caller's active family, newest first.
+	// (GET /api/milestones)
+	ListMilestones(w http.ResponseWriter, r *http.Request, params ListMilestonesParams)
+	// CreateMilestone Log a milestone for a baby in the caller's active family.
+	// (POST /api/milestones)
+	CreateMilestone(w http.ResponseWriter, r *http.Request)
+	// DeleteMilestone Delete a milestone log.
+	// (DELETE /api/milestones/{id})
+	DeleteMilestone(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdateMilestone Partial update. `notes` may be sent as `null` to CLEAR it; `time` and `title` are not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
+	// (PATCH /api/milestones/{id})
+	UpdateMilestone(w http.ResponseWriter, r *http.Request, id IdPath)
+	// ListNotes Note logs in the caller's active family, newest first.
+	// (GET /api/notes)
+	ListNotes(w http.ResponseWriter, r *http.Request, params ListNotesParams)
+	// CreateNote Log a note for a baby in the caller's active family.
+	// (POST /api/notes)
+	CreateNote(w http.ResponseWriter, r *http.Request)
+	// DeleteNote Delete a note log.
+	// (DELETE /api/notes/{id})
+	DeleteNote(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdateNote Partial update. `notes` may be sent as `null` to CLEAR it; `time` and `content` are not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
+	// (PATCH /api/notes/{id})
+	UpdateNote(w http.ResponseWriter, r *http.Request, id IdPath)
+	// ListPumps Pump logs in the caller's active family, newest first.
+	// (GET /api/pumps)
+	ListPumps(w http.ResponseWriter, r *http.Request, params ListPumpsParams)
+	// CreatePump Log a pumping session for a baby in the caller's active family.
+	// (POST /api/pumps)
+	CreatePump(w http.ResponseWriter, r *http.Request)
+	// DeletePump Delete a pump log.
+	// (DELETE /api/pumps/{id})
+	DeletePump(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdatePump Partial update. `side`, `amountMl`, `durationMin` and `notes` may be sent as `null` to CLEAR that column; `time` is not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
+	// (PATCH /api/pumps/{id})
+	UpdatePump(w http.ResponseWriter, r *http.Request, id IdPath)
 	// ListSleeps Sleep logs in the caller's active family, newest first (by startTime).
 	// (GET /api/sleep)
 	ListSleeps(w http.ResponseWriter, r *http.Request, params ListSleepsParams)
@@ -188,6 +260,118 @@ func (siw *ServerInterfaceWrapper) UpdateBaby(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateBaby(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListBaths operation middleware
+func (siw *ServerInterfaceWrapper) ListBaths(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListBathsParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListBaths(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateBath operation middleware
+func (siw *ServerInterfaceWrapper) CreateBath(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateBath(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteBath operation middleware
+func (siw *ServerInterfaceWrapper) DeleteBath(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteBath(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateBath operation middleware
+func (siw *ServerInterfaceWrapper) UpdateBath(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateBath(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -506,6 +690,566 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMeasurements operation middleware
+func (siw *ServerInterfaceWrapper) ListMeasurements(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMeasurementsParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMeasurements(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateMeasurement operation middleware
+func (siw *ServerInterfaceWrapper) CreateMeasurement(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateMeasurement(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteMeasurement operation middleware
+func (siw *ServerInterfaceWrapper) DeleteMeasurement(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteMeasurement(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateMeasurement operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMeasurement(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMeasurement(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMedicine operation middleware
+func (siw *ServerInterfaceWrapper) ListMedicine(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMedicineParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMedicine(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateMedicine operation middleware
+func (siw *ServerInterfaceWrapper) CreateMedicine(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateMedicine(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteMedicine operation middleware
+func (siw *ServerInterfaceWrapper) DeleteMedicine(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteMedicine(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateMedicine operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMedicine(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMedicine(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMilestones operation middleware
+func (siw *ServerInterfaceWrapper) ListMilestones(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMilestonesParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMilestones(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateMilestone operation middleware
+func (siw *ServerInterfaceWrapper) CreateMilestone(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateMilestone(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteMilestone operation middleware
+func (siw *ServerInterfaceWrapper) DeleteMilestone(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteMilestone(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateMilestone operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMilestone(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMilestone(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListNotes operation middleware
+func (siw *ServerInterfaceWrapper) ListNotes(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListNotesParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListNotes(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateNote operation middleware
+func (siw *ServerInterfaceWrapper) CreateNote(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateNote(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteNote operation middleware
+func (siw *ServerInterfaceWrapper) DeleteNote(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteNote(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateNote operation middleware
+func (siw *ServerInterfaceWrapper) UpdateNote(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateNote(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListPumps operation middleware
+func (siw *ServerInterfaceWrapper) ListPumps(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPumpsParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPumps(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreatePump operation middleware
+func (siw *ServerInterfaceWrapper) CreatePump(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreatePump(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeletePump operation middleware
+func (siw *ServerInterfaceWrapper) DeletePump(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeletePump(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdatePump operation middleware
+func (siw *ServerInterfaceWrapper) UpdatePump(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdatePump(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -962,6 +1706,30 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/sleep-locations", wrapper.CreateSleepLocation)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/sleep-locations/{id}", wrapper.DeleteSleepLocation)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/summary", wrapper.GetSummary)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/medicine", wrapper.ListMedicine)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/medicine", wrapper.CreateMedicine)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/medicine/{id}", wrapper.DeleteMedicine)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/medicine/{id}", wrapper.UpdateMedicine)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/baths", wrapper.ListBaths)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/baths", wrapper.CreateBath)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/baths/{id}", wrapper.DeleteBath)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/baths/{id}", wrapper.UpdateBath)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/notes", wrapper.ListNotes)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/notes", wrapper.CreateNote)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/notes/{id}", wrapper.DeleteNote)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/notes/{id}", wrapper.UpdateNote)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/milestones", wrapper.ListMilestones)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/milestones", wrapper.CreateMilestone)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/milestones/{id}", wrapper.DeleteMilestone)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/milestones/{id}", wrapper.UpdateMilestone)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/measurements", wrapper.ListMeasurements)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/measurements", wrapper.CreateMeasurement)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/measurements/{id}", wrapper.DeleteMeasurement)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/measurements/{id}", wrapper.UpdateMeasurement)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/pumps", wrapper.ListPumps)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/pumps", wrapper.CreatePump)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/pumps/{id}", wrapper.DeletePump)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/pumps/{id}", wrapper.UpdatePump)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/me", wrapper.GetMe)
 
 	return m
@@ -1086,6 +1854,137 @@ func (response UpdateBaby200JSONResponse) VisitUpdateBabyResponse(w http.Respons
 type UpdateBaby404JSONResponse Error
 
 func (response UpdateBaby404JSONResponse) VisitUpdateBabyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListBathsRequestObject struct {
+	Params ListBathsParams
+}
+
+type ListBathsResponseObject interface {
+	VisitListBathsResponse(w http.ResponseWriter) error
+}
+
+type ListBaths200JSONResponse []BathLog
+
+func (response ListBaths200JSONResponse) VisitListBathsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBathRequestObject struct {
+	Body *CreateBathJSONRequestBody
+}
+
+type CreateBathResponseObject interface {
+	VisitCreateBathResponse(w http.ResponseWriter) error
+}
+
+type CreateBath201JSONResponse BathLog
+
+func (response CreateBath201JSONResponse) VisitCreateBathResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBath404JSONResponse Error
+
+func (response CreateBath404JSONResponse) VisitCreateBathResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteBathRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteBathResponseObject interface {
+	VisitDeleteBathResponse(w http.ResponseWriter) error
+}
+
+type DeleteBath200JSONResponse Ok
+
+func (response DeleteBath200JSONResponse) VisitDeleteBathResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteBath404JSONResponse Error
+
+func (response DeleteBath404JSONResponse) VisitDeleteBathResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBathRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdateBathJSONRequestBody
+}
+
+type UpdateBathResponseObject interface {
+	VisitUpdateBathResponse(w http.ResponseWriter) error
+}
+
+type UpdateBath200JSONResponse BathLog
+
+func (response UpdateBath200JSONResponse) VisitUpdateBathResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBath404JSONResponse Error
+
+func (response UpdateBath404JSONResponse) VisitUpdateBathResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1533,6 +2432,661 @@ func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) e
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMeasurementsRequestObject struct {
+	Params ListMeasurementsParams
+}
+
+type ListMeasurementsResponseObject interface {
+	VisitListMeasurementsResponse(w http.ResponseWriter) error
+}
+
+type ListMeasurements200JSONResponse []MeasurementLog
+
+func (response ListMeasurements200JSONResponse) VisitListMeasurementsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateMeasurementRequestObject struct {
+	Body *CreateMeasurementJSONRequestBody
+}
+
+type CreateMeasurementResponseObject interface {
+	VisitCreateMeasurementResponse(w http.ResponseWriter) error
+}
+
+type CreateMeasurement201JSONResponse MeasurementLog
+
+func (response CreateMeasurement201JSONResponse) VisitCreateMeasurementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateMeasurement404JSONResponse Error
+
+func (response CreateMeasurement404JSONResponse) VisitCreateMeasurementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteMeasurementRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteMeasurementResponseObject interface {
+	VisitDeleteMeasurementResponse(w http.ResponseWriter) error
+}
+
+type DeleteMeasurement200JSONResponse Ok
+
+func (response DeleteMeasurement200JSONResponse) VisitDeleteMeasurementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteMeasurement404JSONResponse Error
+
+func (response DeleteMeasurement404JSONResponse) VisitDeleteMeasurementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMeasurementRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdateMeasurementJSONRequestBody
+}
+
+type UpdateMeasurementResponseObject interface {
+	VisitUpdateMeasurementResponse(w http.ResponseWriter) error
+}
+
+type UpdateMeasurement200JSONResponse MeasurementLog
+
+func (response UpdateMeasurement200JSONResponse) VisitUpdateMeasurementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMeasurement404JSONResponse Error
+
+func (response UpdateMeasurement404JSONResponse) VisitUpdateMeasurementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMedicineRequestObject struct {
+	Params ListMedicineParams
+}
+
+type ListMedicineResponseObject interface {
+	VisitListMedicineResponse(w http.ResponseWriter) error
+}
+
+type ListMedicine200JSONResponse []MedicineLog
+
+func (response ListMedicine200JSONResponse) VisitListMedicineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateMedicineRequestObject struct {
+	Body *CreateMedicineJSONRequestBody
+}
+
+type CreateMedicineResponseObject interface {
+	VisitCreateMedicineResponse(w http.ResponseWriter) error
+}
+
+type CreateMedicine201JSONResponse MedicineLog
+
+func (response CreateMedicine201JSONResponse) VisitCreateMedicineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateMedicine404JSONResponse Error
+
+func (response CreateMedicine404JSONResponse) VisitCreateMedicineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteMedicineRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteMedicineResponseObject interface {
+	VisitDeleteMedicineResponse(w http.ResponseWriter) error
+}
+
+type DeleteMedicine200JSONResponse Ok
+
+func (response DeleteMedicine200JSONResponse) VisitDeleteMedicineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteMedicine404JSONResponse Error
+
+func (response DeleteMedicine404JSONResponse) VisitDeleteMedicineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMedicineRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdateMedicineJSONRequestBody
+}
+
+type UpdateMedicineResponseObject interface {
+	VisitUpdateMedicineResponse(w http.ResponseWriter) error
+}
+
+type UpdateMedicine200JSONResponse MedicineLog
+
+func (response UpdateMedicine200JSONResponse) VisitUpdateMedicineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMedicine404JSONResponse Error
+
+func (response UpdateMedicine404JSONResponse) VisitUpdateMedicineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMilestonesRequestObject struct {
+	Params ListMilestonesParams
+}
+
+type ListMilestonesResponseObject interface {
+	VisitListMilestonesResponse(w http.ResponseWriter) error
+}
+
+type ListMilestones200JSONResponse []MilestoneLog
+
+func (response ListMilestones200JSONResponse) VisitListMilestonesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateMilestoneRequestObject struct {
+	Body *CreateMilestoneJSONRequestBody
+}
+
+type CreateMilestoneResponseObject interface {
+	VisitCreateMilestoneResponse(w http.ResponseWriter) error
+}
+
+type CreateMilestone201JSONResponse MilestoneLog
+
+func (response CreateMilestone201JSONResponse) VisitCreateMilestoneResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateMilestone404JSONResponse Error
+
+func (response CreateMilestone404JSONResponse) VisitCreateMilestoneResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteMilestoneRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteMilestoneResponseObject interface {
+	VisitDeleteMilestoneResponse(w http.ResponseWriter) error
+}
+
+type DeleteMilestone200JSONResponse Ok
+
+func (response DeleteMilestone200JSONResponse) VisitDeleteMilestoneResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteMilestone404JSONResponse Error
+
+func (response DeleteMilestone404JSONResponse) VisitDeleteMilestoneResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMilestoneRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdateMilestoneJSONRequestBody
+}
+
+type UpdateMilestoneResponseObject interface {
+	VisitUpdateMilestoneResponse(w http.ResponseWriter) error
+}
+
+type UpdateMilestone200JSONResponse MilestoneLog
+
+func (response UpdateMilestone200JSONResponse) VisitUpdateMilestoneResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMilestone404JSONResponse Error
+
+func (response UpdateMilestone404JSONResponse) VisitUpdateMilestoneResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNotesRequestObject struct {
+	Params ListNotesParams
+}
+
+type ListNotesResponseObject interface {
+	VisitListNotesResponse(w http.ResponseWriter) error
+}
+
+type ListNotes200JSONResponse []NoteLog
+
+func (response ListNotes200JSONResponse) VisitListNotesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateNoteRequestObject struct {
+	Body *CreateNoteJSONRequestBody
+}
+
+type CreateNoteResponseObject interface {
+	VisitCreateNoteResponse(w http.ResponseWriter) error
+}
+
+type CreateNote201JSONResponse NoteLog
+
+func (response CreateNote201JSONResponse) VisitCreateNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateNote404JSONResponse Error
+
+func (response CreateNote404JSONResponse) VisitCreateNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteNoteRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteNoteResponseObject interface {
+	VisitDeleteNoteResponse(w http.ResponseWriter) error
+}
+
+type DeleteNote200JSONResponse Ok
+
+func (response DeleteNote200JSONResponse) VisitDeleteNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteNote404JSONResponse Error
+
+func (response DeleteNote404JSONResponse) VisitDeleteNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNoteRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdateNoteJSONRequestBody
+}
+
+type UpdateNoteResponseObject interface {
+	VisitUpdateNoteResponse(w http.ResponseWriter) error
+}
+
+type UpdateNote200JSONResponse NoteLog
+
+func (response UpdateNote200JSONResponse) VisitUpdateNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateNote404JSONResponse Error
+
+func (response UpdateNote404JSONResponse) VisitUpdateNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPumpsRequestObject struct {
+	Params ListPumpsParams
+}
+
+type ListPumpsResponseObject interface {
+	VisitListPumpsResponse(w http.ResponseWriter) error
+}
+
+type ListPumps200JSONResponse []PumpLog
+
+func (response ListPumps200JSONResponse) VisitListPumpsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreatePumpRequestObject struct {
+	Body *CreatePumpJSONRequestBody
+}
+
+type CreatePumpResponseObject interface {
+	VisitCreatePumpResponse(w http.ResponseWriter) error
+}
+
+type CreatePump201JSONResponse PumpLog
+
+func (response CreatePump201JSONResponse) VisitCreatePumpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreatePump404JSONResponse Error
+
+func (response CreatePump404JSONResponse) VisitCreatePumpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeletePumpRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeletePumpResponseObject interface {
+	VisitDeletePumpResponse(w http.ResponseWriter) error
+}
+
+type DeletePump200JSONResponse Ok
+
+func (response DeletePump200JSONResponse) VisitDeletePumpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeletePump404JSONResponse Error
+
+func (response DeletePump404JSONResponse) VisitDeletePumpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdatePumpRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdatePumpJSONRequestBody
+}
+
+type UpdatePumpResponseObject interface {
+	VisitUpdatePumpResponse(w http.ResponseWriter) error
+}
+
+type UpdatePump200JSONResponse PumpLog
+
+func (response UpdatePump200JSONResponse) VisitUpdatePumpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdatePump404JSONResponse Error
+
+func (response UpdatePump404JSONResponse) VisitUpdatePumpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1989,6 +3543,18 @@ type StrictServerInterface interface {
 	// UpdateBaby Partial update. An empty body is a no-op that returns the baby unchanged.
 	// (PATCH /api/babies/{id})
 	UpdateBaby(ctx context.Context, request UpdateBabyRequestObject) (UpdateBabyResponseObject, error)
+	// ListBaths Bath logs in the caller's active family, newest first.
+	// (GET /api/baths)
+	ListBaths(ctx context.Context, request ListBathsRequestObject) (ListBathsResponseObject, error)
+	// CreateBath Log a bath for a baby in the caller's active family.
+	// (POST /api/baths)
+	CreateBath(ctx context.Context, request CreateBathRequestObject) (CreateBathResponseObject, error)
+	// DeleteBath Delete a bath log.
+	// (DELETE /api/baths/{id})
+	DeleteBath(ctx context.Context, request DeleteBathRequestObject) (DeleteBathResponseObject, error)
+	// UpdateBath Partial update. `notes` may be sent as `null` to CLEAR it; `time` is not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
+	// (PATCH /api/baths/{id})
+	UpdateBath(ctx context.Context, request UpdateBathRequestObject) (UpdateBathResponseObject, error)
 	// ListDiapers Diaper logs in the caller's active family, newest first.
 	// (GET /api/diapers)
 	ListDiapers(ctx context.Context, request ListDiapersRequestObject) (ListDiapersResponseObject, error)
@@ -2028,6 +3594,66 @@ type StrictServerInterface interface {
 	// GetMe Session info for the SPA shell. Requires a session but NOT an active family — the family/member/plan fields are null when the caller has none.
 	// (GET /api/me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// ListMeasurements Measurement logs in the caller's active family, newest first.
+	// (GET /api/measurements)
+	ListMeasurements(ctx context.Context, request ListMeasurementsRequestObject) (ListMeasurementsResponseObject, error)
+	// CreateMeasurement Log a measurement for a baby in the caller's active family.
+	// (POST /api/measurements)
+	CreateMeasurement(ctx context.Context, request CreateMeasurementRequestObject) (CreateMeasurementResponseObject, error)
+	// DeleteMeasurement Delete a measurement log.
+	// (DELETE /api/measurements/{id})
+	DeleteMeasurement(ctx context.Context, request DeleteMeasurementRequestObject) (DeleteMeasurementResponseObject, error)
+	// UpdateMeasurement Partial update. `notes` may be sent as `null` to CLEAR it; `time`/`type`/`value` are not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
+	// (PATCH /api/measurements/{id})
+	UpdateMeasurement(ctx context.Context, request UpdateMeasurementRequestObject) (UpdateMeasurementResponseObject, error)
+	// ListMedicine Medicine logs in the caller's active family, newest first.
+	// (GET /api/medicine)
+	ListMedicine(ctx context.Context, request ListMedicineRequestObject) (ListMedicineResponseObject, error)
+	// CreateMedicine Log a medicine dose for a baby in the caller's active family.
+	// (POST /api/medicine)
+	CreateMedicine(ctx context.Context, request CreateMedicineRequestObject) (CreateMedicineResponseObject, error)
+	// DeleteMedicine Delete a medicine log.
+	// (DELETE /api/medicine/{id})
+	DeleteMedicine(ctx context.Context, request DeleteMedicineRequestObject) (DeleteMedicineResponseObject, error)
+	// UpdateMedicine Partial update. `amount`, `unit` and `notes` may be sent as `null` to CLEAR that column; `time`/`name` are not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
+	// (PATCH /api/medicine/{id})
+	UpdateMedicine(ctx context.Context, request UpdateMedicineRequestObject) (UpdateMedicineResponseObject, error)
+	// ListMilestones Milestone logs in the caller's active family, newest first.
+	// (GET /api/milestones)
+	ListMilestones(ctx context.Context, request ListMilestonesRequestObject) (ListMilestonesResponseObject, error)
+	// CreateMilestone Log a milestone for a baby in the caller's active family.
+	// (POST /api/milestones)
+	CreateMilestone(ctx context.Context, request CreateMilestoneRequestObject) (CreateMilestoneResponseObject, error)
+	// DeleteMilestone Delete a milestone log.
+	// (DELETE /api/milestones/{id})
+	DeleteMilestone(ctx context.Context, request DeleteMilestoneRequestObject) (DeleteMilestoneResponseObject, error)
+	// UpdateMilestone Partial update. `notes` may be sent as `null` to CLEAR it; `time` and `title` are not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
+	// (PATCH /api/milestones/{id})
+	UpdateMilestone(ctx context.Context, request UpdateMilestoneRequestObject) (UpdateMilestoneResponseObject, error)
+	// ListNotes Note logs in the caller's active family, newest first.
+	// (GET /api/notes)
+	ListNotes(ctx context.Context, request ListNotesRequestObject) (ListNotesResponseObject, error)
+	// CreateNote Log a note for a baby in the caller's active family.
+	// (POST /api/notes)
+	CreateNote(ctx context.Context, request CreateNoteRequestObject) (CreateNoteResponseObject, error)
+	// DeleteNote Delete a note log.
+	// (DELETE /api/notes/{id})
+	DeleteNote(ctx context.Context, request DeleteNoteRequestObject) (DeleteNoteResponseObject, error)
+	// UpdateNote Partial update. `notes` may be sent as `null` to CLEAR it; `time` and `content` are not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
+	// (PATCH /api/notes/{id})
+	UpdateNote(ctx context.Context, request UpdateNoteRequestObject) (UpdateNoteResponseObject, error)
+	// ListPumps Pump logs in the caller's active family, newest first.
+	// (GET /api/pumps)
+	ListPumps(ctx context.Context, request ListPumpsRequestObject) (ListPumpsResponseObject, error)
+	// CreatePump Log a pumping session for a baby in the caller's active family.
+	// (POST /api/pumps)
+	CreatePump(ctx context.Context, request CreatePumpRequestObject) (CreatePumpResponseObject, error)
+	// DeletePump Delete a pump log.
+	// (DELETE /api/pumps/{id})
+	DeletePump(ctx context.Context, request DeletePumpRequestObject) (DeletePumpResponseObject, error)
+	// UpdatePump Partial update. `side`, `amountMl`, `durationMin` and `notes` may be sent as `null` to CLEAR that column; `time` is not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
+	// (PATCH /api/pumps/{id})
+	UpdatePump(ctx context.Context, request UpdatePumpRequestObject) (UpdatePumpResponseObject, error)
 	// ListSleeps Sleep logs in the caller's active family, newest first (by startTime).
 	// (GET /api/sleep)
 	ListSleeps(ctx context.Context, request ListSleepsRequestObject) (ListSleepsResponseObject, error)
@@ -2212,6 +3838,122 @@ func (sh *strictHandler) UpdateBaby(w http.ResponseWriter, r *http.Request, id I
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateBabyResponseObject); ok {
 		if err := validResponse.VisitUpdateBabyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListBaths operation middleware
+func (sh *strictHandler) ListBaths(w http.ResponseWriter, r *http.Request, params ListBathsParams) {
+	var request ListBathsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListBaths(ctx, request.(ListBathsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListBaths")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListBathsResponseObject); ok {
+		if err := validResponse.VisitListBathsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateBath operation middleware
+func (sh *strictHandler) CreateBath(w http.ResponseWriter, r *http.Request) {
+	var request CreateBathRequestObject
+
+	var body CreateBathJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateBath(ctx, request.(CreateBathRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateBath")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateBathResponseObject); ok {
+		if err := validResponse.VisitCreateBathResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteBath operation middleware
+func (sh *strictHandler) DeleteBath(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteBathRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteBath(ctx, request.(DeleteBathRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteBath")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteBathResponseObject); ok {
+		if err := validResponse.VisitDeleteBathResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateBath operation middleware
+func (sh *strictHandler) UpdateBath(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdateBathRequestObject
+
+	request.Id = id
+
+	var body UpdateBathJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateBath(ctx, request.(UpdateBathRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateBath")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateBathResponseObject); ok {
+		if err := validResponse.VisitUpdateBathResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2575,6 +4317,586 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMeasurements operation middleware
+func (sh *strictHandler) ListMeasurements(w http.ResponseWriter, r *http.Request, params ListMeasurementsParams) {
+	var request ListMeasurementsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMeasurements(ctx, request.(ListMeasurementsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMeasurements")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMeasurementsResponseObject); ok {
+		if err := validResponse.VisitListMeasurementsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateMeasurement operation middleware
+func (sh *strictHandler) CreateMeasurement(w http.ResponseWriter, r *http.Request) {
+	var request CreateMeasurementRequestObject
+
+	var body CreateMeasurementJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateMeasurement(ctx, request.(CreateMeasurementRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateMeasurement")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateMeasurementResponseObject); ok {
+		if err := validResponse.VisitCreateMeasurementResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteMeasurement operation middleware
+func (sh *strictHandler) DeleteMeasurement(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteMeasurementRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteMeasurement(ctx, request.(DeleteMeasurementRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteMeasurement")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteMeasurementResponseObject); ok {
+		if err := validResponse.VisitDeleteMeasurementResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateMeasurement operation middleware
+func (sh *strictHandler) UpdateMeasurement(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdateMeasurementRequestObject
+
+	request.Id = id
+
+	var body UpdateMeasurementJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateMeasurement(ctx, request.(UpdateMeasurementRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateMeasurement")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateMeasurementResponseObject); ok {
+		if err := validResponse.VisitUpdateMeasurementResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMedicine operation middleware
+func (sh *strictHandler) ListMedicine(w http.ResponseWriter, r *http.Request, params ListMedicineParams) {
+	var request ListMedicineRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMedicine(ctx, request.(ListMedicineRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMedicine")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMedicineResponseObject); ok {
+		if err := validResponse.VisitListMedicineResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateMedicine operation middleware
+func (sh *strictHandler) CreateMedicine(w http.ResponseWriter, r *http.Request) {
+	var request CreateMedicineRequestObject
+
+	var body CreateMedicineJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateMedicine(ctx, request.(CreateMedicineRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateMedicine")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateMedicineResponseObject); ok {
+		if err := validResponse.VisitCreateMedicineResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteMedicine operation middleware
+func (sh *strictHandler) DeleteMedicine(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteMedicineRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteMedicine(ctx, request.(DeleteMedicineRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteMedicine")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteMedicineResponseObject); ok {
+		if err := validResponse.VisitDeleteMedicineResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateMedicine operation middleware
+func (sh *strictHandler) UpdateMedicine(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdateMedicineRequestObject
+
+	request.Id = id
+
+	var body UpdateMedicineJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateMedicine(ctx, request.(UpdateMedicineRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateMedicine")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateMedicineResponseObject); ok {
+		if err := validResponse.VisitUpdateMedicineResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMilestones operation middleware
+func (sh *strictHandler) ListMilestones(w http.ResponseWriter, r *http.Request, params ListMilestonesParams) {
+	var request ListMilestonesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMilestones(ctx, request.(ListMilestonesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMilestones")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMilestonesResponseObject); ok {
+		if err := validResponse.VisitListMilestonesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateMilestone operation middleware
+func (sh *strictHandler) CreateMilestone(w http.ResponseWriter, r *http.Request) {
+	var request CreateMilestoneRequestObject
+
+	var body CreateMilestoneJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateMilestone(ctx, request.(CreateMilestoneRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateMilestone")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateMilestoneResponseObject); ok {
+		if err := validResponse.VisitCreateMilestoneResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteMilestone operation middleware
+func (sh *strictHandler) DeleteMilestone(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteMilestoneRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteMilestone(ctx, request.(DeleteMilestoneRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteMilestone")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteMilestoneResponseObject); ok {
+		if err := validResponse.VisitDeleteMilestoneResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateMilestone operation middleware
+func (sh *strictHandler) UpdateMilestone(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdateMilestoneRequestObject
+
+	request.Id = id
+
+	var body UpdateMilestoneJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateMilestone(ctx, request.(UpdateMilestoneRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateMilestone")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateMilestoneResponseObject); ok {
+		if err := validResponse.VisitUpdateMilestoneResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListNotes operation middleware
+func (sh *strictHandler) ListNotes(w http.ResponseWriter, r *http.Request, params ListNotesParams) {
+	var request ListNotesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListNotes(ctx, request.(ListNotesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListNotes")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListNotesResponseObject); ok {
+		if err := validResponse.VisitListNotesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateNote operation middleware
+func (sh *strictHandler) CreateNote(w http.ResponseWriter, r *http.Request) {
+	var request CreateNoteRequestObject
+
+	var body CreateNoteJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateNote(ctx, request.(CreateNoteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateNote")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateNoteResponseObject); ok {
+		if err := validResponse.VisitCreateNoteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteNote operation middleware
+func (sh *strictHandler) DeleteNote(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteNoteRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteNote(ctx, request.(DeleteNoteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteNote")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteNoteResponseObject); ok {
+		if err := validResponse.VisitDeleteNoteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateNote operation middleware
+func (sh *strictHandler) UpdateNote(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdateNoteRequestObject
+
+	request.Id = id
+
+	var body UpdateNoteJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateNote(ctx, request.(UpdateNoteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateNote")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateNoteResponseObject); ok {
+		if err := validResponse.VisitUpdateNoteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListPumps operation middleware
+func (sh *strictHandler) ListPumps(w http.ResponseWriter, r *http.Request, params ListPumpsParams) {
+	var request ListPumpsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPumps(ctx, request.(ListPumpsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPumps")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPumpsResponseObject); ok {
+		if err := validResponse.VisitListPumpsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreatePump operation middleware
+func (sh *strictHandler) CreatePump(w http.ResponseWriter, r *http.Request) {
+	var request CreatePumpRequestObject
+
+	var body CreatePumpJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreatePump(ctx, request.(CreatePumpRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreatePump")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreatePumpResponseObject); ok {
+		if err := validResponse.VisitCreatePumpResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeletePump operation middleware
+func (sh *strictHandler) DeletePump(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeletePumpRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeletePump(ctx, request.(DeletePumpRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeletePump")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeletePumpResponseObject); ok {
+		if err := validResponse.VisitDeletePumpResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdatePump operation middleware
+func (sh *strictHandler) UpdatePump(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdatePumpRequestObject
+
+	request.Id = id
+
+	var body UpdatePumpJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdatePump(ctx, request.(UpdatePumpRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdatePump")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdatePumpResponseObject); ok {
+		if err := validResponse.VisitUpdatePumpResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -193,6 +193,35 @@ var operationAuthTiers = map[string]authTier{
 
 	"GetSummary": tierFamily,
 
+	// The six Phase 3 activity types (Task 12; REF §A1 "other-logs.ts —
+	// makeLogRoutes factory"). All 24 operations are tierFamily: every kind
+	// is free (no plan gate) and every operation is ordinary family-scoped
+	// CRUD, unlike sleep-locations' admin-only writes.
+	"ListMedicine":      tierFamily,
+	"CreateMedicine":    tierFamily,
+	"UpdateMedicine":    tierFamily,
+	"DeleteMedicine":    tierFamily,
+	"ListBaths":         tierFamily,
+	"CreateBath":        tierFamily,
+	"UpdateBath":        tierFamily,
+	"DeleteBath":        tierFamily,
+	"ListNotes":         tierFamily,
+	"CreateNote":        tierFamily,
+	"UpdateNote":        tierFamily,
+	"DeleteNote":        tierFamily,
+	"ListMilestones":    tierFamily,
+	"CreateMilestone":   tierFamily,
+	"UpdateMilestone":   tierFamily,
+	"DeleteMilestone":   tierFamily,
+	"ListMeasurements":  tierFamily,
+	"CreateMeasurement": tierFamily,
+	"UpdateMeasurement": tierFamily,
+	"DeleteMeasurement": tierFamily,
+	"ListPumps":         tierFamily,
+	"CreatePump":        tierFamily,
+	"UpdatePump":        tierFamily,
+	"DeletePump":        tierFamily,
+
 	// ListSleepLocations is a plain family-scoped read; Create/Delete are
 	// family-admin-only AND rejected for API keys (REF §A1
 	// sleep-locations.ts). middleware.RequireAdmin already answers both

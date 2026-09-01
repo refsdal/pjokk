@@ -687,6 +687,547 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/medicine:
+    get:
+      operationId: listMedicine
+      summary: Medicine logs in the caller's active family, newest first.
+      tags: [medicine]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Medicine logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MedicineLog"
+    post:
+      operationId: createMedicine
+      summary: Log a medicine dose for a baby in the caller's active family.
+      tags: [medicine]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMedicine"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicineLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/medicine/{id}:
+    patch:
+      operationId: updateMedicine
+      summary: >-
+        Partial update. `amount`, `unit` and `notes` may be sent as `null`
+        to CLEAR that column; `time`/`name` are not nullable — only settable
+        or omitted. An empty body is a no-op. See internal/api/feeds.go for
+        the omitted-vs-null presence-detection pattern this endpoint needs.
+      tags: [medicine]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMedicine"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicineLog"
+        "404":
+          description: No medicine log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteMedicine
+      summary: Delete a medicine log.
+      tags: [medicine]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No medicine log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/baths:
+    get:
+      operationId: listBaths
+      summary: Bath logs in the caller's active family, newest first.
+      tags: [baths]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Bath logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BathLog"
+    post:
+      operationId: createBath
+      summary: Log a bath for a baby in the caller's active family.
+      tags: [baths]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBath"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BathLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/baths/{id}:
+    patch:
+      operationId: updateBath
+      summary: >-
+        Partial update. `notes` may be sent as `null` to CLEAR it; `time`
+        is not nullable — only settable or omitted. An empty body is a
+        no-op. See internal/api/feeds.go for the omitted-vs-null
+        presence-detection pattern this endpoint needs.
+      tags: [baths]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBath"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BathLog"
+        "404":
+          description: No bath log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteBath
+      summary: Delete a bath log.
+      tags: [baths]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No bath log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/notes:
+    get:
+      operationId: listNotes
+      summary: Note logs in the caller's active family, newest first.
+      tags: [notes]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Note logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NoteLog"
+    post:
+      operationId: createNote
+      summary: Log a note for a baby in the caller's active family.
+      tags: [notes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNote"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoteLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/notes/{id}:
+    patch:
+      operationId: updateNote
+      summary: >-
+        Partial update. `notes` may be sent as `null` to CLEAR it; `time`
+        and `content` are not nullable — only settable or omitted. An empty
+        body is a no-op. See internal/api/feeds.go for the omitted-vs-null
+        presence-detection pattern this endpoint needs.
+      tags: [notes]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNote"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoteLog"
+        "404":
+          description: No note log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteNote
+      summary: Delete a note log.
+      tags: [notes]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No note log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/milestones:
+    get:
+      operationId: listMilestones
+      summary: Milestone logs in the caller's active family, newest first.
+      tags: [milestones]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Milestone logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MilestoneLog"
+    post:
+      operationId: createMilestone
+      summary: Log a milestone for a baby in the caller's active family.
+      tags: [milestones]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMilestone"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MilestoneLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/milestones/{id}:
+    patch:
+      operationId: updateMilestone
+      summary: >-
+        Partial update. `notes` may be sent as `null` to CLEAR it; `time`
+        and `title` are not nullable — only settable or omitted. An empty
+        body is a no-op. See internal/api/feeds.go for the omitted-vs-null
+        presence-detection pattern this endpoint needs.
+      tags: [milestones]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMilestone"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MilestoneLog"
+        "404":
+          description: No milestone log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteMilestone
+      summary: Delete a milestone log.
+      tags: [milestones]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No milestone log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/measurements:
+    get:
+      operationId: listMeasurements
+      summary: Measurement logs in the caller's active family, newest first.
+      tags: [measurements]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Measurement logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MeasurementLog"
+    post:
+      operationId: createMeasurement
+      summary: Log a measurement for a baby in the caller's active family.
+      tags: [measurements]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMeasurement"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeasurementLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/measurements/{id}:
+    patch:
+      operationId: updateMeasurement
+      summary: >-
+        Partial update. `notes` may be sent as `null` to CLEAR it;
+        `time`/`type`/`value` are not nullable — only settable or omitted.
+        An empty body is a no-op. See internal/api/feeds.go for the
+        omitted-vs-null presence-detection pattern this endpoint needs.
+      tags: [measurements]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMeasurement"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeasurementLog"
+        "404":
+          description: No measurement log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteMeasurement
+      summary: Delete a measurement log.
+      tags: [measurements]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No measurement log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/pumps:
+    get:
+      operationId: listPumps
+      summary: Pump logs in the caller's active family, newest first.
+      tags: [pumps]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Pump logs, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PumpLog"
+    post:
+      operationId: createPump
+      summary: Log a pumping session for a baby in the caller's active family.
+      tags: [pumps]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePump"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PumpLog"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/pumps/{id}:
+    patch:
+      operationId: updatePump
+      summary: >-
+        Partial update. `side`, `amountMl`, `durationMin` and `notes` may
+        be sent as `null` to CLEAR that column; `time` is not nullable —
+        only settable or omitted. An empty body is a no-op. See
+        internal/api/feeds.go for the omitted-vs-null presence-detection
+        pattern this endpoint needs.
+      tags: [pumps]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePump"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PumpLog"
+        "404":
+          description: No pump log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deletePump
+      summary: Delete a pump log.
+      tags: [pumps]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No pump log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/me:
     get:
       operationId: getMe
@@ -1252,6 +1793,421 @@ components:
             sleepMin:
               type: integer
               format: int32
+    MedicineLog:
+      type: object
+      required:
+        - id
+        - babyId
+        - caretakerId
+        - caretakerName
+        - notes
+        - time
+        - name
+        - amount
+        - unit
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
+        name:
+          type: string
+        amount:
+          type: number
+          format: double
+          nullable: true
+        unit:
+          type: string
+          enum: [ml, mg, drops, dose]
+          nullable: true
+    CreateMedicine:
+      type: object
+      required: [babyId, time, name]
+      properties:
+        babyId:
+          type: string
+        time:
+          type: string
+          format: date-time
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        amount:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1000
+        unit:
+          type: string
+          enum: [ml, mg, drops, dose]
+        notes:
+          type: string
+          maxLength: 1000
+    UpdateMedicine:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `amount`,
+        `unit` and `notes` may also be sent as `null` to CLEAR that column;
+        `time`/`name` are not nullable — only settable or omitted (see
+        internal/api/feeds.go for the omitted-vs-null presence-detection
+        pattern this endpoint needs).
+      properties:
+        time:
+          type: string
+          format: date-time
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        amount:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1000
+          nullable: true
+        unit:
+          type: string
+          enum: [ml, mg, drops, dose]
+          nullable: true
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+    BathLog:
+      type: object
+      required: [id, babyId, caretakerId, caretakerName, notes, time]
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
+    CreateBath:
+      type: object
+      required: [babyId, time]
+      properties:
+        babyId:
+          type: string
+        time:
+          type: string
+          format: date-time
+        notes:
+          type: string
+          maxLength: 1000
+    UpdateBath:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `notes` may
+        also be sent as `null` to CLEAR it; `time` is not nullable — only
+        settable or omitted (see internal/api/feeds.go for the
+        omitted-vs-null presence-detection pattern this endpoint needs).
+      properties:
+        time:
+          type: string
+          format: date-time
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+    NoteLog:
+      type: object
+      required:
+        [id, babyId, caretakerId, caretakerName, notes, time, content]
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
+        content:
+          type: string
+    CreateNote:
+      type: object
+      required: [babyId, time, content]
+      properties:
+        babyId:
+          type: string
+        time:
+          type: string
+          format: date-time
+        content:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        notes:
+          type: string
+          maxLength: 1000
+    UpdateNote:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `notes` may
+        also be sent as `null` to CLEAR it; `time`/`content` are not
+        nullable — only settable or omitted (see internal/api/feeds.go for
+        the omitted-vs-null presence-detection pattern this endpoint
+        needs).
+      properties:
+        time:
+          type: string
+          format: date-time
+        content:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+    MilestoneLog:
+      type: object
+      required:
+        [id, babyId, caretakerId, caretakerName, notes, time, title]
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
+        title:
+          type: string
+    CreateMilestone:
+      type: object
+      required: [babyId, time, title]
+      properties:
+        babyId:
+          type: string
+        time:
+          type: string
+          format: date-time
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        notes:
+          type: string
+          maxLength: 1000
+    UpdateMilestone:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `notes` may
+        also be sent as `null` to CLEAR it; `time`/`title` are not
+        nullable — only settable or omitted (see internal/api/feeds.go for
+        the omitted-vs-null presence-detection pattern this endpoint
+        needs).
+      properties:
+        time:
+          type: string
+          format: date-time
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+    MeasurementLog:
+      type: object
+      required:
+        [id, babyId, caretakerId, caretakerName, notes, time, type, value]
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [weight, length, head]
+        value:
+          type: number
+          format: double
+    CreateMeasurement:
+      type: object
+      required: [babyId, time, type, value]
+      properties:
+        babyId:
+          type: string
+        time:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [weight, length, head]
+        value:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 200
+        notes:
+          type: string
+          maxLength: 1000
+    UpdateMeasurement:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `notes` may
+        also be sent as `null` to CLEAR it; `time`/`type`/`value` are not
+        nullable — only settable or omitted (see internal/api/feeds.go for
+        the omitted-vs-null presence-detection pattern this endpoint
+        needs).
+      properties:
+        time:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [weight, length, head]
+        value:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 200
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+    PumpLog:
+      type: object
+      required:
+        - id
+        - babyId
+        - caretakerId
+        - caretakerName
+        - notes
+        - time
+        - side
+        - amountMl
+        - durationMin
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
+        side:
+          type: string
+          enum: [left, right, both]
+          nullable: true
+        amountMl:
+          type: integer
+          format: int32
+          nullable: true
+        durationMin:
+          type: integer
+          format: int32
+          nullable: true
+    CreatePump:
+      type: object
+      required: [babyId, time]
+      properties:
+        babyId:
+          type: string
+        time:
+          type: string
+          format: date-time
+        side:
+          type: string
+          enum: [left, right, both]
+        amountMl:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+        durationMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+        notes:
+          type: string
+          maxLength: 1000
+    UpdatePump:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `side`,
+        `amountMl`, `durationMin` and `notes` may also be sent as `null`
+        to CLEAR that column; `time` is not nullable — only settable or
+        omitted (see internal/api/feeds.go for the omitted-vs-null
+        presence-detection pattern this endpoint needs).
+      properties:
+        time:
+          type: string
+          format: date-time
+        side:
+          type: string
+          enum: [left, right, both]
+          nullable: true
+        amountMl:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+          nullable: true
+        durationMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+          nullable: true
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
     Error:
       type: object
       description: >-

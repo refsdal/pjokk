@@ -106,6 +106,72 @@ func (e CreateFeedType) Valid() bool {
 	}
 }
 
+// Defines values for CreateMeasurementType.
+const (
+	CreateMeasurementTypeHead   CreateMeasurementType = "head"
+	CreateMeasurementTypeLength CreateMeasurementType = "length"
+	CreateMeasurementTypeWeight CreateMeasurementType = "weight"
+)
+
+// Valid indicates whether the value is a known member of the CreateMeasurementType enum.
+func (e CreateMeasurementType) Valid() bool {
+	switch e {
+	case CreateMeasurementTypeHead:
+		return true
+	case CreateMeasurementTypeLength:
+		return true
+	case CreateMeasurementTypeWeight:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateMedicineUnit.
+const (
+	CreateMedicineUnitDose  CreateMedicineUnit = "dose"
+	CreateMedicineUnitDrops CreateMedicineUnit = "drops"
+	CreateMedicineUnitMg    CreateMedicineUnit = "mg"
+	CreateMedicineUnitMl    CreateMedicineUnit = "ml"
+)
+
+// Valid indicates whether the value is a known member of the CreateMedicineUnit enum.
+func (e CreateMedicineUnit) Valid() bool {
+	switch e {
+	case CreateMedicineUnitDose:
+		return true
+	case CreateMedicineUnitDrops:
+		return true
+	case CreateMedicineUnitMg:
+		return true
+	case CreateMedicineUnitMl:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreatePumpSide.
+const (
+	CreatePumpSideBoth  CreatePumpSide = "both"
+	CreatePumpSideLeft  CreatePumpSide = "left"
+	CreatePumpSideRight CreatePumpSide = "right"
+)
+
+// Valid indicates whether the value is a known member of the CreatePumpSide enum.
+func (e CreatePumpSide) Valid() bool {
+	switch e {
+	case CreatePumpSideBoth:
+		return true
+	case CreatePumpSideLeft:
+		return true
+	case CreatePumpSideRight:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DiaperLogType.
 const (
 	DiaperLogTypeBoth  DiaperLogType = "both"
@@ -169,6 +235,51 @@ func (e FeedLogType) Valid() bool {
 	}
 }
 
+// Defines values for MeasurementLogType.
+const (
+	MeasurementLogTypeHead   MeasurementLogType = "head"
+	MeasurementLogTypeLength MeasurementLogType = "length"
+	MeasurementLogTypeWeight MeasurementLogType = "weight"
+)
+
+// Valid indicates whether the value is a known member of the MeasurementLogType enum.
+func (e MeasurementLogType) Valid() bool {
+	switch e {
+	case MeasurementLogTypeHead:
+		return true
+	case MeasurementLogTypeLength:
+		return true
+	case MeasurementLogTypeWeight:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MedicineLogUnit.
+const (
+	MedicineLogUnitDose  MedicineLogUnit = "dose"
+	MedicineLogUnitDrops MedicineLogUnit = "drops"
+	MedicineLogUnitMg    MedicineLogUnit = "mg"
+	MedicineLogUnitMl    MedicineLogUnit = "ml"
+)
+
+// Valid indicates whether the value is a known member of the MedicineLogUnit enum.
+func (e MedicineLogUnit) Valid() bool {
+	switch e {
+	case MedicineLogUnitDose:
+		return true
+	case MedicineLogUnitDrops:
+		return true
+	case MedicineLogUnitMg:
+		return true
+	case MedicineLogUnitMl:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OkOk.
 const (
 	OkOkTrue OkOk = true
@@ -199,6 +310,27 @@ func (e PlayLogType) Valid() bool {
 	case Tummy:
 		return true
 	case Walk:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PumpLogSide.
+const (
+	PumpLogSideBoth  PumpLogSide = "both"
+	PumpLogSideLeft  PumpLogSide = "left"
+	PumpLogSideRight PumpLogSide = "right"
+)
+
+// Valid indicates whether the value is a known member of the PumpLogSide enum.
+func (e PumpLogSide) Valid() bool {
+	switch e {
+	case PumpLogSideBoth:
+		return true
+	case PumpLogSideLeft:
+		return true
+	case PumpLogSideRight:
 		return true
 	default:
 		return false
@@ -304,6 +436,72 @@ func (e UpdateFeedType) Valid() bool {
 	}
 }
 
+// Defines values for UpdateMeasurementType.
+const (
+	UpdateMeasurementTypeHead   UpdateMeasurementType = "head"
+	UpdateMeasurementTypeLength UpdateMeasurementType = "length"
+	UpdateMeasurementTypeWeight UpdateMeasurementType = "weight"
+)
+
+// Valid indicates whether the value is a known member of the UpdateMeasurementType enum.
+func (e UpdateMeasurementType) Valid() bool {
+	switch e {
+	case UpdateMeasurementTypeHead:
+		return true
+	case UpdateMeasurementTypeLength:
+		return true
+	case UpdateMeasurementTypeWeight:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateMedicineUnit.
+const (
+	UpdateMedicineUnitDose  UpdateMedicineUnit = "dose"
+	UpdateMedicineUnitDrops UpdateMedicineUnit = "drops"
+	UpdateMedicineUnitMg    UpdateMedicineUnit = "mg"
+	UpdateMedicineUnitMl    UpdateMedicineUnit = "ml"
+)
+
+// Valid indicates whether the value is a known member of the UpdateMedicineUnit enum.
+func (e UpdateMedicineUnit) Valid() bool {
+	switch e {
+	case UpdateMedicineUnitDose:
+		return true
+	case UpdateMedicineUnitDrops:
+		return true
+	case UpdateMedicineUnitMg:
+		return true
+	case UpdateMedicineUnitMl:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdatePumpSide.
+const (
+	UpdatePumpSideBoth  UpdatePumpSide = "both"
+	UpdatePumpSideLeft  UpdatePumpSide = "left"
+	UpdatePumpSideRight UpdatePumpSide = "right"
+)
+
+// Valid indicates whether the value is a known member of the UpdatePumpSide enum.
+func (e UpdatePumpSide) Valid() bool {
+	switch e {
+	case UpdatePumpSideBoth:
+		return true
+	case UpdatePumpSideLeft:
+		return true
+	case UpdatePumpSideRight:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Healthz200JSONResponseBodyOk.
 const (
 	Healthz200JSONResponseBodyOkTrue Healthz200JSONResponseBodyOk = true
@@ -360,6 +558,16 @@ type Baby struct {
 // BabySex defines model for Baby.Sex.
 type BabySex string
 
+// BathLog defines model for BathLog.
+type BathLog struct {
+	BabyId        string    `json:"babyId"`
+	CaretakerId   string    `json:"caretakerId"`
+	CaretakerName string    `json:"caretakerName"`
+	Id            string    `json:"id"`
+	Notes         *string   `json:"notes"`
+	Time          time.Time `json:"time"`
+}
+
 // CreateBaby defines model for CreateBaby.
 type CreateBaby struct {
 	BirthDate time.Time      `json:"birthDate"`
@@ -369,6 +577,13 @@ type CreateBaby struct {
 
 // CreateBabySex defines model for CreateBaby.Sex.
 type CreateBabySex string
+
+// CreateBath defines model for CreateBath.
+type CreateBath struct {
+	BabyId string    `json:"babyId"`
+	Notes  *string   `json:"notes,omitempty"`
+	Time   time.Time `json:"time"`
+}
 
 // CreateDiaper defines model for CreateDiaper.
 type CreateDiaper struct {
@@ -399,6 +614,60 @@ type CreateFeedSide string
 
 // CreateFeedType defines model for CreateFeed.Type.
 type CreateFeedType string
+
+// CreateMeasurement defines model for CreateMeasurement.
+type CreateMeasurement struct {
+	BabyId string                `json:"babyId"`
+	Notes  *string               `json:"notes,omitempty"`
+	Time   time.Time             `json:"time"`
+	Type   CreateMeasurementType `json:"type"`
+	Value  float64               `json:"value"`
+}
+
+// CreateMeasurementType defines model for CreateMeasurement.Type.
+type CreateMeasurementType string
+
+// CreateMedicine defines model for CreateMedicine.
+type CreateMedicine struct {
+	Amount *float64            `json:"amount,omitempty"`
+	BabyId string              `json:"babyId"`
+	Name   string              `json:"name"`
+	Notes  *string             `json:"notes,omitempty"`
+	Time   time.Time           `json:"time"`
+	Unit   *CreateMedicineUnit `json:"unit,omitempty"`
+}
+
+// CreateMedicineUnit defines model for CreateMedicine.Unit.
+type CreateMedicineUnit string
+
+// CreateMilestone defines model for CreateMilestone.
+type CreateMilestone struct {
+	BabyId string    `json:"babyId"`
+	Notes  *string   `json:"notes,omitempty"`
+	Time   time.Time `json:"time"`
+	Title  string    `json:"title"`
+}
+
+// CreateNote defines model for CreateNote.
+type CreateNote struct {
+	BabyId  string    `json:"babyId"`
+	Content string    `json:"content"`
+	Notes   *string   `json:"notes,omitempty"`
+	Time    time.Time `json:"time"`
+}
+
+// CreatePump defines model for CreatePump.
+type CreatePump struct {
+	AmountMl    *int32          `json:"amountMl,omitempty"`
+	BabyId      string          `json:"babyId"`
+	DurationMin *int32          `json:"durationMin,omitempty"`
+	Notes       *string         `json:"notes,omitempty"`
+	Side        *CreatePumpSide `json:"side,omitempty"`
+	Time        time.Time       `json:"time"`
+}
+
+// CreatePumpSide defines model for CreatePump.Side.
+type CreatePumpSide string
 
 // CreateSleep defines model for CreateSleep.
 type CreateSleep struct {
@@ -486,6 +755,37 @@ type Me struct {
 	UserId string  `json:"userId"`
 }
 
+// MeasurementLog defines model for MeasurementLog.
+type MeasurementLog struct {
+	BabyId        string             `json:"babyId"`
+	CaretakerId   string             `json:"caretakerId"`
+	CaretakerName string             `json:"caretakerName"`
+	Id            string             `json:"id"`
+	Notes         *string            `json:"notes"`
+	Time          time.Time          `json:"time"`
+	Type          MeasurementLogType `json:"type"`
+	Value         float64            `json:"value"`
+}
+
+// MeasurementLogType defines model for MeasurementLog.Type.
+type MeasurementLogType string
+
+// MedicineLog defines model for MedicineLog.
+type MedicineLog struct {
+	Amount        *float64         `json:"amount"`
+	BabyId        string           `json:"babyId"`
+	CaretakerId   string           `json:"caretakerId"`
+	CaretakerName string           `json:"caretakerName"`
+	Id            string           `json:"id"`
+	Name          string           `json:"name"`
+	Notes         *string          `json:"notes"`
+	Time          time.Time        `json:"time"`
+	Unit          *MedicineLogUnit `json:"unit"`
+}
+
+// MedicineLogUnit defines model for MedicineLog.Unit.
+type MedicineLogUnit string
+
 // Member defines model for Member.
 type Member struct {
 	Email string  `json:"email"`
@@ -496,6 +796,28 @@ type Member struct {
 	Name     string `json:"name"`
 	Role     string `json:"role"`
 	UserId   string `json:"userId"`
+}
+
+// MilestoneLog defines model for MilestoneLog.
+type MilestoneLog struct {
+	BabyId        string    `json:"babyId"`
+	CaretakerId   string    `json:"caretakerId"`
+	CaretakerName string    `json:"caretakerName"`
+	Id            string    `json:"id"`
+	Notes         *string   `json:"notes"`
+	Time          time.Time `json:"time"`
+	Title         string    `json:"title"`
+}
+
+// NoteLog defines model for NoteLog.
+type NoteLog struct {
+	BabyId        string    `json:"babyId"`
+	CaretakerId   string    `json:"caretakerId"`
+	CaretakerName string    `json:"caretakerName"`
+	Content       string    `json:"content"`
+	Id            string    `json:"id"`
+	Notes         *string   `json:"notes"`
+	Time          time.Time `json:"time"`
 }
 
 // Ok The standard `{ok:true}` success body for actions with no other payload.
@@ -522,6 +844,22 @@ type PlayLog struct {
 
 // PlayLogType defines model for PlayLog.Type.
 type PlayLogType string
+
+// PumpLog defines model for PumpLog.
+type PumpLog struct {
+	AmountMl      *int32       `json:"amountMl"`
+	BabyId        string       `json:"babyId"`
+	CaretakerId   string       `json:"caretakerId"`
+	CaretakerName string       `json:"caretakerName"`
+	DurationMin   *int32       `json:"durationMin"`
+	Id            string       `json:"id"`
+	Notes         *string      `json:"notes"`
+	Side          *PumpLogSide `json:"side"`
+	Time          time.Time    `json:"time"`
+}
+
+// PumpLogSide defines model for PumpLog.Side.
+type PumpLogSide string
 
 // SetMemberRole defines model for SetMemberRole.
 type SetMemberRole struct {
@@ -579,6 +917,12 @@ type UpdateBaby struct {
 // UpdateBabySex defines model for UpdateBaby.Sex.
 type UpdateBabySex string
 
+// UpdateBath Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time` is not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
+type UpdateBath struct {
+	Notes *string    `json:"notes,omitempty"`
+	Time  *time.Time `json:"time,omitempty"`
+}
+
 // UpdateDiaper Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time`/`type` are not nullable — only settable or omitted (see internal/api/feeds.go for the presence-detection pattern this endpoint shares with UpdateFeed).
 type UpdateDiaper struct {
 	Notes *string           `json:"notes,omitempty"`
@@ -607,6 +951,55 @@ type UpdateFeedSide string
 // UpdateFeedType defines model for UpdateFeed.Type.
 type UpdateFeedType string
 
+// UpdateMeasurement Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time`/`type`/`value` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
+type UpdateMeasurement struct {
+	Notes *string                `json:"notes,omitempty"`
+	Time  *time.Time             `json:"time,omitempty"`
+	Type  *UpdateMeasurementType `json:"type,omitempty"`
+	Value *float64               `json:"value,omitempty"`
+}
+
+// UpdateMeasurementType defines model for UpdateMeasurement.Type.
+type UpdateMeasurementType string
+
+// UpdateMedicine Every field is optional; an empty object is a no-op. `amount`, `unit` and `notes` may also be sent as `null` to CLEAR that column; `time`/`name` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
+type UpdateMedicine struct {
+	Amount *float64            `json:"amount,omitempty"`
+	Name   *string             `json:"name,omitempty"`
+	Notes  *string             `json:"notes,omitempty"`
+	Time   *time.Time          `json:"time,omitempty"`
+	Unit   *UpdateMedicineUnit `json:"unit,omitempty"`
+}
+
+// UpdateMedicineUnit defines model for UpdateMedicine.Unit.
+type UpdateMedicineUnit string
+
+// UpdateMilestone Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time`/`title` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
+type UpdateMilestone struct {
+	Notes *string    `json:"notes,omitempty"`
+	Time  *time.Time `json:"time,omitempty"`
+	Title *string    `json:"title,omitempty"`
+}
+
+// UpdateNote Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time`/`content` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
+type UpdateNote struct {
+	Content *string    `json:"content,omitempty"`
+	Notes   *string    `json:"notes,omitempty"`
+	Time    *time.Time `json:"time,omitempty"`
+}
+
+// UpdatePump Every field is optional; an empty object is a no-op. `side`, `amountMl`, `durationMin` and `notes` may also be sent as `null` to CLEAR that column; `time` is not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
+type UpdatePump struct {
+	AmountMl    *int32          `json:"amountMl,omitempty"`
+	DurationMin *int32          `json:"durationMin,omitempty"`
+	Notes       *string         `json:"notes,omitempty"`
+	Side        *UpdatePumpSide `json:"side,omitempty"`
+	Time        *time.Time      `json:"time,omitempty"`
+}
+
+// UpdatePumpSide defines model for UpdatePump.Side.
+type UpdatePumpSide string
+
 // UpdateSleep Every field is optional; an empty object is a no-op. `endTime`, `location` and `notes` may also be sent as `null` to CLEAR that column — clearing `endTime` reopens the session and can 409 if another session for the same baby is already active (see internal/api/sleep.go). `startTime` is not nullable — only settable or omitted.
 type UpdateSleep struct {
 	EndTime   *time.Time `json:"endTime,omitempty"`
@@ -632,6 +1025,15 @@ type LimitQuery = int
 // MemberIdPath defines model for memberIdPath.
 type MemberIdPath = string
 
+// ListBathsParams defines parameters for ListBaths.
+type ListBathsParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+
+	// Limit Maximum number of rows to return.
+	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ListDiapersParams defines parameters for ListDiapers.
 type ListDiapersParams struct {
 	// BabyId Restrict the result to one baby in the caller's family.
@@ -643,6 +1045,51 @@ type ListDiapersParams struct {
 
 // ListFeedsParams defines parameters for ListFeeds.
 type ListFeedsParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+
+	// Limit Maximum number of rows to return.
+	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListMeasurementsParams defines parameters for ListMeasurements.
+type ListMeasurementsParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+
+	// Limit Maximum number of rows to return.
+	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListMedicineParams defines parameters for ListMedicine.
+type ListMedicineParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+
+	// Limit Maximum number of rows to return.
+	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListMilestonesParams defines parameters for ListMilestones.
+type ListMilestonesParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+
+	// Limit Maximum number of rows to return.
+	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListNotesParams defines parameters for ListNotes.
+type ListNotesParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+
+	// Limit Maximum number of rows to return.
+	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListPumpsParams defines parameters for ListPumps.
+type ListPumpsParams struct {
 	// BabyId Restrict the result to one baby in the caller's family.
 	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
 
@@ -688,6 +1135,12 @@ type CreateBabyJSONRequestBody = CreateBaby
 // UpdateBabyJSONRequestBody defines body for UpdateBaby for application/json ContentType.
 type UpdateBabyJSONRequestBody = UpdateBaby
 
+// CreateBathJSONRequestBody defines body for CreateBath for application/json ContentType.
+type CreateBathJSONRequestBody = CreateBath
+
+// UpdateBathJSONRequestBody defines body for UpdateBath for application/json ContentType.
+type UpdateBathJSONRequestBody = UpdateBath
+
 // CreateDiaperJSONRequestBody defines body for CreateDiaper for application/json ContentType.
 type CreateDiaperJSONRequestBody = CreateDiaper
 
@@ -702,6 +1155,36 @@ type CreateFeedJSONRequestBody = CreateFeed
 
 // UpdateFeedJSONRequestBody defines body for UpdateFeed for application/json ContentType.
 type UpdateFeedJSONRequestBody = UpdateFeed
+
+// CreateMeasurementJSONRequestBody defines body for CreateMeasurement for application/json ContentType.
+type CreateMeasurementJSONRequestBody = CreateMeasurement
+
+// UpdateMeasurementJSONRequestBody defines body for UpdateMeasurement for application/json ContentType.
+type UpdateMeasurementJSONRequestBody = UpdateMeasurement
+
+// CreateMedicineJSONRequestBody defines body for CreateMedicine for application/json ContentType.
+type CreateMedicineJSONRequestBody = CreateMedicine
+
+// UpdateMedicineJSONRequestBody defines body for UpdateMedicine for application/json ContentType.
+type UpdateMedicineJSONRequestBody = UpdateMedicine
+
+// CreateMilestoneJSONRequestBody defines body for CreateMilestone for application/json ContentType.
+type CreateMilestoneJSONRequestBody = CreateMilestone
+
+// UpdateMilestoneJSONRequestBody defines body for UpdateMilestone for application/json ContentType.
+type UpdateMilestoneJSONRequestBody = UpdateMilestone
+
+// CreateNoteJSONRequestBody defines body for CreateNote for application/json ContentType.
+type CreateNoteJSONRequestBody = CreateNote
+
+// UpdateNoteJSONRequestBody defines body for UpdateNote for application/json ContentType.
+type UpdateNoteJSONRequestBody = UpdateNote
+
+// CreatePumpJSONRequestBody defines body for CreatePump for application/json ContentType.
+type CreatePumpJSONRequestBody = CreatePump
+
+// UpdatePumpJSONRequestBody defines body for UpdatePump for application/json ContentType.
+type UpdatePumpJSONRequestBody = UpdatePump
 
 // CreateSleepJSONRequestBody defines body for CreateSleep for application/json ContentType.
 type CreateSleepJSONRequestBody = CreateSleep
