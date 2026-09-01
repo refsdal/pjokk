@@ -98,6 +98,30 @@ func (s *service) resolveSession(r *http.Request) (*Session, *limen.SessionResul
 	if by, ok := validated.Session.Metadata[metaImpersonatedBy].(string); ok {
 		session.ImpersonatedBy = by
 	}
+
+	// An impersonated session is only as valid as the OPERATOR behind it.
+	// Its user_id is the TARGET's, so revoking the operator's sessions —
+	// banning them, signing them out, deleting the account — does not touch
+	// this row unless something also walks the `impersonation` table
+	// (Service.RevokeImpersonatedSessions does, and every caller that cuts
+	// an operator off calls it). This is the backstop for the case where
+	// one does not: an operator who is banned or gone cannot keep acting as
+	// somebody else, whatever state the impersonation table is in.
+	//
+	// Reported as "signed out" rather than an error, exactly like a banned
+	// user above: no caller has to remember to check.
+	if session.ImpersonatedBy != "" {
+		banned, err := s.q.IsUserBanned(r.Context(), session.ImpersonatedBy)
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return nil, nil, nil
+		case err != nil:
+			return nil, nil, fmt.Errorf("auth: load impersonating admin: %w", err)
+		case banned:
+			return nil, nil, nil
+		}
+	}
+
 	return session, validated.Refreshed, nil
 }
 

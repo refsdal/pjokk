@@ -260,6 +260,51 @@ func (q *Queries) IsSessionUserBanned(ctx context.Context, token string) (bool, 
 	return banned, err
 }
 
+const isUserBanned = `-- name: IsUserBanned :one
+SELECT "banned" FROM "users" WHERE "id" = $1
+`
+
+// Ban state for a user id, for the impersonation check in resolveSession:
+// an impersonated session is only as valid as the OPERATOR behind it. No
+// rows means the account is gone, which the caller treats the same way.
+func (q *Queries) IsUserBanned(ctx context.Context, id string) (bool, error) {
+	row := q.db.QueryRow(ctx, isUserBanned, id)
+	var banned bool
+	err := row.Scan(&banned)
+	return banned, err
+}
+
+const listImpersonatedTokensByAdmin = `-- name: ListImpersonatedTokensByAdmin :many
+SELECT "impersonated_token" FROM "impersonation" WHERE "admin_id" = $1
+`
+
+// Every live impersonated session this operator is driving.
+//
+// Banning, deleting, or signing out a user revokes the sessions whose
+// user_id is theirs — which does NOT include a session they are
+// impersonating, since that one belongs to the target. Without this list
+// those sessions outlive the operator's own access. Served by
+// impersonation_admin_idx (00003_impersonation.sql).
+func (q *Queries) ListImpersonatedTokensByAdmin(ctx context.Context, adminID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listImpersonatedTokensByAdmin, adminID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var impersonated_token string
+		if err := rows.Scan(&impersonated_token); err != nil {
+			return nil, err
+		}
+		items = append(items, impersonated_token)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setUserPassword = `-- name: SetUserPassword :exec
 UPDATE "users" SET "password" = $2, "updated_at" = now() WHERE "id" = $1
 `

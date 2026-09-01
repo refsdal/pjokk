@@ -98,3 +98,19 @@ VALUES ($1, $2, $3);
 -- Limen (cred.HashPassword), so the stored value is byte-compatible with
 -- what its sign-in comparison expects; only the write is ours.
 UPDATE "users" SET "password" = $2, "updated_at" = now() WHERE "id" = $1;
+
+-- name: IsUserBanned :one
+-- Ban state for a user id, for the impersonation check in resolveSession:
+-- an impersonated session is only as valid as the OPERATOR behind it. No
+-- rows means the account is gone, which the caller treats the same way.
+SELECT "banned" FROM "users" WHERE "id" = $1;
+
+-- name: ListImpersonatedTokensByAdmin :many
+-- Every live impersonated session this operator is driving.
+--
+-- Banning, deleting, or signing out a user revokes the sessions whose
+-- user_id is theirs — which does NOT include a session they are
+-- impersonating, since that one belongs to the target. Without this list
+-- those sessions outlive the operator's own access. Served by
+-- impersonation_admin_idx (00003_impersonation.sql).
+SELECT "impersonated_token" FROM "impersonation" WHERE "admin_id" = $1;

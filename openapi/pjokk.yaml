@@ -2395,6 +2395,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Ok"
+        "400":
+          description: >-
+            The password does not meet the credential policy. `minLength`
+            below is checked before the handler runs; the rest of the
+            policy (an uppercase letter and a number, per Limen's
+            configured defaults) cannot be expressed as a JSON-Schema
+            constraint and is reported here, with the same VALIDATION code.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "404":
           description: No user with this id.
           content:
@@ -2444,7 +2455,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/Ok"
         "400":
-          description: Refused — the caller's own account, or a banned target.
+          description: >-
+            Refused — the caller's own account, a banned target, or a
+            caller who is themselves being impersonated (impersonation
+            cannot be chained).
           content:
             application/json:
               schema:

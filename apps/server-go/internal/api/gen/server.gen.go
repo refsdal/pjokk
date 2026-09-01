@@ -3496,6 +3496,20 @@ func (response SetAdminUserPassword200JSONResponse) VisitSetAdminUserPasswordRes
 	return err
 }
 
+type SetAdminUserPassword400JSONResponse Error
+
+func (response SetAdminUserPassword400JSONResponse) VisitSetAdminUserPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type SetAdminUserPassword404JSONResponse Error
 
 func (response SetAdminUserPassword404JSONResponse) VisitSetAdminUserPasswordResponse(w http.ResponseWriter) error {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
+	"github.com/refsdal/pjokk/server/internal/auth"
 	"github.com/refsdal/pjokk/server/internal/db"
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
 )
@@ -36,12 +37,27 @@ import (
 //
 // # Auditing
 //
-// Every mutation writes an admin_audit row through middleware.Audit before
-// the change lands, so a failure leaves a record of the attempt rather than
-// a silent gap. The admin_id is always the REAL operator: for the
-// impersonation pair that means the system admin, never the account being
-// impersonated (StopImpersonating reads it from the session's
-// impersonated_by marker, which only the server writes).
+// Every mutation writes an admin_audit row BEFORE the change it records,
+// and that write is CHECKED: a failure aborts the request with a 500 and
+// nothing is mutated. Not middleware.Audit — that helper deliberately
+// swallows its error, which is right for exactly one caller
+// (middleware.RequireFamily's `impersonated.write` trail, where an audit
+// failure must not deny a caretaker the ability to log a feed) and wrong
+// for an admin console, whose whole purpose is that destructive actions
+// leave a record. The TypeScript predecessor awaited its audit() and let a
+// failure propagate; this restores that.
+//
+// Ordering is audit-first everywhere. Where a transaction already exists
+// (DeleteAdminFamily, DeleteAdminUser) both writes are in it, so the pair
+// is atomic. Where there is none, "audit first" means a failed mutation can
+// leave a row describing an action that did not happen — the safe direction:
+// an unexplained entry invites a question, a silent mutation does not.
+//
+// The admin_id is always the REAL operator: for the impersonation pair that
+// means the system admin, never the account being impersonated
+// (StopImpersonating reads it from the session's impersonated_by marker,
+// which only the server writes), and adminID below applies the same rule to
+// every other route.
 
 // refused is the 400 envelope apps/api/src/routes/admin.ts used for
 // "this account may not be deleted" (self, or the tombstone). The same code
@@ -49,6 +65,24 @@ import (
 // yourself/a banned account — with a message that says which.
 func refused(message string) gen.Error {
 	return gen.Error{Error: message, Code: "REFUSED"}
+}
+
+// audit appends one row to the system-admin trail and PROPAGATES a failure,
+// unlike middleware.Audit — see this file's "Auditing" section for why the
+// console needs the checked version and who still wants the swallowing one.
+//
+// q is a parameter rather than d.Q so a caller inside a transaction can pass
+// its own querier and get the row committed with the change it describes.
+// An empty detail is stored as NULL.
+func audit(ctx context.Context, q *dbgen.Queries, adminID, action, target, detail string) error {
+	params := dbgen.InsertAdminAuditParams{AdminID: adminID, Action: action, Target: target}
+	if detail != "" {
+		params.Detail = &detail
+	}
+	if err := q.InsertAdminAudit(ctx, params); err != nil {
+		return fmt.Errorf("api: write audit entry %q: %w", action, err)
+	}
+	return nil
 }
 
 // adminID is who is ACCOUNTABLE for a tierSysadmin request — the human
@@ -147,16 +181,19 @@ func (d Deps) DeleteAdminFamily(ctx context.Context, req gen.DeleteAdminFamilyRe
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := d.Q.WithTx(tx)
 
-	if err := qtx.InsertAdminAudit(ctx, dbgen.InsertAdminAuditParams{
-		AdminID: admin,
-		Action:  "family.delete",
-		Target:  req.Id,
-		Detail:  &name,
-	}); err != nil {
+	if err := audit(ctx, qtx, admin, "family.delete", req.Id, name); err != nil {
 		return nil, err
 	}
-	if _, err := qtx.DeleteOrganization(ctx, req.Id); err != nil {
+	// Zero rows means the family disappeared between the lookup above and
+	// this DELETE (a concurrent delete). Answered as the same 404 the
+	// lookup would have given rather than a 200 for a delete that deleted
+	// nothing.
+	n, err := qtx.DeleteOrganization(ctx, req.Id)
+	if err != nil {
 		return nil, err
+	}
+	if n == 0 {
+		return gen.DeleteAdminFamily404JSONResponse(notFound()), nil
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
@@ -231,6 +268,16 @@ func (d Deps) DeleteAdminUser(ctx context.Context, req gen.DeleteAdminUserReques
 		return nil, err
 	}
 
+	// Before the transaction, because it goes through Limen rather than our
+	// pool: any session this account is DRIVING through impersonation
+	// belongs to the target user, so the users-row delete below cascades
+	// neither it nor anything else away. Doing it first means a delete that
+	// then fails has only cost the operator their impersonated sessions —
+	// the harmless direction.
+	if err := d.Auth.RevokeImpersonatedSessions(ctx, req.Id); err != nil {
+		return nil, err
+	}
+
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -250,17 +297,8 @@ func (d Deps) DeleteAdminUser(ctx context.Context, req gen.DeleteAdminUserReques
 	}
 
 	// Inside the transaction: an audit row for a delete that then rolls
-	// back would be a lie. middleware.Audit is best-effort by design (it
-	// swallows its error), which is right for the impersonated-write trail
-	// but not here — this one insert is checked, so a trail failure aborts
-	// the delete rather than losing the record of it.
-	detail := target.Email
-	if err := qtx.InsertAdminAudit(ctx, dbgen.InsertAdminAuditParams{
-		AdminID: admin,
-		Action:  "user.delete",
-		Target:  req.Id,
-		Detail:  &detail,
-	}); err != nil {
+	// back would be a lie.
+	if err := audit(ctx, qtx, admin, "user.delete", req.Id, target.Email); err != nil {
 		return nil, err
 	}
 
@@ -306,9 +344,21 @@ func (d Deps) BanAdminUser(ctx context.Context, req gen.BanAdminUserRequestObjec
 		reason = req.Body.Reason
 	}
 
-	middleware.Audit(ctx, d.Q, admin, "user.ban", req.Id, target.Email)
+	if err := audit(ctx, d.Q, admin, "user.ban", req.Id, target.Email); err != nil {
+		return nil, err
+	}
 
 	if err := d.Q.BanAdminUser(ctx, dbgen.BanAdminUserParams{ID: req.Id, BanReason: reason}); err != nil {
+		return nil, err
+	}
+	// Order matters, and not for the obvious reason. The sessions this user
+	// is DRIVING as somebody else belong to the impersonated user, so
+	// RevokeAllSessions never sees them — but it does revoke the ADMIN
+	// session each impersonation row points at, and `impersonation`
+	// cascades on that token (00003). Revoking their own sessions first
+	// would therefore delete the very rows the sweep reads, leaving the
+	// impersonated sessions alive with nothing left to find them by.
+	if err := d.Auth.RevokeImpersonatedSessions(ctx, req.Id); err != nil {
 		return nil, err
 	}
 	if err := d.Auth.RevokeAllSessions(ctx, req.Id); err != nil {
@@ -333,7 +383,9 @@ func (d Deps) UnbanAdminUser(ctx context.Context, req gen.UnbanAdminUserRequestO
 		return nil, err
 	}
 
-	middleware.Audit(ctx, d.Q, admin, "user.unban", req.Id, target.Email)
+	if err := audit(ctx, d.Q, admin, "user.unban", req.Id, target.Email); err != nil {
+		return nil, err
+	}
 
 	if err := d.Q.UnbanAdminUser(ctx, req.Id); err != nil {
 		return nil, err
@@ -363,9 +415,25 @@ func (d Deps) SetAdminUserPassword(ctx context.Context, req gen.SetAdminUserPass
 		return nil, err
 	}
 
-	middleware.Audit(ctx, d.Q, admin, "user.password.set", req.Id, target.Email)
+	if err := audit(ctx, d.Q, admin, "user.password.set", req.Id, target.Email); err != nil {
+		return nil, err
+	}
 
 	if err := d.Auth.SetPassword(ctx, req.Id, req.Body.Password); err != nil {
+		// A password the credential policy refuses is the caller's mistake,
+		// not the server's. The spec's own 8..128 bound is checked before
+		// this handler runs; auth's policy (Limen's configured one: an
+		// uppercase letter and a number too) is not expressible as a
+		// JSON-Schema constraint the client could pre-check, so it arrives
+		// here and is reported the same way the spec layer reports its own
+		// rejections.
+		var policy *auth.PasswordPolicyError
+		if errors.As(err, &policy) {
+			return gen.SetAdminUserPassword400JSONResponse(gen.Error{
+				Error: "Password " + policy.Requirement,
+				Code:  "VALIDATION",
+			}), nil
+		}
 		return nil, err
 	}
 	return gen.SetAdminUserPassword200JSONResponse{Ok: gen.OkOkTrue}, nil
@@ -387,8 +455,17 @@ func (d Deps) RevokeAdminUserSessions(ctx context.Context, req gen.RevokeAdminUs
 		return nil, err
 	}
 
-	middleware.Audit(ctx, d.Q, admin, "user.sessions.revoke", req.Id, target.Email)
+	if err := audit(ctx, d.Q, admin, "user.sessions.revoke", req.Id, target.Email); err != nil {
+		return nil, err
+	}
 
+	// "Signed out everywhere" has to include the sessions they are driving
+	// as somebody else, and that sweep must run FIRST — see BanAdminUser
+	// for why revoking their own sessions first would destroy the rows it
+	// reads.
+	if err := d.Auth.RevokeImpersonatedSessions(ctx, req.Id); err != nil {
+		return nil, err
+	}
 	if err := d.Auth.RevokeAllSessions(ctx, req.Id); err != nil {
 		return nil, err
 	}
@@ -443,7 +520,9 @@ func (d Deps) ImpersonateAdminUser(ctx context.Context, req gen.ImpersonateAdmin
 		return nil, errors.New("api: ImpersonateAdminUser reached without CaptureHTTP (tier wiring?)")
 	}
 
-	middleware.Audit(ctx, d.Q, session.UserID, "user.impersonate", req.Id, target.Email)
+	if err := audit(ctx, d.Q, session.UserID, "user.impersonate", req.Id, target.Email); err != nil {
+		return nil, err
+	}
 
 	if err := d.Auth.Impersonate(ctx, w, r, session, req.Id); err != nil {
 		return nil, fmt.Errorf("api: impersonate %s: %w", req.Id, err)
@@ -492,7 +571,9 @@ func (d Deps) StopImpersonating(ctx context.Context, _ gen.StopImpersonatingRequ
 
 	// The REAL admin is the audit row's author, not the account whose
 	// session is making the request.
-	middleware.Audit(ctx, d.Q, session.ImpersonatedBy, "impersonation.stop", session.UserID, "")
+	if err := audit(ctx, d.Q, session.ImpersonatedBy, "impersonation.stop", session.UserID, ""); err != nil {
+		return nil, err
+	}
 
 	if err := d.Auth.StopImpersonating(ctx, w, r, session); err != nil {
 		return nil, fmt.Errorf("api: stop impersonating: %w", err)
@@ -536,6 +617,11 @@ func (d Deps) CreateAdminAuditNote(ctx context.Context, req gen.CreateAdminAudit
 	if req.Body.Detail != nil {
 		detail = *req.Body.Detail
 	}
-	middleware.Audit(ctx, d.Q, admin, req.Body.Action, req.Body.Target, detail)
+	// Checked, obviously: this endpoint IS the write. Answering {ok:true}
+	// for a row that was never stored would be the worst version of the
+	// best-effort trail.
+	if err := audit(ctx, d.Q, admin, req.Body.Action, req.Body.Target, detail); err != nil {
+		return nil, err
+	}
 	return gen.CreateAdminAuditNote200JSONResponse{Ok: gen.OkOkTrue}, nil
 }

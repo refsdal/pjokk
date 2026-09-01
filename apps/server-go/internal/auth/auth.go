@@ -132,6 +132,14 @@ type Service interface {
 	SetPassword(ctx context.Context, userID, newPassword string) error
 	RevokeAllSessions(ctx context.Context, userID string) error
 
+	// RevokeImpersonatedSessions revokes every session this user is driving
+	// through impersonation. RevokeAllSessions does NOT cover those: an
+	// impersonated session's user_id is the TARGET's, so cutting off an
+	// operator (ban, sign-out-everywhere, account deletion) must call both
+	// or the operator keeps working sessions as whoever they were
+	// impersonating.
+	RevokeImpersonatedSessions(ctx context.Context, adminUserID string) error
+
 	Impersonate(ctx context.Context, w http.ResponseWriter, r *http.Request, adminSession *Session, targetUserID string) error
 	StopImpersonating(ctx context.Context, w http.ResponseWriter, r *http.Request, s *Session) error
 }
@@ -718,11 +726,26 @@ func (s *service) SetActiveFamily(ctx context.Context, sessionToken, familyID st
 // either way, so the stored value is exactly what its sign-in comparison
 // expects; only who issues the UPDATE differs.
 func (s *service) SetPassword(ctx context.Context, userID, newPassword string) error {
+	// Validated in ONE place, ahead of both branches. Limen enforces its
+	// policy inside its own SetPassword and would reject a weak password
+	// there — but the reset branch below never reaches that code, so
+	// without this the two branches would accept different passwords and a
+	// spec-valid lowercase one would 500 on the first branch and succeed on
+	// the second.
+	if err := validatePassword(newPassword); err != nil {
+		return err
+	}
+
 	user, err := s.core.DBAction.FindUserByID(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("auth: load user: %w", err)
 	}
 
+	// An empty string is treated as "no password", not as a password of
+	// length zero: CreateUser's passwordless branch stores NULL, but a row
+	// written by anything else (a migration, an import) could hold '' with
+	// the same meaning, and Limen's own SetPassword accepts both (its
+	// UPDATE guard is `password IS NULL OR password = ''`).
 	if user.Password == nil || *user.Password == "" {
 		if err := s.cred.SetPassword(ctx, user, newPassword, true); err != nil {
 			return fmt.Errorf("auth: set password: %w", err)
@@ -739,13 +762,85 @@ func (s *service) SetPassword(ctx context.Context, userID, newPassword string) e
 	}
 	// Same effect as the revokeOtherSessions:true the branch above asks
 	// Limen for: a reset must not leave a compromised session alive.
+	//
+	// Not in one transaction with the UPDATE, and it cannot be: revocation
+	// goes through Limen's session manager, which owns its own handle and
+	// takes no transaction from us (the first branch has the same split —
+	// Limen's SetPassword opens its OWN transaction around both). The order
+	// is the safe one: if the revoke fails after the UPDATE, the caller
+	// gets an error while the old password has already stopped working. The
+	// reverse order would report failure with the old password still live.
 	return s.RevokeAllSessions(ctx, userID)
 }
 
+// Password policy, mirroring what credentialpassword.New() configures in
+// New above — it is constructed with no ConfigOptions, so these ARE its
+// defaults (constants.go in the plugin: min length 8, uppercase required,
+// numbers required, symbols not required). If New ever passes
+// WithPasswordMinLength/WithPasswordRequire*, change these to match, or
+// SetPassword and Limen's own sign-up will disagree about what is
+// acceptable.
+const (
+	passwordMinLength = 8
+	passwordUppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	passwordDigits    = "0123456789"
+)
+
+// PasswordPolicyError says a password was rejected before it was stored,
+// and which requirement it failed. Callers map it to a 400 rather than a
+// 500 — it is the user's input that is wrong, not the server.
+//
+// Requirement is phrased to follow the word "Password", so an HTTP layer
+// can render "Password " + Requirement without restating anything.
+type PasswordPolicyError struct {
+	Requirement string
+}
+
+func (e *PasswordPolicyError) Error() string {
+	return "auth: password " + e.Requirement
+}
+
+// validatePassword enforces the policy above. It runs before ANY write, in
+// both of SetPassword's branches.
+func validatePassword(password string) error {
+	switch {
+	case len(password) < passwordMinLength:
+		return &PasswordPolicyError{Requirement: fmt.Sprintf("must be at least %d characters", passwordMinLength)}
+	case !strings.ContainsAny(password, passwordUppercase):
+		return &PasswordPolicyError{Requirement: "must contain an uppercase letter"}
+	case !strings.ContainsAny(password, passwordDigits):
+		return &PasswordPolicyError{Requirement: "must contain a number"}
+	default:
+		return nil
+	}
+}
+
 // RevokeAllSessions signs a user out everywhere.
+//
+// "Everywhere" is scoped to sessions whose user_id is theirs, which is what
+// Limen knows about — see RevokeImpersonatedSessions for the other half.
 func (s *service) RevokeAllSessions(ctx context.Context, userID string) error {
 	if err := s.limen.RevokeAllSessions(ctx, userID); err != nil {
 		return fmt.Errorf("auth: revoke sessions: %w", err)
+	}
+	return nil
+}
+
+// RevokeImpersonatedSessions revokes every session adminUserID is driving
+// through impersonation (see the interface's doc comment for why this is
+// separate from RevokeAllSessions).
+//
+// Revoking the session cascades its `impersonation` row away (00003), so
+// the list shrinks as it is walked and nothing else needs tidying.
+func (s *service) RevokeImpersonatedSessions(ctx context.Context, adminUserID string) error {
+	tokens, err := s.q.ListImpersonatedTokensByAdmin(ctx, adminUserID)
+	if err != nil {
+		return fmt.Errorf("auth: list impersonated sessions: %w", err)
+	}
+	for _, token := range tokens {
+		if err := s.limen.RevokeSession(ctx, token); err != nil {
+			return fmt.Errorf("auth: revoke impersonated session: %w", err)
+		}
 	}
 	return nil
 }

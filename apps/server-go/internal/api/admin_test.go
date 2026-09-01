@@ -722,10 +722,13 @@ func TestAdminBanKillsSessionsAndAPIKeysUnbanRestores(t *testing.T) {
 	// absent one. Asserting the downstream effect rather than the sign-in
 	// status code is the assertion that matters.
 	fresh := signInWith(t, a, "victim@example.com", "Testrig-password-123")
-	if fresh.Status == http.StatusOK {
-		if res := a.Do(http.MethodGet, "/api/me", sessionCookieFrom(t, fresh), nil); res.Status != http.StatusUnauthorized {
-			t.Errorf("banned user's fresh session /api/me = %d %s, want 401", res.Status, res.Raw)
-		}
+	if fresh.Status != http.StatusOK {
+		t.Fatalf("banned sign-in = %d %s — Limen's credential route reads no `banned` "+
+			"column, so this is expected to succeed; if it starts failing, assert the "+
+			"rejection here instead", fresh.Status, fresh.Raw)
+	}
+	if res := a.Do(http.MethodGet, "/api/me", sessionCookieFrom(t, fresh), nil); res.Status != http.StatusUnauthorized {
+		t.Errorf("banned user's fresh session /api/me = %d %s, want 401", res.Status, res.Raw)
 	}
 
 	listed := a.DoArray(http.MethodGet, "/api/admin/users?query=victim@example.com", cookie, nil)
@@ -788,7 +791,7 @@ func TestAdminSetPasswordAndRevokeSessions(t *testing.T) {
 		t.Errorf("revoke audit = %+v", row)
 	}
 
-	const newPassword = "brand-new-password-9"
+	const newPassword = "Brand-new-password-9"
 	set := a.Do(http.MethodPost, "/api/admin/users/"+victimID+"/password", cookie, map[string]any{
 		"password": newPassword,
 	})
@@ -993,6 +996,156 @@ func TestAdminActionsUnderImpersonationNameTheRealOperator(t *testing.T) {
 	}
 }
 
+// Cutting an OPERATOR off must also kill the sessions they are DRIVING
+// through impersonation. Those sessions' user_id is the TARGET's, so
+// RevokeAllSessions — which is user-scoped — never sees them: without the
+// impersonation-table sweep, a banned or signed-out admin keeps a fully
+// working session as whoever they were impersonating.
+func TestCuttingOffAnOperatorKillsTheSessionsTheyDrive(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		// cut runs the action that must revoke the operator's driven
+		// sessions, as a second sysadmin acting on the first.
+		cut func(a *testrig.AppRig, cookie, operatorID string) *testrig.Result
+	}{
+		{"ban", func(a *testrig.AppRig, cookie, operatorID string) *testrig.Result {
+			return a.Do(http.MethodPost, "/api/admin/users/"+operatorID+"/ban", cookie, nil)
+		}},
+		{"revoke sessions", func(a *testrig.AppRig, cookie, operatorID string) *testrig.Result {
+			return a.Do(http.MethodPost, "/api/admin/users/"+operatorID+"/sessions/revoke", cookie, nil)
+		}},
+		{"delete", func(a *testrig.AppRig, cookie, operatorID string) *testrig.Result {
+			return a.Do(http.MethodPost, "/api/admin/users/"+operatorID+"/delete", cookie, nil)
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// A: the operator. B: the account A impersonates. C: the second
+			// sysadmin who cuts A off.
+			a, familyID, operatorCookie, operatorID := sysadminRig(t, "Hansen")
+
+			targetID := a.SignUp("Ordinary parent", "target@example.com")
+			a.AddMember(familyID, targetID, auth.RoleMember, "target@example.com")
+
+			enforcerID := a.SignUp("Second admin", "enforcer@example.com")
+			enforcerCookie := a.AddMember(familyID, enforcerID, auth.RoleAdmin, "enforcer@example.com")
+			makeSysadmin(t, a, enforcerID)
+
+			start := a.Do(http.MethodPost, "/api/admin/users/"+targetID+"/impersonate", operatorCookie, nil)
+			if start.Status != http.StatusOK {
+				t.Fatalf("impersonate = %d %s", start.Status, start.Raw)
+			}
+			impersonated := sessionCookieFrom(t, start)
+			if res := a.Do(http.MethodGet, "/api/me", impersonated, nil); res.Status != http.StatusOK {
+				t.Fatalf("impersonated session before the cut = %d %s, want 200", res.Status, res.Raw)
+			}
+
+			if res := tc.cut(a, enforcerCookie, operatorID); res.Status != http.StatusOK {
+				t.Fatalf("%s = %d %s, want 200", tc.name, res.Status, res.Raw)
+			}
+
+			if res := a.Do(http.MethodGet, "/api/me", impersonated, nil); res.Status != http.StatusUnauthorized {
+				t.Errorf("impersonated session after %s = %d %s, want 401 — the operator's "+
+					"driven sessions must die with their own", tc.name, res.Status, res.Raw)
+			}
+			assertCount(t, a,
+				`SELECT COUNT(*)::int FROM "impersonation" WHERE "admin_id" = $1`, 0, operatorID)
+		})
+	}
+}
+
+// The backstop for the same hazard, one layer down: even with the
+// impersonation row still in place, a session whose operator has been banned
+// must not resolve. Proven by banning the operator's users row directly,
+// which is what a code path that forgot RevokeImpersonatedSessions would
+// leave behind.
+func TestImpersonatedSessionDiesWithABannedOperator(t *testing.T) {
+	a, familyID, operatorCookie, operatorID := sysadminRig(t, "Hansen")
+
+	targetID := a.SignUp("Ordinary parent", "target@example.com")
+	a.AddMember(familyID, targetID, auth.RoleMember, "target@example.com")
+
+	start := a.Do(http.MethodPost, "/api/admin/users/"+targetID+"/impersonate", operatorCookie, nil)
+	if start.Status != http.StatusOK {
+		t.Fatalf("impersonate = %d %s", start.Status, start.Raw)
+	}
+	impersonated := sessionCookieFrom(t, start)
+
+	// The column only — no session revocation, no impersonation-table sweep.
+	if _, err := a.Rig.Pool.Exec(context.Background(),
+		`UPDATE "users" SET "banned" = true WHERE "id" = $1`, operatorID); err != nil {
+		t.Fatalf("ban the operator: %v", err)
+	}
+
+	if res := a.Do(http.MethodGet, "/api/me", impersonated, nil); res.Status != http.StatusUnauthorized {
+		t.Errorf("impersonated session with a banned operator = %d %s, want 401", res.Status, res.Raw)
+	}
+}
+
+// The credential policy is Limen's (min 8, an uppercase letter, a number)
+// and must be applied identically whether the account has a password
+// already or not — the two branches of auth.Service.SetPassword. A
+// spec-valid but policy-failing password is the caller's mistake: 400
+// VALIDATION, never a 500.
+func TestAdminSetPasswordEnforcesTheSamePolicyOnBothBranches(t *testing.T) {
+	a, familyID, cookie, _ := sysadminRig(t, "Hansen")
+
+	// One account with no password at all (the invite-provisioned path),
+	// one with the rig's own.
+	passwordless, err := a.Deps.Auth.CreateUser(context.Background(), "Invited parent", "invited@example.com", "")
+	if err != nil {
+		t.Fatalf("CreateUser without a password: %v", err)
+	}
+
+	withPassword := a.SignUp("Existing parent", "existing@example.com")
+	a.AddMember(familyID, withPassword, auth.RoleMember, "existing@example.com")
+
+	set := func(userID, password string) *testrig.Result {
+		t.Helper()
+		return a.Do(http.MethodPost, "/api/admin/users/"+userID+"/password", cookie,
+			map[string]any{"password": password})
+	}
+
+	// Long enough for the spec, but no uppercase and no number: it reaches
+	// the handler and must be refused the same way on both branches.
+	for _, tc := range []struct{ name, userID string }{
+		{"no existing password", passwordless},
+		{"existing password", withPassword},
+	} {
+		res := set(tc.userID, "lowercaseonly")
+		if res.Status != http.StatusBadRequest || res.JSON["code"] != "VALIDATION" {
+			t.Errorf("%s + policy-failing password = %d %s, want 400 VALIDATION",
+				tc.name, res.Status, res.Raw)
+		}
+		if msg, _ := res.JSON["error"].(string); !strings.Contains(msg, "uppercase") {
+			t.Errorf("%s error = %q, want it to name the failed requirement", tc.name, msg)
+		}
+		res = set(tc.userID, "Lowercaseonly")
+		if res.Status != http.StatusBadRequest || res.JSON["code"] != "VALIDATION" {
+			t.Errorf("%s + no-number password = %d %s, want 400 VALIDATION",
+				tc.name, res.Status, res.Raw)
+		}
+	}
+
+	// A compliant password works on the no-password branch, and the account
+	// can then actually sign in with it — the recovery path's whole point.
+	const compliant = "Compliant-password-1"
+	if res := set(passwordless, compliant); res.Status != http.StatusOK {
+		t.Fatalf("compliant password on a passwordless account = %d %s, want 200", res.Status, res.Raw)
+	}
+	if res := signInWith(t, a, "invited@example.com", compliant); res.Status != http.StatusOK {
+		t.Errorf("sign-in after establishing a first password = %d %s, want 200", res.Status, res.Raw)
+	}
+
+	// Nothing was recorded for the refused attempts beyond the audit rows
+	// the successful ones wrote: the trail records the attempt, never the
+	// password (asserted in full by TestAdminSetPasswordAndRevokeSessions).
+	for _, row := range auditRows(t, a) {
+		if strings.Contains(row.Detail, compliant) {
+			t.Fatalf("the audit trail recorded a password: %+v", row)
+		}
+	}
+}
+
 // -----------------------------------------------------------------------
 // Schema guard
 // -----------------------------------------------------------------------
@@ -1001,25 +1154,29 @@ func TestAdminActionsUnderImpersonationNameTheRealOperator(t *testing.T) {
 // that queries/admin.sql's ReassignUserReferences points at the tombstone,
 // plus the one it deletes instead (calendar_assignee — an assignment is not
 // an attribution).
-var reassignedUserReferences = map[string]string{
-	"sleep_log":         "caretaker_id",
-	"feed_log":          "caretaker_id",
-	"diaper_log":        "caretaker_id",
-	"medicine_log":      "caretaker_id",
-	"bath_log":          "caretaker_id",
-	"note_log":          "caretaker_id",
-	"milestone_log":     "caretaker_id",
-	"measurement_log":   "caretaker_id",
-	"pump_log":          "caretaker_id",
-	"play_log":          "caretaker_id",
-	"vaccine_log":       "caretaker_id",
-	"vaccine_document":  "uploaded_by",
-	"vaccine_dismissal": "dismissed_by",
-	"family_invite":     "created_by",
-	"api_key":           "created_by",
-	"admin_audit":       "admin_id",
-	"calendar_event":    "created_by",
-	"calendar_assignee": "user_id",
+// Keyed by "table.column", not by table: a table can reference users
+// through more than one column (a future `approved_by` next to a
+// `created_by`), and a table-keyed map would silently accept the second one
+// as covered.
+var reassignedUserReferences = map[string]bool{
+	"sleep_log.caretaker_id":         true,
+	"feed_log.caretaker_id":          true,
+	"diaper_log.caretaker_id":        true,
+	"medicine_log.caretaker_id":      true,
+	"bath_log.caretaker_id":          true,
+	"note_log.caretaker_id":          true,
+	"milestone_log.caretaker_id":     true,
+	"measurement_log.caretaker_id":   true,
+	"pump_log.caretaker_id":          true,
+	"play_log.caretaker_id":          true,
+	"vaccine_log.caretaker_id":       true,
+	"vaccine_document.uploaded_by":   true,
+	"vaccine_dismissal.dismissed_by": true,
+	"family_invite.created_by":       true,
+	"api_key.created_by":             true,
+	"admin_audit.admin_id":           true,
+	"calendar_event.created_by":      true,
+	"calendar_assignee.user_id":      true,
 }
 
 // A migration that adds a new non-cascading reference to "users" — another
@@ -1049,36 +1206,61 @@ func TestUserDeleteCoversEveryNonCascadingUserReference(t *testing.T) {
 	}
 	defer rows.Close()
 
-	found := map[string]string{}
+	found := map[string]bool{}
 	for rows.Next() {
 		var table, column string
 		if err := rows.Scan(&table, &column); err != nil {
 			t.Fatalf("scan foreign key: %v", err)
 		}
-		found[table] = column
+		found[table+"."+column] = true
 	}
 	if err := rows.Err(); err != nil {
 		t.Fatalf("read foreign keys: %v", err)
 	}
 
-	for table, column := range found {
-		want, ok := reassignedUserReferences[table]
-		if !ok {
-			t.Errorf("%s.%s references users with no cascade and is NOT handled by "+
+	for ref := range found {
+		if !reassignedUserReferences[ref] {
+			t.Errorf("%s references users with no cascade and is NOT handled by "+
 				"ReassignUserReferences — add a branch there (or a DELETE, if it is an "+
 				"assignment rather than an attribution) or account deletion will fail on it",
-				table, column)
-			continue
-		}
-		if want != column {
-			t.Errorf("%s references users through %q, but ReassignUserReferences handles %q",
-				table, column, want)
+				ref)
 		}
 	}
-	for table := range reassignedUserReferences {
-		if _, ok := found[table]; !ok {
+	for ref := range reassignedUserReferences {
+		if !found[ref] {
 			t.Errorf("ReassignUserReferences handles %q, which no longer has a "+
-				"non-cascading foreign key to users — stale branch", table)
+				"non-cascading foreign key to users — stale branch", ref)
+		}
+	}
+
+	// The other direction: a CASCADE from a table that owns data would turn
+	// an account deletion into a data deletion. organizations is the one
+	// that matters — Limen ships an `organizations.user_id` creator column
+	// with ON DELETE CASCADE, and 00002_limen_align.sql drops it precisely
+	// so deleting a caretaker cannot take their family (and every log in it)
+	// with them. sqlc's schema view still shows that column, so codegen will
+	// not catch its return; this will.
+	var cascades []string
+	cascadeRows, err := a.Rig.Pool.Query(context.Background(), `
+		SELECT c.conrelid::regclass::text
+		FROM "pg_constraint" c
+		WHERE c.contype = 'f' AND c.confrelid = 'users'::regclass AND c.confdeltype = 'c'`)
+	if err != nil {
+		t.Fatalf("read cascading foreign keys: %v", err)
+	}
+	defer cascadeRows.Close()
+	for cascadeRows.Next() {
+		var table string
+		if err := cascadeRows.Scan(&table); err != nil {
+			t.Fatalf("scan cascading foreign key: %v", err)
+		}
+		cascades = append(cascades, table)
+	}
+	for _, table := range cascades {
+		if table == "organizations" {
+			t.Error("organizations references users with ON DELETE CASCADE — deleting a " +
+				"caretaker would delete every family they created, and every log in it. " +
+				"Either drop the column (as 00002 does) or add it to ReassignUserReferences")
 		}
 	}
 }
