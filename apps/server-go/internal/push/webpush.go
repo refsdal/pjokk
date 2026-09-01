@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -54,12 +55,24 @@ func New(q *gen.Queries, vapidPublic, vapidPrivate, appURL string) (*WebPush, er
 // the Sender port needs it.
 func (w *WebPush) Subject() string { return w.subject }
 
-// ToUser sends payload to every subscription registered for userID, pruning
-// whichever ones the push service reports as gone (404 or 410) along the
-// way, and returns how many deliveries succeeded. A per-subscription
-// send failure (network error, non-2xx that isn't 404/410) is neither
-// fatal to the batch nor treated as a delivery: it just doesn't count,
-// mirroring the TypeScript original's catch-and-continue.
+// ToUser sends payload to every subscription registered for userID, then
+// prunes whichever ones the push service reported as gone (404 or 410), and
+// returns how many deliveries succeeded. A per-subscription send failure
+// (network error, non-2xx that isn't 404/410) is neither fatal to the batch
+// nor treated as a delivery: it just doesn't count, mirroring the
+// TypeScript original's catch-and-continue.
+//
+// Sending happens for EVERY subscription before any pruning starts —
+// deliberately not delete-as-you-go. An early version deleted a dead
+// subscription inline, inside the send loop: if that DELETE itself failed,
+// ToUser returned early and every subscription later in the slice never got
+// a send attempt at all. The TypeScript original never had this failure
+// mode (it sent to every subscription via Promise.all, then pruned in one
+// batch afterwards) — collecting the dead endpoints and pruning once the
+// loop is done restores that guarantee. A prune failure is logged, not
+// returned: it must not retroactively undo or misreport the delivered
+// count, and the next ToUser call will simply try to prune the same
+// still-dead subscription again.
 func (w *WebPush) ToUser(ctx context.Context, userID string, p PushPayload) (int, error) {
 	subs, err := w.q.ListPushSubscriptionsByUser(ctx, userID)
 	if err != nil {
@@ -72,16 +85,22 @@ func (w *WebPush) ToUser(ctx context.Context, userID string, p PushPayload) (int
 	}
 
 	delivered := 0
+	var dead []gen.PushSubscription
 	for _, sub := range subs {
 		switch w.sendOne(ctx, sub, body) {
 		case outcomeOK:
 			delivered++
 		case outcomeGone:
-			if err := w.q.DeletePushSubscriptionByEndpoint(ctx, sub.Endpoint); err != nil {
-				return delivered, fmt.Errorf("push: prune dead subscription %q: %w", sub.ID, err)
-			}
+			dead = append(dead, sub)
 		}
 	}
+
+	for _, sub := range dead {
+		if err := w.q.DeletePushSubscriptionByEndpoint(ctx, sub.Endpoint); err != nil {
+			log.Printf("push: prune dead subscription %q: %v", sub.ID, err)
+		}
+	}
+
 	return delivered, nil
 }
 
@@ -107,6 +126,10 @@ func (w *WebPush) sendOne(ctx context.Context, sub gen.PushSubscription, body []
 		TTL:             3600,
 	})
 	if err != nil {
+		// Matches push.ts's console.warn("push send failed:", err): a
+		// transport failure is worth knowing about operationally, even
+		// though it's deliberately not fatal to the rest of the batch.
+		log.Printf("push: send to subscription %q failed: %v", sub.ID, err)
 		return outcomeError
 	}
 	defer resp.Body.Close()
@@ -118,5 +141,6 @@ func (w *WebPush) sendOne(ctx context.Context, sub gen.PushSubscription, body []
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return outcomeOK
 	}
+	log.Printf("push: send to subscription %q got unexpected status %d", sub.ID, resp.StatusCode)
 	return outcomeError
 }

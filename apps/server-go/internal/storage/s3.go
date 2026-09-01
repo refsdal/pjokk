@@ -110,6 +110,11 @@ func isNotFound(err error) bool {
 	return false
 }
 
+// Delete batches every key into one DeleteObjects call. The S3 API caps a
+// single DeleteObjects request at 1000 keys; today's callers (a handful of
+// vaccine-entry attachments, a handful of pruned backup snapshots) stay far
+// below that, so this does not chunk. Chunk into 1000-key batches if a
+// future caller's keys slice can grow past that.
 func (s *s3Storage) Delete(ctx context.Context, keys ...string) error {
 	if len(keys) == 0 {
 		return nil

@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -290,5 +291,89 @@ func TestToUserWithNoSubscriptionsDeliversNothing(t *testing.T) {
 	}
 	if delivered != 0 {
 		t.Errorf("delivered = %d, want 0", delivered)
+	}
+}
+
+// TestToUserAttemptsEverySubscriptionEvenWhenAnEarlierOneIs410 covers the
+// review finding that ToUser used to prune a dead subscription inline,
+// inside the send loop: a subscription ordered before the LAST one in the
+// slice being 410 must not stop the last one from ever being attempted.
+// Pruning now happens in a second pass after every send has been attempted,
+// so all three subscriptions here must receive a request regardless of the
+// order the slice was iterated in.
+func TestToUserAttemptsEverySubscriptionEvenWhenAnEarlierOneIs410(t *testing.T) {
+	rig := testrig.Setup(t)
+	ctx := context.Background()
+
+	var mu sync.Mutex
+	var requestOrder []string
+	record := func(name string, status int) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			mu.Lock()
+			requestOrder = append(requestOrder, name)
+			mu.Unlock()
+			w.WriteHeader(status)
+		}
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ok-1", record("ok-1", http.StatusCreated))
+	mux.HandleFunc("/gone", record("gone", http.StatusGone))
+	mux.HandleFunc("/ok-2", record("ok-2", http.StatusCreated))
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	insertFamilyAndUser(t, ctx, rig, "fam-push-order", "user-push-order")
+	createSubscription(t, ctx, rig, "fam-push-order", "user-push-order", server.URL+"/ok-1")
+	createSubscription(t, ctx, rig, "fam-push-order", "user-push-order", server.URL+"/gone")
+	last := createSubscription(t, ctx, rig, "fam-push-order", "user-push-order", server.URL+"/ok-2")
+
+	priv, pub := generateVAPIDKeys(t)
+	sender, err := push.New(rig.Q, pub, priv, "https://app.pjokk.test")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	delivered, err := sender.ToUser(ctx, "user-push-order", push.PushPayload{Title: "t", Body: "b"})
+	if err != nil {
+		t.Fatalf("ToUser: %v", err)
+	}
+	if delivered != 2 {
+		t.Errorf("delivered = %d, want 2", delivered)
+	}
+
+	mu.Lock()
+	order := append([]string(nil), requestOrder...)
+	mu.Unlock()
+	if len(order) != 3 {
+		t.Fatalf("request order = %v, want all 3 subscriptions to receive a send attempt", order)
+	}
+	sawOK2 := false
+	for _, name := range order {
+		if name == "ok-2" {
+			sawOK2 = true
+		}
+	}
+	if !sawOK2 {
+		t.Errorf("request order = %v, want the subscription AFTER the 410 (ok-2) to have been attempted", order)
+	}
+
+	// The last subscription (the one the old inline-delete code would have
+	// abandoned) must still be present: only the 410 one gets pruned.
+	subs, err := rig.Q.ListPushSubscriptionsByUser(ctx, "user-push-order")
+	if err != nil {
+		t.Fatalf("ListPushSubscriptionsByUser: %v", err)
+	}
+	if len(subs) != 2 {
+		t.Fatalf("subscriptions after the send = %d, want 2 (only the 410 pruned)", len(subs))
+	}
+	foundLast := false
+	for _, sub := range subs {
+		if sub.Endpoint == last.Endpoint {
+			foundLast = true
+		}
+	}
+	if !foundLast {
+		t.Errorf("remaining subscriptions = %+v, want the last one (%q) still present", subs, last.Endpoint)
 	}
 }
