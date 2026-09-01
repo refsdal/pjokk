@@ -50,18 +50,18 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: apps/server-go/go.mod
+          go-version-file: apps/server/go.mod
 
-      # apps/server-go is the live backend (apps/api and apps/server are the
-      # pre-migration TS backend, still built above until Task 30 deletes
-      # them). Same TEST_DATABASE_URL, same Postgres service — -p 1 because
-      # several Go test packages truncate shared tables between tests and
-      # are not safe to run as concurrent packages against one database.
+      # apps/server is the backend: a Go module, outside the bun workspace,
+      # so the steps above never touch it. Same TEST_DATABASE_URL, same
+      # Postgres service — -p 1 because several Go test packages truncate
+      # shared tables between tests and are not safe to run as concurrent
+      # packages against one database.
       - name: Go vet
-        run: cd apps/server-go && go vet ./...
+        run: cd apps/server && go vet ./...
 
       - name: Go tests
-        run: cd apps/server-go && go test -p 1 -count=1 ./...
+        run: cd apps/server && go test -p 1 -count=1 ./...
 
       - name: Build
         run: bun run build

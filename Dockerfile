@@ -3,7 +3,7 @@
 # Pjokk — one image, one static Go binary, five modes selected by argv[1]:
 # the web server (default: migrate-then-serve-and-schedule), `server` (HTTP
 # only), `worker` (scheduler only), `migrate` and `cron <job>`, plus
-# `healthcheck` for HEALTHCHECK below. See apps/server-go/cmd/pjokk/main.go
+# `healthcheck` for HEALTHCHECK below. See apps/server/cmd/pjokk/main.go
 # for the authoritative dispatch table.
 #
 # The runtime stage is `scratch`: no shell, no libc, no package manager, no
@@ -26,12 +26,12 @@ WORKDIR /app
 
 # Every workspace manifest, and ONLY the manifests: this layer exists so that
 # editing source never reinstalls. `bun install --frozen-lockfile` validates
-# the lockfile against the whole workspace, so the manifests of workspaces
-# this image never builds (apps/api, apps/server, apps/landing) have to be
-# here too — omitting them is a lockfile mismatch, not a smaller install.
+# the lockfile against the whole workspace, so the manifest of apps/landing —
+# a workspace this image never builds — has to be here too; omitting it is a
+# lockfile mismatch, not a smaller install. apps/server is not listed at all:
+# it is the Go module now, with no package.json and no place in the bun
+# workspace.
 COPY package.json bun.lock ./
-COPY apps/api/package.json ./apps/api/
-COPY apps/server/package.json ./apps/server/
 COPY apps/landing/package.json ./apps/landing/
 COPY apps/frontend/package.json ./apps/frontend/
 COPY packages/shared/package.json ./packages/shared/
@@ -66,11 +66,11 @@ FROM --platform=$BUILDPLATFORM golang:1.27 AS build
 ARG TARGETOS TARGETARCH
 WORKDIR /src
 
-COPY apps/server-go/go.mod apps/server-go/go.sum ./
+COPY apps/server/go.mod apps/server/go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod,id=pjokk-gomod \
     go mod download
 
-COPY apps/server-go/ ./
+COPY apps/server/ ./
 
 # The real SPA replaces the placeholder index.html that internal/web commits
 # so `go build`/`go test` have something to embed. This MUST happen before
@@ -79,7 +79,7 @@ COPY apps/server-go/ ./
 COPY --from=frontend /app/dist/client ./internal/web/dist
 
 # No `go generate` here: sqlc and oapi-codegen output is committed (see
-# apps/server-go/generate.go), and a code generator in the image build is a
+# apps/server/generate.go), and a code generator in the image build is a
 # second, unreviewed source of truth for what ships.
 #
 # CGO_ENABLED=0 is what makes the scratch stage possible at all — a cgo build

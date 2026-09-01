@@ -11,8 +11,8 @@ dev.db*
 .import.sql
 .env
 
-# apps/server-go embeds its SPA build from here; the placeholder index.html
+# apps/server embeds its SPA build from here; the placeholder index.html
 # committed alongside internal/web/web.go is real repo content, not a build
 # artifact — the blanket `dist/` rule above would otherwise swallow it.
-!apps/server-go/internal/web/dist/
-!apps/server-go/internal/web/dist/index.html
+!apps/server/internal/web/dist/
+!apps/server/internal/web/dist/index.html

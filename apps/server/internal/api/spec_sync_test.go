@@ -14,7 +14,7 @@ import (
 //
 // `go test` runs with the package's source directory as its working
 // directory, so both paths below are relative to
-// apps/server-go/internal/api.
+// apps/server/internal/api.
 func TestEmbeddedSpecMatchesRepoRoot(t *testing.T) {
 	embedded, err := os.ReadFile("pjokk.yaml")
 	if err != nil {
@@ -28,7 +28,7 @@ func TestEmbeddedSpecMatchesRepoRoot(t *testing.T) {
 
 	if !bytes.Equal(embedded, root) {
 		t.Fatalf("internal/api/pjokk.yaml has drifted from openapi/pjokk.yaml — " +
-			"run `go generate ./...` from apps/server-go to resync the embedded copy, " +
+			"run `go generate ./...` from apps/server to resync the embedded copy, " +
 			"then commit the result")
 	}
 }

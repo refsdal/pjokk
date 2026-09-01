@@ -1,6 +1,6 @@
 // Package api is the HTTP surface's composition point: it builds the
 // /api/* handler from Deps (the collaborators the composition root in
-// apps/server-go/cmd/pjokk assembles) and the generated OpenAPI-derived
+// apps/server/cmd/pjokk assembles) and the generated OpenAPI-derived
 // server code in internal/api/gen.
 //
 // package web wraps whatever NewHandler returns with static asset serving
@@ -81,9 +81,9 @@ import (
 )
 
 // Deps is every collaborator the API layer needs, assembled by the
-// composition root (apps/server, née; here apps/server-go/cmd/pjokk) and
-// never constructed by this package itself (CLAUDE.md's Deps discipline,
-// carried over from apps/api).
+// composition root (apps/server/cmd/pjokk) and never constructed by this
+// package itself (CLAUDE.md's Deps discipline, carried over from the
+// TypeScript apps/api this package replaced).
 //
 // Storage, RateLimit and Push are minimal ports declared in their own
 // packages ahead of their real implementations (Tasks 6/7) so this struct

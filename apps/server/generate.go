@@ -1,6 +1,6 @@
 // Command go generate regenerates the OpenAPI-derived code in
 // internal/api/gen from openapi/pjokk.yaml (repo root). Run from
-// apps/server-go:
+// apps/server:
 //
 //	export PATH=$HOME/.local/go/bin:$HOME/go/bin:$PATH
 //	go generate ./...

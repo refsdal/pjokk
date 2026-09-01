@@ -17,7 +17,7 @@ name: Release
 # container runs is deployment infrastructure this repo does not own. Rolling
 # out means, in order:
 #
-#   1. `/app/dispatch migrate` as a one-off (Job / initContainer / compose
+#   1. `/app/pjokk migrate` as a one-off (Job / initContainer / compose
 #      `migrate` service). Before the new image serves traffic: migrations are
 #      append-only, so old code running briefly against a newer schema is
 #      safe, whereas new code against an older schema is not.
@@ -114,6 +114,19 @@ jobs:
 
       - name: Tests
         run: bun run test
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/server/go.mod
+
+      # The backend is Go and outside the bun workspace, so the two steps
+      # above cover only the SPA and the landing site. Without these a
+      # release could publish an image whose server was never tested.
+      - name: Go vet
+        run: cd apps/server && go vet ./...
+
+      - name: Go tests
+        run: cd apps/server && go test -p 1 -count=1 ./...
 
   publish:
     needs: [version, verify]

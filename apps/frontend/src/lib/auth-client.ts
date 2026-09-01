@@ -8,7 +8,7 @@ import { API_BASE } from "./api";
 import { resetCache } from "./query";
 
 // Limen (Go) replaced better-auth here. Only a narrow slice of Limen's HTTP
-// surface is mounted server-side (apps/server-go/internal/auth/auth.go's
+// surface is mounted server-side (apps/server/internal/auth/auth.go's
 // allowedRouteIDs): credential sign-in, Google authorize + callback, signout,
 // GET /me, and organization create/list/switch. Everything else 404s, so this
 // module deliberately exposes only the calls that map onto that allowlist.

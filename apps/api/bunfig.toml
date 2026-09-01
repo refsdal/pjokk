@@ -1,7 +1,0 @@
-[test]
-# Applies the schema once and empties the database before each test. Lives in
-# this package rather than the repo root because bunfig.toml is resolved from
-# the working directory only: it does not merge with a parent and does not walk
-# up, so a root-level preload would either be ignored or would impose this
-# package's Postgres setup on packages that have no database.
-preload = ["./test/setup.ts"]
