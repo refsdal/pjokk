@@ -376,7 +376,7 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 		if startVal != nil {
 			startParam = pgtype.Timestamptz{Time: *startVal, Valid: true}
 		}
-		if _, err := qtx.UpdateCalendarEvent(ctx, dbgen.UpdateCalendarEventParams{
+		n, err := qtx.UpdateCalendarEvent(ctx, dbgen.UpdateCalendarEventParams{
 			FamilyID:               fam.FamilyID,
 			ID:                     req.Id,
 			TitleSet:               titleSet,
@@ -396,8 +396,19 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 			RemindMinutesBeforeSet: remindSet,
 			RemindMinutesBeforeVal: remindVal,
 			ClearRemindedAt:        rearm,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, err
+		}
+		// Re-check ownership against the UPDATE's own row count rather than
+		// trusting the pre-check (existing, fetched above) alone: a
+		// concurrent delete between that check and this transaction's
+		// UPDATE would otherwise write nothing and still report success.
+		// Mirrors apps/api/src/db/scoped.ts's updateCalendarEvent, which
+		// treats a zero-row update the same as the "not found" branch of
+		// its own ownership check.
+		if n == 0 {
+			return gen.UpdateCalendarEvent404JSONResponse(notFound()), nil
 		}
 	}
 

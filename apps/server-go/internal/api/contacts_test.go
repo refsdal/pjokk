@@ -311,3 +311,42 @@ func TestCreateContactBadEmailIs400AndUnknownIdIs404(t *testing.T) {
 		t.Errorf("unknown id PATCH status = %d, want 404", missing.Status)
 	}
 }
+
+// TestUpdateContactUnknownIdWithInvalidBabyIdIs400 pins the validation
+// order apps/api/src/routes/contacts.ts's updateContact uses: babiesValid
+// runs BEFORE the update ever attempts to find the row, so a PATCH naming
+// both a nonexistent contact id AND a babyId outside the caller's family
+// answers 400 INVALID_REFERENCE, not 404 — the reference check never gets
+// to see that the contact doesn't exist.
+func TestUpdateContactUnknownIdWithInvalidBabyIdIs400(t *testing.T) {
+	a := testrig.App(t)
+	_, cookie := a.NewFamily("Hansen", "parent@example.com")
+	familyB, _ := a.NewFamily("Other family", "other@example.com")
+	theirBabyID := a.NewBaby(familyB, "Their baby")
+
+	res := a.Do(http.MethodPatch, "/api/contacts/does-not-exist", cookie, map[string]any{
+		"babyIds": []string{theirBabyID},
+	})
+	if res.Status != http.StatusBadRequest {
+		t.Fatalf("status = %d, body %s, want 400", res.Status, res.Raw)
+	}
+	if res.JSON["code"] != "INVALID_REFERENCE" {
+		t.Errorf("code = %v, want INVALID_REFERENCE", res.JSON["code"])
+	}
+}
+
+// TestUpdateContactUnknownIdWithValidBabyIdsIs404 is the companion case:
+// once the babyIds themselves are all valid, the same PATCH against a
+// nonexistent contact id falls through to the ordinary 404.
+func TestUpdateContactUnknownIdWithValidBabyIdsIs404(t *testing.T) {
+	a := testrig.App(t)
+	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
+	babyID := a.NewBaby(familyID, "Nora")
+
+	res := a.Do(http.MethodPatch, "/api/contacts/does-not-exist", cookie, map[string]any{
+		"babyIds": []string{babyID},
+	})
+	if res.Status != http.StatusNotFound {
+		t.Errorf("status = %d, body %s, want 404", res.Status, res.Raw)
+	}
+}

@@ -187,13 +187,6 @@ func (d Deps) CreateContact(ctx context.Context, req gen.CreateContactRequestObj
 func (d Deps) UpdateContact(ctx context.Context, req gen.UpdateContactRequestObject) (gen.UpdateContactResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
-	if _, err := d.Q.GetContact(ctx, dbgen.GetContactParams{FamilyID: fam.FamilyID, ID: req.Id}); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return gen.UpdateContact404JSONResponse(notFound()), nil
-		}
-		return nil, err
-	}
-
 	fields, err := rawBodyFields(ctx)
 	if err != nil {
 		return nil, err
@@ -239,12 +232,24 @@ func (d Deps) UpdateContact(ctx context.Context, req gen.UpdateContactRequestObj
 	if babyIdsSet && babyIdsVal != nil {
 		babyIDs = uniqueStrings(*babyIdsVal)
 	}
+	// refsValid runs BEFORE the existence check below — apps/api/src/routes/
+	// contacts.ts's updateContact calls babiesValid before it ever attempts
+	// the update, so a PATCH naming both a nonexistent/cross-family contact
+	// id AND an invalid babyId answers 400 INVALID_REFERENCE, not 404 (see
+	// TestUpdateContactUnknownIdWithInvalidBabyIdIs400).
 	ok, err := refsValid(ctx, d, fam.FamilyID, babyIDs, nil)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		return gen.UpdateContact400JSONResponse{Error: "Unknown baby", Code: "INVALID_REFERENCE"}, nil
+	}
+
+	if _, err := d.Q.GetContact(ctx, dbgen.GetContactParams{FamilyID: fam.FamilyID, ID: req.Id}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return gen.UpdateContact404JSONResponse(notFound()), nil
+		}
+		return nil, err
 	}
 
 	anySet := nameSet || roleSet || iconSet || phoneSet || emailSet || websiteSet || notesSet
@@ -264,7 +269,7 @@ func (d Deps) UpdateContact(ctx context.Context, req gen.UpdateContactRequestObj
 	qtx := d.Q.WithTx(tx)
 
 	if anySet {
-		if _, err := qtx.UpdateContact(ctx, dbgen.UpdateContactParams{
+		n, err := qtx.UpdateContact(ctx, dbgen.UpdateContactParams{
 			FamilyID:   fam.FamilyID,
 			ID:         req.Id,
 			NameSet:    nameSet,
@@ -281,8 +286,18 @@ func (d Deps) UpdateContact(ctx context.Context, req gen.UpdateContactRequestObj
 			WebsiteVal: websiteVal,
 			NotesSet:   notesSet,
 			NotesVal:   notesVal,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, err
+		}
+		// Re-check ownership against the UPDATE's own row count rather than
+		// trusting the pre-check above: a concurrent delete between that
+		// check and this transaction's UPDATE would otherwise write nothing
+		// and still report success. Mirrors apps/api/src/db/scoped.ts's
+		// updateContact, which treats a zero-row update the same as the
+		// "not found" branch of its own ownership check.
+		if n == 0 {
+			return gen.UpdateContact404JSONResponse(notFound()), nil
 		}
 	}
 
