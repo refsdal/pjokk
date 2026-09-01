@@ -114,3 +114,14 @@ SELECT "banned" FROM "users" WHERE "id" = $1;
 -- those sessions outlive the operator's own access. Served by
 -- impersonation_admin_idx (00003_impersonation.sql).
 SELECT "impersonated_token" FROM "impersonation" WHERE "admin_id" = $1;
+
+-- name: GetUserRole :one
+-- Backs allowOrgCreation (see auth.go): the system-admin role that opens
+-- /admin lives on this column, not on any family membership.
+SELECT COALESCE("role", '') FROM "users" WHERE "id" = $1;
+
+-- name: CountMembershipsForUser :one
+-- Every family this user belongs to, across ALL organizations — unlike
+-- CountFamilyMembership (scoped to one organization_id), this backs
+-- allowOrgCreation's "no existing family yet" self-serve-founding check.
+SELECT COUNT(*)::int FROM "organization_members" WHERE "user_id" = $1;

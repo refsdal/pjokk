@@ -51,6 +51,20 @@ func (q *Queries) CountFamilyMembership(ctx context.Context, arg CountFamilyMemb
 	return column_1, err
 }
 
+const countMembershipsForUser = `-- name: CountMembershipsForUser :one
+SELECT COUNT(*)::int FROM "organization_members" WHERE "user_id" = $1
+`
+
+// Every family this user belongs to, across ALL organizations — unlike
+// CountFamilyMembership (scoped to one organization_id), this backs
+// allowOrgCreation's "no existing family yet" self-serve-founding check.
+func (q *Queries) CountMembershipsForUser(ctx context.Context, userID string) (int32, error) {
+	row := q.db.QueryRow(ctx, countMembershipsForUser, userID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const createImpersonation = `-- name: CreateImpersonation :exec
 INSERT INTO "impersonation" ("impersonated_token", "admin_token", "admin_id")
 VALUES ($1, $2, $3)
@@ -225,6 +239,19 @@ func (q *Queries) GetSessionRecord(ctx context.Context, token string) (GetSessio
 	var i GetSessionRecordRow
 	err := row.Scan(&i.UserID, &i.Metadata, &i.ExpiresAt)
 	return i, err
+}
+
+const getUserRole = `-- name: GetUserRole :one
+SELECT COALESCE("role", '') FROM "users" WHERE "id" = $1
+`
+
+// Backs allowOrgCreation (see auth.go): the system-admin role that opens
+// /admin lives on this column, not on any family membership.
+func (q *Queries) GetUserRole(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, getUserRole, id)
+	var role string
+	err := row.Scan(&role)
+	return role, err
 }
 
 const insertFamilyMemberRole = `-- name: InsertFamilyMemberRole :exec

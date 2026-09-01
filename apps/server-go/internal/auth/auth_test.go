@@ -598,7 +598,13 @@ func TestFamilyNamesMayRepeat(t *testing.T) {
 	f := newFixture(t, false)
 
 	oneID, _ := f.signIn("One", "one@example.com")
-	twoID, cookie := f.signIn("Two", "two@example.com")
+	twoID, _ := f.signIn("Two", "two@example.com")
+	// A third, still family-less user for the HTTP-route half of this test:
+	// allowOrgCreation (Task 22 fix) permits self-serve founding only while a
+	// user holds zero memberships, so reusing oneID/twoID here — both
+	// already admins of a family from the CreateFamily calls below — would
+	// conflate "family names may repeat" with that unrelated gate.
+	_, cookie := f.signIn("Three", "three@example.com")
 
 	first, err := f.svc.CreateFamily(f.ctx, oneID, "Hansen")
 	if err != nil {
@@ -619,6 +625,61 @@ func TestFamilyNamesMayRepeat(t *testing.T) {
 	f.mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("Limen's create route rejected a repeated family name: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestOrgCreationRestrictedToSystemAdminsAndFamilyLessUsers is a Task 22
+// regression test for a real leak found while porting apps/api/test/
+// security.test.ts's "only system admins can create families (H2)": the
+// Go port had NO equivalent of auth.ts's allowUserToCreateOrganization gate.
+// organizations:create stayed enabled in allowedRouteIDs (see New's own
+// comment, "the family switcher") with nothing behind it, so ANY signed-in
+// user — including one already belonging to a family — could hit
+// POST /api/auth/organizations directly and found an arbitrary new family,
+// admin of their own creation, entirely bypassing the closed-alpha
+// invite-code gate CLAUDE.md commits to. Fixed by allowOrgCreation (auth.go),
+// wired in as organization.WithAllowOrgCreation: a system admin may always
+// create; anyone else may self-serve found exactly one family, while they
+// hold zero memberships, and must go through an invite after that.
+func TestOrgCreationRestrictedToSystemAdminsAndFamilyLessUsers(t *testing.T) {
+	f := newFixture(t, false)
+
+	create := func(cookie *http.Cookie) int {
+		req := httptest.NewRequest(http.MethodPost, auth.BasePath+"/organizations", strings.NewReader(`{"name":"Rogue family"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(cookie)
+		rec := httptest.NewRecorder()
+		f.mux.ServeHTTP(rec, req)
+		return rec.Code
+	}
+
+	// A brand-new, family-less user may self-serve found their first family.
+	userID, cookie := f.signIn("Founder", "founder@example.com")
+	if code := create(cookie); code != http.StatusCreated {
+		t.Fatalf("first (family-less) create status = %d, want 201", code)
+	}
+
+	// The same now-member user may NOT found a second one.
+	if code := create(cookie); code != http.StatusForbidden {
+		t.Fatalf("second create by an existing member status = %d, want 403", code)
+	}
+
+	// Promoting them to system admin lifts the restriction, same as the TS
+	// predecessor's H2 test (rig() denied, then role=admin allowed).
+	f.promote(userID)
+	if code := create(cookie); code != http.StatusCreated {
+		t.Fatalf("sysadmin create status = %d, want 201", code)
+	}
+
+	// The internal CreateFamily entry point (invite/admin flows, tests)
+	// enforces the identical rule for an ordinary already-member user, not
+	// just the HTTP route.
+	memberID, _ := f.signIn("Plain member", "plain-member@example.com")
+	if _, err := f.svc.CreateFamily(f.ctx, memberID, "First"); err != nil {
+		t.Fatalf("first CreateFamily for a family-less user: %v", err)
+	}
+	if _, err := f.svc.CreateFamily(f.ctx, memberID, "Second"); err == nil {
+		t.Fatal("CreateFamily allowed an existing member to found a second family")
 	}
 }
 

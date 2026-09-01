@@ -188,6 +188,13 @@ func New(cfg Config) (Service, error) {
 	// the pool and is finished when the pool is closed by its owner.
 	sqlDB := stdlib.OpenDBFromPool(cfg.Pool)
 
+	// A standalone Queries wrapping the same pool, for the allowOrgCreation
+	// closure below — built here because organization.New runs before the
+	// service (and its own s.q) exists. gen.New is a thin wrapper with no
+	// state of its own, so a second one over the same *pgxpool.Pool costs
+	// nothing.
+	authQueries := gen.New(cfg.Pool)
+
 	core := &corePlugin{}
 	plugins := []limen.Plugin{
 		credentialpassword.New(),
@@ -207,6 +214,21 @@ func New(cfg Config) (Service, error) {
 					return provided
 				}
 				return familySlug(name)
+			}),
+			// Task 22 fix (security review H2 — "only system admins can
+			// create families"): apps/api/src/infrastructure/auth.ts's
+			// allowUserToCreateOrganization gate had NO Go-side equivalent.
+			// organizations:create stays enabled in allowedRouteIDs above
+			// for the SPA's self-serve founding + family switcher, but
+			// without this hook ANY signed-in user — including one who
+			// already belongs to a family — could call it directly and
+			// spin up an arbitrary new family, admin of their own, wholly
+			// bypassing the closed-alpha invite-code gate. Mirrors the TS
+			// rule exactly: a system admin may always create; anyone else
+			// may self-serve found ONE family while they hold zero
+			// memberships, and must use an invite code after that.
+			organization.WithAllowOrgCreation(func(ctx context.Context, user *limen.User) bool {
+				return allowOrgCreation(ctx, authQueries, idString(user.ID))
 			}),
 		),
 		core,
@@ -533,6 +555,36 @@ func (s *service) createUserWithoutCredential(ctx context.Context, name, email s
 		return "", fmt.Errorf("auth: read back created user: %w", err)
 	}
 	return idString(created.ID), nil
+}
+
+// allowOrgCreation is the Go-side port of apps/api/src/infrastructure/
+// auth.ts's allowUserToCreateOrganization, wired in as
+// organization.WithAllowOrgCreation (see New). A system admin may always
+// create a family; anyone else may do so exactly once, self-serve, while
+// they hold NO existing membership — after that, joining another family
+// goes through an invite code, never a second self-service create. Both
+// entry points (this package's own CreateFamily, used by the invite/admin
+// flows and tests, and Limen's own POST /organizations the SPA's family
+// switcher calls) run through organization.API.CreateOrganization, which
+// checks this hook, so the rule cannot be bypassed by hitting one path
+// instead of the other.
+//
+// Fails CLOSED (false) on a query error: an unreadable user cannot be
+// verified as either a system admin or family-less, and "deny" is the safe
+// side of that ambiguity — never "allow, and find out later."
+func allowOrgCreation(ctx context.Context, q *gen.Queries, userID string) bool {
+	role, err := q.GetUserRole(ctx, userID)
+	if err != nil {
+		return false
+	}
+	if role == RoleSystemAdmin {
+		return true
+	}
+	memberships, err := q.CountMembershipsForUser(ctx, userID)
+	if err != nil {
+		return false
+	}
+	return memberships == 0
 }
 
 // CreateFamily creates the organization and makes userID its first member
