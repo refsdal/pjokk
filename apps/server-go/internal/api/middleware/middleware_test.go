@@ -275,6 +275,78 @@ func TestRequireFamilyPopulatesTheFamilyContext(t *testing.T) {
 	}
 }
 
+// Pjokk writes exactly one role per membership, but the schema permits more
+// (Limen's shape: one row per role held). If that ever happens the resolved
+// role must be the most privileged one — sorting by the role NAME would rank
+// "member" ahead of "owner" and silently demote the caller.
+func TestRequireFamilyResolvesTheMostPrivilegedRole(t *testing.T) {
+	f := newFixture(t)
+	userID, cookie := f.signIn("Two Roles", "tworoles@example.com")
+	familyID := f.family(userID, cookie.Value, "Hansen")
+	f.exec(`DELETE FROM "organization_member_roles" WHERE "organization_id" = $1`, familyID)
+	f.exec(`
+		INSERT INTO "organization_member_roles" ("member_id", "organization_id", "role")
+		SELECT om."id", om."organization_id", r."role"
+		FROM "organization_members" om, (VALUES ('member'), ('owner')) AS r("role")
+		WHERE om."organization_id" = $1`, familyID)
+
+	p := &probe{}
+	handler := middleware.Session(f.deps)(
+		middleware.RequireFamily(f.deps)(middleware.RequireAdmin()(p.handler())))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/invites", nil)
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body %s — an owner was demoted to member", rec.Code, rec.Body.String())
+	}
+	if p.family.MemberRole != "owner" {
+		t.Errorf("MemberRole = %q, want owner", p.family.MemberRole)
+	}
+}
+
+// A membership row with no role row still IS a membership. RequireFamily's
+// job is tenancy, not authorization: the caller gets in with an empty role,
+// which is member-level access and fails RequireAdmin. The alternative — 403
+// NOT_MEMBER — would lock a family out of its own data over a missing role
+// row, which is the wrong direction to fail.
+func TestRequireFamilyAdmitsARolelessMembership(t *testing.T) {
+	f := newFixture(t)
+	userID, cookie := f.signIn("Roleless", "roleless@example.com")
+	familyID := f.family(userID, cookie.Value, "Hansen")
+	f.exec(`DELETE FROM "organization_member_roles" WHERE "organization_id" = $1`, familyID)
+
+	p := &probe{}
+	handler := middleware.Session(f.deps)(middleware.RequireFamily(f.deps)(p.handler()))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/summary", nil)
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body %s", rec.Code, rec.Body.String())
+	}
+	if p.family.FamilyID != familyID {
+		t.Errorf("FamilyID = %q, want %q", p.family.FamilyID, familyID)
+	}
+	if p.family.MemberRole != "" {
+		t.Errorf("MemberRole = %q, want empty", p.family.MemberRole)
+	}
+
+	// ...and that empty role is refused the admin surface.
+	adminProbe := &probe{}
+	adminHandler := middleware.Session(f.deps)(
+		middleware.RequireFamily(f.deps)(middleware.RequireAdmin()(adminProbe.handler())))
+	adminReq := httptest.NewRequest(http.MethodGet, "/api/invites", nil)
+	adminReq.AddCookie(cookie)
+	adminRec := httptest.NewRecorder()
+	adminHandler.ServeHTTP(adminRec, adminReq)
+	assertRejected(t, adminRec, adminProbe, http.StatusForbidden, "FORBIDDEN")
+}
+
 // -------------------------------------------------------------------------
 // Impersonated writes — REF §A5 item 2, second half
 // -------------------------------------------------------------------------
@@ -874,6 +946,58 @@ func TestTrustedProxyRewritesRemoteAddr(t *testing.T) {
 	}
 	if req.RemoteAddr != "192.0.2.1:1234" {
 		t.Errorf("the original request was mutated: RemoteAddr = %q", req.RemoteAddr)
+	}
+}
+
+// RFC 7230 lets a proxy append its observation as a SEPARATE header line, and
+// nginx-class ingresses do. Reading only the first line would leave
+// hop-counting inside client-supplied data while the trusted proxy's actual
+// observation sat unseen in the second — a forged client address.
+func TestTrustedProxyReadsEveryForwardedForLine(t *testing.T) {
+	var seen string
+	next := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { seen = r.RemoteAddr })
+
+	req := httptest.NewRequest(http.MethodGet, "/api/thing", nil)
+	// The client forged a chain; the proxy appended what it really saw.
+	req.Header.Add("X-Forwarded-For", "9.9.9.9, 198.51.100.7")
+	req.Header.Add("X-Forwarded-For", "203.0.113.5")
+	middleware.TrustedProxy(1)(next).ServeHTTP(httptest.NewRecorder(), req)
+
+	host, _, err := net.SplitHostPort(seen)
+	if err != nil {
+		host = seen
+	}
+	if host == "198.51.100.7" {
+		t.Fatal("only the first X-Forwarded-For line was read: the client's forged chain won")
+	}
+	if host != "203.0.113.5" {
+		t.Errorf("RemoteAddr = %q, want the address the trusted proxy appended (203.0.113.5)", seen)
+	}
+}
+
+// The same header handling on the limiter's own address resolution: a
+// multi-line header and the equivalent single-line one must land in the SAME
+// bucket, or an attacker splits the header and gets a fresh one per request.
+func TestRateLimitReadsEveryForwardedForLine(t *testing.T) {
+	f := newFixture(t)
+	p := &probe{}
+	handler := middleware.RateLimit(f.deps.RateLimit, "test-multiline", 1, 600, false, 1)(p.handler())
+
+	multi := httptest.NewRequest(http.MethodGet, "/api/thing", nil)
+	multi.Header.Add("X-Forwarded-For", "9.9.9.9, 198.51.100.7")
+	multi.Header.Add("X-Forwarded-For", "203.0.113.5")
+	multiRec := httptest.NewRecorder()
+	handler.ServeHTTP(multiRec, multi)
+	if multiRec.Code != http.StatusOK {
+		t.Fatalf("first request: %d", multiRec.Code)
+	}
+
+	single := httptest.NewRequest(http.MethodGet, "/api/thing", nil)
+	single.Header.Set("X-Forwarded-For", "9.9.9.9, 198.51.100.7, 203.0.113.5")
+	singleRec := httptest.NewRecorder()
+	handler.ServeHTTP(singleRec, single)
+	if singleRec.Code != http.StatusTooManyRequests {
+		t.Errorf("the single-line equivalent got %d, want 429 — it must share the bucket", singleRec.Code)
 	}
 }
 

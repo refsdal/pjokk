@@ -63,10 +63,21 @@ WHERE "id" = $1;
 --
 -- The role lives on organization_member_roles, one row per role held
 -- (00002_limen_align.sql). Pjokk assigns exactly one — SetMemberRole is
--- delete-then-insert — so the lateral picks a single row; ORDER BY makes the
--- choice deterministic if a future path ever writes two ('admin' sorts before
--- 'member' and 'owner', so the more privileged role wins a tie, matching the
--- single-role column the TypeScript predecessor read).
+-- delete-then-insert — so the lateral picks a single row. The ORDER BY is an
+-- explicit privilege order rather than a lexicographic one: sorting by the
+-- role NAME would rank member ahead of owner, silently demoting a member who
+-- somehow held both. This ranks admin, then owner, then everything else, so a
+-- membership that ever grows a second role keeps the access its most
+-- privileged one grants — the same answer the single-role column the
+-- TypeScript predecessor read would have given.
+--
+-- COALESCE to an empty string rather than treating a roleless membership as
+-- a rejection:
+-- the membership ROW is what membership means, and RequireFamily's job is
+-- tenancy, not authorization. An empty role reads and writes within the
+-- family (what every member may do) and fails RequireAdmin, which is the
+-- fail-safe direction — the alternative locks a family out of its own data
+-- over a missing role row.
 SELECT
     COALESCE(r."role", '') AS role,
     o."plan"
@@ -76,7 +87,11 @@ LEFT JOIN LATERAL (
     SELECT omr."role"
     FROM "organization_member_roles" omr
     WHERE omr."member_id" = om."id"
-    ORDER BY omr."role"
+    ORDER BY CASE omr."role"
+        WHEN 'admin' THEN 0
+        WHEN 'owner' THEN 1
+        ELSE 2
+    END, omr."role"
     LIMIT 1
 ) r ON true
 WHERE om."organization_id" = $1 AND om."user_id" = $2

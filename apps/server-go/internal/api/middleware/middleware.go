@@ -401,7 +401,7 @@ func RateLimit(store ratelimit.Store, name string, limit, windowSeconds int, glo
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			bucket := "global"
 			if !global {
-				address := ratelimit.ClientIP(r.Header.Get("X-Forwarded-For"), r.RemoteAddr, hops)
+				address := ratelimit.ClientIP(forwardedFor(r), r.RemoteAddr, hops)
 				sum := sha256.Sum256([]byte(address))
 				bucket = hex.EncodeToString(sum[:])[:32]
 			}
@@ -444,7 +444,7 @@ func TrustedProxy(hops int) func(http.Handler) http.Handler {
 			return next
 		}
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			address := ratelimit.ClientIP(r.Header.Get("X-Forwarded-For"), r.RemoteAddr, hops)
+			address := ratelimit.ClientIP(forwardedFor(r), r.RemoteAddr, hops)
 			if address == "" || address == "unknown" {
 				next.ServeHTTP(w, r)
 				return
@@ -463,6 +463,22 @@ func TrustedProxy(hops int) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, &rewritten)
 		})
 	}
+}
+
+// forwardedFor joins EVERY X-Forwarded-For header line into one chain.
+//
+// r.Header.Get returns only the first line, and RFC 7230 lets a proxy append
+// its observation either to the existing line or as a new one — nginx and
+// several ingress controllers do the latter. Reading just the first line
+// would then leave hop-counting inside client-supplied data while the trusted
+// proxy's actual observation sat unseen in the second line: forged rate-limit
+// buckets, and a forged RemoteAddr once TrustedProxy is enabled.
+//
+// The TypeScript original read the Fetch API's Headers.get, which joins all
+// lines with ", " — this restores that behaviour. ClientIP trims each entry,
+// so joining without a space is equivalent.
+func forwardedFor(r *http.Request) string {
+	return strings.Join(r.Header.Values("X-Forwarded-For"), ",")
 }
 
 // isRead reports whether the method is one of the two the rules treat as

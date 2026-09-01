@@ -68,6 +68,18 @@ func TestClientIP(t *testing.T) {
 			want:      "1.2.3.4",
 		},
 		{
+			name: "several header lines joined into one chain read as one chain",
+			// What middleware.forwardedFor produces from an
+			// `X-Forwarded-For: 9.9.9.9, 1.2.3.4` line plus a second
+			// `X-Forwarded-For: 203.0.113.5` line. It must count from the
+			// right of the WHOLE chain, not of the first line.
+			forwarded:  "9.9.9.9, 1.2.3.4,203.0.113.5",
+			socket:     "10.0.0.1:5555",
+			hops:       1,
+			want:       "203.0.113.5",
+			wantReason: "hop-counting inside only the first line lands in client-supplied data",
+		},
+		{
 			name:      "an empty header falls back to the socket address",
 			forwarded: "",
 			socket:    "10.0.0.1:5555",

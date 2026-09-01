@@ -142,6 +142,12 @@ func withSpecValidation(spec *openapi3.T, next http.Handler) http.Handler {
 // session must exist, nothing more (no family or role check — those routes
 // are documentation, not data). Everything else in /api/* sits behind
 // package middleware's chain.
+//
+// Note for whoever mounts middleware.Session across /api/: both it and this
+// resolve the session through SessionFromRequestRefreshing, so a request that
+// went through both during a refresh would carry the same Set-Cookie twice.
+// Drop this helper in favour of the middleware at that point rather than
+// stacking them.
 func requireSession(d Deps, w http.ResponseWriter, r *http.Request) bool {
 	session, err := d.Auth.SessionFromRequestRefreshing(w, r)
 	switch {
@@ -173,6 +179,13 @@ func NewHandler(d Deps) http.Handler {
 		panic(fmt.Sprintf("api: marshal embedded spec: %v", err))
 	}
 
+	if d.RateLimit == nil {
+		// One mistake, one failure mode: middleware.RateLimit panics on a nil
+		// store, so a Deps without one must fail here too rather than quietly
+		// serving an unlimited sign-in route.
+		panic("api: NewHandler needs a rate-limit store")
+	}
+
 	mux := http.NewServeMux()
 
 	// The auth handler is mounted directly, never behind spec validation.
@@ -188,14 +201,8 @@ func NewHandler(d Deps) http.Handler {
 	// around authHandler: net/http's ServeMux dispatches by specificity, so
 	// this claims exactly the credential sign-in POST and every other auth
 	// route reaches Limen untouched.
-	//
-	// Skipped when no store was supplied. A Deps without one is a test or a
-	// half-built composition root, and a nil store would panic at startup;
-	// the real composition root always supplies it.
-	if d.RateLimit != nil {
-		mux.Handle("POST "+auth.BasePath+"/signin/credential",
-			middleware.RateLimit(d.RateLimit, "auth-signin", 20, 600, false, d.TrustedProxyHops)(authHandler))
-	}
+	mux.Handle("POST "+auth.BasePath+"/signin/credential",
+		middleware.RateLimit(d.RateLimit, "auth-signin", 20, 600, false, d.TrustedProxyHops)(authHandler))
 
 	mux.HandleFunc("GET /api/openapi.json", func(w http.ResponseWriter, r *http.Request) {
 		if !requireSession(d, w, r) {
