@@ -267,9 +267,12 @@ self-hosted tracker has nobody to bill.
 ## Development
 
 Two toolchains, because the app is two halves: Go builds the server, Bun
-builds the SPA and the landing site.
+builds the SPA and the landing site. You do not install either by hand —
+[mise](https://mise.jdx.dev) pins both (plus the codegen tools `go generate`
+expects) in `.mise.toml`, and CI installs from the same file.
 
 ```sh
+mise install
 bun install
 docker compose -f docker-compose.test.yml up -d   # Postgres on :55432, for tests and dev
 

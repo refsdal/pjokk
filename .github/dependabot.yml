@@ -1,0 +1,33 @@
+# Dependabot keeps three ecosystems fresh. Workflow actions are pinned by
+# commit hash with a trailing version comment — Dependabot updates both the
+# hash and the comment together. Minor/patch bumps are grouped into one PR
+# per ecosystem to keep the noise down; majors arrive individually so their
+# changelogs get read.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: gomod
+    directory: /apps/server
+    schedule:
+      interval: weekly
+    groups:
+      go-minor-patch:
+        update-types: [minor, patch]
+        patterns: ["*"]
+
+  # The bun workspaces (bun.lock) go through the npm ecosystem.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      js-minor-patch:
+        update-types: [minor, patch]
+        patterns: ["*"]
