@@ -248,6 +248,24 @@ func (e CreateFeedType) Valid() bool {
 	}
 }
 
+// Defines values for CreateInviteRole.
+const (
+	CreateInviteRoleAdmin  CreateInviteRole = "admin"
+	CreateInviteRoleMember CreateInviteRole = "member"
+)
+
+// Valid indicates whether the value is a known member of the CreateInviteRole enum.
+func (e CreateInviteRole) Valid() bool {
+	switch e {
+	case CreateInviteRoleAdmin:
+		return true
+	case CreateInviteRoleMember:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateMeasurementType.
 const (
 	CreateMeasurementTypeHead   CreateMeasurementType = "head"
@@ -398,6 +416,66 @@ func (e FeedLogType) Valid() bool {
 	}
 }
 
+// Defines values for InviteRole.
+const (
+	InviteRoleAdmin  InviteRole = "admin"
+	InviteRoleMember InviteRole = "member"
+)
+
+// Valid indicates whether the value is a known member of the InviteRole enum.
+func (e InviteRole) Valid() bool {
+	switch e {
+	case InviteRoleAdmin:
+		return true
+	case InviteRoleMember:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for InviteInfoReason.
+const (
+	Exhausted InviteInfoReason = "exhausted"
+	Expired   InviteInfoReason = "expired"
+	NotFound  InviteInfoReason = "not_found"
+	Revoked   InviteInfoReason = "revoked"
+)
+
+// Valid indicates whether the value is a known member of the InviteInfoReason enum.
+func (e InviteInfoReason) Valid() bool {
+	switch e {
+	case Exhausted:
+		return true
+	case Expired:
+		return true
+	case NotFound:
+		return true
+	case Revoked:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for InviteInfoRole.
+const (
+	InviteInfoRoleAdmin  InviteInfoRole = "admin"
+	InviteInfoRoleMember InviteInfoRole = "member"
+)
+
+// Valid indicates whether the value is a known member of the InviteInfoRole enum.
+func (e InviteInfoRole) Valid() bool {
+	switch e {
+	case InviteInfoRoleAdmin:
+		return true
+	case InviteInfoRoleMember:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for MeasurementLogType.
 const (
 	MeasurementLogTypeHead   MeasurementLogType = "head"
@@ -518,6 +596,24 @@ func (e PushPrefsFeedReminderHours) Valid() bool {
 	case N4:
 		return true
 	case N6:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RedeemResultRole.
+const (
+	RedeemResultRoleAdmin  RedeemResultRole = "admin"
+	RedeemResultRoleMember RedeemResultRole = "member"
+)
+
+// Valid indicates whether the value is a known member of the RedeemResultRole enum.
+func (e RedeemResultRole) Valid() bool {
+	switch e {
+	case RedeemResultRoleAdmin:
+		return true
+	case RedeemResultRoleMember:
 		return true
 	default:
 		return false
@@ -1083,6 +1179,16 @@ type CreateFeedSide string
 // CreateFeedType defines model for CreateFeed.Type.
 type CreateFeedType string
 
+// CreateInvite Every field is optional; an empty (or absent) body uses every default.
+type CreateInvite struct {
+	ExpiresInHours *int              `json:"expiresInHours,omitempty"`
+	MaxUses        *int              `json:"maxUses,omitempty"`
+	Role           *CreateInviteRole `json:"role,omitempty"`
+}
+
+// CreateInviteRole defines model for CreateInvite.Role.
+type CreateInviteRole string
+
 // CreateMeasurement defines model for CreateMeasurement.
 type CreateMeasurement struct {
 	BabyId string                `json:"babyId"`
@@ -1239,6 +1345,37 @@ type FeedLogSide string
 // FeedLogType defines model for FeedLog.Type.
 type FeedLogType string
 
+// Invite defines model for Invite.
+type Invite struct {
+	Code      string     `json:"code"`
+	ExpiresAt time.Time  `json:"expiresAt"`
+	FamilyId  string     `json:"familyId"`
+	MaxUses   int        `json:"maxUses"`
+	RevokedAt *time.Time `json:"revokedAt"`
+	Role      InviteRole `json:"role"`
+
+	// Url `{AppURL}/join/{code}`, ready to render as a QR code.
+	Url       string `json:"url"`
+	UsedCount int    `json:"usedCount"`
+}
+
+// InviteRole defines model for Invite.Role.
+type InviteRole string
+
+// InviteInfo defines model for InviteInfo.
+type InviteInfo struct {
+	FamilyName *string           `json:"familyName"`
+	Reason     *InviteInfoReason `json:"reason"`
+	Role       *InviteInfoRole   `json:"role"`
+	Valid      bool              `json:"valid"`
+}
+
+// InviteInfoReason defines model for InviteInfo.Reason.
+type InviteInfoReason string
+
+// InviteInfoRole defines model for InviteInfo.Role.
+type InviteInfoRole string
+
 // Me familyId/memberRole/plan/impersonatedBy are null when the caller has no active family (or, for impersonatedBy, is not impersonated).
 type Me struct {
 	Email          string  `json:"email"`
@@ -1376,6 +1513,22 @@ type PushPrefsFeedReminderHours int
 type PushTestResult struct {
 	Sent int `json:"sent"`
 }
+
+// Redeem defines model for Redeem.
+type Redeem struct {
+	Code string `json:"code"`
+}
+
+// RedeemResult defines model for RedeemResult.
+type RedeemResult struct {
+	AlreadyMember bool             `json:"alreadyMember"`
+	FamilyId      string           `json:"familyId"`
+	FamilyName    string           `json:"familyName"`
+	Role          RedeemResultRole `json:"role"`
+}
+
+// RedeemResultRole defines model for RedeemResult.Role.
+type RedeemResultRole string
 
 // SetMemberRole defines model for SetMemberRole.
 type SetMemberRole struct {
@@ -1683,6 +1836,9 @@ type Wake struct {
 // BabyIdQuery defines model for babyIdQuery.
 type BabyIdQuery = string
 
+// CodePath defines model for codePath.
+type CodePath = string
+
 // IdPath defines model for idPath.
 type IdPath = string
 
@@ -1897,6 +2053,12 @@ type CreateFeedJSONRequestBody = CreateFeed
 
 // UpdateFeedJSONRequestBody defines body for UpdateFeed for application/json ContentType.
 type UpdateFeedJSONRequestBody = UpdateFeed
+
+// CreateInviteJSONRequestBody defines body for CreateInvite for application/json ContentType.
+type CreateInviteJSONRequestBody = CreateInvite
+
+// RedeemInviteJSONRequestBody defines body for RedeemInvite for application/json ContentType.
+type RedeemInviteJSONRequestBody = Redeem
 
 // CreateApiKeyJSONRequestBody defines body for CreateApiKey for application/json ContentType.
 type CreateApiKeyJSONRequestBody = CreateApiKey

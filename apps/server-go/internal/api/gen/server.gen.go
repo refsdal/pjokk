@@ -103,6 +103,21 @@ type ServerInterface interface {
 	// UpdateFeed Partial update. A field sent as `null` clears the column; an omitted field is left unchanged; an empty body is a no-op that returns the feed unchanged. `time`/`type` are not nullable — only settable or omitted. See internal/api/feeds.go for how this endpoint tells "omitted" apart from "null" (the generated request type alone cannot).
 	// (PATCH /api/feeds/{id})
 	UpdateFeed(w http.ResponseWriter, r *http.Request, id IdPath)
+	// ListInvites Invite codes ever issued for the family, newest first — used and revoked ones included. Family admin only.
+	// (GET /api/invites)
+	ListInvites(w http.ResponseWriter, r *http.Request)
+	// CreateInvite Mint an invite code (QR-at-Sunday-dinner grain: codes are shared aloud or by QR, not email-addressed like Limen's own organization invitations). Family admin only.
+	// (POST /api/invites)
+	CreateInvite(w http.ResponseWriter, r *http.Request)
+	// GetInviteInfo What the /join page shows before sign-in: which family, which role, still valid? No session required. Codes are credentials, so this is rate-limited: 30/10min per client plus a 500/10min global backstop against distributed guessing.
+	// (GET /api/invites/info/{code})
+	GetInviteInfo(w http.ResponseWriter, r *http.Request, code CodePath)
+	// RedeemInvite Join a family with an invite code. Requires a signed-in session — no active family required, since this IS how one is acquired. Membership and the code's use-count are written atomically in one transaction. Rate-limited: 10/10min per client plus a 200/10min global backstop.
+	// (POST /api/invites/redeem)
+	RedeemInvite(w http.ResponseWriter, r *http.Request)
+	// RevokeInvite Revoke a code (sets revokedAt) so it can no longer be redeemed. Family admin only.
+	// (DELETE /api/invites/{code})
+	RevokeInvite(w http.ResponseWriter, r *http.Request, code CodePath)
 	// ListApiKeys Bearer API keys for the family, newest first. The full key is never included — only createApiKey's response ever carries it. Family admin only; refused for API-key callers (Task 19).
 	// (GET /api/keys)
 	ListApiKeys(w http.ResponseWriter, r *http.Request)
@@ -964,6 +979,100 @@ func (siw *ServerInterfaceWrapper) UpdateFeed(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateFeed(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListInvites operation middleware
+func (siw *ServerInterfaceWrapper) ListInvites(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListInvites(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateInvite operation middleware
+func (siw *ServerInterfaceWrapper) CreateInvite(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateInvite(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetInviteInfo operation middleware
+func (siw *ServerInterfaceWrapper) GetInviteInfo(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "code" -------------
+	var code CodePath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "code", r.PathValue("code"), &code, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetInviteInfo(w, r, code)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RedeemInvite operation middleware
+func (siw *ServerInterfaceWrapper) RedeemInvite(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RedeemInvite(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeInvite operation middleware
+func (siw *ServerInterfaceWrapper) RevokeInvite(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "code" -------------
+	var code CodePath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "code", r.PathValue("code"), &code, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeInvite(w, r, code)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2676,6 +2785,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/keys", wrapper.ListApiKeys)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/keys", wrapper.CreateApiKey)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/keys/{id}", wrapper.RevokeApiKey)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/invites", wrapper.ListInvites)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/invites", wrapper.CreateInvite)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/invites/{code}", wrapper.RevokeInvite)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/invites/info/{code}", wrapper.GetInviteInfo)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/invites/redeem", wrapper.RedeemInvite)
 
 	return m
 }
@@ -3652,6 +3766,157 @@ func (response UpdateFeed200JSONResponse) VisitUpdateFeedResponse(w http.Respons
 type UpdateFeed404JSONResponse Error
 
 func (response UpdateFeed404JSONResponse) VisitUpdateFeedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInvitesRequestObject struct {
+}
+
+type ListInvitesResponseObject interface {
+	VisitListInvitesResponse(w http.ResponseWriter) error
+}
+
+type ListInvites200JSONResponse []Invite
+
+func (response ListInvites200JSONResponse) VisitListInvitesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateInviteRequestObject struct {
+	Body *CreateInviteJSONRequestBody
+}
+
+type CreateInviteResponseObject interface {
+	VisitCreateInviteResponse(w http.ResponseWriter) error
+}
+
+type CreateInvite201JSONResponse Invite
+
+func (response CreateInvite201JSONResponse) VisitCreateInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInviteInfoRequestObject struct {
+	Code CodePath `json:"code"`
+}
+
+type GetInviteInfoResponseObject interface {
+	VisitGetInviteInfoResponse(w http.ResponseWriter) error
+}
+
+type GetInviteInfo200JSONResponse InviteInfo
+
+func (response GetInviteInfo200JSONResponse) VisitGetInviteInfoResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeemInviteRequestObject struct {
+	Body *RedeemInviteJSONRequestBody
+}
+
+type RedeemInviteResponseObject interface {
+	VisitRedeemInviteResponse(w http.ResponseWriter) error
+}
+
+type RedeemInvite200JSONResponse RedeemResult
+
+func (response RedeemInvite200JSONResponse) VisitRedeemInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeemInvite400JSONResponse Error
+
+func (response RedeemInvite400JSONResponse) VisitRedeemInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeemInvite401JSONResponse Error
+
+func (response RedeemInvite401JSONResponse) VisitRedeemInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeInviteRequestObject struct {
+	Code CodePath `json:"code"`
+}
+
+type RevokeInviteResponseObject interface {
+	VisitRevokeInviteResponse(w http.ResponseWriter) error
+}
+
+type RevokeInvite200JSONResponse Ok
+
+func (response RevokeInvite200JSONResponse) VisitRevokeInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeInvite404JSONResponse Error
+
+func (response RevokeInvite404JSONResponse) VisitRevokeInviteResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -5600,6 +5865,21 @@ type StrictServerInterface interface {
 	// UpdateFeed Partial update. A field sent as `null` clears the column; an omitted field is left unchanged; an empty body is a no-op that returns the feed unchanged. `time`/`type` are not nullable — only settable or omitted. See internal/api/feeds.go for how this endpoint tells "omitted" apart from "null" (the generated request type alone cannot).
 	// (PATCH /api/feeds/{id})
 	UpdateFeed(ctx context.Context, request UpdateFeedRequestObject) (UpdateFeedResponseObject, error)
+	// ListInvites Invite codes ever issued for the family, newest first — used and revoked ones included. Family admin only.
+	// (GET /api/invites)
+	ListInvites(ctx context.Context, request ListInvitesRequestObject) (ListInvitesResponseObject, error)
+	// CreateInvite Mint an invite code (QR-at-Sunday-dinner grain: codes are shared aloud or by QR, not email-addressed like Limen's own organization invitations). Family admin only.
+	// (POST /api/invites)
+	CreateInvite(ctx context.Context, request CreateInviteRequestObject) (CreateInviteResponseObject, error)
+	// GetInviteInfo What the /join page shows before sign-in: which family, which role, still valid? No session required. Codes are credentials, so this is rate-limited: 30/10min per client plus a 500/10min global backstop against distributed guessing.
+	// (GET /api/invites/info/{code})
+	GetInviteInfo(ctx context.Context, request GetInviteInfoRequestObject) (GetInviteInfoResponseObject, error)
+	// RedeemInvite Join a family with an invite code. Requires a signed-in session — no active family required, since this IS how one is acquired. Membership and the code's use-count are written atomically in one transaction. Rate-limited: 10/10min per client plus a 200/10min global backstop.
+	// (POST /api/invites/redeem)
+	RedeemInvite(ctx context.Context, request RedeemInviteRequestObject) (RedeemInviteResponseObject, error)
+	// RevokeInvite Revoke a code (sets revokedAt) so it can no longer be redeemed. Family admin only.
+	// (DELETE /api/invites/{code})
+	RevokeInvite(ctx context.Context, request RevokeInviteRequestObject) (RevokeInviteResponseObject, error)
 	// ListApiKeys Bearer API keys for the family, newest first. The full key is never included — only createApiKey's response ever carries it. Family admin only; refused for API-key callers (Task 19).
 	// (GET /api/keys)
 	ListApiKeys(ctx context.Context, request ListApiKeysRequestObject) (ListApiKeysResponseObject, error)
@@ -6604,6 +6884,147 @@ func (sh *strictHandler) UpdateFeed(w http.ResponseWriter, r *http.Request, id I
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateFeedResponseObject); ok {
 		if err := validResponse.VisitUpdateFeedResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListInvites operation middleware
+func (sh *strictHandler) ListInvites(w http.ResponseWriter, r *http.Request) {
+	var request ListInvitesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListInvites(ctx, request.(ListInvitesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListInvites")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListInvitesResponseObject); ok {
+		if err := validResponse.VisitListInvitesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateInvite operation middleware
+func (sh *strictHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
+	var request CreateInviteRequestObject
+
+	var body CreateInviteJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateInvite(ctx, request.(CreateInviteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateInvite")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateInviteResponseObject); ok {
+		if err := validResponse.VisitCreateInviteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetInviteInfo operation middleware
+func (sh *strictHandler) GetInviteInfo(w http.ResponseWriter, r *http.Request, code CodePath) {
+	var request GetInviteInfoRequestObject
+
+	request.Code = code
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetInviteInfo(ctx, request.(GetInviteInfoRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetInviteInfo")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetInviteInfoResponseObject); ok {
+		if err := validResponse.VisitGetInviteInfoResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RedeemInvite operation middleware
+func (sh *strictHandler) RedeemInvite(w http.ResponseWriter, r *http.Request) {
+	var request RedeemInviteRequestObject
+
+	var body RedeemInviteJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RedeemInvite(ctx, request.(RedeemInviteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RedeemInvite")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RedeemInviteResponseObject); ok {
+		if err := validResponse.VisitRedeemInviteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeInvite operation middleware
+func (sh *strictHandler) RevokeInvite(w http.ResponseWriter, r *http.Request, code CodePath) {
+	var request RevokeInviteRequestObject
+
+	request.Code = code
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeInvite(ctx, request.(RevokeInviteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeInvite")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeInviteResponseObject); ok {
+		if err := validResponse.VisitRevokeInviteResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

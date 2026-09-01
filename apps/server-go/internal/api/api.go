@@ -146,7 +146,9 @@ func loadSpec() *openapi3.T {
 type authTier int
 
 const (
-	// tierPublic runs no auth chain at all: liveness/readiness probes.
+	// tierPublic runs no auth chain at all: liveness/readiness probes, plus
+	// (from Task 20) GET /api/invites/info/{code} — the /join page's
+	// pre-sign-in status check needs no caller at all.
 	tierPublic authTier = iota
 	// tierSession requires a resolved caller (session or API key) but NOT
 	// an active family. Only GET /api/me uses this today.
@@ -320,6 +322,21 @@ var operationAuthTiers = map[string]authTier{
 	"ListApiKeys":  tierAdmin,
 	"CreateApiKey": tierAdmin,
 	"RevokeApiKey": tierAdmin,
+
+	// Invites (Task 20; REF §A1 invites.ts). ListInvites/CreateInvite/
+	// RevokeInvite are the family-admin management surface, same tier as
+	// API keys above. GetInviteInfo is tierPublic — the /join page's
+	// pre-sign-in status check — and RedeemInvite is tierSession: a caller
+	// must be signed in, but (unlike every tierFamily/tierAdmin route) is
+	// NOT required to already have an active family, since redeeming a
+	// code is how one is acquired. Both public operations are additionally
+	// rate-limited by rateLimitChain below — a concern this map doesn't
+	// express, since it's orthogonal to who may call the operation at all.
+	"ListInvites":   tierAdmin,
+	"CreateInvite":  tierAdmin,
+	"RevokeInvite":  tierAdmin,
+	"GetInviteInfo": tierPublic,
+	"RedeemInvite":  tierSession,
 }
 
 // assertOperationAuthCoverage panics unless operationAuthTiers has exactly
@@ -418,6 +435,44 @@ func authChain(d Deps) gen.StrictMiddlewareFunc {
 			chain = func(h http.Handler) http.Handler { return apiKey(session(family(rejectAPIKey(h)))) }
 		default:
 			panic(fmt.Sprintf("api: unknown authTier %d for operation %q", tier, operationID))
+		}
+		return adaptMiddleware(chain)(f, operationID)
+	}
+}
+
+// rateLimitChain is the second gen.StrictMiddlewareFunc passed to
+// gen.NewStrictHandlerWithOptions, alongside authChain: the operationID-keyed
+// layer that applies the invite endpoints' credential rate limits (REF §A1
+// invites.ts's `middleware: [rateLimit(...), rateLimit(...)]` array on
+// inviteInfo/redeem — a per-operation middleware list has no equivalent at
+// this layer's granularity other than switching on operationID, same as
+// authChain does for auth tiers). Every other operationID is untouched.
+//
+// Listed AFTER authChain in NewHandler's middlewares slice. Per
+// gen.StrictServerInterface's generated dispatch (server.gen.go: `for _,
+// middleware := range sh.middlewares { handler = middleware(handler, op) }`)
+// the LAST entry ends up OUTERMOST — the same fold NewHandler's own
+// StdHTTPServerOptions.Middlewares comment documents for the unrelated
+// http.Handler-layer slice — so listing this second puts rate limiting
+// OUTSIDE the auth chain: a request is charged against its quota before
+// RequireSession gets a chance to reject it, matching the TypeScript
+// predecessor's behaviour (Hono's route middleware runs before the
+// handler's own session check).
+func rateLimitChain(d Deps) gen.StrictMiddlewareFunc {
+	inviteInfoIP := middleware.RateLimit(d.RateLimit, "invite-info", 30, 600, false, d.TrustedProxyHops)
+	inviteInfoGlobal := middleware.RateLimit(d.RateLimit, "invite-info-global", 500, 600, true, d.TrustedProxyHops)
+	inviteRedeemIP := middleware.RateLimit(d.RateLimit, "invite-redeem", 10, 600, false, d.TrustedProxyHops)
+	inviteRedeemGlobal := middleware.RateLimit(d.RateLimit, "invite-redeem-global", 200, 600, true, d.TrustedProxyHops)
+
+	return func(f gen.StrictHandlerFunc, operationID string) gen.StrictHandlerFunc {
+		var chain func(http.Handler) http.Handler
+		switch operationID {
+		case "GetInviteInfo":
+			chain = func(h http.Handler) http.Handler { return inviteInfoIP(inviteInfoGlobal(h)) }
+		case "RedeemInvite":
+			chain = func(h http.Handler) http.Handler { return inviteRedeemIP(inviteRedeemGlobal(h)) }
+		default:
+			return f
 		}
 		return adaptMiddleware(chain)(f, operationID)
 	}
@@ -623,7 +678,7 @@ func NewHandler(d Deps) http.Handler {
 	// leak internals (e.g. a raw pgx error) straight to the client).
 	strictHandler := gen.NewStrictHandlerWithOptions(
 		d,
-		[]gen.StrictMiddlewareFunc{authChain(d)},
+		[]gen.StrictMiddlewareFunc{authChain(d), rateLimitChain(d)},
 		gen.StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  requestErrorHandler,
 			ResponseErrorHandlerFunc: responseErrorHandler,

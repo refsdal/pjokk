@@ -2075,6 +2075,117 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/invites:
+    get:
+      operationId: listInvites
+      summary: >-
+        Invite codes ever issued for the family, newest first — used and
+        revoked ones included. Family admin only.
+      tags: [invites]
+      responses:
+        "200":
+          description: Invites for the family.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invite"
+    post:
+      operationId: createInvite
+      summary: >-
+        Mint an invite code (QR-at-Sunday-dinner grain: codes are shared
+        aloud or by QR, not email-addressed like Limen's own organization
+        invitations). Family admin only.
+      tags: [invites]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInvite"
+      responses:
+        "201":
+          description: Created invite code.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invite"
+  /api/invites/{code}:
+    delete:
+      operationId: revokeInvite
+      summary: >-
+        Revoke a code (sets revokedAt) so it can no longer be redeemed.
+        Family admin only.
+      tags: [invites]
+      parameters:
+        - $ref: "#/components/parameters/codePath"
+      responses:
+        "200":
+          description: Revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No such code in the caller's family, or already revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/invites/info/{code}:
+    get:
+      operationId: getInviteInfo
+      summary: >-
+        What the /join page shows before sign-in: which family, which
+        role, still valid? No session required. Codes are credentials, so
+        this is rate-limited: 30/10min per client plus a 500/10min global
+        backstop against distributed guessing.
+      tags: [invites]
+      parameters:
+        - $ref: "#/components/parameters/codePath"
+      responses:
+        "200":
+          description: Invite status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteInfo"
+  /api/invites/redeem:
+    post:
+      operationId: redeemInvite
+      summary: >-
+        Join a family with an invite code. Requires a signed-in session —
+        no active family required, since this IS how one is acquired.
+        Membership and the code's use-count are written atomically in one
+        transaction. Rate-limited: 10/10min per client plus a 200/10min
+        global backstop.
+      tags: [invites]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Redeem"
+      responses:
+        "200":
+          description: Joined (or already a member).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RedeemResult"
+        "400":
+          description: Invalid, expired, exhausted, or revoked code.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not signed in.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
 components:
   parameters:
@@ -2105,6 +2216,13 @@ components:
       name: memberId
       in: path
       description: The family-membership row id (NOT the user id).
+      required: true
+      schema:
+        type: string
+    codePath:
+      name: code
+      in: path
+      description: An invite code.
       required: true
       schema:
         type: string
@@ -3797,6 +3915,95 @@ components:
               description: >-
                 The full bearer token (`pjk_…`). Shown exactly once — this
                 response is the only place it ever appears.
+    Invite:
+      type: object
+      required:
+        - code
+        - familyId
+        - role
+        - expiresAt
+        - maxUses
+        - usedCount
+        - revokedAt
+        - url
+      properties:
+        code:
+          type: string
+        familyId:
+          type: string
+        role:
+          type: string
+          enum: [admin, member]
+        expiresAt:
+          type: string
+          format: date-time
+        maxUses:
+          type: integer
+        usedCount:
+          type: integer
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+        url:
+          type: string
+          description: "`{AppURL}/join/{code}`, ready to render as a QR code."
+    CreateInvite:
+      type: object
+      description: Every field is optional; an empty (or absent) body uses every default.
+      properties:
+        role:
+          type: string
+          enum: [admin, member]
+          default: member
+        expiresInHours:
+          type: integer
+          minimum: 1
+          maximum: 720
+          default: 72
+        maxUses:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 5
+    InviteInfo:
+      type: object
+      required: [valid, familyName, role, reason]
+      properties:
+        valid:
+          type: boolean
+        familyName:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [admin, member]
+          nullable: true
+        reason:
+          type: string
+          enum: [revoked, expired, exhausted, not_found]
+          nullable: true
+    Redeem:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 64
+    RedeemResult:
+      type: object
+      required: [familyId, familyName, role, alreadyMember]
+      properties:
+        familyId:
+          type: string
+        familyName:
+          type: string
+        role:
+          type: string
+          enum: [admin, member]
+        alreadyMember:
+          type: boolean
     Error:
       type: object
       description: >-
