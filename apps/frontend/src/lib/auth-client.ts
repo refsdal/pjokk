@@ -122,13 +122,24 @@ export const signUp = {
    * generated OpenAPI client (`lib/api.ts`'s `client`); it only exists
    * through this Limen-generated method, same as every other `signIn.*`/
    * `authClient.*` call in this file. Throws on failure, same as
-   * signIn.credential. Callers still call signIn.password right after (see
-   * Login.tsx) so session establishment — and its resetCache() — goes
-   * through the one place that already owns it, rather than relying on this
-   * call's own parseSession.
+   * signIn.credential.
+   *
+   * This route runs with parseSession:true and no skipStore, so Limen's
+   * applyEffects writes the new session into the SAME store useSession()
+   * subscribes to, synchronously, before this call even resolves — the
+   * account is already signed in the moment this returns. Do NOT follow it
+   * with signIn.password: that would be a redundant re-auth racing a
+   * <Navigate> that has already mounted (useSession() re-renders as soon as
+   * the store updates), which showed up as both a spurious round trip and a
+   * false "Sign-in failed" toast on an account that was actually created
+   * fine. Only resetCache() — mirroring signIn.password's own cache-reset
+   * half — belongs after it.
    */
   async credential(email: string, password: string): Promise<void> {
     await authClient.signUp.credential({ email, password });
+    // Mirrors signIn.password: nothing of any previous account's cached
+    // data should survive into this brand-new one.
+    await resetCache();
   },
 };
 

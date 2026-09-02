@@ -46,12 +46,16 @@ export function LoginScreen({ redirectTo = "/home" }: { redirectTo?: string }) {
     setBusy(true);
     try {
       if (mode === "create") {
-        // Create the account, then sign in with it exactly as the
-        // "Sign in" path does — same resetCache()/session-establishment
-        // code, no bespoke post-signup handling to keep in sync.
+        // signUp.credential already establishes the session (Limen writes
+        // it into the same store useSession() reads, synchronously, before
+        // this resolves) and resets the cache itself — a follow-up
+        // signIn.password would be a redundant re-auth racing the
+        // <Navigate> that useSession()'s re-render already mounted by the
+        // time it ran.
         await signUp.credential(email, password);
+      } else {
+        await signIn.password(email, password);
       }
-      await signIn.password(email, password);
       void navigate({ to: redirectTo });
     } catch (err) {
       toast(err instanceof Error ? err.message : t("Sign-in failed"), "error");
