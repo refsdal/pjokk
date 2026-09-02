@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { client, unwrap } from "@/lib/api";
 import { authClient, signOut, useSession } from "@/lib/auth-client";
-import { useMe } from "@/lib/data";
+import { useConfig, useMe } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { toLocalDateInput } from "@/lib/time";
 import { toast } from "@/lib/toast";
@@ -16,9 +16,15 @@ import { toast } from "@/lib/toast";
 export function WelcomeScreen() {
   const { data: session, isPending } = useSession();
   const me = useMe();
+  const config = useConfig();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const hasFamily = !!me.data?.familyId;
+  const isSysadmin = me.data?.role === "admin";
+  // Family creation is otherwise closed-alpha (invite-redeem only, #26):
+  // without this, POST /api/organizations 403s once OPEN_SIGNUP is off, so
+  // there is no point offering the form to someone who can't submit it.
+  const canCreate = (config.data?.openSignup ?? false) || isSysadmin;
 
   const [familyName, setFamilyName] = useState("");
   const [babyName, setBabyName] = useState("");
@@ -92,27 +98,36 @@ export function WelcomeScreen() {
       </div>
 
       {!hasFamily ? (
-        <form
-          className="space-y-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void createFamily();
-          }}
-        >
-          <Input
-            placeholder={t("Family name (e.g. “The Olsens”)")}
-            value={familyName}
-            onChange={(e) => setFamilyName(e.target.value)}
-          />
-          <Button
-            size="full"
-            type="submit"
-            disabled={busy || familyName.trim().length === 0}
-          >
-            {t("Create family")}
-          </Button>
+        <div className="space-y-6">
+          {canCreate && (
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void createFamily();
+              }}
+            >
+              <Input
+                placeholder={t("Family name (e.g. “The Olsens”)")}
+                value={familyName}
+                onChange={(e) => setFamilyName(e.target.value)}
+              />
+              <Button
+                size="full"
+                type="submit"
+                disabled={busy || familyName.trim().length === 0}
+              >
+                {t("Create family")}
+              </Button>
+            </form>
+          )}
 
-          <div className="space-y-2 pt-6 text-center">
+          {/* Signup is closed-alpha: family creation is invite-redeem-driven
+              (#26), so a family-less, non-open-signup, non-sysadmin visitor
+              would just get a 403 from the form above — it's hidden, and
+              this guidance (already what non-founders saw below the form)
+              becomes the primary content instead. */}
+          <div className={`space-y-2 text-center ${canCreate ? "pt-6" : ""}`}>
             <p className="text-sm font-semibold text-ink-soft">
               {t("Invited to a family?")}
             </p>
@@ -121,6 +136,13 @@ export function WelcomeScreen() {
                 "Open the invite link (or scan the QR) from your family's admin to join them instead.",
               )}
             </p>
+            {!canCreate && (
+              <p className="text-sm text-muted">
+                {t(
+                  "Pjokk is invite-only. Ask a family admin for an invite link.",
+                )}
+              </p>
+            )}
             <button
               type="button"
               className="text-sm text-muted underline"
@@ -131,7 +153,7 @@ export function WelcomeScreen() {
               {t("Sign out")}
             </button>
           </div>
-        </form>
+        </div>
       ) : (
         <form
           className="space-y-3"
