@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { apiSignIn, apiSignup, freshEmail, uiSignIn } from "./helpers";
+import { PASSWORD, apiSignIn, apiSignup, freshEmail, freshFamily, uiSignIn } from "./helpers";
 
 // The seam no other suite sees: the limen-auth client driving the real
 // login screen against the real backend.
@@ -40,4 +40,30 @@ test("signs out from Welcome", async ({ page, request }) => {
   // that abort IS the evidence, so swallow it and assert where we landed.
   await page.goto("/home").catch(() => {});
   await expect(page).toHaveURL(/\/login/, { timeout: 10_000 });
+});
+
+test("a returning user with a family signs in and lands on Home with their data", async ({ page, request, browser }) => {
+  // Set up an established account: family, baby, and a logged feed.
+  const { email } = await freshFamily(page, request, "returning");
+  await page.getByRole("button", { name: "Feed", exact: true }).click();
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText(/1 feeds/)).toBeVisible({ timeout: 10_000 });
+
+  // A brand-new context is a genuine returning session on a fresh device:
+  // no cookies, no persisted query cache, no service worker. Signing in
+  // through the login SCREEN must land on Home — not Welcome, the family
+  // already exists — with the baby and the earlier feed present. This is
+  // the complement to the new-user tests above, and the case the
+  // identity-caching regressions would have broken.
+  const ctx = await browser.newContext();
+  const returning = await ctx.newPage();
+  await returning.goto("/login");
+  await returning.getByPlaceholder("Email").fill(email);
+  await returning.getByPlaceholder("Password").fill(PASSWORD);
+  await returning.getByRole("button", { name: "Sign in with email" }).click();
+
+  await expect(returning).toHaveURL(/\/home/, { timeout: 10_000 });
+  await expect(returning.getByText("Baby returning").first()).toBeVisible();
+  await expect(returning.getByText(/1 feeds/)).toBeVisible();
+  await ctx.close();
 });

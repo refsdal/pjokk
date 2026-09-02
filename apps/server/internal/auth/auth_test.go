@@ -509,13 +509,16 @@ func TestFamilyLifecycleReachesSession(t *testing.T) {
 		t.Errorf("ActiveFamilyID = %q, want %q", ownerSession.ActiveFamilyID, familyID)
 	}
 
-	// The member's own session is untouched by the owner switching families.
+	// The member's session resolves to THEIR family independently: the
+	// resolver auto-activates the one family they belong to (regardless of
+	// the owner's switch above), so a returning member lands in it rather
+	// than being stranded family-less.
 	memberSession, err := f.svc.SessionFromRequest(signedInRequest(memberCookie))
 	if err != nil {
 		t.Fatalf("SessionFromRequest (member): %v", err)
 	}
-	if memberSession.ActiveFamilyID != "" {
-		t.Errorf("member ActiveFamilyID = %q, want empty", memberSession.ActiveFamilyID)
+	if memberSession.ActiveFamilyID != familyID {
+		t.Errorf("member ActiveFamilyID = %q, want %q (auto-activated)", memberSession.ActiveFamilyID, familyID)
 	}
 
 	// Promotion, then removal.
@@ -1065,5 +1068,49 @@ func assertRoles(t *testing.T, f *fixture, familyID, userID string, want []strin
 		if got[i] != want[i] {
 			t.Fatalf("roles = %v, want %v", got, want)
 		}
+	}
+}
+
+// A returning member's fresh sign-in has no active family set (only create,
+// switch, and invite-redeem set one), yet must resolve INTO their family —
+// otherwise the SPA strands them on /welcome asking them to create a family
+// they already belong to. resolveSession auto-selects it.
+func TestFreshSignInAutoActivatesTheMembersFamily(t *testing.T) {
+	f := newFixture(t, false)
+
+	ownerID, _ := f.signIn("Owner", "owner@example.com")
+	memberID, _ := f.signIn("Member", "member@example.com")
+	familyID, err := f.svc.CreateFamily(f.ctx, ownerID, "Nordmann")
+	if err != nil {
+		t.Fatalf("CreateFamily: %v", err)
+	}
+	if err := f.svc.AddMember(f.ctx, familyID, memberID, auth.RoleMember); err != nil {
+		t.Fatalf("AddMember: %v", err)
+	}
+
+	// A brand-new session for the SAME member (a second sign-in, e.g. a new
+	// device) — nothing has set this session's active org.
+	body, _ := json.Marshal(map[string]string{"credential": "member@example.com", "password": signInPassword})
+	rec := f.post(auth.BasePath+"/signin/credential", string(body))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("re-sign-in: %d %s", rec.Code, rec.Body.String())
+	}
+	freshCookie := f.sessionCookie(rec)
+	sess, err := f.svc.SessionFromRequest(signedInRequest(freshCookie))
+	if err != nil {
+		t.Fatalf("SessionFromRequest: %v", err)
+	}
+	if sess.ActiveFamilyID != familyID {
+		t.Errorf("fresh member session ActiveFamilyID = %q, want %q", sess.ActiveFamilyID, familyID)
+	}
+
+	// A genuinely family-less user stays family-less — nothing to activate.
+	_, lonerCookie := f.signIn("Loner", "loner@example.com")
+	loner, err := f.svc.SessionFromRequest(signedInRequest(lonerCookie))
+	if err != nil {
+		t.Fatalf("SessionFromRequest (loner): %v", err)
+	}
+	if loner.ActiveFamilyID != "" {
+		t.Errorf("loner ActiveFamilyID = %q, want empty", loner.ActiveFamilyID)
 	}
 }

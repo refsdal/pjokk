@@ -202,6 +202,26 @@ func (q *Queries) ListBabies(ctx context.Context, familyID string) ([]Baby, erro
 	return items, nil
 }
 
+const mostRecentMembership = `-- name: MostRecentMembership :one
+SELECT om."organization_id"
+FROM "organization_members" om
+WHERE om."user_id" = $1
+ORDER BY om."created_at" DESC, om."organization_id" DESC
+LIMIT 1
+`
+
+// The family a user most recently joined — used to auto-activate a session
+// that has no active organization yet (a returning user's fresh sign-in),
+// so they land in a family rather than being told to create one they
+// already belong to. Multi-family users can still switch; this just picks a
+// sane default.
+func (q *Queries) MostRecentMembership(ctx context.Context, userID string) (string, error) {
+	row := q.db.QueryRow(ctx, mostRecentMembership, userID)
+	var organization_id string
+	err := row.Scan(&organization_id)
+	return organization_id, err
+}
+
 const updateBaby = `-- name: UpdateBaby :one
 UPDATE "baby"
 SET "name" = $3, "birth_date" = $4, "sex" = $5

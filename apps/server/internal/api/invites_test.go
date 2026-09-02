@@ -196,27 +196,24 @@ func TestRedeemAddsMembershipAndIncrementsUseAtomically(t *testing.T) {
 		t.Fatalf("GET /api/babies after redeem: status = %d, body %s", after.Status, after.Raw)
 	}
 
-	// The membership itself is durable, not just that one session's active
-	// family: a completely fresh sign-in (new session, no active family
-	// yet) redeems the SAME code again — alreadyMember this time, since
-	// InsertOrganizationMember's row persisted — and, once its own
-	// setActive runs, sees the family too. This is the check that the
-	// hand-written organization_members/organization_member_roles insert
-	// inside redeemInviteTx produced rows RequireFamily's own membership
-	// query (the same one every other route relies on) actually
-	// recognises — not just something this test's own SQL can see.
+	// The membership is durable AND auto-activates on a fresh sign-in: a
+	// returning member gets a new session with no active family set, and the
+	// session resolver selects their family for them (see resolveSession) —
+	// so a domain route works immediately, without a re-redeem or a manual
+	// switch. This also proves the hand-written
+	// organization_members/organization_member_roles insert inside
+	// redeemInviteTx produced rows RequireFamily's own membership query (the
+	// same one every route relies on) actually recognises — not just
+	// something this test's own SQL can see.
 	freshCookie := a.SignIn("newcomer@example.com")
-	beforeFresh := a.DoArray(http.MethodGet, "/api/babies", freshCookie, nil)
-	if beforeFresh.Status != http.StatusForbidden {
-		t.Fatalf("GET /api/babies (fresh session, no active family yet): status = %d, want 403", beforeFresh.Status)
+	freshVisit := a.DoArray(http.MethodGet, "/api/babies", freshCookie, nil)
+	if freshVisit.Status != http.StatusOK {
+		t.Fatalf("GET /api/babies (fresh session auto-activates the family): status = %d, body %s", freshVisit.Status, freshVisit.Raw)
 	}
+	// Re-redeeming the same code from that session is idempotent.
 	again := a.Do(http.MethodPost, "/api/invites/redeem", freshCookie, map[string]any{"code": code})
 	if again.Status != http.StatusOK || again.JSON["alreadyMember"] != true {
 		t.Fatalf("re-redeem from fresh session: status = %d, body %s, want 200 alreadyMember:true", again.Status, again.Raw)
-	}
-	afterFresh := a.DoArray(http.MethodGet, "/api/babies", freshCookie, nil)
-	if afterFresh.Status != http.StatusOK {
-		t.Fatalf("GET /api/babies (fresh session, after re-redeem): status = %d, body %s", afterFresh.Status, afterFresh.Raw)
 	}
 }
 

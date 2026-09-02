@@ -81,3 +81,15 @@ WHERE "family_id" = $1 AND "id" = ANY(sqlc.slice(ids));
 -- member (parent or caretaker) can be assigned.
 SELECT "user_id" FROM "organization_members"
 WHERE "organization_id" = $1 AND "user_id" = ANY(sqlc.slice(ids));
+
+-- name: MostRecentMembership :one
+-- The family a user most recently joined — used to auto-activate a session
+-- that has no active organization yet (a returning user's fresh sign-in),
+-- so they land in a family rather than being told to create one they
+-- already belong to. Multi-family users can still switch; this just picks a
+-- sane default.
+SELECT om."organization_id"
+FROM "organization_members" om
+WHERE om."user_id" = $1
+ORDER BY om."created_at" DESC, om."organization_id" DESC
+LIMIT 1;
