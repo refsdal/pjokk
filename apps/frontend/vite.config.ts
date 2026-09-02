@@ -85,11 +85,20 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
-            // Never cache auth; NetworkFirst for other API GETs so the
-            // timeline/home render offline from the last known state.
+            // Never cache identity — auth (Limen) or /api/me. GET /api/me
+            // decides routing (active family, /welcome vs /home); a cached
+            // copy served after a family is created bounces the founder back
+            // to /welcome. (In the better-auth era session identity lived
+            // under /api/auth/*, which this exclusion already covered; the
+            // Go port moved it to the top-level /api/me, so it needs naming
+            // explicitly — exact match, or /api/medicine and
+            // /api/measurements would be excluded too.) NetworkFirst for
+            // other API GETs so the timeline/home render offline from the
+            // last known state.
             urlPattern: ({ url, request }) =>
               url.pathname.startsWith("/api/") &&
               !url.pathname.startsWith("/api/auth") &&
+              url.pathname !== "/api/me" &&
               request.method === "GET",
             handler: "NetworkFirst",
             options: {

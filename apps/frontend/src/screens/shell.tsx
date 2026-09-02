@@ -18,7 +18,12 @@ export function AppShell() {
   const { data: session, isPending } = useSession();
   const me = useMe();
 
-  if (isPending || me.isPending) {
+  // me refetches on every mount (see useMe) — wait for THAT fetch to settle
+  // before trusting familyId, so a reload never routes on the persisted
+  // pre-family snapshot. isFetchedAfterMount flips true once the mount-fetch
+  // resolves (offline: it settles as an error and the persisted value
+  // stands, which is the offline-first contract).
+  if (isPending || me.isPending || !me.isFetchedAfterMount) {
     return <div className="min-h-dvh" />;
   }
   if (!session) {

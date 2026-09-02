@@ -22,6 +22,14 @@ export function useMe() {
     // A 401 here means "signed out", which the auth gates already handle;
     // retrying it just delays the redirect to /login.
     retry: false,
+    // me decides routing (which family is active, /welcome vs /home) and is
+    // persisted across reloads. It must NOT be served stale: a founder who
+    // just created a family would otherwise reload into the pre-family
+    // snapshot (familyId null, still "fresh" under the global 15s staleTime)
+    // and get bounced to /welcome. Always re-derive it from the server on
+    // mount; the shell waits for that fetch before trusting familyId.
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 
