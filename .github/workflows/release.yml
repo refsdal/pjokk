@@ -175,6 +175,12 @@ jobs:
       - name: Install
         run: bun install --frozen-lockfile
 
+      # dockers_v2 builds both platforms with an SBOM attestation in one
+      # buildx run — that needs the docker-container driver, which this
+      # action creates and selects (the runner's default "docker" driver
+      # supports neither attestations nor multi-platform pushes).
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
       - name: Log in to the container registry
         if: needs.version.outputs.publish == 'true'
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
