@@ -94,16 +94,21 @@ export const signIn = {
   },
 
   /**
-   * Google. Resolves the provider's authorization URL and navigates there;
-   * the callback returns the browser to `redirectTo`. Clears the cache first
-   * because the navigation leaves the page for good.
+   * Any configured OAuth provider. Resolves the provider's authorization URL
+   * and navigates there; the callback returns the browser to `redirectTo`.
+   * Clears the cache first because the navigation leaves the page for good.
    */
-  async google(redirectTo: string): Promise<void> {
+  async social(provider: string, redirectTo: string): Promise<void> {
     await resetCache();
     await authClient.signIn.social({
-      provider: "google",
+      provider,
       redirectUri: absoluteUrl(redirectTo),
     });
+  },
+
+  /** Back-compat alias; call sites may migrate to social("google", …). */
+  async google(redirectTo: string): Promise<void> {
+    return signIn.social("google", redirectTo);
   },
 };
 
