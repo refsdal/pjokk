@@ -413,8 +413,12 @@ var knownRouteIDs = []string{
 //   - verify-email / email-verifications: same, no mailer.
 //
 // Kept: credential sign-in, Google authorize + callback, signout, the
-// session read, and the three organization routes the family switcher uses
-// (create, list, switch). Signup is kept only when signup is open.
+// session read, and the four organization routes the SPA uses: create,
+// list, switch, and the member-self read (GET /organizations/me) that the
+// limen-auth client fires in the background after create/switch to refresh
+// its own store — disabled it produced a harmless-but-noisy swallowed 404.
+// It returns only the caller's own membership. Signup is kept only when
+// signup is open.
 func allowedRouteIDs(openSignup bool) []string {
 	allowed := []string{
 		"signin",
@@ -426,6 +430,7 @@ func allowedRouteIDs(openSignup bool) []string {
 		"organizations:create",
 		"organizations:list",
 		"organizations:switch",
+		"organizations:member-get",
 	}
 	if openSignup {
 		allowed = append(allowed, "signup")
