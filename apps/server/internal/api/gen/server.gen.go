@@ -94,6 +94,9 @@ type ServerInterface interface {
 	// UpdateCalendarEvent Partial update. `description`/`location`/`durationMin`/ `remindMinutesBefore` may be sent as `null` to CLEAR that column; `title`/`category`/`startTime`/`allDay` are not nullable — only settable or omitted. An event that IS (or becomes, via this same PATCH) all-day always has durationMin cleared. Changing `startTime` or `remindMinutesBefore` re-arms the reminder sweep (clears remindedAt). `babyIds`/`assigneeUserIds`, when present, REPLACE the link set; omitted leaves it untouched.
 	// (PATCH /api/calendar/events/{id})
 	UpdateCalendarEvent(w http.ResponseWriter, r *http.Request, id IdPath)
+	// GetConfig Public client configuration: which account-creation paths the /login and /join screens should offer. No session required, and no secrets in the response — just two booleans-worth of config the client could otherwise only infer indirectly (e.g. by trying a credential signup and reading the 403).
+	// (GET /api/config)
+	GetConfig(w http.ResponseWriter, r *http.Request)
 	// ListContacts The family's address book, by name. Zero linked babies means a contact the whole family shares. Free (no plan gate — see internal/api/contacts.go).
 	// (GET /api/contacts)
 	ListContacts(w http.ResponseWriter, r *http.Request)
@@ -932,6 +935,20 @@ func (siw *ServerInterfaceWrapper) UpdateCalendarEvent(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateCalendarEvent(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetConfig operation middleware
+func (siw *ServerInterfaceWrapper) GetConfig(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetConfig(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3039,6 +3056,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/healthz", wrapper.Healthz)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/readyz", wrapper.Readyz)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/config", wrapper.GetConfig)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/babies", wrapper.ListBabies)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/babies", wrapper.CreateBaby)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/babies/{id}", wrapper.DeleteBaby)
@@ -4012,6 +4030,30 @@ func (response UpdateCalendarEvent404JSONResponse) VisitUpdateCalendarEventRespo
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConfigRequestObject struct {
+}
+
+type GetConfigResponseObject interface {
+	VisitGetConfigResponse(w http.ResponseWriter) error
+}
+
+type GetConfig200JSONResponse struct {
+	OauthProviders []string `json:"oauthProviders"`
+	OpenSignup     bool     `json:"openSignup"`
+}
+
+func (response GetConfig200JSONResponse) VisitGetConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -6700,6 +6742,9 @@ type StrictServerInterface interface {
 	// UpdateCalendarEvent Partial update. `description`/`location`/`durationMin`/ `remindMinutesBefore` may be sent as `null` to CLEAR that column; `title`/`category`/`startTime`/`allDay` are not nullable — only settable or omitted. An event that IS (or becomes, via this same PATCH) all-day always has durationMin cleared. Changing `startTime` or `remindMinutesBefore` re-arms the reminder sweep (clears remindedAt). `babyIds`/`assigneeUserIds`, when present, REPLACE the link set; omitted leaves it untouched.
 	// (PATCH /api/calendar/events/{id})
 	UpdateCalendarEvent(ctx context.Context, request UpdateCalendarEventRequestObject) (UpdateCalendarEventResponseObject, error)
+	// GetConfig Public client configuration: which account-creation paths the /login and /join screens should offer. No session required, and no secrets in the response — just two booleans-worth of config the client could otherwise only infer indirectly (e.g. by trying a credential signup and reading the 403).
+	// (GET /api/config)
+	GetConfig(ctx context.Context, request GetConfigRequestObject) (GetConfigResponseObject, error)
 	// ListContacts The family's address book, by name. Zero linked babies means a contact the whole family shares. Free (no plan gate — see internal/api/contacts.go).
 	// (GET /api/contacts)
 	ListContacts(ctx context.Context, request ListContactsRequestObject) (ListContactsResponseObject, error)
@@ -7666,6 +7711,30 @@ func (sh *strictHandler) UpdateCalendarEvent(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateCalendarEventResponseObject); ok {
 		if err := validResponse.VisitUpdateCalendarEventResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetConfig operation middleware
+func (sh *strictHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
+	var request GetConfigRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetConfig(ctx, request.(GetConfigRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetConfig")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetConfigResponseObject); ok {
+		if err := validResponse.VisitGetConfigResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

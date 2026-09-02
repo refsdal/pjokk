@@ -60,6 +60,32 @@ paths:
                   error:
                     type: string
 
+  /api/config:
+    get:
+      operationId: getConfig
+      summary: >-
+        Public client configuration: which account-creation paths the
+        /login and /join screens should offer. No session required, and no
+        secrets in the response — just two booleans-worth of config the
+        client could otherwise only infer indirectly (e.g. by trying a
+        credential signup and reading the 403).
+      tags: [config]
+      responses:
+        "200":
+          description: Which account-creation paths the client should offer.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [openSignup, oauthProviders]
+                properties:
+                  openSignup:
+                    type: boolean
+                  oauthProviders:
+                    type: array
+                    items:
+                      type: string
+
   /api/babies:
     get:
       operationId: listBabies

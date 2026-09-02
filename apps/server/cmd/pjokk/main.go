@@ -536,12 +536,26 @@ func buildDeps(ctx context.Context, cfg *config.Config) (api.Deps, func(), error
 		VAPIDPublicKey:   cfg.VAPIDPublicKey,
 		TrustedProxyHops: cfg.TrustedProxyHops,
 
+		OpenSignup:     cfg.OpenSignup,
+		OAuthProviders: oauthProviders(cfg),
+
 		// ExtraRoutes stays nil, always. It is internal/testrig's seam for
 		// proving the middleware chain end-to-end; a real composition that
 		// set it would be mounting routes that exist in no OpenAPI spec.
 		ExtraRoutes: nil,
 	}
 	return deps, closePool, nil
+}
+
+// oauthProviders lists the OAuth provider ids the SPA may offer, derived
+// from which credentials are configured. Google today; the list grows as
+// providers are added, and the SPA renders one button per id.
+func oauthProviders(cfg *config.Config) []string {
+	var p []string
+	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
+		p = append(p, "google")
+	}
+	return p
 }
 
 // buildStorage picks the object-storage driver. config.Load has already
