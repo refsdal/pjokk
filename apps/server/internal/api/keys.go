@@ -64,6 +64,16 @@ const apiKeyTokenPrefix = "pjk_"
 // as the displayable "prefix" column (see this file's doc comment).
 const apiKeyPrefixLen = 12
 
+// sha256Hex is deliberately a fast hash, not a slow KDF (CodeQL's
+// go/weak-sensitive-data-hashing flags it; dismissed as a false positive).
+// Slow KDFs exist to protect LOW-entropy secrets — human passwords — from
+// brute force. These tokens carry 160 bits from crypto/rand, so the search
+// space, not the hash speed, is the defense; and APIKeyAuth recomputes this
+// on every request for an indexed key_hash lookup, where a per-request
+// bcrypt/argon2 would be a self-inflicted DoS and a salted hash would break
+// deterministic lookup. Storing API tokens as SHA-256 is the standard
+// design (GitHub and Stripe tokens included). User passwords are different
+// and DO go through a slow KDF (argon2id, via Limen).
 func sha256Hex(s string) string {
 	sum := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(sum[:])
