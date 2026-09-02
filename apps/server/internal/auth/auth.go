@@ -251,7 +251,7 @@ func New(cfg Config) (Service, error) {
 			// may self-serve found ONE family while they hold zero
 			// memberships, and must use an invite code after that.
 			organization.WithAllowOrgCreation(func(ctx context.Context, user *limen.User) bool {
-				return allowOrgCreation(ctx, authQueries, idString(user.ID))
+				return allowOrgCreation(ctx, authQueries, idString(user.ID), cfg.OpenSignup)
 			}),
 		),
 		core,
@@ -345,14 +345,13 @@ func googlePlugin(cfg Config) limen.Plugin {
 			return fields
 		}),
 	}
-	if !cfg.OpenSignup {
-		// Closed signup has to cover Google too, or "no open signup" means
-		// "no open signup unless you own a Google account". With this set,
-		// an unknown email gets ErrAccountNotFound instead of a new user;
-		// the invite-redeem flow provisions the account first (CreateUser
-		// with an empty password) and Google then links to it.
-		opts = append(opts, oauth.WithRequireExplicitSignUp())
-	}
+	// OAuth account creation is intentionally OPEN even under closed signup:
+	// it is the only way a brand-new invitee can get the account they need to
+	// redeem an invite (Limen has no per-invite signup gate). Safe because an
+	// uninvited OAuth account cannot create a family (allowOrgCreation requires
+	// OPEN_SIGNUP or sysadmin) or reach any family route, and the orphan purge
+	// removes it after 7 days. Credential signup stays gated by OPEN_SIGNUP
+	// (WithHTTPDisabledPaths above).
 	return oauth.New(opts...)
 }
 
@@ -589,18 +588,21 @@ func (s *service) createUserWithoutCredential(ctx context.Context, name, email s
 // auth.ts's allowUserToCreateOrganization, wired in as
 // organization.WithAllowOrgCreation (see New). A system admin may always
 // create a family; anyone else may do so exactly once, self-serve, while
-// they hold NO existing membership — after that, joining another family
-// goes through an invite code, never a second self-service create. Both
-// entry points (this package's own CreateFamily, used by the invite/admin
-// flows and tests, and Limen's own POST /organizations the SPA's family
-// switcher calls) run through organization.API.CreateOrganization, which
-// checks this hook, so the rule cannot be bypassed by hitting one path
-// instead of the other.
+// they hold NO existing membership AND OPEN_SIGNUP is on — the founder
+// bootstrap window. Under closed signup nobody self-serves: an uninvited
+// OAuth account (now that OAuth signup is open) is family-less too, and this
+// is the guard that keeps it from minting itself a free family. After a first
+// family, joining another goes through an invite code, never a second
+// self-service create. Both entry points (this package's own CreateFamily,
+// used by the invite/admin flows and tests, and Limen's own POST
+// /organizations the SPA's family switcher calls) run through
+// organization.API.CreateOrganization, which checks this hook, so the rule
+// cannot be bypassed by hitting one path instead of the other.
 //
 // Fails CLOSED (false) on a query error: an unreadable user cannot be
 // verified as either a system admin or family-less, and "deny" is the safe
 // side of that ambiguity — never "allow, and find out later."
-func allowOrgCreation(ctx context.Context, q *gen.Queries, userID string) bool {
+func allowOrgCreation(ctx context.Context, q *gen.Queries, userID string, openSignup bool) bool {
 	role, err := q.GetUserRole(ctx, userID)
 	if err != nil {
 		return false
@@ -612,7 +614,11 @@ func allowOrgCreation(ctx context.Context, q *gen.Queries, userID string) bool {
 	if err != nil {
 		return false
 	}
-	return memberships == 0
+	// A family-less non-admin may self-create ONLY during the OPEN_SIGNUP
+	// founder-bootstrap window. Under closed signup an uninvited OAuth
+	// account is family-less too, and must not be able to mint a free family
+	// — it stays inert and the orphan purge removes it.
+	return memberships == 0 && openSignup
 }
 
 // CreateFamily creates the organization and makes userID its first member
