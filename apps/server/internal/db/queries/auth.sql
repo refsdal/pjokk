@@ -169,3 +169,13 @@ SELECT COALESCE("role", '') FROM "users" WHERE "id" = $1;
 -- CountFamilyMembership (scoped to one organization_id), this backs
 -- allowOrgCreation's "no existing family yet" self-serve-founding check.
 SELECT COUNT(*)::int FROM "organization_members" WHERE "user_id" = $1;
+
+-- name: SetSessionActiveOrg :exec
+-- Persist a session's active organization directly (bypassing the org
+-- plugin), used to auto-activate a returning user's fresh session in the
+-- resolution path. WHERE active_organization_id IS NULL guards against
+-- clobbering a family the user explicitly switched to in a concurrent
+-- request.
+UPDATE "sessions"
+SET "active_organization_id" = $2
+WHERE "token" = $1 AND "active_organization_id" IS NULL;

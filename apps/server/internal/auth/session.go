@@ -122,6 +122,26 @@ func (s *service) resolveSession(r *http.Request) (*Session, *limen.SessionResul
 		}
 	}
 
+	// Auto-activate a family for a session that has none. A returning user's
+	// fresh sign-in creates a session with no active organization (only
+	// family creation, switching, or invite-redeem sets one), so without
+	// this every returning member would be resolved as family-less and the
+	// SPA would strand them on /welcome — asked to create a family they
+	// already belong to. Pick their most recently-joined family; multi-family
+	// users can still switch. Never for an impersonated session (its active
+	// family is the operator's deliberate choice) and best-effort: a failure
+	// here just leaves the session family-less, exactly as before.
+	if session.ActiveFamilyID == "" && session.ImpersonatedBy == "" {
+		familyID, err := s.q.MostRecentMembership(r.Context(), session.UserID)
+		if err == nil && familyID != "" {
+			if err := s.q.SetSessionActiveOrg(r.Context(), gen.SetSessionActiveOrgParams{
+				Token: session.Token, ActiveOrganizationID: &familyID,
+			}); err == nil {
+				session.ActiveFamilyID = familyID
+			}
+		}
+	}
+
 	return session, validated.Refreshed, nil
 }
 

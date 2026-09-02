@@ -390,6 +390,27 @@ func (q *Queries) ListImpersonatedTokensByAdmin(ctx context.Context, adminID str
 	return items, nil
 }
 
+const setSessionActiveOrg = `-- name: SetSessionActiveOrg :exec
+UPDATE "sessions"
+SET "active_organization_id" = $2
+WHERE "token" = $1 AND "active_organization_id" IS NULL
+`
+
+type SetSessionActiveOrgParams struct {
+	Token                string
+	ActiveOrganizationID *string
+}
+
+// Persist a session's active organization directly (bypassing the org
+// plugin), used to auto-activate a returning user's fresh session in the
+// resolution path. WHERE active_organization_id IS NULL guards against
+// clobbering a family the user explicitly switched to in a concurrent
+// request.
+func (q *Queries) SetSessionActiveOrg(ctx context.Context, arg SetSessionActiveOrgParams) error {
+	_, err := q.db.Exec(ctx, setSessionActiveOrg, arg.Token, arg.ActiveOrganizationID)
+	return err
+}
+
 const setUserPassword = `-- name: SetUserPassword :exec
 UPDATE "users" SET "password" = $2, "updated_at" = now() WHERE "id" = $1
 `

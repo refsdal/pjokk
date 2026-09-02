@@ -26,10 +26,23 @@ export const persister = createAsyncStoragePersister({
   key: "pjokk-query-cache",
 });
 
+// Identity/routing queries are NEVER persisted: on a cold load they must
+// come fresh from the server, not from a disk snapshot. Persisting `me`
+// meant a founder who had just created a family could reload into the
+// pre-family snapshot (familyId null) and get bounced to /welcome, where a
+// second create is refused. Persistence exists for offline-viewable CONTENT
+// (timeline, home cards, stats) — those tolerate a stale-then-revalidate
+// render; "which family am I in" does not.
+const NEVER_PERSIST = new Set(["me", "family", "members"]);
+
 export const persistOptions = {
   persister,
   maxAge: 14 * DAY,
-  buster: "v1",
+  buster: "v2",
+  dehydrateOptions: {
+    shouldDehydrateQuery: (query: { queryKey: readonly unknown[] }) =>
+      !NEVER_PERSIST.has(String(query.queryKey[0])),
+  },
 };
 
 // Forget everything, in memory AND on disk. Needed wherever the identity

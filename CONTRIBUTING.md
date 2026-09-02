@@ -26,6 +26,8 @@ docker compose -f docker-compose.test.yml up -d    # Postgres for tests + dev
 
 mise run test     # the full suite: Go against real Postgres + frontend/landing
 mise run check    # lint, typecheck, i18n coverage, goreleaser config
+mise run e2e      # Playwright against the real container image (needs Docker;
+                  # first run: `bunx playwright install --with-deps chromium`)
 ```
 
 Run the app locally: `cd apps/server && go run ./cmd/pjokk` (needs the env
