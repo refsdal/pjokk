@@ -408,9 +408,9 @@ Releases are signed with keyless cosign via GitHub's OIDC — the signature
 proves the artifacts came out of this repository's release workflow.
 
 ```sh
-# 1. The checksum file's signature (covers every archive transitively):
+# 1. The checksum file's Sigstore bundle (covers every archive transitively):
 cosign verify-blob \
-  --certificate checksums.txt.pem --signature checksums.txt.sig \
+  --bundle checksums.txt.sigstore.json \
   --certificate-identity-regexp 'https://github.com/refsdal/pjokk/\.github/workflows/release\.yml@.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   checksums.txt

@@ -52,18 +52,19 @@ sboms:
   - artifacts: archive
 
 # Keyless cosign signature over the checksum file: verifying it plus the
-# checksums transitively verifies every archive. README documents the
-# `cosign verify-blob` invocation.
+# checksums transitively verifies every archive. cosign 3.x signs into a
+# single Sigstore bundle (signature + certificate in one JSON file) — the
+# old --output-signature/--output-certificate flags refuse to run without
+# it. README documents the `cosign verify-blob --bundle` invocation.
 signs:
   - cmd: cosign
     artifacts: checksum
     output: true
-    certificate: "${artifact}.pem"
+    signature: "${artifact}.sigstore.json"
     args:
       - sign-blob
       - --yes
-      - --output-signature=${signature}
-      - --output-certificate=${certificate}
+      - --bundle=${signature}
       - ${artifact}
 
 # Multi-platform image from the same COPY-only Dockerfile the rest of the
