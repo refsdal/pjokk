@@ -481,3 +481,11 @@ a local build, but nothing deploys it automatically yet.
 
 `CLAUDE.md` is the project constitution (product principles, stack decisions,
 roadmap). `DECISIONS.md` logs the boring choices made along the way.
+
+## License
+
+[AGPL-3.0](LICENSE). Self-host it, fork it, improve it — and if you offer a
+modified Pjokk to others as a service, share your changes the same way.
+
+Security reports: see [SECURITY.md](SECURITY.md). Contributions: see
+[CONTRIBUTING.md](CONTRIBUTING.md).

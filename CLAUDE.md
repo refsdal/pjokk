@@ -246,7 +246,8 @@ landing site has no separate test deploy).
 
 ## Information architecture
 
-Four tabs: **Home · Timeline · Stats · Settings**. Two sheets (log entry, More).
+Five tabs: **Home · Timeline · Stats · Calendar · Settings**. Two sheets (log
+entry, More).
 No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
 (the invite flow IS onboarding).
 
@@ -407,8 +408,11 @@ sheet pattern — build the pattern well once.
 > attachment-only). The sprout-track importer gained mappings for all
 > three and stopped silently dropping TBSP amounts, DRY diapers, sleep
 > type/quality, diaper detail, feed reaction fields and calendar events.
-> **Landing page + apex move (2026-08-27):** the app moved to the apex
-> (`pjokk.no`, test `test.pjokk.no`; the `app.` hostnames are retired,
+> **Landing page + apex move (2026-08-27):** — SUPERSEDED on the hostname
+> point: the landing split later un-retired `app.pjokk.no` (the app lives
+> there again; the apex serves the static landing site — see DECISIONS.md
+> "Supersedes" entry). Historically: the app moved to the apex
+> (`pjokk.no`, test `test.pjokk.no`; the `app.` hostnames were retired,
 > workers.dev off, `trustedOrigins` down to one) and the signed-in home
 > screen moved from `/` to `/home`. `/` is now a public landing page
 > rendered BY THE WORKER — one self-contained document, inline CSS, zero

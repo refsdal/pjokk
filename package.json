@@ -1,6 +1,7 @@
 {
   "name": "pjokk",
   "private": true,
+  "license": "AGPL-3.0-only",
   "version": "0.1.0",
   "type": "module",
   "// workspaces": "apps/server is deliberately absent: the backend is a Go module (apps/server/go.mod) with no package.json, so the glob that used to be apps/* is spelled out. Adding a JavaScript workspace means adding it here.",
