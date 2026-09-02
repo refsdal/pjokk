@@ -175,7 +175,7 @@ choices, noted so they can be revisited deliberately.
 
 - **System admin = better-auth admin plugin** (user.role "admin"), fully
   separate from per-family member roles. Bootstrap is a manual SQL UPDATE
-  (dev seed makes Anders admin; prod granted to andersro93@ros-nett.com).
+  (dev seed makes the founder admin; prod granted to the founder's account).
 - **/admin is a lazy route**, English-only operator console, hidden behind a
   Settings link + role guard client-side and requireSysadmin server-side.
 - **User support ops go through better-auth's /api/auth/admin/*** (list,
@@ -388,7 +388,7 @@ Architecture + line-by-line + UX reviews; batches 1–5 implemented same day.
 ## Infra
 
 - **Deployed to the Refsdal Holding AS Cloudflare account**
-  (`ec92f89b...`, chosen because the repo lives under ~/projects/refsdal and
+  (`<redacted>...`, chosen because the repo lives under ~/projects/refsdal and
   pjokk.no is personal). To move: create D1/KV/R2 in the new account, update
   ids in wrangler.jsonc, re-apply migrations, re-set secrets, redeploy.
 - **Deploy command is `wrangler deploy -c dist/pjokk/wrangler.json`** — the
