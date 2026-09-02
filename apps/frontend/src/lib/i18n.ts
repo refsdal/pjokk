@@ -384,6 +384,8 @@ const nb: Record<string, string> = {
   Password: "Passord",
   "Sign in with email": "Logg inn med e-post",
   "Sign-in failed": "Innlogging feilet",
+  "Create account": "Opprett konto",
+  "Have an account? Sign in": "Har du allerede en konto? Logg inn",
   "Pjokk is invite-only. Ask a family admin for an invite link.":
     "Pjokk er kun på invitasjon. Be en familieadmin om en invitasjonslenke.",
   "Checking invite…": "Sjekker invitasjon…",

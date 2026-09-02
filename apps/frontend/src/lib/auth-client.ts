@@ -112,6 +112,26 @@ export const signIn = {
   },
 };
 
+export const signUp = {
+  /**
+   * Bootstrap credential account creation (the OPEN_SIGNUP path only — the
+   * invite-redeem flow never calls this; it stays gated server-side too, see
+   * apps/server/internal/auth/auth.go). Limen's credential plugin mounts
+   * this at POST /signup/credential, exactly parallel to signIn.credential
+   * above — it is NOT one of our own `/api/*` routes, so it is not in the
+   * generated OpenAPI client (`lib/api.ts`'s `client`); it only exists
+   * through this Limen-generated method, same as every other `signIn.*`/
+   * `authClient.*` call in this file. Throws on failure, same as
+   * signIn.credential. Callers still call signIn.password right after (see
+   * Login.tsx) so session establishment — and its resetCache() — goes
+   * through the one place that already owns it, rather than relying on this
+   * call's own parseSession.
+   */
+  async credential(email: string, password: string): Promise<void> {
+    await authClient.signUp.credential({ email, password });
+  },
+};
+
 /**
  * Sign out, then drop every cached query. The offline cache is persisted to
  * IndexedDB and survives the reload that follows, so without this the next
