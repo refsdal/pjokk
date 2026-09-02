@@ -44,3 +44,11 @@ run = """
 trap 'bash scripts/restore-embed-overlay.sh' EXIT
 goreleaser release --snapshot --clean --skip=sign
 """
+
+[tasks.e2e]
+description = "Playwright E2E against the real image (builds it if missing)"
+run = """
+trap 'bash scripts/e2e-stack.sh down' EXIT
+bash scripts/e2e-stack.sh up
+cd e2e && bunx playwright test
+"""

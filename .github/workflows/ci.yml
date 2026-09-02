@@ -179,6 +179,47 @@ jobs:
           docker run --rm --network pjokk-ci "${env_args[@]}" pjokk:ci \
             cron frequent
 
+      # The Playwright suite drives the same smoke-tested image through a real
+      # browser — sign-in, family setup, logging flows. It needs signup open
+      # (the suite creates its own accounts), so the app container restarts
+      # with OPEN_SIGNUP=1 against the same database.
+      - name: Restart app with signup open
+        run: |
+          docker rm -f app
+          docker run -d --name app --network pjokk-ci -p 3000:3000 \
+            -e DATABASE_URL=postgres://pjokk:pjokk@pg:5432/pjokk \
+            -e APP_URL=http://localhost:3000 \
+            -e AUTH_SECRET=ci-smoke-test-secret-at-least-32-bytes-long \
+            -e STORAGE_DRIVER=fs -e STORAGE_FS_PATH=/data \
+            -e OPEN_SIGNUP=1 \
+            pjokk:ci
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:3000/healthz && break
+            sleep 1
+          done
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('bun.lock') }}
+          restore-keys: ${{ runner.os }}-playwright-
+
+      - name: Install Playwright browser
+        run: bunx playwright install --with-deps chromium
+
+      - name: E2E tests
+        env:
+          E2E_BASE_URL: http://127.0.0.1:3000
+        run: cd e2e && bunx playwright test
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          if-no-files-found: ignore
+
       # Only after the smoke test: an image that does not serve must never
       # reach the registry, not even as a preview.
       #

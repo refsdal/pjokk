@@ -16,3 +16,8 @@ dev.db*
 # artifact — the blanket `dist/` rule above would otherwise swallow it.
 !apps/server/internal/web/dist/
 !apps/server/internal/web/dist/index.html
+
+# Playwright
+e2e/test-results/
+e2e/playwright-report/
+test-results/
