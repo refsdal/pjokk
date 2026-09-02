@@ -32,10 +32,14 @@ export function WelcomeScreen() {
   const [sex, setSex] = useState<"girl" | "boy" | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Wait for /api/me as well as the session: `hasFamily` comes from it now,
-  // and rendering before it lands would show the "create a family" step to
-  // someone who already has one.
-  if (isPending || me.isPending) {
+  // Wait for /api/me AND /api/config as well as the session: `hasFamily`
+  // comes from me, `canCreate` comes from config, and rendering before
+  // either lands would show a stale/wrong branch — either the "create a
+  // family" step to someone who already has one, or (config still loading,
+  // so canCreate defaults false) a flash of the invite-only guidance to a
+  // legitimate founder whose session survived a reload but whose query
+  // cache didn't.
+  if (isPending || me.isPending || config.isPending) {
     return <div className="min-h-dvh" />;
   }
   if (!session) {

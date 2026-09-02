@@ -79,12 +79,6 @@ export function JoinScreen() {
       void navigate({ to: "/home" });
     } catch (err) {
       toast(err instanceof Error ? err.message : t("Join failed"), "error");
-      // A failed auto-redeem must not permanently disable the manual retry
-      // below — without this, didAuto stays true forever and the button's
-      // onClick (which only calls redeem() directly) is the visitor's only
-      // remaining path, which is fine, but if we ever gate the button on
-      // didAuto this keeps it working either way.
-      didAuto.current = false;
     } finally {
       setBusy(false);
     }
@@ -92,9 +86,12 @@ export function JoinScreen() {
 
   // Auto-redeem: a signed-in visitor with a valid invite shouldn't have to
   // click "Join family" — the whole point of the link (or QR code) is that
-  // opening it is the action. Runs once per mount; the manual button below
-  // stays as a fallback for the already-signed-in-different-family case and
-  // for retrying after an error.
+  // opening it is the action. Runs exactly once per mount (didAuto is never
+  // reset): a persistent failure — invite hit maxUses, a 500, offline — must
+  // not retry itself against a rate-limited endpoint. The manual button below
+  // is gated only on `busy`, never on `didAuto`, so it stays the retry path
+  // for a failed auto-redeem and the fallback for the
+  // already-signed-in-different-family case.
   // biome-ignore lint/correctness/useExhaustiveDependencies: redeem is a new closure every render; the didAuto ref already guards against firing more than once
   useEffect(() => {
     if (didAuto.current) return;
