@@ -447,6 +447,7 @@ func TestLimenRouteAllowlist(t *testing.T) {
 	kept := []struct{ method, path string }{
 		{http.MethodGet, auth.BasePath + "/me"},
 		{http.MethodGet, auth.BasePath + "/organizations"},
+		{http.MethodGet, auth.BasePath + "/organizations/me"},
 	}
 	for _, route := range kept {
 		rec := f.get(route.path, cookie)
