@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, seedDayMode, test } from "./fixtures";
 import { apiSignIn, apiSignup, freshEmail, freshFamily } from "./helpers";
 
 // The closed-alpha join path: admin mints an invite in Settings, the other
@@ -25,6 +25,7 @@ test("a second caretaker joins via an invite link", async ({ browser, page, requ
   await apiSignup(request, inviteeEmail);
 
   const ctx = await browser.newContext();
+  await seedDayMode(ctx);
   const invitee = await ctx.newPage();
   await apiSignIn(invitee, inviteeEmail);
   await invitee.goto(`/join/${code}`);
@@ -44,6 +45,7 @@ test("a brand-new invitee auto-redeems on opening the join link", async ({ page,
   const inviteeEmail = freshEmail("autoinvitee");
   await apiSignup(request, inviteeEmail);
   const ctx = await browser.newContext();
+  await seedDayMode(ctx);
   const invitee = await ctx.newPage();
   await apiSignIn(invitee, inviteeEmail);
   await invitee.goto(`/join/${code}`);

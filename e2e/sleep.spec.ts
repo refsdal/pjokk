@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { freshFamily } from "./helpers";
 
 test("starts a sleep session, sees the banner, wakes", async ({ page, request }) => {

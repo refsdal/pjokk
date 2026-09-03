@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, seedDayMode, test } from "./fixtures";
 import { PASSWORD, apiSignIn, apiSignup, freshEmail, freshFamily, uiSignIn } from "./helpers";
 
 // The seam no other suite sees: the limen-auth client driving the real
@@ -56,6 +56,7 @@ test("a returning user with a family signs in and lands on Home with their data"
   // the complement to the new-user tests above, and the case the
   // identity-caching regressions would have broken.
   const ctx = await browser.newContext();
+  await seedDayMode(ctx);
   const returning = await ctx.newPage();
   await returning.goto("/login");
   await returning.getByPlaceholder("Email").fill(email);
