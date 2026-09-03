@@ -67,3 +67,16 @@ test("a returning user with a family signs in and lands on Home with their data"
   await expect(returning.getByText(/1 feeds/)).toBeVisible();
   await ctx.close();
 });
+
+// The e2e stack runs OPEN_SIGNUP=1, so the login screen's credential
+// "Create account" toggle is present (issue #27) — the founder-bootstrap
+// path, distinct from the OAuth-account-creation path invite.spec.ts covers.
+test("the login screen creates an account when signup is open", async ({ page }) => {
+  const email = freshEmail("uisignup");
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByPlaceholder("Email").fill(email);
+  await page.getByPlaceholder("Password").fill(PASSWORD);
+  await page.getByRole("button", { name: /Create account/ }).click();
+  await expect(page).toHaveURL(/\/(welcome|home)/, { timeout: 10_000 });
+});

@@ -1288,3 +1288,38 @@ build while the smoke test runs on the PR's build-artifacts image — same
 Dockerfile, same base digest, same flags; the delta is version-stamping
 ldflags, and dockers_v2 pushes the manifest in the same buildx invocation,
 so pre-push smoking of the literal artifact is not possible.
+
+## 2026-09-02 — invitee signup (#26, #27): open OAuth accounts, gated families
+
+Closed the loop from issue #26 (a brand-new invitee could not join a family
+under `OPEN_SIGNUP=0`) and #27 (the SPA had no signup UI at all, only
+Google). Three pieces:
+
+- **OAuth account creation is open even under closed signup.** Limen has no
+  per-invite signup gate, and a brand-new invitee's *only* way to get the
+  account needed to redeem an invite is to create one — so Google sign-in
+  (and any other configured OAuth provider) now creates an account
+  regardless of `OPEN_SIGNUP`. Credential (email/password) signup stays
+  gated on `OPEN_SIGNUP`, unchanged — it remains the founder-bootstrap
+  escape hatch, not a general signup door.
+- **What actually stays closed is family creation**, tightened to `sysadmin
+  OR (the caller belongs to no family AND OPEN_SIGNUP is on)`
+  (`allowOrgCreation`, `apps/server/internal/auth/auth.go`). An uninvited
+  OAuth account can sign in but cannot create an organization or reach any
+  family route — it can only redeem an invite into an existing family.
+- **A public `GET /api/config → { openSignup, oauthProviders }`** lets the
+  SPA render the right controls without hardcoding either list: the Login
+  screen shows a button per configured provider plus, only when
+  `openSignup` is true, a credential "Create account" toggle; Welcome hides
+  its create-family form for a family-less non-sysadmin under closed
+  signup, since submitting it would just 403.
+
+**Accepted residual risk:** an uninvited OAuth signup produces a real,
+inert account — signed in, family-less, unable to do anything — that sits
+in the database until it either redeems an invite or ages out. This is a
+deliberate reframing of the closed-alpha guarantee: it was never "no
+accounts without an invite," it is "no *access* — no family, no child data
+— without an invite." The existing nightly orphan-account purge
+(`internal/jobs/purge.go`, `orphanGracePeriod` = 7 days, wired into the
+`nightly` cron job) already covered post-signup abandonment and needed no
+change to also cover this case.

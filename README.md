@@ -54,10 +54,16 @@ object store to run. The default mode migrates itself under a Postgres
 advisory lock before it starts serving, so there is no separate migration step
 to wait on.
 
-To create the first account, start it once with `OPEN_SIGNUP=1`, sign in, then
-set it back to `0` — after that, accounts exist only through invite codes.
-Put `AUTH_SECRET` in a `.env` file next to the compose file so it survives a
-restart; **if it changes, every existing session is invalidated.**
+To create the first account, start the container once with `OPEN_SIGNUP=1`,
+open the app and use the login screen's "Create account" form — no more
+`curl`ing the API — then set `OPEN_SIGNUP` back to `0`. After that, new
+caretakers never need it: anyone with an invite link opens `/join/CODE` and
+signs in with any configured OAuth provider (account creation via OAuth stays
+open even under closed signup — it just can't create a *family* on its own,
+only redeem an invite into one), which auto-redeems the code and drops them
+straight into the family. Put `AUTH_SECRET` in a `.env` file next to the
+compose file so it survives a restart; **if it changes, every existing
+session is invalidated.**
 
 Already running Postgres, and want files in a bucket rather than a volume?
 Skip the compose file entirely:
