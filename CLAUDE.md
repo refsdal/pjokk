@@ -178,11 +178,17 @@ landing site has no separate test deploy).
   mandatory only if/when a Capacitor App Store build ships. **Passkeys are
   gone**: better-auth's plugin was server-side only and never had UI, and
   Limen has no equivalent, so nothing observable was lost.
-- **Open signup is DISABLED.** Accounts can only be created through the
-  invite-code redeem flow. This is the closed-alpha mechanism. Organization
-  creation is restricted the same way — only a sysadmin or a user who belongs
-  to no family may create one — so a redeemed invite cannot be parlayed into
-  an unlimited supply of families.
+- **Open signup is DISABLED — but the guarantee is no ACCESS without an
+  invite, not no ACCOUNTS.** OAuth account creation (Google) stays open even
+  under closed signup: it is the only way a brand-new invitee can get the
+  account they need to redeem an invite, since Limen has no per-invite
+  signup gate. Credential signup, by contrast, is the founder-bootstrap
+  escape hatch and is gated on `OPEN_SIGNUP` directly. What actually keeps
+  the alpha closed is family creation: an uninvited OAuth account cannot
+  create an organization (`allowOrgCreation` requires `OPEN_SIGNUP` or
+  sysadmin) or reach any family route, so it cannot be parlayed into an
+  unlimited supply of families — it can only sit inert until it redeems an
+  invite or is removed by the orphan-account purge.
 - Custom invite codes (Limen's org invitations, like better-auth's, are
   email-addressed; wrong grain for QR-at-Sunday-dinner). Table:
   `family_invite(code, familyId, role, expiresAt, maxUses, usedCount)`.

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, seedDayMode, test } from "./fixtures";
 import { PASSWORD, apiSignIn, apiSignup, freshEmail, freshFamily, uiSignIn } from "./helpers";
 
 // The seam no other suite sees: the limen-auth client driving the real
@@ -56,6 +56,7 @@ test("a returning user with a family signs in and lands on Home with their data"
   // the complement to the new-user tests above, and the case the
   // identity-caching regressions would have broken.
   const ctx = await browser.newContext();
+  await seedDayMode(ctx);
   const returning = await ctx.newPage();
   await returning.goto("/login");
   await returning.getByPlaceholder("Email").fill(email);
@@ -66,4 +67,17 @@ test("a returning user with a family signs in and lands on Home with their data"
   await expect(returning.getByText("Baby returning").first()).toBeVisible();
   await expect(returning.getByText(/1 feeds/)).toBeVisible();
   await ctx.close();
+});
+
+// The e2e stack runs OPEN_SIGNUP=1, so the login screen's credential
+// "Create account" toggle is present (issue #27) — the founder-bootstrap
+// path, distinct from the OAuth-account-creation path invite.spec.ts covers.
+test("the login screen creates an account when signup is open", async ({ page }) => {
+  const email = freshEmail("uisignup");
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByPlaceholder("Email").fill(email);
+  await page.getByPlaceholder("Password").fill(PASSWORD);
+  await page.getByRole("button", { name: /Create account/ }).click();
+  await expect(page).toHaveURL(/\/(welcome|home)/, { timeout: 10_000 });
 });

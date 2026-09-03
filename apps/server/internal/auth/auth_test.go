@@ -472,7 +472,9 @@ func TestLimenRouteAllowlist(t *testing.T) {
 
 // (c) CreateFamily + AddMember + SetActiveFamily is reflected in the session.
 func TestFamilyLifecycleReachesSession(t *testing.T) {
-	f := newFixture(t, false)
+	// Open signup: a family-less founder self-creates in the bootstrap window
+	// (the only path allowOrgCreation now leaves open to a non-sysadmin).
+	f := newFixture(t, true)
 
 	ownerID, ownerCookie := f.signIn("Owner", "owner@example.com")
 	memberID, memberCookie := f.signIn("Member", "member@example.com")
@@ -556,7 +558,9 @@ func TestFamilyLifecycleReachesSession(t *testing.T) {
 // for every subsequent query, so pointing a session at a family the user is
 // not in would be a straight cross-tenant read.
 func TestSetActiveFamilyRejectsNonMember(t *testing.T) {
-	f := newFixture(t, false)
+	// Open signup so both family-less owners can found their families (the
+	// non-sysadmin bootstrap path); the test itself is about cross-family scope.
+	f := newFixture(t, true)
 
 	ownerID, _ := f.signIn("Owner", "owner@example.com")
 	outsiderID, outsiderCookie := f.signIn("Outsider", "outsider@example.com")
@@ -599,7 +603,9 @@ func TestSetActiveFamilyRejectsNonMember(t *testing.T) {
 // be creatable — through our API and through Limen's own create route, which
 // the allowlist keeps open for the SPA.
 func TestFamilyNamesMayRepeat(t *testing.T) {
-	f := newFixture(t, false)
+	// Open signup so the three family-less founders below can self-create
+	// (bootstrap window); the test is about repeated family names, not the gate.
+	f := newFixture(t, true)
 
 	oneID, _ := f.signIn("One", "one@example.com")
 	twoID, _ := f.signIn("Two", "two@example.com")
@@ -632,23 +638,25 @@ func TestFamilyNamesMayRepeat(t *testing.T) {
 	}
 }
 
-// TestOrgCreationRestrictedToSystemAdminsAndFamilyLessUsers is a Task 22
-// regression test for a real leak found while porting apps/api/test/
-// security.test.ts's "only system admins can create families (H2)": the
-// Go port had NO equivalent of auth.ts's allowUserToCreateOrganization gate.
-// organizations:create stayed enabled in allowedRouteIDs (see New's own
-// comment, "the family switcher") with nothing behind it, so ANY signed-in
-// user — including one already belonging to a family — could hit
-// POST /api/auth/organizations directly and found an arbitrary new family,
-// admin of their own creation, entirely bypassing the closed-alpha
-// invite-code gate CLAUDE.md commits to. Fixed by allowOrgCreation (auth.go),
-// wired in as organization.WithAllowOrgCreation: a system admin may always
-// create; anyone else may self-serve found exactly one family, while they
-// hold zero memberships, and must go through an invite after that.
-func TestOrgCreationRestrictedToSystemAdminsAndFamilyLessUsers(t *testing.T) {
-	f := newFixture(t, false)
-
-	create := func(cookie *http.Cookie) int {
+// TestOrgCreationRouteRestrictedToSysadminOrBootstrap is a Task 22 regression
+// test for a real leak found while porting apps/api/test/security.test.ts's
+// "only system admins can create families (H2)": the Go port had NO equivalent
+// of auth.ts's allowUserToCreateOrganization gate. organizations:create stayed
+// enabled in allowedRouteIDs (see New's own comment, "the family switcher")
+// with nothing behind it, so ANY signed-in user — including one already
+// belonging to a family — could hit POST /api/auth/organizations directly and
+// found an arbitrary new family, admin of their own creation, entirely
+// bypassing the closed-alpha invite-code gate CLAUDE.md commits to. Fixed by
+// allowOrgCreation (auth.go), wired in as organization.WithAllowOrgCreation.
+//
+// This asserts the guard at the HTTP route (the complement of
+// TestOrgCreationGuardMatrix, which drives the CreateFamily entry point).
+// With OAuth signup now open, the family-less self-create path is permitted
+// ONLY in the OPEN_SIGNUP founder-bootstrap window — under closed signup a
+// family-less user (an uninvited OAuth account included) is refused, and only
+// a system admin may create.
+func TestOrgCreationRouteRestrictedToSysadminOrBootstrap(t *testing.T) {
+	create := func(f *fixture, cookie *http.Cookie) int {
 		req := httptest.NewRequest(http.MethodPost, auth.BasePath+"/organizations", strings.NewReader(`{"name":"Rogue family"}`))
 		req.Header.Set("Content-Type", "application/json")
 		req.AddCookie(cookie)
@@ -657,38 +665,47 @@ func TestOrgCreationRestrictedToSystemAdminsAndFamilyLessUsers(t *testing.T) {
 		return rec.Code
 	}
 
-	// A brand-new, family-less user may self-serve found their first family.
-	userID, cookie := f.signIn("Founder", "founder@example.com")
-	if code := create(cookie); code != http.StatusCreated {
-		t.Fatalf("first (family-less) create status = %d, want 201", code)
+	// Closed signup: a family-less user is REFUSED at the route (the security
+	// property — an uninvited OAuth account cannot mint itself a family).
+	closed := newFixture(t, false)
+	lonerID, lonerCookie := closed.signIn("Loner", "loner@example.com")
+	if code := create(closed, lonerCookie); code != http.StatusForbidden {
+		t.Fatalf("closed signup: family-less create status = %d, want 403", code)
 	}
-
-	// The same now-member user may NOT found a second one.
-	if code := create(cookie); code != http.StatusForbidden {
-		t.Fatalf("second create by an existing member status = %d, want 403", code)
-	}
-
 	// Promoting them to system admin lifts the restriction, same as the TS
 	// predecessor's H2 test (rig() denied, then role=admin allowed).
-	f.promote(userID)
-	if code := create(cookie); code != http.StatusCreated {
-		t.Fatalf("sysadmin create status = %d, want 201", code)
+	closed.promote(lonerID)
+	if code := create(closed, lonerCookie); code != http.StatusCreated {
+		t.Fatalf("closed signup: sysadmin create status = %d, want 201", code)
 	}
 
-	// The internal CreateFamily entry point (invite/admin flows, tests)
-	// enforces the identical rule for an ordinary already-member user, not
-	// just the HTTP route.
-	memberID, _ := f.signIn("Plain member", "plain-member@example.com")
-	if _, err := f.svc.CreateFamily(f.ctx, memberID, "First"); err != nil {
+	// Open signup: a brand-new, family-less user may self-serve found their
+	// first family (the bootstrap window).
+	open := newFixture(t, true)
+	_, founderCookie := open.signIn("Founder", "founder@example.com")
+	if code := create(open, founderCookie); code != http.StatusCreated {
+		t.Fatalf("open signup: first (family-less) create status = %d, want 201", code)
+	}
+	// The same now-member user may NOT found a second one, even under open
+	// signup — self-serve founding is a one-time, zero-memberships affordance.
+	if code := create(open, founderCookie); code != http.StatusForbidden {
+		t.Fatalf("open signup: second create by an existing member status = %d, want 403", code)
+	}
+
+	// The internal CreateFamily entry point enforces the identical
+	// existing-member refusal, not just the HTTP route.
+	memberID, _ := open.signIn("Plain member", "plain-member@example.com")
+	if _, err := open.svc.CreateFamily(open.ctx, memberID, "First"); err != nil {
 		t.Fatalf("first CreateFamily for a family-less user: %v", err)
 	}
-	if _, err := f.svc.CreateFamily(f.ctx, memberID, "Second"); err == nil {
+	if _, err := open.svc.CreateFamily(open.ctx, memberID, "Second"); err == nil {
 		t.Fatal("CreateFamily allowed an existing member to found a second family")
 	}
 }
 
 func TestSetMemberRoleRejectsUnknownRole(t *testing.T) {
-	f := newFixture(t, false)
+	// Open signup so the family-less owner can self-create (bootstrap window).
+	f := newFixture(t, true)
 
 	ownerID, _ := f.signIn("Owner", "owner@example.com")
 	familyID, err := f.svc.CreateFamily(f.ctx, ownerID, "Nordmann")
@@ -704,7 +721,9 @@ func TestSetMemberRoleRejectsUnknownRole(t *testing.T) {
 
 // A member id from another family must not be mutable through this family.
 func TestMemberMutationIsFamilyScoped(t *testing.T) {
-	f := newFixture(t, false)
+	// Open signup so both family-less owners can self-create (bootstrap window);
+	// the test is about cross-family member mutation.
+	f := newFixture(t, true)
 
 	oneID, _ := f.signIn("One", "one@example.com")
 	twoID, _ := f.signIn("Two", "two@example.com")
@@ -1076,7 +1095,9 @@ func assertRoles(t *testing.T, f *fixture, familyID, userID string, want []strin
 // otherwise the SPA strands them on /welcome asking them to create a family
 // they already belong to. resolveSession auto-selects it.
 func TestFreshSignInAutoActivatesTheMembersFamily(t *testing.T) {
-	f := newFixture(t, false)
+	// Open signup so the family-less owner can self-create (bootstrap window);
+	// the test is about auto-activating a returning member's family.
+	f := newFixture(t, true)
 
 	ownerID, _ := f.signIn("Owner", "owner@example.com")
 	memberID, _ := f.signIn("Member", "member@example.com")
@@ -1112,5 +1133,37 @@ func TestFreshSignInAutoActivatesTheMembersFamily(t *testing.T) {
 	}
 	if loner.ActiveFamilyID != "" {
 		t.Errorf("loner ActiveFamilyID = %q, want empty", loner.ActiveFamilyID)
+	}
+}
+
+// allowOrgCreation is the closed-alpha family-creation guard. With OAuth
+// signup now open, a family-less non-admin may only create a family during
+// the OPEN_SIGNUP founder-bootstrap window — never under closed signup,
+// where an uninvited OAuth account would otherwise mint itself a free family.
+func TestOrgCreationGuardMatrix(t *testing.T) {
+	// Closed signup: a family-less non-admin CANNOT create a family.
+	closed := newFixture(t, false)
+	lonerID, _ := closed.signIn("Loner", "loner@example.com")
+	if _, err := closed.svc.CreateFamily(closed.ctx, lonerID, "Nope"); err == nil {
+		t.Fatal("closed signup: family-less non-admin created a family, want refusal")
+	}
+
+	// Closed signup: a system admin still can (the founder is sysadmin).
+	adminID, _ := closed.signIn("Admin", "admin@example.com")
+	closed.promote(adminID)
+	if _, err := closed.svc.CreateFamily(closed.ctx, adminID, "Admin Fam"); err != nil {
+		t.Fatalf("closed signup: sysadmin CreateFamily: %v", err)
+	}
+
+	// Open signup: a family-less non-admin CAN (the bootstrap window).
+	open := newFixture(t, true)
+	founderID, _ := open.signIn("Founder", "founder@example.com")
+	if _, err := open.svc.CreateFamily(open.ctx, founderID, "Founder Fam"); err != nil {
+		t.Fatalf("open signup: family-less CreateFamily: %v", err)
+	}
+
+	// Open signup: a user who ALREADY has a family cannot create a second.
+	if _, err := open.svc.CreateFamily(open.ctx, founderID, "Second"); err == nil {
+		t.Fatal("open signup: existing member created a second family, want refusal")
 	}
 }

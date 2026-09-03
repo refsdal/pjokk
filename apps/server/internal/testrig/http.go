@@ -130,10 +130,16 @@ func App(t *testing.T) *AppRig {
 
 	rig := Setup(t)
 
+	// OpenSignup is on because NewFamily seeds families the only way a
+	// non-sysadmin ever founds one: the family-less self-create the
+	// allowOrgCreation guard permits ONLY in the OPEN_SIGNUP founder-bootstrap
+	// window. Under closed signup that seed path is refused by design (see
+	// auth.allowOrgCreation) — the closed-signup guard itself is proven in
+	// auth's TestOrgCreationGuardMatrix, not through this seeding rig.
 	svc, err := auth.New(auth.Config{
 		AppURL:     rigAppURL,
 		Secret:     testAuthSecret,
-		OpenSignup: false,
+		OpenSignup: true,
 		Pool:       rig.Pool,
 	})
 	if err != nil {

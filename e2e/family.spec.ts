@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { freshFamily } from "./helpers";
 
 test("creates a family and a baby, and Home shows the status cards", async ({ page, request }) => {

@@ -2,8 +2,10 @@ import { Navigate, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { signIn, useSession } from "@/lib/auth-client";
+import { signIn, signUp, useSession } from "@/lib/auth-client";
+import { useConfig } from "@/lib/data";
 import { t } from "@/lib/i18n";
+import { oauthProviderLabels } from "@/lib/oauth";
 import { legalUrl } from "@/lib/site";
 import { toast } from "@/lib/toast";
 
@@ -11,7 +13,9 @@ import { toast } from "@/lib/toast";
 // drops in without rework if a store build ever ships.
 export function LoginScreen({ redirectTo = "/home" }: { redirectTo?: string }) {
   const { data: session, isPending } = useSession();
+  const config = useConfig();
   const navigate = useNavigate();
+  const [mode, setMode] = useState<"signin" | "create">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -20,21 +24,38 @@ export function LoginScreen({ redirectTo = "/home" }: { redirectTo?: string }) {
     return <Navigate to={redirectTo} />;
   }
 
-  // Limen's OAuth flow hands the browser to Google and comes back to
+  const providers = config.data?.oauthProviders ?? [];
+  // Bootstrap credential signup only exists while OPEN_SIGNUP is on — same
+  // gate the server enforces (apps/server/internal/auth/auth.go). Once it's
+  // off, `mode` can never reach "create" because the only control that sets
+  // it is itself gated on this flag.
+  const canCreate = config.data?.openSignup ?? false;
+
+  // Limen's OAuth flow hands the browser to the provider and comes back to
   // `redirectTo`; there is no promise to await past the navigation, so the
   // only failure this can report is the authorize call itself.
-  const google = async () => {
+  const oauthSignIn = async (provider: string) => {
     try {
-      await signIn.google(redirectTo);
+      await signIn.social(provider, redirectTo);
     } catch (err) {
       toast(err instanceof Error ? err.message : t("Sign-in failed"), "error");
     }
   };
 
-  const emailSignIn = async () => {
+  const submit = async () => {
     setBusy(true);
     try {
-      await signIn.password(email, password);
+      if (mode === "create") {
+        // signUp.credential already establishes the session (Limen writes
+        // it into the same store useSession() reads, synchronously, before
+        // this resolves) and resets the cache itself — a follow-up
+        // signIn.password would be a redundant re-auth racing the
+        // <Navigate> that useSession()'s re-render already mounted by the
+        // time it ran.
+        await signUp.credential(email, password);
+      } else {
+        await signIn.password(email, password);
+      }
       void navigate({ to: redirectTo });
     } catch (err) {
       toast(err instanceof Error ? err.message : t("Sign-in failed"), "error");
@@ -51,24 +72,35 @@ export function LoginScreen({ redirectTo = "/home" }: { redirectTo?: string }) {
         <p className="mt-1 text-sm text-muted">{t("Family baby tracker")}</p>
       </div>
 
-      <div className="space-y-3">
-        <Button size="full" variant="outline" onClick={google}>
-          {t("Continue with Google")}
-        </Button>
-        {/* Apple lands here if a store build ever requires it. */}
-      </div>
+      {providers.length > 0 && (
+        <div className="space-y-3">
+          {providers.map((provider) => (
+            <Button
+              key={provider}
+              size="full"
+              variant="outline"
+              onClick={() => void oauthSignIn(provider)}
+            >
+              {t(oauthProviderLabels[provider] ?? provider)}
+            </Button>
+          ))}
+          {/* Apple lands here if a store build ever requires it. */}
+        </div>
+      )}
 
-      <div className="flex items-center gap-3 text-xs text-muted">
-        <div className="h-px flex-1 bg-line" />
-        {t("or")}
-        <div className="h-px flex-1 bg-line" />
-      </div>
+      {providers.length > 0 && (
+        <div className="flex items-center gap-3 text-xs text-muted">
+          <div className="h-px flex-1 bg-line" />
+          {t("or")}
+          <div className="h-px flex-1 bg-line" />
+        </div>
+      )}
 
       <form
         className="space-y-3"
         onSubmit={(e) => {
           e.preventDefault();
-          void emailSignIn();
+          void submit();
         }}
       >
         <Input
@@ -81,14 +113,36 @@ export function LoginScreen({ redirectTo = "/home" }: { redirectTo?: string }) {
         <Input
           type="password"
           placeholder={t("Password")}
-          autoComplete="current-password"
+          autoComplete={mode === "create" ? "new-password" : "current-password"}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
         <Button size="full" variant="secondary" disabled={busy} type="submit">
-          {t("Sign in with email")}
+          {mode === "create" ? t("Create account") : t("Sign in with email")}
         </Button>
       </form>
+
+      {canCreate && (
+        <p className="text-center text-xs text-muted">
+          {mode === "signin" ? (
+            <button
+              type="button"
+              className="font-semibold text-accent"
+              onClick={() => setMode("create")}
+            >
+              {t("Create account")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="font-semibold text-accent"
+              onClick={() => setMode("signin")}
+            >
+              {t("Have an account? Sign in")}
+            </button>
+          )}
+        </p>
+      )}
 
       <p className="text-center text-xs text-muted">
         {t("Pjokk is invite-only. Ask a family admin for an invite link.")}

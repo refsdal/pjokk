@@ -104,6 +104,14 @@ type Deps struct {
 	VAPIDPublicKey   string
 	TrustedProxyHops int
 
+	// OpenSignup and OAuthProviders back GetConfig (GET /api/config,
+	// tierPublic): the /login and /join screens' pre-sign-in read of which
+	// account-creation paths to offer. Mirrors config.Config's own
+	// OpenSignup and the OAuth credentials it holds — see cmd/pjokk/main.go's
+	// buildDeps and oauthProviders helper for how they're derived.
+	OpenSignup     bool
+	OAuthProviders []string
+
 	// ExtraRoutes, when non-nil, is called while building the mux, after the
 	// standard routes are registered and before the /api/ catch-all. protect
 	// wraps a handler in the SAME Session + RequireFamily chain every real
@@ -187,6 +195,12 @@ const (
 var operationAuthTiers = map[string]authTier{
 	"Healthz": tierPublic,
 	"Readyz":  tierPublic,
+
+	// GetConfig (invitee-signup Task 2): the /login and /join screens' own
+	// pre-sign-in read, same shape of need as GetInviteInfo below — no
+	// caller exists yet. See tierPublicAPIAllowlist and config.go's doc
+	// comment.
+	"GetConfig": tierPublic,
 
 	"GetMe": tierSession,
 
@@ -392,6 +406,7 @@ var operationAuthTiers = map[string]authTier{
 // invites.go: the /join page's pre-sign-in status check).
 var tierPublicAPIAllowlist = map[string]bool{
 	"GetInviteInfo": true,
+	"GetConfig":     true,
 }
 
 // assertOperationAuthCoverage panics unless operationAuthTiers has exactly

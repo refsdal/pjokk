@@ -1,11 +1,13 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ErrorState } from "@/components/QueryStates";
 import { Button } from "@/components/ui/button";
 import { client, unwrap } from "@/lib/api";
 import { authClient, signIn, useSession } from "@/lib/auth-client";
+import { useConfig } from "@/lib/data";
 import { t } from "@/lib/i18n";
+import { oauthProviderLabels } from "@/lib/oauth";
 import { legalUrl } from "@/lib/site";
 import { toast } from "@/lib/toast";
 
@@ -21,9 +23,13 @@ interface InviteInfo {
 export function JoinScreen() {
   const { code } = useParams({ from: "/join/$code" });
   const { data: session, isPending } = useSession();
+  const config = useConfig();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
+  // Guards the auto-redeem effect below so it fires at most once per mount,
+  // regardless of how many times session/info/busy re-render it.
+  const didAuto = useRef(false);
 
   const info = useQuery({
     queryKey: ["invite-info", code],
@@ -38,14 +44,15 @@ export function JoinScreen() {
   });
 
   const joinPath = `/join/${code}`;
+  const providers = config.data?.oauthProviders ?? [];
 
-  const googleSignIn = async () => {
-    // Signup is closed everywhere EXCEPT through this flow. better-auth took
-    // a per-call `requestSignUp` flag for that; Limen has no client-side
-    // equivalent — the Go OAuth callback decides whether an unknown Google
-    // account may be created.
+  // Signup is closed everywhere EXCEPT through this flow. better-auth took
+  // a per-call `requestSignUp` flag for that; Limen has no client-side
+  // equivalent — the Go OAuth callback decides whether an unknown account
+  // may be created for any given provider.
+  const oauthSignIn = async (provider: string) => {
     try {
-      await signIn.google(joinPath);
+      await signIn.social(provider, joinPath);
     } catch (err) {
       toast(err instanceof Error ? err.message : t("Sign-in failed"), "error");
     }
@@ -76,6 +83,23 @@ export function JoinScreen() {
       setBusy(false);
     }
   };
+
+  // Auto-redeem: a signed-in visitor with a valid invite shouldn't have to
+  // click "Join family" — the whole point of the link (or QR code) is that
+  // opening it is the action. Runs exactly once per mount (didAuto is never
+  // reset): a persistent failure — invite hit maxUses, a 500, offline — must
+  // not retry itself against a rate-limited endpoint. The manual button below
+  // is gated only on `busy`, never on `didAuto`, so it stays the retry path
+  // for a failed auto-redeem and the fallback for the
+  // already-signed-in-different-family case.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: redeem is a new closure every render; the didAuto ref already guards against firing more than once
+  useEffect(() => {
+    if (didAuto.current) return;
+    if (session && info.data?.valid && !busy) {
+      didAuto.current = true;
+      void redeem();
+    }
+  }, [session, info.data?.valid, busy]);
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 px-6 pb-safe pt-safe text-center">
@@ -115,9 +139,15 @@ export function JoinScreen() {
             </Button>
           ) : (
             <div className="space-y-3">
-              <Button size="full" onClick={() => void googleSignIn()}>
-                {t("Continue with Google")}
-              </Button>
+              {providers.map((provider) => (
+                <Button
+                  key={provider}
+                  size="full"
+                  onClick={() => void oauthSignIn(provider)}
+                >
+                  {t(oauthProviderLabels[provider] ?? provider)}
+                </Button>
+              ))}
               <p className="text-xs text-muted">
                 {t("Already have an account?")}{" "}
                 <Link

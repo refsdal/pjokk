@@ -94,16 +94,52 @@ export const signIn = {
   },
 
   /**
-   * Google. Resolves the provider's authorization URL and navigates there;
-   * the callback returns the browser to `redirectTo`. Clears the cache first
-   * because the navigation leaves the page for good.
+   * Any configured OAuth provider. Resolves the provider's authorization URL
+   * and navigates there; the callback returns the browser to `redirectTo`.
+   * Clears the cache first because the navigation leaves the page for good.
    */
-  async google(redirectTo: string): Promise<void> {
+  async social(provider: string, redirectTo: string): Promise<void> {
     await resetCache();
     await authClient.signIn.social({
-      provider: "google",
+      provider,
       redirectUri: absoluteUrl(redirectTo),
     });
+  },
+
+  /** Back-compat alias; call sites may migrate to social("google", …). */
+  async google(redirectTo: string): Promise<void> {
+    return signIn.social("google", redirectTo);
+  },
+};
+
+export const signUp = {
+  /**
+   * Bootstrap credential account creation (the OPEN_SIGNUP path only — the
+   * invite-redeem flow never calls this; it stays gated server-side too, see
+   * apps/server/internal/auth/auth.go). Limen's credential plugin mounts
+   * this at POST /signup/credential, exactly parallel to signIn.credential
+   * above — it is NOT one of our own `/api/*` routes, so it is not in the
+   * generated OpenAPI client (`lib/api.ts`'s `client`); it only exists
+   * through this Limen-generated method, same as every other `signIn.*`/
+   * `authClient.*` call in this file. Throws on failure, same as
+   * signIn.credential.
+   *
+   * This route runs with parseSession:true and no skipStore, so Limen's
+   * applyEffects writes the new session into the SAME store useSession()
+   * subscribes to, synchronously, before this call even resolves — the
+   * account is already signed in the moment this returns. Do NOT follow it
+   * with signIn.password: that would be a redundant re-auth racing a
+   * <Navigate> that has already mounted (useSession() re-renders as soon as
+   * the store updates), which showed up as both a spurious round trip and a
+   * false "Sign-in failed" toast on an account that was actually created
+   * fine. Only resetCache() — mirroring signIn.password's own cache-reset
+   * half — belongs after it.
+   */
+  async credential(email: string, password: string): Promise<void> {
+    await authClient.signUp.credential({ email, password });
+    // Mirrors signIn.password: nothing of any previous account's cached
+    // data should survive into this brand-new one.
+    await resetCache();
   },
 };
 

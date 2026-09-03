@@ -14,9 +14,14 @@ export function freshEmail(tag: string): string {
 
 /**
  * POSTs with a bounded retry on 429. Limen rate-limits signup/signin
- * (~5/10s per IP) — legitimate in production, but a suite creating many
- * accounts in a few seconds trips it. Real users never do; the fixture
- * backs off rather than the app being weakened.
+ * (5/10s per IP, a fixed window keyed by path — see
+ * credential-password/handlers.go's RateLimitRules) — legitimate in
+ * production, but a suite creating many accounts in a few seconds trips it.
+ * Real users never do; the fixture backs off rather than the app being
+ * weakened. The window only clears 10s after the *last accepted* request to
+ * that path (a 429 response does not touch it), so once capped, nothing
+ * shorter than a full 10s wait gets back in — 8 attempts at 1.5s gives ~12s
+ * of headroom past that floor rather than landing right on it.
  */
 async function postWithBackoff(
   request: APIRequestContext,
@@ -24,7 +29,7 @@ async function postWithBackoff(
   data: unknown,
 ): Promise<import("@playwright/test").APIResponse> {
   let res = await request.post(url, { data });
-  for (let attempt = 0; res.status() === 429 && attempt < 6; attempt++) {
+  for (let attempt = 0; res.status() === 429 && attempt < 8; attempt++) {
     await new Promise((r) => setTimeout(r, 1500));
     res = await request.post(url, { data });
   }
@@ -32,13 +37,16 @@ async function postWithBackoff(
 }
 
 /**
- * Creates an account through the API. The SPA has no signup UI (accounts
- * come from Google sign-in or the invite flow — issue #27), so like any
- * fixture this goes straight to the endpoint — which only exists because
- * the e2e stack runs with OPEN_SIGNUP=1. Sign-UP takes "email"; sign-IN
- * takes "credential" — Limen's asymmetry, easy to trip over. The account
- * gets a null display name (the HTTP signup path has no name field);
- * every screen must cope with that anyway.
+ * Creates an account through the API. Most fixtures don't want to drive the
+ * real signup UI (auth.spec.ts does that once, deliberately) so, like any
+ * fixture, this goes straight to the endpoint — which only exists because
+ * the e2e stack runs with OPEN_SIGNUP=1; it also stands in for a brand-new
+ * OAuth account in fixtures that model an invitee (real OAuth can't run in
+ * CI, and OAuth account creation is open regardless of OPEN_SIGNUP — see
+ * DECISIONS.md 2026-09-02). Sign-UP takes "email"; sign-IN takes
+ * "credential" — Limen's asymmetry, easy to trip over. The account gets a
+ * null display name (the HTTP signup path has no name field); every screen
+ * must cope with that anyway.
  */
 export async function apiSignup(
   request: APIRequestContext,
@@ -55,9 +63,9 @@ export async function apiSignup(
  * Signs in via the API: the response's session cookie lands in the page's
  * browser context (page.request shares the cookie jar). Fixtures use this —
  * the login SCREEN is exercised by auth.spec.ts alone, which also keeps the
- * suite's pressure on the auth-signin rate limiter (20/10min per IP) low.
- * Recreating the e2e stack resets the limiter (its counters live in
- * Postgres).
+ * suite's pressure on the auth-signin rate limiter (5/10s per IP, see
+ * postWithBackoff above) low. Recreating the e2e stack resets the limiter
+ * (its counters live in Postgres).
  */
 export async function apiSignIn(page: Page, email: string): Promise<void> {
   const res = await postWithBackoff(page.request, "/api/auth/signin/credential", {

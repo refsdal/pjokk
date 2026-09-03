@@ -38,6 +38,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Public client configuration: which account-creation paths the /login and /join screens should offer. No session required, and no secrets in the response — just two booleans-worth of config the client could otherwise only infer indirectly (e.g. by trying a credential signup and reading the 403). */
+        get: operations["getConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/babies": {
         parameters: {
             query?: never;
@@ -2108,6 +2125,29 @@ export interface operations {
             };
         };
     };
+    getConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Which account-creation paths the client should offer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        openSignup: boolean;
+                        oauthProviders: string[];
+                    };
+                };
+            };
+        };
+    };
     listBabies: {
         parameters: {
             query?: never;
@@ -2299,6 +2339,15 @@ export interface operations {
                     "application/json": components["schemas"]["Ok"];
                 };
             };
+            /** @description Cannot remove the last admin. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Family admin only. */
             403: {
                 headers: {
@@ -2342,6 +2391,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description Cannot demote the last admin. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Family admin only. */
@@ -2859,6 +2917,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SleepLocation"];
+                };
+            };
+            /** @description Name is empty once whitespace is trimmed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Family admin only, or an API key. */

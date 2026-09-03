@@ -39,10 +39,14 @@ func newFixture(t *testing.T) *fixture {
 	t.Helper()
 
 	rig := testrig.Setup(t)
+	// OpenSignup is on so this fixture's CreateFamily helper can seed a family
+	// the way a non-sysadmin founds one: the family-less self-create that the
+	// allowOrgCreation guard permits only in the OPEN_SIGNUP bootstrap window.
+	// The closed-signup refusal is proven in auth's TestOrgCreationGuardMatrix.
 	svc, err := auth.New(auth.Config{
 		AppURL:     "http://localhost:3000",
 		Secret:     testSecret,
-		OpenSignup: false,
+		OpenSignup: true,
 		Pool:       rig.Pool,
 	})
 	if err != nil {
