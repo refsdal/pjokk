@@ -197,6 +197,20 @@ func (s *site) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch r.URL.Path {
+	case "/healthz", "/readyz":
+		// The image bakes in HEALTHCHECK ["/app/pjokk", "healthcheck"],
+		// which probes /healthz in EVERY dispatch mode — so without these a
+		// landing container reports itself unhealthy forever. Same body as
+		// package api's probes, so one probe definition works against any
+		// mode. Readiness is liveness here: nothing to be unready for, this
+		// mode having no database and no dependency of any kind.
+		//
+		// noindex regardless of cfg.Indexable — a probe endpoint has no
+		// business in a search index.
+		h.Set("X-Robots-Tag", "noindex, nofollow")
+		h.Set("Content-Type", "application/json; charset=utf-8")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+		return
 	case "/robots.txt":
 		h.Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = w.Write([]byte(s.robots))

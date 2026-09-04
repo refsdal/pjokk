@@ -209,3 +209,38 @@ func TestServesStaticAssets(t *testing.T) {
 		t.Errorf("GET /og.png = %d, want 200", rec.Code)
 	}
 }
+
+func TestHealthProbes(t *testing.T) {
+	// The image bakes in HEALTHCHECK ["/app/pjokk", "healthcheck"], which
+	// probes /healthz — for EVERY dispatch mode, landing included. Without
+	// these routes a landing container reports itself unhealthy forever:
+	// `docker ps` shows "(unhealthy)" and an orchestrator that honours
+	// health kills it or never marks it ready. Shipped that way in v0.4.0.
+	//
+	// Same body as the app's probes ({"ok":true}) so one probe definition
+	// works against any mode. Readiness is liveness here: this mode has no
+	// database and no dependency that could be unready.
+	h := newHandler(t, defaults())
+	for _, path := range []string{"/healthz", "/readyz"} {
+		rec := get(t, h, path)
+		if rec.Code != http.StatusOK {
+			t.Errorf("GET %s = %d, want 200", path, rec.Code)
+		}
+		if body := strings.TrimSpace(rec.Body.String()); body != `{"ok":true}` {
+			t.Errorf("GET %s body = %q, want {\"ok\":true}", path, body)
+		}
+		if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+			t.Errorf("GET %s content-type = %q, want application/json", path, ct)
+		}
+	}
+}
+
+func TestHealthProbesAreNotIndexed(t *testing.T) {
+	// Even on an indexable host: a probe endpoint has no business in a
+	// search index.
+	cfg := defaults()
+	cfg.Indexable = true
+	if got := get(t, newHandler(t, cfg), "/healthz").Header().Get("X-Robots-Tag"); got != "noindex, nofollow" {
+		t.Errorf("X-Robots-Tag on /healthz = %q, want noindex, nofollow", got)
+	}
+}
