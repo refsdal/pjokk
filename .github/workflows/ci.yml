@@ -179,6 +179,30 @@ jobs:
           docker run --rm --network pjokk-ci "${env_args[@]}" pjokk:ci \
             cron frequent
 
+          # The landing mode ships in this same image and serves the apex, so
+          # it needs its own probe — note it gets NONE of the env above: no
+          # database, no auth secret, no storage. A regression that made
+          # config.LoadLanding require them would only ever show up here.
+          docker run -d --name landing --network pjokk-ci -p 3001:3000 \
+            -e INDEXABLE=1 -e APP_URL=https://app.example.test pjokk:ci landing
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:3001/ >/dev/null && break
+            sleep 1
+          done
+          # Startup substitution actually happened: the CTA points at the
+          # configured app host and no token survives into the response. A
+          # build that skipped scripts/landing-embed-overlay.sh serves the
+          # placeholder and fails right here.
+          curl -fsS http://localhost:3001/ | grep -q 'https://app.example.test/login'
+          if curl -fsS http://localhost:3001/ | grep -q '__PJOKK_'; then
+            echo "landing served an unsubstituted token"; exit 1
+          fi
+          # Clean URLs, both languages, and the indexable pair.
+          curl -fsS http://localhost:3001/nb/privacy >/dev/null
+          curl -fsS http://localhost:3001/robots.txt | grep -q 'Allow: /'
+          curl -fsS http://localhost:3001/sitemap.xml | grep -q '<loc>'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/nope)" = "404"
+
       # The Playwright suite drives the same smoke-tested image through a real
       # browser — sign-in, family setup, logging flows. It needs signup open
       # (the suite creates its own accounts), so the app container restarts

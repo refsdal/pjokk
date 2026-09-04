@@ -1376,3 +1376,65 @@ lives on day-mode Home only (never in the shell, never in night mode), yields
 to `UpdateBanner` rather than stacking in the same fixed slot, and its
 dismissal is permanent per device — with Settings → Install keeping the
 instructions reachable afterwards.
+
+## 2026-09-04 — the landing site moves into the app image as a dispatch mode
+
+The apex was the last thing shipped by hand: CI built `apps/landing/dist`,
+uploaded it as an artifact, and "nothing deploys it automatically yet". The
+obvious fix was a second image — `ghcr.io/refsdal/pjokk-landing`, a small Go
+static server on the same distroless base. It was designed that way and then
+rejected in favour of **a sixth dispatch mode on the existing binary**,
+`pjokk landing`.
+
+The dispatch table already existed for exactly this, and `healthcheck` was
+the precedent: a mode that "constructs NOTHING: no config, no pool, no auth".
+`landing` is the same shape — no database, no auth, no API routes, no
+scheduler — and it costs one `case` and one embed rather than a second
+Dockerfile, a second GoReleaser build, a second image, a second tag ladder, a
+second cosign entry and a separate overlay script. It also removes the
+possibility of version skew between two artifacts built from one commit.
+
+**The trade accepted:** the most-scanned hostname now runs a binary that
+*contains* the API and the Postgres driver. None of it is reachable — landing
+mode mounts no API routes and opens no pool — and the same binary already
+faces the internet on app.pjokk.no, so this buys one artifact instead of two
+for an unreachable-code delta. Image size is the other half of the trade and
+is not close: the whole prerendered site is ~60 kB beside a 21 MB binary.
+
+**Configuration moved from build time to runtime**, which is the part that
+actually needed designing. `apps/landing/build.ts` gained `TEMPLATE=1`: it
+emits `__PJOKK_APP_URL__`, `__PJOKK_SITE_URL__` and
+`__PJOKK_CTA_LABEL_{EN,NB}__` where the deployment's own values would go, and
+`internal/landing` substitutes them **once at startup** with a single
+`strings.Replacer` pass per document — no per-request templating, no HTML
+parsing. Without this the image would bake `pjokk.no` in and a second host
+would need a second build, which is precisely the build-per-environment
+property the app image shed when robots.txt and the security headers moved to
+runtime. `robots.txt`, `sitemap.xml` and `X-Robots-Tag` are likewise served
+rather than built, gated on `INDEXABLE`, still fail-safe: only `"1"` opts in.
+
+**The CTA label goes through a sidecar rather than into Go.** `OPEN_SIGNUP`
+picks "Sign in" or "Get started", in two languages — and duplicating
+Norwegian copy into the server would have made `apps/landing/src/copy.ts`
+stop being the single source of truth for user-facing strings. The build
+writes `cta-labels.json` beside the documents instead, and the server reads
+the label out of it. A missing sidecar is a startup error, not a page that
+serves `__PJOKK_CTA_LABEL_EN__` as a button.
+
+**The sitemap is derived from the embedded tree**, not from a hardcoded path
+list like the TypeScript build's, so a new prerendered document appears in it
+without anyone remembering to add it. The format — every document in both
+languages, each carrying the same hreflang pair — is unchanged.
+
+**A stricter CSP than the SPA's.** The landing site is zero-JavaScript by
+design, so `script-src 'none'`, `connect-src 'none'` and `form-action 'none'`
+cost nothing to promise and are worth promising on the public front door.
+
+Two smaller things fell out. `apps/landing/build.ts` now empties `dist/`
+first, like vite's `emptyOutDir`: a file one mode writes and the other does
+not — `robots.txt` and `sitemap.xml`, which the container serves at request
+time — otherwise survived from a previous build and got embedded into the
+binary as a stale leftover. And `config.LoadLanding` is a second loader
+rather than a flag on `Load`, because the landing mode shares none of the
+app's required variables and `Load` would reject a perfectly good landing
+deployment for missing all three of them.

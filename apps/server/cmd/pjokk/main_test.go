@@ -28,6 +28,7 @@ func TestParseArgs(t *testing.T) {
 		{"migrate", []string{"migrate"}, dispatch{mode: modeMigrate, raw: "migrate"}},
 		{"migrations is an alias for migrate", []string{"migrations"}, dispatch{mode: modeMigrate, raw: "migrations"}},
 		{"healthcheck", []string{"healthcheck"}, dispatch{mode: modeHealthcheck, raw: "healthcheck"}},
+		{"landing", []string{"landing"}, dispatch{mode: modeLanding, raw: "landing"}},
 
 		{"cron with a job", []string{"cron", "nightly"}, dispatch{mode: modeCron, raw: "cron", job: "nightly"}},
 		{"cron with the other job", []string{"cron", "frequent"}, dispatch{mode: modeCron, raw: "cron", job: "frequent"}},

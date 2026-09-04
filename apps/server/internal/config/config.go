@@ -228,3 +228,87 @@ func (c *Config) DisabledSubsystems() []string {
 	}
 	return off
 }
+
+// --- landing mode -----------------------------------------------------
+
+// Landing is the configuration for `pjokk landing`, the dispatch mode that
+// serves the prerendered marketing site and nothing else.
+//
+// It is a separate type and a separate loader because that mode shares none
+// of the app's requirements — no database, no auth secret, no object storage
+// — and Load would reject an otherwise perfect landing deployment for
+// missing all three. Keeping it here rather than reading os.Getenv in
+// cmd/pjokk preserves the rule that every setting is declared, defaulted and
+// validated in this package.
+type Landing struct {
+	SiteURL    string
+	AppURL     string
+	Port       int
+	OpenSignup bool
+	Indexable  bool
+}
+
+// LoadLanding parses the landing site's configuration. Every field has a
+// working default — the real pjokk.no deployment — so a bare
+// `docker run ghcr.io/refsdal/pjokk landing` serves the right thing. Like
+// Load, it reports every problem at once.
+func LoadLanding(env map[string]string) (*Landing, error) {
+	p := &problemCollector{}
+	cfg := &Landing{
+		SiteURL: "https://pjokk.no",
+		AppURL:  "https://app.pjokk.no",
+		Port:    3000,
+	}
+
+	for _, f := range []struct {
+		name string
+		dest *string
+	}{
+		{"SITE_URL", &cfg.SiteURL},
+		{"APP_URL", &cfg.AppURL},
+	} {
+		if v, present := env[f.name]; present && v != "" {
+			if !isValidAbsoluteURL(v) {
+				p.add(f.name, "must be a valid absolute URL")
+			} else {
+				*f.dest = v
+			}
+		}
+	}
+
+	if v, present := env["PORT"]; present && v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			p.add("PORT", "must be a valid integer")
+		} else if n <= 0 {
+			p.add("PORT", "must be positive")
+		} else {
+			cfg.Port = n
+		}
+	}
+
+	// Both fail-safe: only an explicit "1" turns them on, matching the
+	// build-time flags these replaced. A deploy that forgets INDEXABLE must
+	// publish noindex, not Allow: /.
+	cfg.OpenSignup = env["OPEN_SIGNUP"] == "1"
+	cfg.Indexable = env["INDEXABLE"] == "1"
+
+	if len(p.problems) > 0 {
+		return nil, fmt.Errorf("invalid configuration:\n  %s", strings.Join(p.problems, "\n  "))
+	}
+	return cfg, nil
+}
+
+// LandingFromOS loads the landing site's configuration from the process's
+// real environment.
+func LandingFromOS() (*Landing, error) {
+	env := make(map[string]string, len(os.Environ()))
+	for _, kv := range os.Environ() {
+		k, v, ok := strings.Cut(kv, "=")
+		if !ok {
+			continue
+		}
+		env[k] = v
+	}
+	return LoadLanding(env)
+}

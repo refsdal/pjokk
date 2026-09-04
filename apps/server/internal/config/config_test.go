@@ -418,3 +418,88 @@ func TestFromOS_WrapsOSEnviron(t *testing.T) {
 		t.Errorf("Port = %d, want 4242", cfg.Port)
 	}
 }
+
+// --- landing mode -----------------------------------------------------
+
+// `pjokk landing` shares none of the app's requirements: no database, no
+// auth secret, no object storage. Load would reject a perfectly good landing
+// deployment for missing all three, so the mode gets its own loader — the
+// settings still live in this package rather than being read with os.Getenv
+// at a call site (CLAUDE.md), they are just a different, smaller set.
+
+func TestLoadLandingNeedsNothing(t *testing.T) {
+	// A bare `docker run ghcr.io/refsdal/pjokk landing` must work: the
+	// defaults are the real pjokk.no deployment.
+	cfg, err := LoadLanding(map[string]string{})
+	if err != nil {
+		t.Fatalf("LoadLanding({}) = %v, want no error", err)
+	}
+	if cfg.SiteURL != "https://pjokk.no" {
+		t.Errorf("SiteURL = %q, want https://pjokk.no", cfg.SiteURL)
+	}
+	if cfg.AppURL != "https://app.pjokk.no" {
+		t.Errorf("AppURL = %q, want https://app.pjokk.no", cfg.AppURL)
+	}
+	if cfg.Port != 3000 {
+		t.Errorf("Port = %d, want 3000", cfg.Port)
+	}
+	// Fail-safe, exactly as the build-time flag was: unset means noindex.
+	if cfg.Indexable {
+		t.Error("Indexable = true with INDEXABLE unset, want false")
+	}
+	if cfg.OpenSignup {
+		t.Error("OpenSignup = true with OPEN_SIGNUP unset, want false")
+	}
+}
+
+func TestLoadLandingIgnoresAppOnlySettings(t *testing.T) {
+	// The app's required vars are simply not its business; supplying none of
+	// them must not produce a problem report.
+	if _, err := LoadLanding(map[string]string{
+		"INDEXABLE":   "1",
+		"OPEN_SIGNUP": "1",
+		"PORT":        "8080",
+		"SITE_URL":    "https://test.pjokk.no",
+		"APP_URL":     "https://app.test.pjokk.no",
+	}); err != nil {
+		t.Fatalf("LoadLanding = %v, want no error", err)
+	}
+}
+
+func TestLoadLandingReadsOverrides(t *testing.T) {
+	cfg, err := LoadLanding(map[string]string{
+		"SITE_URL":    "https://test.pjokk.no",
+		"APP_URL":     "https://app.test.pjokk.no",
+		"PORT":        "8080",
+		"INDEXABLE":   "1",
+		"OPEN_SIGNUP": "1",
+	})
+	if err != nil {
+		t.Fatalf("LoadLanding = %v", err)
+	}
+	if cfg.SiteURL != "https://test.pjokk.no" || cfg.AppURL != "https://app.test.pjokk.no" {
+		t.Errorf("URLs = %q / %q", cfg.SiteURL, cfg.AppURL)
+	}
+	if cfg.Port != 8080 {
+		t.Errorf("Port = %d, want 8080", cfg.Port)
+	}
+	if !cfg.Indexable || !cfg.OpenSignup {
+		t.Errorf("Indexable = %v, OpenSignup = %v, want both true", cfg.Indexable, cfg.OpenSignup)
+	}
+}
+
+func TestLoadLandingReportsEveryProblemAtOnce(t *testing.T) {
+	_, err := LoadLanding(map[string]string{
+		"SITE_URL": "not-a-url",
+		"APP_URL":  "also-not-a-url",
+		"PORT":     "banana",
+	})
+	if err == nil {
+		t.Fatal("LoadLanding = nil error, want problems")
+	}
+	for _, want := range []string{"SITE_URL", "APP_URL", "PORT"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error missing %s: %v", want, err)
+		}
+	}
+}
