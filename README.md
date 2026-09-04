@@ -345,6 +345,10 @@ docker compose -f docker-compose.yml -f docker-compose.s3.yml up
 run those one-offs against the same built image (both behind the `tools`
 profile, so `up` does not start them).
 
+`docker-compose.landing.yml` is the odd one out: a single service running the
+published image in its `landing` dispatch mode, with no database and no
+secrets, for whoever serves the apex. See "The landing site" below.
+
 ### Versioning and images
 
 Versions are computed from [Conventional Commits](https://www.conventionalcommits.org)
@@ -382,6 +386,12 @@ nothing app-visible changed. The manual dispatch remains for two levers
 only: `dry_run` (the full pipeline as a snapshot, nothing pushed) and
 `allow_major` (1.0 stays a human decision). `mise run snapshot` runs the
 same pipeline locally.
+
+**Image tags carry no `v`.** The git tag is `v0.4.0`; the image is
+`ghcr.io/refsdal/pjokk:0.4.0` — GoReleaser's version template strips the
+prefix. `docker pull …:v0.4.0` fails with `not found`, which is an easy
+minute to lose. The tag ladder is `:0.4.0` (never moves), `:0.4` (moves with
+patches), `:0` (moves with minors), `:latest`, and `:sha-<commit>`.
 
 Images are multi-arch (`linux/amd64` + `linux/arm64`). Building one locally:
 
@@ -476,6 +486,27 @@ docker run -p 8080:3000 \
   -e INDEXABLE=1 \
   ghcr.io/refsdal/pjokk:latest landing
 ```
+
+**Or with Compose**, which is what you want for a real deployment (restart
+policy, a place to keep the settings, labels for whatever reverse proxy sits
+in front):
+
+```sh
+curl -O https://raw.githubusercontent.com/refsdal/pjokk/main/docker-compose.landing.yml
+SITE_URL=https://pjokk.no INDEXABLE=1 \
+  docker compose -f docker-compose.landing.yml up -d
+```
+
+One service, no database, no volumes, no secrets. It is a separate file
+rather than a profile in `docker-compose.yml` for a mechanical reason:
+Compose interpolates the whole file before selecting services, so the app's
+`${AUTH_SECRET:?...}` guard fails even when you only asked for the landing
+site — and previewing a marketing page should not require inventing an auth
+secret for an app you are not running.
+
+`/healthz` and `/readyz` answer `{"ok":true}` in this mode too (readiness is
+liveness — there is nothing to be unready for), so the image's built-in
+`HEALTHCHECK` and any orchestrator probe work unchanged.
 
 `landing` is a dispatch mode like `server` or `cron`, and it constructs
 **nothing else** — no database, no auth, no API routes, no scheduler. There is

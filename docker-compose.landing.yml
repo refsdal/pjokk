@@ -1,0 +1,55 @@
+# Pjokk's landing site — the public marketing + legal site on the apex
+# (pjokk.no), served by the SAME image as the app in its `landing` dispatch
+# mode:
+#
+#   docker compose -f docker-compose.landing.yml up -d   # http://localhost:8080
+#
+# One service, no database, no volumes, no secrets. `landing` mode opens no
+# Postgres connection, mounts no API routes and starts no scheduler — it
+# serves six prerendered documents and nothing else, which is why this file
+# has none of the machinery the other compose files need.
+#
+# It is a SEPARATE FILE rather than a profile in docker-compose.yml for a
+# mechanical reason: Compose interpolates the whole file before it selects
+# services, so the app's `${AUTH_SECRET:?...}` guard fails even when you only
+# asked for the landing site. Previewing a marketing page should not require
+# inventing an auth secret for an app you are not running.
+#
+# In production this runs on a different host from the app — hence APP_URL
+# pointing elsewhere — and INDEXABLE=1 belongs on the real apex and nowhere
+# else. All four settings are substituted into the prerendered HTML at
+# startup, so the same image serves the apex, a test host, or your own
+# domain; see the README's "The landing site" section.
+
+name: pjokk-landing
+
+services:
+  landing:
+    # The published image, like docker-compose.selfhost.yml — nothing to
+    # clone and nothing to build. Working on the landing site itself?
+    # Comment out `image:`, uncomment `build:`, and run
+    # `bash scripts/build-artifacts.sh` first (the Dockerfile is COPY-only).
+    image: ghcr.io/refsdal/pjokk:latest
+    # build: .
+    restart: unless-stopped
+    command: ["landing"]
+    ports:
+      - "${LANDING_PORT:-8080}:3000"
+    environment:
+      # The landing site's own origin: canonical links, hreflang alternates
+      # and sitemap.xml are written from it.
+      SITE_URL: ${SITE_URL:-http://localhost:8080}
+      # Where the call to action sends people — the app, not itself.
+      APP_URL: ${APP_URL:-https://app.pjokk.no}
+      # Call-to-action copy: "Get started" when signup is open, else "Sign in".
+      OPEN_SIGNUP: ${OPEN_SIGNUP:-0}
+      # Fail-safe: only "1" opts a host into being indexed. It gates
+      # robots.txt, whether sitemap.xml is served at all, and the
+      # X-Robots-Tag: noindex header. Leave it alone anywhere but the apex.
+      INDEXABLE: ${INDEXABLE:-0}
+    healthcheck:
+      test: ["CMD", "/app/pjokk", "healthcheck"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
