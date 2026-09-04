@@ -3,11 +3,17 @@
 Pjokk ("en liten pjokk" — a little tyke) is a self-hosted baby tracker for
 families, shipped as a Docker container. It is a from-scratch replacement for
 sprout-track (https://github.com/Oak-and-Sprout/sprout-track), built mobile-first
-as a PWA. Domain: the public marketing + legal site is a separate static
-build on the apex, **pjokk.no** (live) — no server, no JavaScript. The app
-itself, container and all, lives on **app.pjokk.no**, whose signed-in home
-screen is `/home`. Test environment: **test.pjokk.no** (the app host; the
-landing site has no separate test deploy).
+as a PWA. Domain: the public marketing + legal site is a separate prerendered
+build on the apex, **pjokk.no** (live) — zero JavaScript, and served by the
+SAME image in its own dispatch mode (`pjokk landing`), which opens no
+database, no auth and no API. There is no second image to publish: the
+deployment-specific values are substituted into the prerendered HTML at
+startup, not baked in at build time, so one artifact serves the apex, a test
+host and a self-hoster's own domain. The static tree remains buildable
+(`bun run build:landing`) for anyone who would rather host files. The app
+itself lives on **app.pjokk.no**, whose signed-in home screen is `/home`.
+Test environment: **test.pjokk.no** (the app host; the landing site has no
+separate test deploy).
 
 > **Runtime note (2026-09-01):** the app has had three runtimes. It ran on
 > Cloudflare Workers + D1 + R2 + KV through Phase 10; it then ran as a Bun
@@ -96,7 +102,8 @@ landing site has no separate test deploy).
   defaults to `time.Local`, the image sets no `TZ`, and the 30-day backup
   retention window is a privacy-policy commitment stated in UTC). There is no
   env flag for this — the dispatch mode expresses it: the default mode and
-  `worker` mode both start the scheduler, `server` mode never does. Under
+  `worker` mode both start the scheduler, `server` mode never does (nor does
+  `landing`, which starts nothing at all). Under
   Kubernetes, scale `server` for HTTP and drive the scheduled work from
   either CronJobs or exactly one `worker` replica — never more than one thing
   scheduling at once, or every replica/worker fires every job N times.

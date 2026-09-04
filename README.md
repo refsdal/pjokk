@@ -156,6 +156,11 @@ mode you run decides who does this — there is no separate flag any more:
 | *(default, no argument)* | yes | yes, under an advisory lock | yes |
 | `server` | yes | no | no |
 | `worker` | `/healthz` only | no | yes |
+| `landing` | yes, the marketing site only | no (no database at all) | no |
+
+(`landing` serves `pjokk.no` and touches nothing the other modes need — see
+"The landing site" below. `migrate`, `cron <job>` and `healthcheck` are
+one-shot commands rather than long-running modes.)
 
 **One container:** just run the image with no argument. It migrates itself,
 serves the app, and runs the scheduler, all in one process.
@@ -437,7 +442,7 @@ openapi/pjokk.yaml                  the API contract — hand-written, and the s
                                     the generated Go server and the SPA's client types
 apps/server/                        the Go module (github.com/refsdal/pjokk/server)
   ├─ cmd/pjokk/                     composition root + dispatch table: default, server, worker,
-  │                                 migrate, cron <job>, healthcheck
+  │                                 migrate, cron <job>, healthcheck, landing
   └─ internal/
       ├─ api/                       routes, middleware, gen/ (oapi-codegen output)
       ├─ auth/                      the ONLY package that imports Limen, behind auth.Service
@@ -458,30 +463,58 @@ meet.
 
 ### The landing site (apps/landing)
 
-Separate from the container, and not built or published by it — the Dockerfile
-deliberately runs the frontend workspace's own build rather than the root
-`bun run build`, so a landing-only render failure never fails the image build
-(see DECISIONS.md, "Landing split"). Build it with:
+The public marketing site on the apex (`pjokk.no`) — one self-contained
+document per URL, inline CSS, **zero JavaScript**, prerendered in English and
+Norwegian. It is a different host from the app, and it ships two ways.
+
+**As a container, from the same image** (how `pjokk.no` is served):
+
+```sh
+docker run -p 8080:3000 \
+  -e SITE_URL=https://pjokk.no \
+  -e APP_URL=https://app.pjokk.no \
+  -e INDEXABLE=1 \
+  ghcr.io/refsdal/pjokk:latest landing
+```
+
+`landing` is a dispatch mode like `server` or `cron`, and it constructs
+**nothing else** — no database, no auth, no API routes, no scheduler. There is
+no separate image to publish, version or sign: the prerendered site is
+embedded next to the SPA, and the four settings below are substituted into it
+at startup rather than baked in at build time, so one image serves the apex, a
+test host, and a self-hoster's own domain. Every value has a working default,
+so a bare `docker run … landing` serves the real pjokk.no configuration.
+
+**As a static tree**, if you would rather host files:
 
 ```sh
 SITE_URL=https://pjokk.no APP_URL=https://app.pjokk.no OPEN_SIGNUP=0 INDEXABLE=1 \
   bun run build:landing
 ```
 
-Output lands in `apps/landing/dist/` — a plain static tree (HTML, CSS, an icon,
-an OG image, `robots.txt`, `sitemap.xml`) to upload to whatever serves the
-apex. Four environment variables, all optional (defaults shown):
+Output lands in `apps/landing/dist/` — HTML, CSS, an icon, an OG image,
+`robots.txt` and `sitemap.xml` — to upload wherever you like. CI also uploads
+it as a build artifact (`.github/workflows/ci.yml`).
+
+The same four variables configure both, at runtime for the container and at
+build time for the static tree (defaults shown):
 
 | Var | Default | Effect |
 |---|---|---|
-| `SITE_URL` | `https://pjokk.no` | canonical/OpenGraph URLs and hreflang alternates |
+| `SITE_URL` | `https://pjokk.no` | canonical/OpenGraph URLs, hreflang alternates, `sitemap.xml` |
 | `APP_URL` | `https://app.pjokk.no` | where the sign-in/get-started CTA points |
 | `OPEN_SIGNUP` | off (`0`) | CTA copy: "Get started" vs "Sign in" |
-| `INDEXABLE` | off (fail-safe: only `"1"` turns it on) | `noindex` meta + `robots.txt` + whether `sitemap.xml` is written at all — leave unset on every host except the production apex |
+| `INDEXABLE` | off (fail-safe: only `"1"` turns it on) | `robots.txt`, whether `sitemap.xml` is served at all, and the `X-Robots-Tag: noindex` header — leave unset on every host except the production apex |
 
-CI uploads `apps/landing/dist` as a build artifact (see
-`.github/workflows/ci.yml`) so a maintainer can download and publish it without
-a local build, but nothing deploys it automatically yet.
+`PORT` (default `3000`) applies to the container only.
+
+The container is also the stricter of the two: because the site runs no
+JavaScript, it is served under a CSP of `script-src 'none'` with
+`connect-src 'none'` and `form-action 'none'`.
+
+The image build deliberately runs each frontend workspace's own build rather
+than the root `bun run build`, so a landing-only render failure never fails
+the image build (see DECISIONS.md, "Landing split").
 
 ---
 
