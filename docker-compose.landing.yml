@@ -47,9 +47,10 @@ services:
       # robots.txt, whether sitemap.xml is served at all, and the
       # X-Robots-Tag: noindex header. Leave it alone anywhere but the apex.
       INDEXABLE: ${INDEXABLE:-0}
-    healthcheck:
-      test: ["CMD", "/app/pjokk", "healthcheck"]
-      interval: 30s
-      timeout: 3s
-      start_period: 5s
-      retries: 3
+    # No healthcheck: block on purpose. The image already declares one
+    # (Dockerfile: HEALTHCHECK ["/app/pjokk", "healthcheck"]) and Compose
+    # inherits it, which is why no app service in any of these files
+    # declares one either — only `db` does, because the postgres image ships
+    # none and depends_on: service_healthy needs it. A copy here would be a
+    # second definition free to drift from the Dockerfile's; the one this
+    # replaces already had, with a 5s start_period against the image's 10s.

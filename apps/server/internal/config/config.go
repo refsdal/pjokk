@@ -65,6 +65,31 @@ func (p *problemCollector) requireNonEmpty(env map[string]string, field string) 
 	return v, true
 }
 
+// boolFlag reads a strict "0"/"1" flag, defaulting to false when absent or
+// empty and reporting a problem for anything else.
+//
+// Shared by Load and LoadLanding on purpose: OPEN_SIGNUP means the same
+// thing in both runtimes and they are routinely given the same .env, so a
+// value one accepts and the other silently reads as false is a mismatch
+// nothing would surface. LoadLanding used to do `== "1"`, which meant
+// OPEN_SIGNUP=true crash-looped the app (loudly, fine) while the landing
+// page quietly advertised the wrong call to action.
+//
+// Deliberately strict rather than permissive: the fail-safe default stays
+// false, and the point is to REJECT an unrecognised value rather than guess
+// which way the operator meant it.
+func (p *problemCollector) boolFlag(env map[string]string, field string) bool {
+	switch env[field] {
+	case "", "0":
+		return false
+	case "1":
+		return true
+	default:
+		p.add(field, `must be "0" or "1"`)
+		return false
+	}
+}
+
 // isValidAbsoluteURL reports whether v parses as an absolute URL with a
 // scheme and host, the same shape zod's .url() accepts.
 func isValidAbsoluteURL(v string) bool {
@@ -161,14 +186,7 @@ func Load(env map[string]string) (*Config, error) {
 
 	// --- Behaviour switches ---
 
-	switch v := env["OPEN_SIGNUP"]; v {
-	case "", "0":
-		cfg.OpenSignup = false
-	case "1":
-		cfg.OpenSignup = true
-	default:
-		p.add("OPEN_SIGNUP", `must be "0" or "1"`)
-	}
+	cfg.OpenSignup = p.boolFlag(env, "OPEN_SIGNUP")
 
 	cfg.Port = 3000
 	if v, present := env["PORT"]; present && v != "" {
@@ -287,11 +305,12 @@ func LoadLanding(env map[string]string) (*Landing, error) {
 		}
 	}
 
-	// Both fail-safe: only an explicit "1" turns them on, matching the
-	// build-time flags these replaced. A deploy that forgets INDEXABLE must
-	// publish noindex, not Allow: /.
-	cfg.OpenSignup = env["OPEN_SIGNUP"] == "1"
-	cfg.Indexable = env["INDEXABLE"] == "1"
+	// Both fail-safe: absent or "0" means off, matching the build-time flags
+	// these replaced. A deploy that forgets INDEXABLE must publish noindex,
+	// not Allow: /. Parsed by the same helper the app uses, so a shared .env
+	// cannot mean two different things — see boolFlag.
+	cfg.OpenSignup = p.boolFlag(env, "OPEN_SIGNUP")
+	cfg.Indexable = p.boolFlag(env, "INDEXABLE")
 
 	if len(p.problems) > 0 {
 		return nil, fmt.Errorf("invalid configuration:\n  %s", strings.Join(p.problems, "\n  "))

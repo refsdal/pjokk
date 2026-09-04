@@ -488,6 +488,49 @@ func TestLoadLandingReadsOverrides(t *testing.T) {
 	}
 }
 
+func TestLoadLandingRejectsNonBooleanFlags(t *testing.T) {
+	// The app's Load rejects anything but "0"/"1" for OPEN_SIGNUP. LoadLanding
+	// used to compare == "1" and silently read everything else as false, so a
+	// shared .env with OPEN_SIGNUP=true crash-looped the app (loudly, fine)
+	// while the landing page quietly advertised the wrong call to action with
+	// nothing in the log. INDEXABLE was the same shape and worse: silently
+	// not-indexable is the sort of thing found months later.
+	//
+	// The fail-safe defaults are unchanged. The point is to REJECT an invalid
+	// value rather than guess at one.
+	for _, field := range []string{"OPEN_SIGNUP", "INDEXABLE"} {
+		for _, bad := range []string{"true", "yes", "TRUE", "2", " 1"} {
+			if _, err := LoadLanding(map[string]string{field: bad}); err == nil {
+				t.Errorf("LoadLanding(%s=%q) = nil error, want a problem", field, bad)
+			} else if !strings.Contains(err.Error(), field) {
+				t.Errorf("LoadLanding(%s=%q) error missing the field name: %v", field, bad, err)
+			}
+		}
+		// Empty and absent both mean off, as they do for the app.
+		for _, ok := range []string{"", "0", "1"} {
+			if _, err := LoadLanding(map[string]string{field: ok}); err != nil {
+				t.Errorf("LoadLanding(%s=%q) = %v, want no error", field, ok, err)
+			}
+		}
+	}
+}
+
+func TestLoadLandingMatchesAppFlagParsing(t *testing.T) {
+	// The two runtimes share these names and must agree on what they accept:
+	// a value one accepts and the other rejects is a silent mismatch waiting
+	// for a shared .env.
+	for _, v := range []string{"", "0", "1", "true", "yes", "2"} {
+		_, appErr := Load(clone(minimal(), map[string]string{"OPEN_SIGNUP": v}))
+		_, landingErr := LoadLanding(map[string]string{"OPEN_SIGNUP": v})
+		appRejects := appErr != nil && strings.Contains(appErr.Error(), "OPEN_SIGNUP")
+		landingRejects := landingErr != nil
+		if appRejects != landingRejects {
+			t.Errorf("OPEN_SIGNUP=%q: app rejects=%v, landing rejects=%v — they must agree",
+				v, appRejects, landingRejects)
+		}
+	}
+}
+
 func TestLoadLandingReportsEveryProblemAtOnce(t *testing.T) {
 	_, err := LoadLanding(map[string]string{
 		"SITE_URL": "not-a-url",

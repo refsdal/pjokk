@@ -39,9 +39,12 @@ func ScalarHTML() []byte { return scalarHTML }
 // csp is REF §A9's Content-Security-Policy value, reproduced byte-exact.
 const csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 
-// robotsBody is served at GET /robots.txt. Only production sets INDEXABLE
-// (a separate, not-yet-built concern); until then every environment this
-// binary runs in disallows crawling, same as the TS predecessor's default.
+// robotsBody is served at GET /robots.txt. Unconditional, and deliberately
+// so: this is the APP host, which is entirely behind auth and has nothing
+// worth indexing on any environment. INDEXABLE exists and is honoured, but
+// only by `landing` mode (internal/landing), which serves the public site —
+// the app never reads it. Setting INDEXABLE=1 in a shared .env therefore
+// opens up the apex and leaves the app host disallowed, which is correct.
 const robotsBody = "User-agent: *\nDisallow: /\n"
 
 // securityHeaders sets REF §A9's full header set on a non-/api response.
