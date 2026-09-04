@@ -45,6 +45,9 @@ async function copyPublicAsset(name: string) {
 
 await copyPublicAsset("og.png");
 await copyPublicAsset("icon.svg");
+// WebKit ignores an SVG apple-touch-icon, so the landing site ships the same
+// PNG the SPA does (scripts/gen-icons.mjs writes both copies).
+await copyPublicAsset("icon-180.png");
 
 for (const lang of ["en", "nb"] as LandingLang[]) {
   const copy = LANDING_COPY[lang];
@@ -123,7 +126,7 @@ ${urls}
 }
 
 console.log(
-  "landing: wrote dist/index.html, dist/nb/index.html, dist/{privacy,terms}/index.html, dist/nb/{privacy,terms}/index.html, dist/robots.txt, dist/og.png, dist/icon.svg" +
+  "landing: wrote dist/index.html, dist/nb/index.html, dist/{privacy,terms}/index.html, dist/nb/{privacy,terms}/index.html, dist/robots.txt, dist/og.png, dist/icon.svg, dist/icon-180.png" +
     (INDEXABLE
       ? ", dist/sitemap.xml"
       : " (sitemap.xml skipped, not indexable)"),

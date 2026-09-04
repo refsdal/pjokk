@@ -96,7 +96,7 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
 <meta name="theme-color" content="#faf9f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#171512" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="/icon.svg">
+<link rel="apple-touch-icon" href="/icon-180.png">
 <style>${LANDING_CSS}</style>
 </head>
 <body>
@@ -175,7 +175,7 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
 <meta name="theme-color" content="#faf9f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#171512" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="/icon.svg">
+<link rel="apple-touch-icon" href="/icon-180.png">
 <style>${LANDING_CSS}</style>
 </head>
 <body>

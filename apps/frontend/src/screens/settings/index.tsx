@@ -11,6 +11,7 @@ import { AppearanceSection } from "./AppearanceSection";
 import { BabiesSection } from "./BabiesSection";
 import { ContactsSection } from "./ContactsSection";
 import { FamilySection } from "./FamilySection";
+import { InstallSection } from "./InstallSection";
 import { SectionTitle } from "./lib";
 import { NotificationsSection } from "./NotificationsSection";
 import { SleepLocationsSection } from "./SleepLocationsSection";
@@ -50,6 +51,8 @@ export function SettingsScreen() {
             <ApiKeysSection />
           </>
         )}
+
+        <InstallSection />
 
         <SectionTitle>{t("Data")}</SectionTitle>
         <Card className="space-y-3">
