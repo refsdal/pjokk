@@ -1324,6 +1324,59 @@ accounts without an invite," it is "no *access* — no family, no child data
 `nightly` cron job) already covered post-signup abandonment and needed no
 change to also cover this case.
 
+## 2026-09-04 — PWA install: real PNG icons and a state-aware hint
+
+An iPhone user went looking for "Add to Home Screen", did not find it, and
+gave up. Investigation turned up four separate defects, none of which any
+test covered:
+
+- **`apple-touch-icon` pointed at an SVG**, in both the SPA and the landing
+  site. WebKit accepts no SVG there and no SVG in a web app manifest either,
+  so an iPhone adding Pjokk to the home screen was falling back to **a
+  screenshot of the page** as the icon. Fixed with real PNGs.
+- **Nothing in the app ever mentioned installing.** Chromium fires
+  `beforeinstallprompt` and hands you a button; WebKit has no equivalent and
+  never will, so on iOS the Share-sheet item is the only route — and the app
+  said nothing about it, anywhere.
+- No `mobile-web-app-capable` / `apple-mobile-web-app-*` meta tags.
+
+**The PNGs are generated, not drawn.** `scripts/gen-icons.mjs` renders them
+from the same geometry as `icon.svg`, reusing the hand-rolled PNG writer that
+already existed for the landing site's og card — extracted to
+`scripts/lib/{png,mark}.mjs` rather than duplicated. No rasterizer joins the
+toolchain for four static files, and the output stays reproducible. The arc
+centres are now *derived* from the SVG path endpoints (SVG 1.1 F.6.5) instead
+of being hardcoded constants with a note to "re-derive them rather than
+nudging by eye"; that re-render moves 27 subpixels of 2,268,000 in og.png, by
+at most 9/255, all on curve edges — the derived values are the more faithful
+of the two. Every PNG is full-bleed: iOS masks an apple-touch-icon itself
+(ours would round it twice), a maskable icon must fill its square by
+definition, and the encoder writes RGB with no alpha anyway. `icon.svg` keeps
+the rounded tile for engines that take an SVG.
+
+**The hint is a state machine, not an `isIOS` flag** — because the wrong hint
+is worse than none. Inside a Facebook or Mail webview, "tap Share → Add to
+Home Screen" is not merely unhelpful, it is *impossible to follow*: that menu
+item does not exist there. `detectInstallState` therefore separates
+`ios-safari` (give the steps) from `ios-needs-safari` (say "open in Safari
+first", then give the steps), detecting real Safari by requiring BOTH a
+`Version/` and a `Safari/` token — Chrome on iOS carries `Safari/` but never
+`Version/`. iPadOS is caught by `maxTouchPoints > 1`, since it reports itself
+as a Macintosh.
+
+**iOS is checked before a captured prompt.** The two can never both be true on
+a real device (WebKit does not fire the event), so the ordering is
+unobservable in production — but it makes the browser test deterministic,
+where Chromium drives an iPhone user agent.
+
+The detection is a pure function over an env struct, unit-tested across the UA
+matrix; everything that reads live browser state is covered by
+`e2e/install.spec.ts` instead, since the frontend suite has no DOM. The banner
+lives on day-mode Home only (never in the shell, never in night mode), yields
+to `UpdateBanner` rather than stacking in the same fixed slot, and its
+dismissal is permanent per device — with Settings → Install keeping the
+instructions reachable afterwards.
+
 ## 2026-09-04 — the landing site moves into the app image as a dispatch mode
 
 The apex was the last thing shipped by hand: CI built `apps/landing/dist`,
