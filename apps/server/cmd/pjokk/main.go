@@ -50,6 +50,7 @@ import (
 	"github.com/refsdal/pjokk/server/internal/db"
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
 	"github.com/refsdal/pjokk/server/internal/jobs"
+	"github.com/refsdal/pjokk/server/internal/landing"
 	"github.com/refsdal/pjokk/server/internal/push"
 	"github.com/refsdal/pjokk/server/internal/ratelimit"
 	"github.com/refsdal/pjokk/server/internal/storage"
@@ -99,8 +100,16 @@ func run(args []string) int {
 		// typo'd `pjokk migrationz` in a Kubernetes Job would otherwise
 		// silently become a pod that starts a web server and never
 		// completes, instead of failing loudly.
-		fmt.Fprintf(os.Stderr, "Unknown dispatch mode: %q. Expected one of: server, worker, migrate (or migrations), cron, healthcheck, or no argument to migrate-then-serve.\n", d.raw)
+		fmt.Fprintf(os.Stderr, "Unknown dispatch mode: %q. Expected one of: server, worker, migrate (or migrations), cron, healthcheck, landing, or no argument to migrate-then-serve.\n", d.raw)
 		return 2
+
+	case modeLanding:
+		// The marketing site and nothing else. Like modeHealthcheck it
+		// constructs no pool, no auth and no API handler — which is what
+		// lets ONE image serve both hosts (`pjokk` on app.pjokk.no,
+		// `pjokk landing` on the apex) instead of publishing a second
+		// artifact for six static documents.
+		return landingMode()
 
 	case modeMigrate:
 		return migrateMode()
@@ -141,6 +150,7 @@ const (
 	modeMigrate
 	modeCron
 	modeHealthcheck
+	modeLanding
 	modeUnknown
 )
 
@@ -173,6 +183,8 @@ func parseArgs(args []string) dispatch {
 		return dispatch{mode: modeMigrate, raw: raw}
 	case "healthcheck":
 		return dispatch{mode: modeHealthcheck, raw: raw}
+	case "landing":
+		return dispatch{mode: modeLanding, raw: raw}
 	case "cron":
 		job := ""
 		if len(args) > 1 {
@@ -182,6 +194,54 @@ func parseArgs(args []string) dispatch {
 	default:
 		return dispatch{mode: modeUnknown, raw: raw}
 	}
+}
+
+// --- landing ----------------------------------------------------------
+
+// landingMode serves the embedded marketing site. No database, no auth, no
+// scheduler: its config (config.LoadLanding) shares nothing with the app's,
+// and every value has a working default, so a bare
+// `docker run ghcr.io/refsdal/pjokk landing` serves pjokk.no correctly.
+func landingMode() int {
+	cfg, err := config.LandingFromOS()
+	if err != nil {
+		log.Printf("configuration error: %v", err)
+		return 1
+	}
+
+	handler, err := landing.Handler(landing.Config{
+		SiteURL:    cfg.SiteURL,
+		AppURL:     cfg.AppURL,
+		OpenSignup: cfg.OpenSignup,
+		Indexable:  cfg.Indexable,
+	})
+	if err != nil {
+		// A build whose tokens or sidecar are missing must not boot and
+		// serve "__PJOKK_CTA_LABEL_EN__" as a button label.
+		log.Printf("startup failed: %v", err)
+		return 1
+	}
+
+	sig, stopSignals := notifyShutdown()
+	defer stopSignals()
+
+	srv := &http.Server{
+		Addr:              fmt.Sprintf(":%d", cfg.Port),
+		Handler:           handler,
+		ReadHeaderTimeout: readHeaderTimeout,
+		IdleTimeout:       idleTimeout,
+	}
+
+	log.Printf("pjokk landing listening on http://0.0.0.0:%d", cfg.Port)
+	log.Printf("  site: %s", cfg.SiteURL)
+	log.Printf("  app:  %s", cfg.AppURL)
+	if cfg.Indexable {
+		log.Print("  indexable: yes (robots.txt allows, sitemap.xml served)")
+	} else {
+		log.Print("  indexable: no (robots.txt disallows, X-Robots-Tag noindex)")
+	}
+
+	return serveUntilSignal(sig, srv, nil)
 }
 
 // --- healthcheck ------------------------------------------------------

@@ -17,6 +17,11 @@ dev.db*
 !apps/server/internal/web/dist/
 !apps/server/internal/web/dist/index.html
 
+# Same arrangement for the landing site embedded by `pjokk landing`.
+!apps/server/internal/landing/dist/
+!apps/server/internal/landing/dist/index.html
+!apps/server/internal/landing/dist/cta-labels.json
+
 # Playwright
 e2e/test-results/
 e2e/playwright-report/

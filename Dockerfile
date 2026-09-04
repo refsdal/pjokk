@@ -1,10 +1,15 @@
 # syntax=docker/dockerfile:1
 
-# Pjokk — one image, one static Go binary, five modes selected by argv[1]:
+# Pjokk — one image, one static Go binary, six modes selected by argv[1]:
 # the web server (default: migrate-then-serve-and-schedule), `server` (HTTP
-# only), `worker` (scheduler only), `migrate` and `cron <job>`, plus
-# `healthcheck` for HEALTHCHECK below. See apps/server/cmd/pjokk/main.go
+# only), `worker` (scheduler only), `migrate`, `cron <job>` and `landing`
+# (the marketing site at pjokk.no, with no database, auth or API at all),
+# plus `healthcheck` for HEALTHCHECK below. See apps/server/cmd/pjokk/main.go
 # for the authoritative dispatch table.
+#
+# `landing` is why the apex needs no image of its own: the prerendered site
+# is embedded alongside the SPA, and the deployment-specific values in it are
+# substituted at startup rather than baked at build time.
 #
 # NOTHING COMPILES IN HERE. The binaries are built natively, outside Docker:
 #

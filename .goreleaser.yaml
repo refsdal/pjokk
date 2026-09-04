@@ -20,10 +20,12 @@ dist: dist/goreleaser
 
 before:
   hooks:
-    # The SPA must sit in the go:embed directory before the builds run.
-    # Callers restore the overlay afterwards (scripts/restore-embed-overlay.sh)
-    # — GoReleaser OSS has no global after-hooks.
+    # The SPA and the landing site must sit in their go:embed directories
+    # before the builds run. Callers restore both overlays afterwards
+    # (scripts/restore-embed-overlay.sh) — GoReleaser OSS has no global
+    # after-hooks.
     - bash scripts/spa-embed-overlay.sh
+    - bash scripts/landing-embed-overlay.sh
 
 builds:
   - id: pjokk

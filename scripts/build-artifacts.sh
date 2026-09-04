@@ -7,7 +7,10 @@
 #
 # The SPA is not a separate artifact: it is embedded into both binaries via
 # go:embed (scripts/spa-embed-overlay.sh), and the overlay is restored
-# afterwards — even on failure — so the working tree stays clean.
+# afterwards — even on failure — so the working tree stays clean. The landing
+# site rides along the same way (scripts/landing-embed-overlay.sh): one binary
+# serves the app by default and the marketing site under `pjokk landing`, so
+# both hosts ship from a single artifact.
 #
 # The layout mirrors GoReleaser's dockers_v2 build context
 # (linux/<TARGETARCH>/pjokk), so ONE Dockerfile COPY line serves both this
@@ -25,6 +28,7 @@ cd "$(dirname "$0")/.."
 trap 'bash scripts/restore-embed-overlay.sh' EXIT
 
 bash scripts/spa-embed-overlay.sh
+bash scripts/landing-embed-overlay.sh
 
 echo "==> server binaries"
 rm -rf dist/server
