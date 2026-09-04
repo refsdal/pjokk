@@ -224,6 +224,25 @@ const nb: Record<string, string> = {
     "angi kjønn i Innstillinger for persentiler",
   "Log a weight under More → Measurement": "Logg en vekt under Mer → Måling",
 
+  // Install (PWA). The iOS step wording deliberately mirrors what Safari's
+  // Norwegian share sheet actually says, so the reader can match it letter
+  // for letter rather than translating back.
+  Install: "Installer",
+  "Install Pjokk": "Installer Pjokk",
+  "Add Pjokk to your home screen": "Legg Pjokk på hjemskjermen",
+  "Add to home screen": "Legg til på hjemskjermen",
+  "Show me": "Vis meg",
+  "It opens full screen, works offline, and gets its own icon.":
+    "Den åpnes i fullskjerm, virker uten nett og får sitt eget ikon.",
+  "Open Pjokk in Safari first": "Åpne Pjokk i Safari først",
+  "This browser cannot add apps to the home screen. Open pjokk.no in Safari, then follow the steps below.":
+    "Denne nettleseren kan ikke legge apper på hjemskjermen. Åpne pjokk.no i Safari, og følg stegene under.",
+  "Tap the Share button in Safari": "Trykk på Del-knappen i Safari",
+  "Scroll down and tap Add to Home Screen":
+    "Bla ned og trykk «Legg til på Hjem-skjerm»",
+  "Tap Add — Pjokk lands on your home screen":
+    "Trykk «Legg til» — Pjokk havner på hjemskjermen",
+
   // Settings
   Family: "Familie",
   admin: "admin",

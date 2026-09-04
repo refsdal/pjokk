@@ -13,6 +13,7 @@ import {
   ActiveSleepBanner,
 } from "@/components/ActiveSessionBanner";
 import { BabySwitcher } from "@/components/BabySwitcher";
+import { InstallBanner } from "@/components/InstallBanner";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { LogButton } from "@/components/LogButton";
 import { StatusCard } from "@/components/StatusCard";
@@ -253,6 +254,9 @@ export function HomeScreen() {
         babyId={baby.id}
         type={playType}
       />
+
+      {/* Day-mode Home only: night mode is three actions and nothing else. */}
+      <InstallBanner />
     </div>
   );
 }
