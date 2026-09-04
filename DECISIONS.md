@@ -1438,3 +1438,25 @@ binary as a stale leftover. And `config.LoadLanding` is a second loader
 rather than a flag on `Load`, because the landing mode shares none of the
 app's required variables and `Load` would reject a perfectly good landing
 deployment for missing all three of them.
+
+**Addendum (same day): `landing` serves `/healthz` and `/readyz`.** Shipped
+without them in v0.4.0, which was a plain bug — the image bakes in
+`HEALTHCHECK ["/app/pjokk", "healthcheck"]` and that probe runs in EVERY
+dispatch mode, so a landing container failed its own healthcheck forever:
+`docker ps` showing "(unhealthy)", and an orchestrator that honours health
+killing it or never marking it ready. Both probes answer `{"ok":true}`, the
+same body package api's do, so one probe definition works against any mode.
+Readiness is liveness here — this mode has no database and no dependency that
+could be unready — and both are `noindex` regardless of `INDEXABLE`, a probe
+endpoint having no business in a search index.
+
+**And a compose file, `docker-compose.landing.yml`, rather than a profile.**
+The obvious home was a `profiles: ["landing"]` service in
+`docker-compose.yml`, beside the existing `tools` profile. It does not work:
+Compose interpolates the whole file before it selects services, so the app's
+`${AUTH_SECRET:?...}` guard fails even when the only service asked for is one
+that needs no secret — and `.env.example` ships `AUTH_SECRET=` empty, which
+`:?` rejects too, so copying it is not a way out either. Previewing a
+marketing page should not require generating an auth secret for an app you
+are not running. A separate file decouples it completely, and matches the
+repo's existing habit of one compose file per audience.
