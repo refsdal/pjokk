@@ -15,13 +15,17 @@ export const LANDING_CSS = `
   --ink-soft: #524d43;
   --muted: #6e6759;
   --line: #e9e6e0;
-  --accent: #d97757;
+  /* Brand tokens, deliberately identical to the SPA's (apps/frontend/
+     src/styles.css) — the two are one brand and a test asserts they match.
+     Several were tuned by eye against white and sat under the 3:1 WCAG floor
+     for meaningful graphics; deepened the minimum amount to reach it. */
+  --accent: #d87657;
   --accent-soft: #f7e9e2;
   --on-accent: #ffffff;
   --sleep: #8b7bd8;
-  --feed: #5b9bd8;
-  --diaper: #3fb8ab;
-  --growth: #e88d67;
+  --feed: #5795cf;
+  --diaper: #37a095;
+  --growth: #cc7c5b;
   --bezel: #29261f;
   --shadow: 0 24px 60px -24px rgba(41, 38, 31, .32);
   --cycle: 12s;
@@ -38,6 +42,10 @@ export const LANDING_CSS = `
     --line: #2e2b26;
     --accent: #e08a68;
     --accent-soft: #3a2a21;
+    /* Dark mode never overrode --on-accent, so the light theme's white
+       leaked onto the accent: #ffffff on #e08a68 is 2.62:1 — on the primary
+       call to action, on the public front door. */
+    --on-accent: #171512;
     --sleep: #a294e6;
     --feed: #7fb3e8;
     --diaper: #56c6b9;

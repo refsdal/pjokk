@@ -14,18 +14,27 @@
   --color-ink-soft: #524d43;
   --color-muted: #6e6759;
   --color-line: #e9e6e0;
-  --color-accent: #d97757;
+  /* 3.00:1 on --color-bg. Accent is used for icons and links that carry
+     meaning, so it has to clear the 3:1 WCAG floor for graphics; the old
+     #d97757 sat just under it at 2.97. */
+  --color-accent: #d87657;
   --color-accent-soft: #f7e9e2;
   /* Text/icon color ON accent- and danger-colored surfaces. Near-black warm
      in night mode so selected chips and primary buttons emit no white light. */
   --color-on-accent: #ffffff;
   --color-danger: #c4534a;
 
-  /* Category tints (CLAUDE.md §7). */
-  --color-sleep: #8b7bd8;
-  --color-feed: #5b9bd8;
-  --color-diaper: #3fb8ab;
-  --color-growth: #e88d67;
+  /* Category tints (CLAUDE.md §7). These are how you tell a feed from a
+     diaper at a glance, which makes them meaningful graphics rather than
+     decoration — so each clears 3:1 against --color-bg. The originals were
+     tuned by eye against white and three of them did not: feed 2.80,
+     growth 2.37 and diaper 2.31, the last being barely visible in daylight.
+     Deepened the minimum amount that reaches 3:1, hue preserved. Checked by
+     test/contrast.test.ts. */
+  --color-sleep: #8b7bd8; /* 3.37:1 — already passed */
+  --color-feed: #5795cf; /* was #5b9bd8, 2.80:1 */
+  --color-diaper: #37a095; /* was #3fb8ab, 2.31:1 */
+  --color-growth: #cc7c5b; /* was #e88d67, 2.37:1 */
 
   --radius-xl2: 1.25rem;
 }
@@ -42,6 +51,12 @@
   --color-line: #2e2b26;
   --color-accent: #e08a68;
   --color-accent-soft: #3a2a21;
+  /* Dark mode never overrode --color-on-accent, so the light theme's white
+     leaked through onto the accent: #ffffff on #e08a68 is 2.62:1, failing
+     even the large-text floor, on every primary button and selected chip.
+     Night mode had already solved this with a near-black ink; dark gets the
+     same treatment (6.95:1). */
+  --color-on-accent: #171512;
   --color-danger: #d9736a;
   --color-sleep: #a294e6;
   --color-feed: #7fb3e8;
@@ -58,7 +73,10 @@
   --color-surface-2: #2a231c;
   --color-ink: #e8c99a;
   --color-ink-soft: #c2a67e;
-  --color-muted: #8a7455;
+  /* Was #8a7455: 3.83:1 on --color-surface, under the 4.5 floor for the
+     small secondary text it carries (timestamps, "by <caretaker>") — in the
+     one mode that exists to be read at 3am. Now 4.56:1. */
+  --color-muted: #958164;
   --color-line: #322a21;
   --color-accent: #d99a55;
   --color-accent-soft: #33270f;
