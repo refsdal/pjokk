@@ -7,7 +7,7 @@ import {
   IconTemperature,
 } from "@tabler/icons-react";
 import { useState } from "react";
-import type { PlayType } from "@pjokk/shared";
+import type { MeasurementType, PlayType } from "@pjokk/shared";
 import { useNavigate } from "@tanstack/react-router";
 import {
   ActivePlayBanner,
@@ -20,9 +20,13 @@ import { LogButton } from "@/components/LogButton";
 import { StatusCard } from "@/components/StatusCard";
 import {
   formatMeasurement,
-  isFever,
   showsTemperatureCard,
+  temperatureStatus,
+  temperatureTrend,
 } from "@/lib/measurements";
+import { TemperatureSparkline } from "@/components/TemperatureSparkline";
+import { useMeasurements } from "@/lib/data/other";
+import type { TemperatureStatus, TemperatureTrend } from "@/lib/measurements";
 import { Button } from "@/components/ui/button";
 import { DiaperSheet } from "@/components/sheets/DiaperSheet";
 import { FeedSheet } from "@/components/sheets/FeedSheet";
@@ -59,13 +63,46 @@ function feedDetail(feed: {
   return feed.amountMl != null ? `${feed.amountMl} g` : t("solids");
 }
 
+// Colour carries the status, the arrow carries the direction. Both, because
+// colour alone fails for red-green colour blindness — and red/green is
+// precisely the pair that is indistinguishable — and because night mode
+// collapses all three statuses onto its amber ramp, leaving the arrow as the
+// only signal there.
+const STATUS_TINT: Record<TemperatureStatus, string> = {
+  ok: "text-ok",
+  caution: "text-caution",
+  alarm: "text-danger",
+};
+const TREND_ARROW: Record<TemperatureTrend, string> = {
+  rising: "↑",
+  falling: "↓",
+  flat: "→",
+  unknown: "",
+};
+const TREND_LABEL: Record<TemperatureTrend, string> = {
+  rising: "Fever, rising",
+  falling: "Fever, easing",
+  flat: "Fever, steady",
+  unknown: "Fever",
+};
+
 export function HomeScreen() {
   const me = useMe();
   const { babies, baby } = useSelectedBaby();
   const summary = useSummary(baby?.id);
   const feeds = useFeeds(baby?.id);
+  // Measurements are rare — a handful per baby over months — so the existing
+  // list endpoint is cheaper than teaching /api/summary to carry a series.
+  const measurements = useMeasurements(baby?.id);
+  const measurementRows = measurements.data ?? [];
+  const tempTrend = temperatureTrend(measurementRows);
   const [sheet, setSheet] = useState<OpenSheet>(null);
   const [otherKind, setOtherKind] = useState<OtherKind>("medicine");
+  // Which measurement type the log sheet opens on. The More picker leaves it
+  // at weight; the temperature card sets it, so tapping a fever does not land
+  // the user on a weight stepper.
+  const [measurementType, setMeasurementType] =
+    useState<MeasurementType>("weight");
   const [playType, setPlayType] = useState<PlayType>("tummy");
   const { night } = useAppearance();
   const navigate = useNavigate();
@@ -104,6 +141,10 @@ export function HomeScreen() {
   const s = summary.data;
   const active = s?.activeSleep ?? null;
   const activePlay = s?.activePlay ?? null;
+  const tempStatus = temperatureStatus(
+    s?.lastTemperature?.value ?? 0,
+    tempTrend,
+  );
 
   // Never switch layouts while a sheet is open: the 22:00 auto-flip would
   // unmount an open More/Other sheet and discard whatever was typed.
@@ -192,22 +233,22 @@ export function HomeScreen() {
                 icon={IconTemperature}
                 label={t("Last temperature")}
                 time={new Date(s.lastTemperature.time)}
-                detail={formatMeasurement(
+                detail={`${formatMeasurement(
                   s.lastTemperature.type,
                   s.lastTemperature.value,
-                )}
+                )} ${TREND_ARROW[tempTrend]}`}
                 sub={
-                  isFever(s.lastTemperature.type, s.lastTemperature.value)
-                    ? t("Fever")
-                    : undefined
+                  tempStatus === "ok" ? undefined : t(TREND_LABEL[tempTrend])
                 }
-                tintClass={
-                  isFever(s.lastTemperature.type, s.lastTemperature.value)
-                    ? "text-danger"
-                    : "text-growth"
+                tintClass={STATUS_TINT[tempStatus]}
+                accessory={
+                  <span className={STATUS_TINT[tempStatus]}>
+                    <TemperatureSparkline rows={measurementRows} />
+                  </span>
                 }
                 onClick={() => {
                   setOtherKind("measurement");
+                  setMeasurementType("temperature");
                   setSheet("other");
                 }}
               />
@@ -270,6 +311,9 @@ export function HomeScreen() {
         onOpenChange={(o) => setSheet(o ? "more" : null)}
         onPick={(kind) => {
           setOtherKind(kind);
+          // Reset: the temperature card sets this, and without clearing it
+          // here the More picker would keep opening on temperature ever after.
+          setMeasurementType("weight");
           setSheet("other");
         }}
         onPickPlay={(type) => {
@@ -282,6 +326,7 @@ export function HomeScreen() {
         onOpenChange={(o) => setSheet(o ? "other" : null)}
         babyId={baby.id}
         kind={otherKind}
+        initialMeasurementType={measurementType}
       />
       <PlaySheet
         open={sheet === "play"}

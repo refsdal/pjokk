@@ -23,6 +23,13 @@
      in night mode so selected chips and primary buttons emit no white light. */
   --color-on-accent: #ffffff;
   --color-danger: #c4534a;
+  /* Temperature-trend statuses on the Home card. Semantic, not decorative:
+     `ok` is below the fever threshold, `caution` is a fever that is easing
+     or steady, and a rising fever reuses --color-danger. Both clear 3:1
+     against --color-bg (test/contrast.test.ts) and are deliberately muted to
+     sit with the rest of the palette rather than shout over it. */
+  --color-ok: #2e8b57;
+  --color-caution: #a8730a;
 
   /* Category tints (CLAUDE.md §7). These are how you tell a feed from a
      diaper at a glance, which makes them meaningful graphics rather than
@@ -58,6 +65,8 @@
      same treatment (6.95:1). */
   --color-on-accent: #171512;
   --color-danger: #d9736a;
+  --color-ok: #6fcf97;
+  --color-caution: #e0a94a;
   --color-sleep: #a294e6;
   --color-feed: #7fb3e8;
   --color-diaper: #56c6b9;
@@ -82,6 +91,14 @@
   --color-accent-soft: #33270f;
   --color-on-accent: #1d1610;
   --color-danger: #d9825f;
+  /* Night is a single amber ramp with no blue light — it exists so a 3am
+     check does not wake you up, and green is the worst offender after blue.
+     So `ok` and `caution` join the ramp exactly as the category tints below
+     do, and the trend is carried by the arrow glyph and the number instead
+     of by hue. A rising fever keeps --color-danger, which is already a warm
+     amber-red rather than a true red. */
+  --color-ok: #c2a06a;
+  --color-caution: #c2a06a;
   --color-sleep: #c2a06a;
   --color-feed: #c2a06a;
   --color-diaper: #c2a06a;
