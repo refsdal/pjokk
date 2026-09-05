@@ -1567,3 +1567,40 @@ once it is no longer the current state. The summary carries `lastTemperature`
 through its own query rather than reusing `ListMeasurements` with `lim=1`:
 that query is type-agnostic, so weighing the baby after taking her
 temperature would have put 8.4 on the card as if it were degrees.
+
+## 2026-09-05 — the fever card carries a trend, and night mode keeps its ramp
+
+The temperature card answered "how hot is she"; using it during an actual
+illness wants "and is it getting worse". So it gained a three-day sparkline
+and a status colour — but two things had to be decided rather than assumed.
+
+**The traffic light stops at night mode.** Red / amber / green is the obvious
+encoding, and it directly contradicts principle 6: night mode is a single
+amber ramp with *no blue light*, because it exists so that a 3am check does
+not wake you up — and green suppresses melatonin second only to blue. Night
+already collapses every category tint onto one amber (`#c2a06a`); `ok` and
+`caution` now join it, and a rising fever keeps `--color-danger`, which in
+night is already a warm amber-red rather than a true red. The consequence is
+deliberate: **the card is no longer red at 3am**. The direction is carried by
+an arrow (↑ → ↓) beside the reading instead.
+
+That arrow is not only a night-mode fallback. Colour alone carrying meaning
+fails for red-green colour blindness — and red/green is precisely the pair
+that is indistinguishable — so the arrow is the accessible encoding in every
+theme, with colour as reinforcement.
+
+**A fever with one reading is `alarm`, not `caution`.** The trend compares the
+latest reading to the previous one; with a single reading there is no
+direction. Rendering that as reassuring would be a guess in the dangerous
+direction, so an unknown direction is treated as rising.
+
+**No backend change.** Measurements are rare — single digits per baby over
+months — so the card reads the existing `/api/measurements` list and computes
+the trend client-side, rather than teaching `/api/summary` to carry a series.
+`lastTemperature` still drives the headline and the card's visibility.
+
+The sparkline is hand-rolled inline SVG, not recharts: the Stats tab pays for
+that library deliberately and lazily, and a dozen points on a status card do
+not justify it. Its y-domain always contains 38.0 and draws it as a dashed
+line, because a squiggle scaled only to its own values has no reference —
+"below fever" needs something to be below.
