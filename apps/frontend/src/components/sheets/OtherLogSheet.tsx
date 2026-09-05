@@ -1,3 +1,4 @@
+import { measurementMeta } from "@/lib/measurements";
 import {
   IconBath,
   IconMilk,
@@ -48,43 +49,6 @@ export const otherKindMeta: Record<
   milestone: { label: "Milestone", icon: IconSparkles, tint: "text-accent" },
   measurement: { label: "Measurement", icon: IconRuler, tint: "text-growth" },
   pump: { label: "Pump", icon: IconMilk, tint: "text-feed" },
-};
-
-const measurementConfig: Record<
-  MeasurementType,
-  {
-    label: string;
-    unit: string;
-    step: number;
-    min: number;
-    max: number;
-    fallback: number;
-  }
-> = {
-  weight: {
-    label: "Weight",
-    unit: "kg",
-    step: 0.1,
-    min: 0.5,
-    max: 40,
-    fallback: 5,
-  },
-  length: {
-    label: "Length",
-    unit: "cm",
-    step: 0.5,
-    min: 30,
-    max: 130,
-    fallback: 60,
-  },
-  head: {
-    label: "Head",
-    unit: "cm",
-    step: 0.5,
-    min: 25,
-    max: 60,
-    fallback: 40,
-  },
 };
 
 // The "More" picker: six activity types, one tap each.
@@ -242,9 +206,7 @@ export function OtherLogSheet({
       if (kind === "milestone") setTitle("");
       if (kind === "measurement") {
         setMtype("weight");
-        setValue(
-          lastMeasurement("weight") ?? measurementConfig.weight.fallback,
-        );
+        setValue(lastMeasurement("weight") ?? measurementMeta.weight.fallback);
       }
       if (kind === "pump") {
         setSide(
@@ -266,7 +228,7 @@ export function OtherLogSheet({
     setMtype(type);
     // Always re-seed the value on a type switch — kg and cm scales are
     // disjoint, so carrying the old number over would store nonsense.
-    setValue(lastMeasurement(type) ?? measurementConfig[type].fallback);
+    setValue(lastMeasurement(type) ?? measurementMeta[type].fallback);
   };
 
   const createOther = useCreateOther();
@@ -315,7 +277,7 @@ export function OtherLogSheet({
   };
 
   const meta = otherKindMeta[kind];
-  const mcfg = measurementConfig[mtype];
+  const mcfg = measurementMeta[mtype];
   const saveDisabled =
     (kind === "medicine" && name.trim().length === 0) ||
     (kind === "note" && content.trim().length === 0) ||
@@ -382,6 +344,7 @@ export function OtherLogSheet({
                 { value: "weight", label: t("Weight") },
                 { value: "length", label: t("Length") },
                 { value: "head", label: t("Head") },
+                { value: "temperature", label: t("Temperature") },
               ]}
               value={mtype}
               onChange={changeMtype}

@@ -112,6 +112,70 @@ func (q *Queries) FeedsInRange(ctx context.Context, arg FeedsInRangeParams) ([]F
 	return items, nil
 }
 
+const lastMeasurementOfType = `-- name: LastMeasurementOfType :many
+SELECT
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."time", m."type", m."value", m."notes"
+FROM "measurement_log" m
+JOIN "users" u ON u."id" = m."caretaker_id"
+WHERE m."family_id" = $1
+  AND m."baby_id" = $2
+  AND m."type" = $3
+ORDER BY m."time" DESC, m."id" DESC
+LIMIT 1
+`
+
+type LastMeasurementOfTypeParams struct {
+	FamilyID string
+	BabyID   string
+	Type     string
+}
+
+type LastMeasurementOfTypeRow struct {
+	ID            string
+	BabyID        string
+	CaretakerID   string
+	CaretakerName string
+	Time          pgtype.Timestamptz
+	Type          string
+	Value         float64
+	Notes         *string
+}
+
+// The newest measurement of ONE type, for GET /api/summary's lastTemperature.
+// ListMeasurements with lim=1 (the trick lastFeed/lastDiaper use) cannot serve
+// this: it is type-agnostic, so weighing the baby after taking her temperature
+// would return the weight. :many with LIMIT 1 rather than :one so "none yet"
+// is an empty slice instead of pgx.ErrNoRows at the call site.
+func (q *Queries) LastMeasurementOfType(ctx context.Context, arg LastMeasurementOfTypeParams) ([]LastMeasurementOfTypeRow, error) {
+	rows, err := q.db.Query(ctx, lastMeasurementOfType, arg.FamilyID, arg.BabyID, arg.Type)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LastMeasurementOfTypeRow
+	for rows.Next() {
+		var i LastMeasurementOfTypeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.BabyID,
+			&i.CaretakerID,
+			&i.CaretakerName,
+			&i.Time,
+			&i.Type,
+			&i.Value,
+			&i.Notes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const sleepsInRange = `-- name: SleepsInRange :many
 SELECT "start_time", "end_time"
 FROM "sleep_log"

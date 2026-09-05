@@ -1517,3 +1517,53 @@ turns it into a border.
 light even in dark mode. Making it dark would only move the mismatch to light
 mode. The meta is what governs the status bar of the running app, and that is
 now correct from the first frame.
+
+## 2026-09-05 — temperature is a fourth measurement type, and units are canonical
+
+Migrating a real sprout-track database turned up a reading Pjokk had nowhere
+to put: **39.4 °C, with the note "Nora var veldig varm så vi tok en temp
+sjekk"**. The importer's first answer was to keep it as a note. That is a
+worse answer than it looks — a temperature is a number you want to compare
+against the last one, and a note is exactly the shape that cannot be.
+
+**A fourth `type` on `measurement_log`, not a table of its own.** A
+temperature is structurally identical to the three growth measures already
+there: a number with a unit, at a moment, optionally annotated. Making it a
+fourth enum member inherits the shared CRUD engine, the log sheet, timeline
+rows, CSV export and the nightly backup for the cost of one constraint
+(`00004_measurement_temperature.sql`). Nothing that reads growth data needed
+touching: the growth chart and the stats weight row already filter
+`type = 'weight'`, so a temperature cannot reach the WHO percentile maths.
+
+**Values are stored in the canonical unit; the unit is never a column.**
+Weight is kilograms, length and head are centimetres, temperature is degrees
+Celsius, and `measurement_log` has no unit column at all — the unit is a pure
+function of the type, resolved at the render sites. This is what keeps a
+future Fahrenheit (or pounds) preference a *display* concern: it converts at
+the edge and touches neither the schema nor a single stored row. The
+importer normalises on the way in for the same reason, converting sprout's
+`lb`, `in` and `F`.
+
+**Which immediately exposed a bug.** The unit was being re-derived in three
+separate places as `type === "weight" ? "kg" : "cm"`. That reads fine with
+three types and is silently wrong with four — **the CSV export was writing
+every temperature as centimetres**. The knowledge now lives in one table per
+language (`MeasurementUnit` in Go, `measurementMeta` in
+`lib/measurements.ts`), each carrying the comment that names them as the seam
+a units preference hooks into, and the export test pins all four mappings
+rather than just the new one. The duplication was the bug; deleting it was
+the fix.
+
+**Fever is 38.0 °C inclusive**, the standard infant definition, rendered with
+the existing `--color-danger` token rather than a new colour. It appears on
+the timeline row and the Home card, because a fever is the one measurement
+worth spotting while scrolling back through a sick week.
+
+**The Home card is windowed to 24 hours.** "Status before action" argues for
+putting the latest temperature on the home screen; "calm, not cute" argues
+against spending permanent space on something that matters a few days a year.
+The window settles it, and matches the `Last sleep` card, which also yields
+once it is no longer the current state. The summary carries `lastTemperature`
+through its own query rather than reusing `ListMeasurements` with `lim=1`:
+that query is type-agnostic, so weighing the baby after taking her
+temperature would have put 8.4 on the card as if it were degrees.

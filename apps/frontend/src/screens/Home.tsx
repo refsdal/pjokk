@@ -4,6 +4,7 @@ import {
   IconDiaper,
   IconMoon,
   IconPlus,
+  IconTemperature,
 } from "@tabler/icons-react";
 import { useState } from "react";
 import type { PlayType } from "@pjokk/shared";
@@ -17,6 +18,11 @@ import { InstallBanner } from "@/components/InstallBanner";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { LogButton } from "@/components/LogButton";
 import { StatusCard } from "@/components/StatusCard";
+import {
+  formatMeasurement,
+  isFever,
+  showsTemperatureCard,
+} from "@/lib/measurements";
 import { Button } from "@/components/ui/button";
 import { DiaperSheet } from "@/components/sheets/DiaperSheet";
 import { FeedSheet } from "@/components/sheets/FeedSheet";
@@ -177,6 +183,35 @@ export function HomeScreen() {
               onClick={() => setSheet("sleep")}
             />
           )}
+          {/* Only while it is still a live question — see
+              showsTemperatureCard. A fever takes the danger tint so it reads
+              at a glance, which is the whole reason the card exists. */}
+          {s?.lastTemperature &&
+            showsTemperatureCard(new Date(s.lastTemperature.time)) && (
+              <StatusCard
+                icon={IconTemperature}
+                label={t("Last temperature")}
+                time={new Date(s.lastTemperature.time)}
+                detail={formatMeasurement(
+                  s.lastTemperature.type,
+                  s.lastTemperature.value,
+                )}
+                sub={
+                  isFever(s.lastTemperature.type, s.lastTemperature.value)
+                    ? t("Fever")
+                    : undefined
+                }
+                tintClass={
+                  isFever(s.lastTemperature.type, s.lastTemperature.value)
+                    ? "text-danger"
+                    : "text-growth"
+                }
+                onClick={() => {
+                  setOtherKind("measurement");
+                  setSheet("other");
+                }}
+              />
+            )}
         </div>
 
         {/* 2×2 log grid */}

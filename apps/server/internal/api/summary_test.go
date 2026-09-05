@@ -226,3 +226,72 @@ func TestSummaryFamilyScoped(t *testing.T) {
 		t.Fatalf("own-family GET summary status = %d, body %s", own.Status, own.Raw)
 	}
 }
+
+// The Home screen shows a temperature card, so the summary carries the latest
+// temperature the way it already carries the last feed and last diaper. It
+// must be the latest TEMPERATURE specifically, not the latest measurement:
+// weighing the baby after taking her temperature must not blank the card, and
+// must certainly not put 8.4 on it as if it were degrees.
+func TestSummaryLastTemperatureIgnoresOtherMeasurementTypes(t *testing.T) {
+	a := testrig.App(t)
+	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
+	babyID := a.NewBaby(familyID, "Nora")
+	now := time.Now().UTC()
+
+	// An older temperature, a newer one, and a weight newer than both.
+	for _, m := range []struct {
+		typ   string
+		value float64
+		at    time.Time
+	}{
+		{"temperature", 37.2, now.Add(-6 * time.Hour)},
+		{"temperature", 39.4, now.Add(-2 * time.Hour)},
+		{"weight", 8.4, now.Add(-1 * time.Hour)},
+	} {
+		res := a.Do(http.MethodPost, "/api/measurements", cookie, map[string]any{
+			"babyId": babyID,
+			"time":   m.at.Format(time.RFC3339),
+			"type":   m.typ,
+			"value":  m.value,
+		})
+		if res.Status != http.StatusCreated {
+			t.Fatalf("create %s: status %d, body %s", m.typ, res.Status, res.Raw)
+		}
+	}
+
+	res := a.Do(http.MethodGet, "/api/summary?babyId="+babyID, cookie, nil)
+	if res.Status != http.StatusOK {
+		t.Fatalf("status = %d, body %s", res.Status, res.Raw)
+	}
+	last, ok := res.JSON["lastTemperature"].(map[string]any)
+	if !ok {
+		t.Fatalf("lastTemperature = %v, want an object", res.JSON["lastTemperature"])
+	}
+	if last["value"] != 39.4 {
+		t.Errorf("lastTemperature.value = %v, want 39.4", last["value"])
+	}
+	if last["type"] != "temperature" {
+		t.Errorf("lastTemperature.type = %v, want temperature", last["type"])
+	}
+}
+
+// A family that has never taken a temperature gets an explicit null, not a
+// missing key — the field is required-and-nullable, so the SPA can render the
+// card's absence without probing for undefined.
+func TestSummaryLastTemperatureIsNullWhenNoneRecorded(t *testing.T) {
+	a := testrig.App(t)
+	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
+	babyID := a.NewBaby(familyID, "Nora")
+
+	res := a.Do(http.MethodGet, "/api/summary?babyId="+babyID, cookie, nil)
+	if res.Status != http.StatusOK {
+		t.Fatalf("status = %d, body %s", res.Status, res.Raw)
+	}
+	v, present := res.JSON["lastTemperature"]
+	if !present {
+		t.Fatalf("lastTemperature key absent; want present and null")
+	}
+	if v != nil {
+		t.Errorf("lastTemperature = %v, want null", v)
+	}
+}

@@ -22,6 +22,29 @@ import (
 // shared createLog/updateLog/deleteLog engine and medicine.go for a fuller
 // worked example of the PATCH tri-state pattern.
 
+// MeasurementUnit is the canonical unit a measurement's `value` is stored in.
+//
+// measurement_log deliberately has NO unit column: the unit is a pure
+// function of the type, and every row is stored in the canonical unit —
+// kilograms, centimetres, degrees Celsius. This is the single seam a future
+// units preference (Fahrenheit, pounds) hooks into: it converts for DISPLAY
+// at the edge and leaves every stored row and the schema untouched. Do not
+// introduce a per-row unit; normalise on the way in instead, the way
+// scripts/import-sprout-track.mjs converts sprout's lb and in.
+//
+// The three-type world could get away with `if weight { kg } else { cm }`.
+// A fourth type makes that silently wrong, which is why this is a table.
+func MeasurementUnit(typ string) string {
+	switch typ {
+	case "weight":
+		return "kg"
+	case "temperature":
+		return "°C"
+	default: // length, head
+		return "cm"
+	}
+}
+
 func serMeasurement(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, typ string, value float64, notes *string) gen.MeasurementLog {
 	return gen.MeasurementLog{
 		Id:            id,

@@ -1,4 +1,9 @@
 import {
+  formatMeasurement,
+  isFever,
+  measurementMeta,
+} from "@/lib/measurements";
+import {
   IconBabyBottle,
   IconDiaper,
   IconMoon,
@@ -112,15 +117,11 @@ function entryMain(e: TimelineEntry): { title: string; detail: string | null } {
     return { title: t("Milestone"), detail: e.title };
   }
   if (e.kind === "measurement") {
-    const label =
-      e.type === "weight"
-        ? t("Weight")
-        : e.type === "length"
-          ? t("Length")
-          : t("Head");
+    // Label and unit both come from the shared table — re-deriving the unit
+    // here as `weight ? kg : cm` is what made temperatures render as lengths.
     return {
-      title: label,
-      detail: `${e.value.toFixed(1)} ${e.type === "weight" ? "kg" : "cm"}`,
+      title: t(measurementMeta[e.type].label),
+      detail: formatMeasurement(e.type, e.value),
     };
   }
   if (e.kind === "play") {
@@ -174,8 +175,14 @@ function Row({
   entry: TimelineEntry;
   onClick: () => void;
 }) {
-  const { icon: Icon, tint } = kindStyle[entry.kind];
+  const { icon: Icon, tint: baseTint } = kindStyle[entry.kind];
   const { title, detail } = entryMain(entry);
+  // A fever is the one measurement worth spotting while scrolling back
+  // through a sick week, so it takes the danger token instead of the usual
+  // growth tint. Everything else stays calm.
+  const fever =
+    entry.kind === "measurement" && isFever(entry.type, entry.value);
+  const tint = fever ? "text-danger" : baseTint;
   const active =
     (entry.kind === "sleep" || entry.kind === "play") && !entry.endTime;
   return (

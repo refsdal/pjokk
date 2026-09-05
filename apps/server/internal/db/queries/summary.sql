@@ -32,3 +32,20 @@ FROM "sleep_log"
 WHERE "family_id" = sqlc.arg(family_id) AND "baby_id" = sqlc.arg(baby_id)
   AND "start_time" < sqlc.arg(to_ts)::timestamptz
   AND ("end_time" IS NULL OR "end_time" > sqlc.arg(from_ts)::timestamptz);
+
+-- name: LastMeasurementOfType :many
+-- The newest measurement of ONE type, for GET /api/summary's lastTemperature.
+-- ListMeasurements with lim=1 (the trick lastFeed/lastDiaper use) cannot serve
+-- this: it is type-agnostic, so weighing the baby after taking her temperature
+-- would return the weight. :many with LIMIT 1 rather than :one so "none yet"
+-- is an empty slice instead of pgx.ErrNoRows at the call site.
+SELECT
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."time", m."type", m."value", m."notes"
+FROM "measurement_log" m
+JOIN "users" u ON u."id" = m."caretaker_id"
+WHERE m."family_id" = sqlc.arg(family_id)
+  AND m."baby_id" = sqlc.arg(baby_id)
+  AND m."type" = sqlc.arg(type)
+ORDER BY m."time" DESC, m."id" DESC
+LIMIT 1;

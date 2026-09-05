@@ -90,6 +90,23 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		lastFeed = &v
 	}
 
+	// The newest TEMPERATURE, not the newest measurement — its own query for
+	// exactly that reason (see summary.sql). Backs the Home temperature card.
+	lastTemps, err := d.Q.LastMeasurementOfType(ctx, dbgen.LastMeasurementOfTypeParams{
+		FamilyID: fam.FamilyID,
+		BabyID:   babyID,
+		Type:     "temperature",
+	})
+	if err != nil {
+		return nil, err
+	}
+	var lastTemperature *gen.MeasurementLog
+	if len(lastTemps) > 0 {
+		r := lastTemps[0]
+		v := serMeasurement(r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.Time, r.Type, r.Value, r.Notes)
+		lastTemperature = &v
+	}
+
 	lastDiapers, err := d.Q.ListDiapers(ctx, dbgen.ListDiapersParams{FamilyID: fam.FamilyID, BabyID: &babyID, Lim: 1})
 	if err != nil {
 		return nil, err
@@ -190,11 +207,12 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 	}
 
 	return gen.GetSummary200JSONResponse{
-		LastFeed:    lastFeed,
-		LastDiaper:  lastDiaper,
-		ActiveSleep: activeSleep,
-		LastSleep:   lastSleep,
-		ActivePlay:  activePlay,
+		LastFeed:        lastFeed,
+		LastDiaper:      lastDiaper,
+		ActiveSleep:     activeSleep,
+		LastSleep:       lastSleep,
+		ActivePlay:      activePlay,
+		LastTemperature: lastTemperature,
 		Today: struct {
 			Both     int32 `json:"both"`
 			Dirty    int32 `json:"dirty"`

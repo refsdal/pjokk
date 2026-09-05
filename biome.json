@@ -11,7 +11,8 @@
       "!apps/server",
       "!apps/landing/dist",
       "!.claude",
-      "!scripts/import-sprout-track.mjs"
+      "!scripts/import-sprout-track.mjs",
+      "!backup"
     ]
   },
   "css": {

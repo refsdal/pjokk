@@ -132,3 +132,58 @@ func TestExportCSVEmptyFamilyIsHeaderOnly(t *testing.T) {
 		t.Errorf("csv = %q, want exactly the header line (no data rows)", csv)
 	}
 }
+
+// The CSV's `unit` column is derived from the measurement's type, since
+// measurement_log stores no unit — weight is kg, length and head are cm, and
+// a temperature is °C. Deriving it as "weight ? kg : cm" (which is what the
+// three-type world could get away with) exports every temperature as a
+// length, so this pins the whole mapping rather than just the new arm.
+func TestExportCSVDerivesMeasurementUnitFromType(t *testing.T) {
+	a := testrig.App(t)
+	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
+	babyID := a.NewBaby(familyID, "Nora")
+
+	for _, m := range []struct {
+		typ   string
+		value float64
+	}{
+		{"weight", 8.4},
+		{"length", 70.4},
+		{"head", 43.5},
+		{"temperature", 39.4},
+	} {
+		res := a.Do(http.MethodPost, "/api/measurements", cookie, map[string]any{
+			"babyId": babyID,
+			"time":   time.Now().UTC().Format(time.RFC3339),
+			"type":   m.typ,
+			"value":  m.value,
+		})
+		if res.Status != http.StatusCreated {
+			t.Fatalf("create %s: status %d, body %s", m.typ, res.Status, res.Raw)
+		}
+	}
+
+	csv := string(a.Do(http.MethodGet, "/api/export.csv", cookie, nil).Raw)
+	for _, want := range []string{"weight", "length", "head", "temperature"} {
+		if !strings.Contains(csv, want) {
+			t.Fatalf("export missing %s row:\n%s", want, csv)
+		}
+	}
+	for _, c := range []struct{ typ, unit string }{
+		{"weight", "kg"},
+		{"length", "cm"},
+		{"head", "cm"},
+		{"temperature", "°C"},
+	} {
+		var found bool
+		for _, line := range strings.Split(csv, "\n") {
+			if strings.Contains(line, ","+c.typ+",") && strings.Contains(line, ","+c.unit+",") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("no %s row carrying unit %q:\n%s", c.typ, c.unit, csv)
+		}
+	}
+}

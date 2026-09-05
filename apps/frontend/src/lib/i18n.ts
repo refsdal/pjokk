@@ -179,6 +179,9 @@ const nb: Record<string, string> = {
   Weight: "Vekt",
   Length: "Lengde",
   Head: "Hodeomkrets",
+  Temperature: "Temperatur",
+  "Last temperature": "Siste temperatur",
+  Fever: "Feber",
   "Could not save: ": "Kunne ikke lagre: ",
   "Could not update: ": "Kunne ikke oppdatere: ",
 
