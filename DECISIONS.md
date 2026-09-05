@@ -1460,3 +1460,60 @@ that needs no secret — and `.env.example` ships `AUTH_SECRET=` empty, which
 marketing page should not require generating an auth secret for an app you
 are not running. A separate file decouples it completely, and matches the
 repo's existing habit of one compose file per audience.
+
+## 2026-09-05 — the theme is decided before the first paint, and the palette is measured
+
+Reported from a real installed app: on an Android phone in **dark mode**, the
+status bar went near-white and the clock and notification icons became
+unreadable. Light mode was fine.
+
+**Cause: the theme was applied too late.** Both `AppearanceProvider` and
+`useNight` set their class and the `theme-color` meta from a `useEffect`,
+which runs *after* the first paint. An installed PWA takes its status-bar
+colour from that meta, so it always started at the hardcoded light
+`#faf9f7`; the system, being in dark mode, drew its light glyphs over it.
+The same lateness had a second symptom nobody had reported: **every cold
+start in dark or night mode flashed the light theme first** — in an app whose
+night mode exists precisely so that a parent at 3am gets near-black and no
+blue light.
+
+`public/theme-init.js` now resolves theme and night mode from the same
+`localStorage` keys and applies both, plus the meta, before anything paints.
+
+**A separate file, not an inline `<script>`.** The app is served under
+`script-src 'self'` with no `'unsafe-inline'` and no hashes
+(`internal/web/web.go`). An inline bootstrap would have worked in `vite dev`
+and been silently blocked in the container — the worst way to discover a CSP.
+The cost is a duplicate of the resolution logic that cannot import from the
+bundle; `test/contrast.test.ts` asserts its colours and storage keys still
+match the real ones, so the copies cannot drift in silence.
+
+**Then the rest of the palette was measured rather than eyeballed**, which
+turned up three more problems of the same family — a light-mode value
+inherited by a dark theme that never overrode it:
+
+- **`--color-on-accent` was never overridden in `.dark`.** White text on the
+  dark accent is **2.62:1**, below even the large-text floor, on every primary
+  button and selected chip. Night mode had already solved this with a
+  near-black ink; dark now does the same (6.95:1). The landing site had the
+  identical bug on its call to action, on the public front door.
+- **Three light-mode category tints sat under 3:1** against the background —
+  feed 2.80, growth 2.37, diaper **2.31**. These are not decoration: the tint
+  is how a feed is told from a diaper at a glance, which is the entire "status
+  before action" premise. Deepened by the minimum that reaches 3:1, hue
+  preserved.
+- **Night's `--color-muted` was 3.83:1** on cards, under the 4.5 floor for the
+  small secondary text it carries — timestamps and "by <caretaker>" — in the
+  one mode that exists to be read at 3am.
+
+The numbers are now tests, not an audit: `test/contrast.test.ts` and the
+landing's palette tests hold every token pair to WCAG 2.1 (4.5:1 text, 3:1
+meaningful graphics), and assert the two copies of the brand palette match.
+Hairlines and scrims are deliberately excluded — holding a divider to 3:1
+turns it into a border.
+
+**Known limitation, not fixed:** `manifest.theme_color` and
+`background_color` are static by specification, so the OS splash screen is
+light even in dark mode. Making it dark would only move the mismatch to light
+mode. The meta is what governs the status bar of the running app, and that is
+now correct from the first frame.

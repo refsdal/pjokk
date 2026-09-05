@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "bun:test";
 import { LANDING_COPY } from "../src/copy";
 import { renderLandingPage, renderLegalPage } from "../src/page";
+import { LANDING_CSS as LANDING_STYLES } from "../src/styles";
 
 // Render-level assertions moved here from apps/api/test/landing.test.ts. The
 // HTTP-level ones (headers, cookie negotiation, the live route) stay on the
@@ -247,4 +249,123 @@ describe("renderLegalPage", () => {
       `<link rel="canonical" href="${SITE_URL}/nb/privacy">`,
     );
   });
+});
+
+// --- palette -------------------------------------------------------------
+
+// The landing site carries its own copy of the brand tokens (it is a separate
+// build with no shared stylesheet), so the two can drift. They did: both had
+// category tints tuned by eye that sat under the 3:1 WCAG floor, and neither
+// overrode --on-accent in dark mode, leaving white text at 2.62:1 on the
+// primary call to action. These tests keep the copies honest in both
+// directions — matching values, and contrast that actually passes.
+
+const SPA_CSS = readFileSync(
+  new URL("../../frontend/src/styles.css", import.meta.url),
+  "utf8",
+);
+const LANDING_CSS = LANDING_STYLES;
+
+function readTokens(
+  src: string,
+  prefix: string,
+  from: number,
+): Record<string, string> {
+  const open = src.indexOf("{", from);
+  const block = src.slice(open, src.indexOf("}", open));
+  const out: Record<string, string> = {};
+  for (const m of block.matchAll(
+    new RegExp(`--${prefix}([\\w-]+):\\s*(#[0-9a-fA-F]{6})`, "g"),
+  )) {
+    const [, name, value] = m;
+    if (name && value) out[name] = value.toLowerCase();
+  }
+  return out;
+}
+
+/** A missing token is a broken test, not a silent undefined comparison. */
+function tok(t: Record<string, string>, name: string): string {
+  const v = t[name];
+  if (!v) throw new Error(`no --${name} in the landing palette`);
+  return v;
+}
+
+function contrast(a: string, b: string): number {
+  const lum = (hex: string) => {
+    const n = Number.parseInt(hex.slice(1), 16);
+    const ch = (c: number) => {
+      const v = c / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    return (
+      0.2126 * ch((n >> 16) & 255) +
+      0.7152 * ch((n >> 8) & 255) +
+      0.0722 * ch(n & 255)
+    );
+  };
+  const hi = Math.max(lum(a), lum(b));
+  const lo = Math.min(lum(a), lum(b));
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+describe("landing palette", () => {
+  const light = readTokens(LANDING_CSS, "", LANDING_CSS.indexOf(":root"));
+  const dark = {
+    ...light,
+    ...readTokens(
+      LANDING_CSS,
+      "",
+      LANDING_CSS.indexOf("prefers-color-scheme: dark"),
+    ),
+  };
+  const spaLight = readTokens(SPA_CSS, "color-", SPA_CSS.indexOf("@theme"));
+  const spaDark = {
+    ...spaLight,
+    ...readTokens(SPA_CSS, "color-", SPA_CSS.indexOf(".dark")),
+  };
+
+  const SHARED = [
+    "bg",
+    "surface",
+    "surface-2",
+    "ink",
+    "ink-soft",
+    "muted",
+    "line",
+    "accent",
+    "accent-soft",
+    "on-accent",
+    "sleep",
+    "feed",
+    "diaper",
+    "growth",
+  ];
+
+  for (const token of SHARED) {
+    it(`${token} matches the SPA in both schemes`, () => {
+      expect(light[token], `light --${token}`).toBe(spaLight[token]);
+      expect(dark[token], `dark --${token}`).toBe(spaDark[token]);
+    });
+  }
+
+  for (const [name, t] of [
+    ["light", light],
+    ["dark", dark],
+  ] as const) {
+    it(`${name}: body text is readable`, () => {
+      expect(contrast(tok(t, "ink"), tok(t, "bg"))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(tok(t, "muted"), tok(t, "bg"))).toBeGreaterThanOrEqual(
+        4.5,
+      );
+    });
+
+    it(`${name}: the call-to-action button is readable`, () => {
+      const [fg, bg] = [tok(t, "on-accent"), tok(t, "accent")];
+      const r = contrast(fg, bg);
+      expect(
+        r,
+        `on-accent ${fg} on accent ${bg} = ${r.toFixed(2)}:1`,
+      ).toBeGreaterThanOrEqual(3);
+    });
+  }
 });
