@@ -3,15 +3,29 @@
 // 1) Inspect the source db to find ids and caretaker names:
 //      node scripts/import-sprout-track.mjs sprout.db --inspect
 //
-// 2) Generate SQL (writes .import.sql), mapping sprout entities to Pjokk:
+// 2) Generate SQL, mapping sprout entities to Pjokk. Either name the target
+//    ids yourself:
 //      node scripts/import-sprout-track.mjs sprout.db \
 //        --family fam_pjokk_test \
 //        --baby <sproutBabyId>=baby_nora \
 //        --caretaker "Anders"=user_anders --caretaker "Kristine"=user_kristine \
 //        --default-caretaker user_anders
 //
+//    …or let the SQL resolve them at APPLY time from one account, which is
+//    the right shape when sprout recorded a single caretaker (or its
+//    "system" one) and saves querying production for two uuids first:
+//      node scripts/import-sprout-track.mjs sprout.db \
+//        --resolve-by-email you@example.com --create-babies \
+//        --out pjokk-import.sql
+//
+//    --resolve-by-email looks the family up through organization_members and
+//    ABORTS the transaction unless it matches exactly one (user, family):
+//    importing four thousand rows into the wrong family is not a typo you
+//    can undo. --create-babies creates each sprout baby under a st- id
+//    instead of needing a --baby mapping. --out defaults to .import.sql.
+//
 // 3) Apply (review the SQL first — it is a one-off against real data):
-//      psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f .import.sql
+//      psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f pjokk-import.sql
 //
 // Idempotent: rows get deterministic ids (st-<sproutId>) and ON CONFLICT DO
 // NOTHING, so re-running never duplicates. Soft-deleted sprout rows are
@@ -20,12 +34,22 @@
 // fixing a mapping and re-running does NOT update rows already imported:
 // delete the st-% rows first.
 //
-// Imported: feeds, diapers, sleep, notes, milestones, pumps, baths,
-// measurements, medicine, play, vaccines, contacts, calendar events.
+// Imported: feeds (incl. FoodLog as `solids`), diapers, sleep, notes,
+// milestones, pumps, baths, measurements, medicine, play, vaccines,
+// contacts, calendar events.
+//
+// FoodLog is sprout's separate solids tracker. Pjokk has no solids screen —
+// it has a `solids` FEED type whose amount_ml is RENDERED AS GRAMS (see
+// FeedSheet unit="g" and the summary's solidsG), which is what those rows
+// hold, so they import as feeds. The amount is taken as grams whatever
+// sprout's unit said: G and ML are grams-ish for puree, and converting a
+// TBSP row (12 tbsp = 177 g) would make a baby's first taste of solids the
+// largest meal of her first two months. The summary counts every row whose
+// unit was reinterpreted this way.
 //
 // NOT imported, because Pjokk has no equivalent:
 //   MoodLog, PlayLog activities beyond the three Pjokk types (folded into
-//   notes), FoodLog/Food/BabyAllergen (solids tracker),
+//   notes), BabyAllergen,
 //   BreastMilkAdjustment (freezer inventory), Photo/PhotoLog, Settings,
 //   and VaccineDocument files (sprout stores them encrypted on its own
 //   disk, outside the SQLite file this script reads — re-attach by hand).
@@ -35,6 +59,11 @@
 //   condition / colour / blowout / cream, sleep NAP-vs-NIGHT and quality,
 //   milestone category, bath type. A DRY diaper becomes a note ("Dry nappy
 //   check") rather than a wet one, so wet-nappy counts stay true.
+//   sprout's medicine units are singular (DROP, PILL)
+//   where Pjokk's enum is plural, so they are mapped by name rather than by
+//   identity — matching them exactly used to drop the unit off every
+//   Vitamin D dose — and a dose whose unit has no Pjokk equivalent keeps
+//   its amount and carries the unit in notes.
 //   Recurring calendar events import as their FIRST occurrence only.
 //   A breastfeed recorded as two sided rows in sprout stays two rows here.
 //
@@ -113,6 +142,14 @@ if (args.includes("--inspect")) {
 const familyId = flag("family");
 const babyMap = new Map(flagAll("baby").map((p) => p.split("=")));
 const defaultCaretaker = flag("default-caretaker");
+const outPath = flag("out") ?? ".import.sql";
+// --resolve-by-email emits SQL that looks the family and the caretaker up at
+// APPLY time instead of baking ids in, so the file can be reviewed and run
+// without first querying production for two uuids. Everything is attributed
+// to that one account, which is right when sprout recorded a single
+// caretaker (or the "system" one) and wrong otherwise -- hence the warning.
+const resolveEmail = flag("resolve-by-email");
+const createBabies = args.includes("--create-babies");
 // --caretaker accepts sprout caretaker NAME or ID on the left.
 const caretakerByKey = new Map(
   flagAll("caretaker").map((p) => {
@@ -120,12 +157,29 @@ const caretakerByKey = new Map(
     return [p.slice(0, i), p.slice(i + 1)];
   }),
 );
-if (!familyId || babyMap.size === 0) {
+// Babies are created by the generated SQL under deterministic st- ids, which
+// also registers the mapping --baby would otherwise have to supply by hand.
+const sproutBabies = createBabies
+  ? rows(
+      `SELECT id, firstName, lastName, birthDate, gender FROM Baby WHERE deletedAt IS NULL`,
+    )
+  : [];
+for (const b of sproutBabies) babyMap.set(b.id, `st-${b.id}`);
+
+if (!resolveEmail && !familyId) {
+  console.error("--family (or --resolve-by-email) is required");
+  process.exit(1);
+}
+if (babyMap.size === 0) {
   console.error(
-    "--family and at least one --baby mapping are required (run --inspect first)",
+    "at least one --baby mapping (or --create-babies) is required (run --inspect first)",
   );
   process.exit(1);
 }
+if (resolveEmail && (caretakerByKey.size > 0 || defaultCaretaker))
+  console.warn(
+    "warning: --resolve-by-email attributes every row to one account; --caretaker/--default-caretaker are ignored",
+  );
 
 const caretakers = new Map(
   rows(`SELECT id, name FROM Caretaker`).map((c) => [c.id, c.name]),
@@ -160,6 +214,15 @@ const toKg = (v, unit) => {
 };
 const toCm = (v, unit) =>
   String(unit ?? "cm").toLowerCase() === "in" ? v * 2.54 : v;
+// Pjokk stores every temperature in its canonical unit, °C, the way it stores
+// weight in kg — there is no unit column. sprout's Unit table has both C and
+// F, so a Fahrenheit row must convert here rather than land as a 100 °C baby.
+const toCelsius = (v, unit) => {
+  const u = String(unit ?? "c")
+    .toLowerCase()
+    .replace("\u00b0", "");
+  return u === "f" ? ((v - 32) * 5) / 9 : v;
+};
 
 const out = [];
 const skipped = {};
@@ -193,28 +256,79 @@ const render = (col, v) => {
   return v;
 };
 
-const insert = (table, cols, vals) =>
+const insert = (table, cols, vals) => {
+  const exprs = cols.map((col, i) => render(col, vals[i])).join(", ");
+  const head = `INSERT INTO "${table}" (${cols.join(", ")})`;
+  // In resolve mode family_id/caretaker_id are bare column references into the
+  // single-row _import_target, so the statement is a SELECT rather than VALUES.
   out.push(
-    `INSERT INTO "${table}" (${cols.join(", ")}) VALUES (${cols
-      .map((col, i) => render(col, vals[i]))
-      .join(", ")}) ON CONFLICT DO NOTHING;`,
+    resolveEmail
+      ? `${head} SELECT ${exprs} FROM _import_target ON CONFLICT DO NOTHING;`
+      : `${head} VALUES (${exprs}) ON CONFLICT DO NOTHING;`,
   );
+};
+
+const FAMILY_REF = "family_id";
+const CARETAKER_REF = "caretaker_id";
+const familyExpr = () => (resolveEmail ? FAMILY_REF : esc(familyId));
 
 const base = (r, timeMs) => {
   const babyId = babyMap.get(r.babyId);
-  const caretakerId = resolveCaretaker(r.caretakerId);
   if (!babyId) return skip("unmapped baby"), null;
-  if (!caretakerId)
-    return skip("unmapped caretaker (set --default-caretaker)"), null;
+  let caretakerExpr = CARETAKER_REF;
+  if (!resolveEmail) {
+    const caretakerId = resolveCaretaker(r.caretakerId);
+    if (!caretakerId)
+      return skip("unmapped caretaker (set --default-caretaker)"), null;
+    caretakerExpr = esc(caretakerId);
+  }
   if (timeMs === null) return skip("unparseable time"), null;
-  return [
-    esc(`st-${r.id}`),
-    esc(familyId),
-    esc(babyId),
-    esc(caretakerId),
-    timeMs,
-  ];
+  return [esc(`st-${r.id}`), familyExpr(), esc(babyId), caretakerExpr, timeMs];
 };
+
+// The prelude: resolve the target, then create the babies. Both must precede
+// every log insert, so they are emitted before the per-table loops run.
+if (resolveEmail) {
+  out.push(
+    "BEGIN;",
+    "",
+    "-- Resolve the family and the caretaker from one account, rather than",
+    "-- baking ids in. A missing or ambiguous match aborts the transaction:",
+    "-- importing 4000 rows into the wrong family is not a recoverable typo.",
+    "CREATE TEMP TABLE _import_target ON COMMIT DROP AS",
+    "SELECT u.id AS caretaker_id, o.id AS family_id",
+    'FROM "users" u',
+    'JOIN "organization_members" m ON m.user_id = u.id',
+    'JOIN "organizations" o ON o.id = m.organization_id',
+    `WHERE u.email = ${esc(resolveEmail)} AND u.deleted_at IS NULL;`,
+    "",
+    "DO $$",
+    "DECLARE n int;",
+    "BEGIN",
+    "  SELECT count(*) INTO n FROM _import_target;",
+    "  IF n <> 1 THEN",
+    `    RAISE EXCEPTION 'expected exactly one (user, family) for ${resolveEmail}, found %', n;`,
+    "  END IF;",
+    "END $$;",
+    "",
+  );
+}
+for (const b of sproutBabies) {
+  const name = [b.firstName, b.lastName].filter(Boolean).join(" ") || "Baby";
+  const sex = { FEMALE: "girl", MALE: "boy" }[b.gender];
+  insert(
+    "baby",
+    ["id", "family_id", "name", "birth_date", "sex"],
+    [
+      esc(`st-${b.id}`),
+      familyExpr(),
+      esc(name),
+      ms(b.birthDate),
+      sex ? esc(sex) : "NULL",
+    ],
+  );
+}
+if (sproutBabies.length) out.push("");
 
 for (const r of rows(`SELECT * FROM FeedLog WHERE deletedAt IS NULL`)) {
   const b = base(r, ms(r.time));
@@ -266,6 +380,74 @@ for (const r of rows(`SELECT * FROM FeedLog WHERE deletedAt IS NULL`)) {
       type === "breast" ? "NULL" : (toMl(r.amount, r.unitAbbr) ?? "NULL"),
       r.side ? esc(r.side.toLowerCase()) : "NULL",
       type === "breast" ? (durationMin ?? "NULL") : "NULL",
+      escOrNull(notes),
+      now,
+    ],
+  );
+}
+
+// FoodLog is sprout's solids tracker, a table apart from FeedLog. Pjokk has
+// no separate solids screen -- it has a `solids` FEED type whose amount_ml is
+// rendered as GRAMS (FeedSheet unit="g", summary solidsG), which is exactly
+// what these rows hold. They used to be dropped wholesale; a row here is a
+// meal, and 150 of them is half a year of weaning.
+const foodNames = new Map(
+  rows(`SELECT id, name FROM Food`).map((f) => [f.id, String(f.name).trim()]),
+);
+for (const r of rows(`SELECT * FROM FoodLog WHERE deletedAt IS NULL`)) {
+  const b = base(r, ms(r.time));
+  if (!b) continue;
+  // `foods` is a JSON array; `foodId` is the single-food shorthand.
+  let foodIds = [];
+  try {
+    foodIds = JSON.parse(r.foods ?? "[]")
+      .map((f) => f?.foodId)
+      .filter(Boolean);
+  } catch {
+    // Malformed JSON just falls through to foodId below.
+  }
+  if (!foodIds.length && r.foodId) foodIds = [r.foodId];
+  const foodUnit = String(r.unitAbbr ?? "").toLowerCase();
+  if (r.amount != null && foodUnit && foodUnit !== "g")
+    skip(`solids amount in ${r.unitAbbr} taken as grams`);
+  const names = foodIds.map((i) => foodNames.get(i)).filter(Boolean);
+  const notes =
+    [
+      names.join(", ") || null,
+      r.enjoyment ? String(r.enjoyment).toLowerCase() : null,
+      r.hadReaction
+        ? `reaction${r.reactionDescription ? `: ${r.reactionDescription}` : ""}`
+        : null,
+      r.notes,
+    ]
+      .filter(Boolean)
+      .join(" \u00b7 ") || null;
+  insert(
+    "feed_log",
+    [
+      "id",
+      "family_id",
+      "baby_id",
+      "caretaker_id",
+      "time",
+      "type",
+      "amount_ml",
+      "side",
+      "duration_min",
+      "notes",
+      "created_at",
+    ],
+    [
+      ...b,
+      esc("solids"),
+      // The amount is taken as GRAMS whatever the unit says. G and ML are
+      // grams-ish for puree either way, and converting the handful of early
+      // TBSP rows (12 tbsp = 177 g) would make a baby's first taste of solids
+      // the largest meal of her first two months -- the number was recorded
+      // against sprout's default unit label, not actually measured in spoons.
+      r.amount != null ? Math.round(r.amount) : "NULL",
+      "NULL",
+      "NULL",
       escOrNull(notes),
       now,
     ],
@@ -472,6 +654,7 @@ for (const r of rows(`SELECT * FROM Measurement WHERE deletedAt IS NULL`)) {
     WEIGHT: "weight",
     HEIGHT: "length",
     HEAD_CIRCUMFERENCE: "head",
+    TEMPERATURE: "temperature",
   };
   const type = map[r.type];
   if (!type) {
@@ -479,7 +662,11 @@ for (const r of rows(`SELECT * FROM Measurement WHERE deletedAt IS NULL`)) {
     continue;
   }
   const value =
-    type === "weight" ? toKg(r.value, r.unit) : toCm(r.value, r.unit);
+    type === "weight"
+      ? toKg(r.value, r.unit)
+      : type === "temperature"
+        ? toCelsius(r.value, r.unit)
+        : toCm(r.value, r.unit);
   insert(
     "measurement_log",
     [
@@ -500,11 +687,33 @@ for (const r of rows(`SELECT * FROM Measurement WHERE deletedAt IS NULL`)) {
 const medicineNames = new Map(
   rows(`SELECT id, name FROM Medicine`).map((m) => [m.id, m.name]),
 );
-const PJOKK_UNITS = new Set(["ml", "mg", "drops", "dose"]);
+// sprout's unit vocabulary is singular (DROP, PILL); Pjokk's enum is
+// ("ml","mg","drops","dose"). Matching them by identity silently dropped the
+// unit off every Vitamin D dose, so map explicitly and keep what will not fit
+// in the notes rather than losing the dose entirely.
+const MEDICINE_UNIT = {
+  drop: "drops",
+  drops: "drops",
+  dose: "dose",
+  ml: "ml",
+  mg: "mg",
+};
 for (const r of rows(`SELECT * FROM MedicineLog WHERE deletedAt IS NULL`)) {
   const b = base(r, ms(r.time));
   if (!b) continue;
   const unit = String(r.unitAbbr ?? "").toLowerCase();
+  const mappedUnit = MEDICINE_UNIT[unit] ?? null;
+  if (unit && !mappedUnit)
+    skip(`medicine unit ${r.unitAbbr} kept in notes (no Pjokk unit fits)`);
+  const medicineNotes =
+    [
+      !mappedUnit && unit
+        ? `${r.doseAmount ?? ""} ${unit}`.trim()
+        : null,
+      r.notes,
+    ]
+      .filter(Boolean)
+      .join(" \u00b7 ") || null;
   insert(
     "medicine_log",
     [
@@ -523,8 +732,8 @@ for (const r of rows(`SELECT * FROM MedicineLog WHERE deletedAt IS NULL`)) {
       ...b,
       esc(medicineNames.get(r.medicineId) ?? "Medicine"),
       r.doseAmount ?? "NULL",
-      PJOKK_UNITS.has(unit) ? esc(unit) : "NULL",
-      escOrNull(r.notes),
+      mappedUnit ? esc(mappedUnit) : "NULL",
+      escOrNull(medicineNotes),
       now,
     ],
   );
@@ -651,10 +860,14 @@ for (const r of rows(`SELECT * FROM CalendarEvent WHERE deletedAt IS NULL`)) {
     skip("calendar event with unparseable start time");
     continue;
   }
-  const createdBy = resolveCaretaker(null);
-  if (!createdBy) {
-    skip("calendar event (set --default-caretaker)");
-    continue;
+  let createdBy = CARETAKER_REF;
+  if (!resolveEmail) {
+    const resolved = resolveCaretaker(null);
+    if (!resolved) {
+      skip("calendar event (set --default-caretaker)");
+      continue;
+    }
+    createdBy = esc(resolved);
   }
   const id = `st-${r.id}`;
   const endMs = ms(r.endTime);
@@ -690,8 +903,8 @@ for (const r of rows(`SELECT * FROM CalendarEvent WHERE deletedAt IS NULL`)) {
     ],
     [
       esc(id),
-      esc(familyId),
-      esc(createdBy),
+      familyExpr(),
+      createdBy,
       esc(r.title ?? "Event"),
       escOrNull(description),
       escOrNull(r.location),
@@ -715,6 +928,14 @@ for (const r of rows(`SELECT * FROM CalendarEvent WHERE deletedAt IS NULL`)) {
     );
   }
   for (const sproutCaretakerId of new Set(eventCaretakers.get(r.id) ?? [])) {
+    if (resolveEmail) {
+      insert(
+        "calendar_assignee",
+        ["event_id", "user_id"],
+        [esc(id), CARETAKER_REF],
+      );
+      continue;
+    }
     const userId = resolveCaretaker(sproutCaretakerId);
     // resolveCaretaker falls back to the default, which would silently
     // assign every unmapped caretaker to one person — only take real hits.
@@ -761,7 +982,7 @@ for (const r of rows(`SELECT * FROM Contact WHERE deletedAt IS NULL`)) {
     ],
     [
       esc(`st-${r.id}`),
-      esc(familyId),
+      familyExpr(),
       esc(r.name ?? "Contact"),
       escOrNull(r.role),
       icon ? esc(icon) : "NULL",
@@ -775,8 +996,10 @@ for (const r of rows(`SELECT * FROM Contact WHERE deletedAt IS NULL`)) {
   );
 }
 
-writeFileSync(".import.sql", out.join("\n") + "\n");
-console.log(`wrote .import.sql (${out.length} inserts)`);
+if (resolveEmail) out.push("", "COMMIT;");
+writeFileSync(outPath, out.join("\n") + "\n");
+const inserts = out.filter((l) => l.startsWith("INSERT")).length;
+console.log(`wrote ${outPath} (${inserts} inserts)`);
 if (Object.keys(skipped).length) {
   console.log("skipped:");
   for (const [why, n] of Object.entries(skipped))
