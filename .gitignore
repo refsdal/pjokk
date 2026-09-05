@@ -26,3 +26,8 @@ dev.db*
 e2e/test-results/
 e2e/playwright-report/
 test-results/
+
+# Sprout-track migration: the source SQLite and the generated import SQL are
+# real health data about a child. They are working files, never artifacts.
+/backup/
+.import.sql
