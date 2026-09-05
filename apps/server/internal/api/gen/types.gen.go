@@ -268,9 +268,10 @@ func (e CreateInviteRole) Valid() bool {
 
 // Defines values for CreateMeasurementType.
 const (
-	CreateMeasurementTypeHead   CreateMeasurementType = "head"
-	CreateMeasurementTypeLength CreateMeasurementType = "length"
-	CreateMeasurementTypeWeight CreateMeasurementType = "weight"
+	CreateMeasurementTypeHead        CreateMeasurementType = "head"
+	CreateMeasurementTypeLength      CreateMeasurementType = "length"
+	CreateMeasurementTypeTemperature CreateMeasurementType = "temperature"
+	CreateMeasurementTypeWeight      CreateMeasurementType = "weight"
 )
 
 // Valid indicates whether the value is a known member of the CreateMeasurementType enum.
@@ -279,6 +280,8 @@ func (e CreateMeasurementType) Valid() bool {
 	case CreateMeasurementTypeHead:
 		return true
 	case CreateMeasurementTypeLength:
+		return true
+	case CreateMeasurementTypeTemperature:
 		return true
 	case CreateMeasurementTypeWeight:
 		return true
@@ -478,9 +481,10 @@ func (e InviteInfoRole) Valid() bool {
 
 // Defines values for MeasurementLogType.
 const (
-	MeasurementLogTypeHead   MeasurementLogType = "head"
-	MeasurementLogTypeLength MeasurementLogType = "length"
-	MeasurementLogTypeWeight MeasurementLogType = "weight"
+	MeasurementLogTypeHead        MeasurementLogType = "head"
+	MeasurementLogTypeLength      MeasurementLogType = "length"
+	MeasurementLogTypeTemperature MeasurementLogType = "temperature"
+	MeasurementLogTypeWeight      MeasurementLogType = "weight"
 )
 
 // Valid indicates whether the value is a known member of the MeasurementLogType enum.
@@ -489,6 +493,8 @@ func (e MeasurementLogType) Valid() bool {
 	case MeasurementLogTypeHead:
 		return true
 	case MeasurementLogTypeLength:
+		return true
+	case MeasurementLogTypeTemperature:
 		return true
 	case MeasurementLogTypeWeight:
 		return true
@@ -835,9 +841,10 @@ func (e UpdateFeedType) Valid() bool {
 
 // Defines values for UpdateMeasurementType.
 const (
-	UpdateMeasurementTypeHead   UpdateMeasurementType = "head"
-	UpdateMeasurementTypeLength UpdateMeasurementType = "length"
-	UpdateMeasurementTypeWeight UpdateMeasurementType = "weight"
+	UpdateMeasurementTypeHead        UpdateMeasurementType = "head"
+	UpdateMeasurementTypeLength      UpdateMeasurementType = "length"
+	UpdateMeasurementTypeTemperature UpdateMeasurementType = "temperature"
+	UpdateMeasurementTypeWeight      UpdateMeasurementType = "weight"
 )
 
 // Valid indicates whether the value is a known member of the UpdateMeasurementType enum.
@@ -846,6 +853,8 @@ func (e UpdateMeasurementType) Valid() bool {
 	case UpdateMeasurementTypeHead:
 		return true
 	case UpdateMeasurementTypeLength:
+		return true
+	case UpdateMeasurementTypeTemperature:
 		return true
 	case UpdateMeasurementTypeWeight:
 		return true
@@ -1672,7 +1681,10 @@ type Summary struct {
 	LastDiaper  *DiaperLog `json:"lastDiaper"`
 	LastFeed    *FeedLog   `json:"lastFeed"`
 	LastSleep   *SleepLog  `json:"lastSleep"`
-	Today       struct {
+
+	// LastTemperature The newest `temperature` measurement, or null. Specifically the newest of that TYPE, not the newest measurement — a weight taken after a temperature must not displace it. Backs the Home screen's temperature card.
+	LastTemperature *MeasurementLog `json:"lastTemperature"`
+	Today           struct {
 		Both     int32 `json:"both"`
 		Dirty    int32 `json:"dirty"`
 		Feeds    int32 `json:"feeds"`

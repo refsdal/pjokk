@@ -229,10 +229,7 @@ func rowMilestone(r dbgen.ExportMilestonesRow) exportRow {
 }
 
 func rowMeasurement(r dbgen.ExportMeasurementsRow) exportRow {
-	unit := "cm"
-	if r.Type == "weight" {
-		unit = "kg"
-	}
+	unit := MeasurementUnit(r.Type)
 	return exportRow{
 		sortTime: r.Time.Time,
 		cells: map[string]*string{

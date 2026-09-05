@@ -614,3 +614,35 @@ func stringOfLen(n int) string {
 	}
 	return string(b)
 }
+
+// --- temperature (a fourth measurement type) ---
+
+// Pjokk measures weight/length/head. A temperature is the same shape — a
+// number with a unit at a moment — so it is a fourth `type` on measurement_log
+// rather than a table of its own. The value is stored in the CANONICAL unit
+// (°C) exactly as weight is stored in kg: the unit is a function of the type,
+// never a column, which is what keeps a future Fahrenheit toggle a display
+// concern instead of a migration.
+func TestMeasurementAcceptsTemperature(t *testing.T) {
+	a := testrig.App(t)
+	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
+	babyID := a.NewBaby(familyID, "Nora")
+
+	created := a.Do(http.MethodPost, "/api/measurements", cookie, map[string]any{
+		"babyId": babyID,
+		"time":   time.Now().UTC().Format(time.RFC3339),
+		"type":   "temperature",
+		"value":  39.4,
+	})
+	if created.Status != http.StatusCreated {
+		t.Fatalf("create temperature: status %d, body %s", created.Status, created.Raw)
+	}
+	if got := created.JSON["type"]; got != "temperature" {
+		t.Errorf("type = %v, want temperature", got)
+	}
+	// 39.4 is not representable in binary float32; a narrowing conversion
+	// anywhere in the chain would surface here as 39.400001525878906.
+	if got := created.JSON["value"]; got != 39.4 {
+		t.Errorf("value = %v, want 39.4", got)
+	}
+}

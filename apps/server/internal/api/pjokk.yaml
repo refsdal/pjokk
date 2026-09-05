@@ -3388,6 +3388,7 @@ components:
         - activeSleep
         - lastSleep
         - activePlay
+        - lastTemperature
         - today
       properties:
         lastFeed:
@@ -3409,6 +3410,15 @@ components:
         activePlay:
           allOf:
             - $ref: "#/components/schemas/PlayLog"
+          nullable: true
+        lastTemperature:
+          description: >-
+            The newest `temperature` measurement, or null. Specifically the
+            newest of that TYPE, not the newest measurement — a weight taken
+            after a temperature must not displace it. Backs the Home screen's
+            temperature card.
+          allOf:
+            - $ref: "#/components/schemas/MeasurementLog"
           nullable: true
         today:
           type: object
@@ -3706,7 +3716,7 @@ components:
           format: date-time
         type:
           type: string
-          enum: [weight, length, head]
+          enum: [weight, length, head, temperature]
         value:
           type: number
           format: double
@@ -3721,7 +3731,7 @@ components:
           format: date-time
         type:
           type: string
-          enum: [weight, length, head]
+          enum: [weight, length, head, temperature]
         value:
           type: number
           format: double
@@ -3744,7 +3754,7 @@ components:
           format: date-time
         type:
           type: string
-          enum: [weight, length, head]
+          enum: [weight, length, head, temperature]
         value:
           type: number
           format: double

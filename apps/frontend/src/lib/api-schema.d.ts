@@ -1576,6 +1576,8 @@ export interface components {
             activeSleep: components["schemas"]["SleepLog"] | null;
             lastSleep: components["schemas"]["SleepLog"] | null;
             activePlay: components["schemas"]["PlayLog"] | null;
+            /** @description The newest `temperature` measurement, or null. Specifically the newest of that TYPE, not the newest measurement — a weight taken after a temperature must not displace it. Backs the Home screen's temperature card. */
+            lastTemperature: components["schemas"]["MeasurementLog"] | null;
             today: {
                 /** Format: int32 */
                 feeds: number;
@@ -1707,7 +1709,7 @@ export interface components {
             /** Format: date-time */
             time: string;
             /** @enum {string} */
-            type: "weight" | "length" | "head";
+            type: "weight" | "length" | "head" | "temperature";
             /** Format: double */
             value: number;
         };
@@ -1716,7 +1718,7 @@ export interface components {
             /** Format: date-time */
             time: string;
             /** @enum {string} */
-            type: "weight" | "length" | "head";
+            type: "weight" | "length" | "head" | "temperature";
             /** Format: double */
             value: number;
             notes?: string;
@@ -1726,7 +1728,7 @@ export interface components {
             /** Format: date-time */
             time?: string;
             /** @enum {string} */
-            type?: "weight" | "length" | "head";
+            type?: "weight" | "length" | "head" | "temperature";
             /** Format: double */
             value?: number;
             notes?: string | null;

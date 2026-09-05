@@ -145,7 +145,12 @@ export const SleepLocationSchema = z.object({
 // --- Phase 3 activity types: same structural pattern as the core three ---
 
 export const medicineUnits = ["ml", "mg", "drops", "dose"] as const;
-export const measurementTypes = ["weight", "length", "head"] as const;
+export const measurementTypes = [
+  "weight",
+  "length",
+  "head",
+  "temperature",
+] as const;
 
 const createBase = {
   babyId: z.string(),
@@ -218,7 +223,11 @@ export const UpdateMilestoneSchema = z.object({
   title: z.string().min(1).max(200).optional(),
 });
 
-// Units implied by type: weight in kg, length/head in cm.
+// Units implied by type: weight in kg, length/head in cm, temperature in °C.
+// There is deliberately no unit column — a value is always stored in its
+// type's canonical unit, so a future Fahrenheit preference converts for
+// display and touches neither the schema nor a single stored row. The units
+// table itself lives in apps/frontend/src/lib/measurements.ts.
 export const MeasurementLogSchema = z.object({
   ...logBase,
   time: isoTime(),
@@ -377,6 +386,10 @@ export const SummarySchema = z.object({
   lastSleep: SleepLogSchema.nullable(),
   // The running timed activity (tummy time, a walk), or null.
   activePlay: PlayLogSchema.nullable(),
+  // The newest `temperature` measurement, or null — specifically the newest
+  // of that TYPE, so weighing the baby afterwards does not displace it.
+  // Backs the Home screen's temperature card.
+  lastTemperature: MeasurementLogSchema.nullable(),
   // Local-day totals for the requester's timezone (see the `tz` query param).
   today: z.object({
     feeds: z.number().int(),
