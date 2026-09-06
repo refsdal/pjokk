@@ -613,10 +613,11 @@ var vaccineDocumentsPattern = regexp.MustCompile(`^/api/vaccines/[^/]+/documents
 // skipSpecValidation reports whether r's path is one of the routes that
 // never go through kin-openapi request validation: the auth handler (Limen
 // owns its own request shapes), raw file streaming, the CSV export stream,
-// and vaccine document uploads (multipart, not JSON). /api/auth/ is also
-// structurally unreachable here (see NewHandler's mount order) — it is
-// listed anyway so this function documents the full exclusion set on its
-// own, independent of how the mux happens to be wired today.
+// vaccine document uploads (multipart, not JSON), and the avatar upload
+// (multipart) and avatar streaming routes. /api/auth/ is also structurally
+// unreachable here (see NewHandler's mount order) — it is listed anyway so
+// this function documents the full exclusion set on its own, independent of
+// how the mux happens to be wired today.
 func skipSpecValidation(r *http.Request) bool {
 	switch {
 	case strings.HasPrefix(r.URL.Path, auth.BasePath+"/"):
@@ -626,6 +627,10 @@ func skipSpecValidation(r *http.Request) bool {
 	case r.URL.Path == "/api/export.csv":
 		return true
 	case vaccineDocumentsPattern.MatchString(r.URL.Path):
+		return true
+	case r.URL.Path == "/api/me/avatar":
+		return true
+	case strings.HasPrefix(r.URL.Path, "/api/users/"):
 		return true
 	default:
 		return false
@@ -755,6 +760,11 @@ func NewHandler(d Deps) http.Handler {
 	// apps/api/src/app.ts's filesApp sits behind the identical "/api/*"
 	// apiKeyAuth middleware every other route does, so this port must too.
 	d.mountFileRoutes(mux, familyChain(d))
+
+	// Avatars (internal/api/avatar.go): multipart in, JPEG out — hand-routed
+	// for the same reason as the files routes, but session tier (a profile
+	// is global) and never an API key.
+	d.mountAvatarRoutes(mux, sessionChain(d))
 
 	// CSV export (internal/api/export.go's package doc comment): same
 	// reasoning as the files routes above — a text/csv streamed body has
