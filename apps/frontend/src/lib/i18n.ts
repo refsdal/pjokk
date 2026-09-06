@@ -39,6 +39,16 @@ const nb: Record<string, string> = {
   "Too many requests — wait a few minutes":
     "For mange forespørsler – vent noen minutter",
   "Could not send": "Kunne ikke sende",
+  "Help requested": "Ber om hjelp",
+  "On the way": "På vei",
+  "needs a hand": "trenger en hånd",
+  "needs a hand from": "trenger hjelp fra",
+  "is on the way": "er på vei",
+  Someone: "Noen",
+  someone: "noen",
+  "On my way": "Jeg kommer",
+  "Never mind": "Glem det",
+  Done: "Ferdig",
 
   // Sheets: shared
   Save: "Lagre",

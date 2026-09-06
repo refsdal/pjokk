@@ -7,13 +7,14 @@ import {
   IconTemperature,
 } from "@tabler/icons-react";
 import { useState } from "react";
-import type { MeasurementType, PlayType } from "@pjokk/shared";
+import type { HelpRequest, MeasurementType, PlayType } from "@pjokk/shared";
 import { useNavigate } from "@tanstack/react-router";
 import {
   ActivePlayBanner,
   ActiveSleepBanner,
 } from "@/components/ActiveSessionBanner";
 import { BabySwitcher } from "@/components/BabySwitcher";
+import { HelpCard } from "@/components/HelpCard";
 import { InstallBanner } from "@/components/InstallBanner";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { LogButton } from "@/components/LogButton";
@@ -141,6 +142,7 @@ export function HomeScreen() {
   const s = summary.data;
   const active = s?.activeSleep ?? null;
   const activePlay = s?.activePlay ?? null;
+  const openHelp = s?.openHelp ?? null;
   const tempStatus = temperatureStatus(
     s?.lastTemperature?.value ?? 0,
     tempTrend,
@@ -163,6 +165,7 @@ export function HomeScreen() {
         activeSleepId={active?.id ?? null}
         recentFeeds={feeds.data ?? []}
         lastDiaper={s?.lastDiaper ?? null}
+        openHelp={openHelp}
       />
     );
   }
@@ -181,6 +184,10 @@ export function HomeScreen() {
       </header>
 
       <div className="space-y-3 pb-tabbar">
+        {/* Below the baby header, above everything else: a call for help is
+            the first thing to see, but it must not displace whose home this
+            is. */}
+        {openHelp && <HelpCard request={openHelp} />}
         {active && <ActiveSleepBanner session={active} />}
         {activePlay && <ActivePlayBanner session={activePlay} />}
 
@@ -350,6 +357,7 @@ function NightHome({
   activeSleepId,
   recentFeeds,
   lastDiaper,
+  openHelp,
 }: {
   babyId: string;
   sheet: OpenSheet;
@@ -357,6 +365,7 @@ function NightHome({
   activeSleepId: string | null;
   recentFeeds: Parameters<typeof FeedSheet>[0]["recentFeeds"];
   lastDiaper: Parameters<typeof DiaperSheet>[0]["lastDiaper"];
+  openHelp: HelpRequest | null;
 }) {
   const wakeSleep = useWakeSleep();
   const nightAction = (
@@ -381,6 +390,7 @@ function NightHome({
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-end px-4 pb-tabbar">
       <div className="space-y-3 pb-4">
         <IconBabyCarriage className="mx-auto h-6 w-6 text-muted" />
+        {openHelp && <HelpCard request={openHelp} />}
         {activeSleepId
           ? nightAction(t("Wake"), IconMoon, () =>
               wakeSleep.mutate({ id: activeSleepId }),

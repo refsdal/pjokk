@@ -154,8 +154,56 @@ input[type="number"] {
   animation: pulse-soft 2.4s ease-in-out infinite;
 }
 
+/* Help card (components/HelpCard.tsx): while a request is open, a ring
+   radiates from the card and the hand icon waves, on one shared 2.4 s
+   cycle. The ring takes its colour from --color-danger so night mode's
+   amber-red comes through unchanged. Both stop on acknowledge. */
+@keyframes help-ping {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-danger) 55%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 14px
+      color-mix(in srgb, var(--color-danger) 0%, transparent);
+  }
+}
+@keyframes help-wave {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0);
+  }
+  10% {
+    transform: rotate(14deg);
+  }
+  20% {
+    transform: rotate(-12deg);
+  }
+  30% {
+    transform: rotate(10deg);
+  }
+  40% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(0);
+  }
+}
+.animate-help-ping {
+  animation: help-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.animate-help-wave {
+  animation: help-wave 2.4s ease-in-out infinite;
+  transform-origin: 50% 90%;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-pulse-soft {
+    animation: none;
+  }
+  /* The solid red border alone carries the state. */
+  .animate-help-ping,
+  .animate-help-wave {
     animation: none;
   }
   * {
