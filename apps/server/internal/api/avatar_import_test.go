@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -109,6 +110,42 @@ func TestGoogleAvatarImportFailureIsAttemptedOnce(t *testing.T) {
 	p, err := a.Deps.Q.GetUserProfile(context.Background(), id)
 	if err != nil || !p.AvatarImportedAt.Valid {
 		t.Errorf("avatar_imported_at not marked after a failed attempt (err %v)", err)
+	}
+}
+
+// TestGoogleAvatarImportRefusesRedirectsOffTheAllowlist proves the fix for
+// the SSRF gap CheckRedirect closes: an allowlisted host redirecting to a
+// non-allowlisted one must never be followed. The AllowedHost here accepts
+// only 127.0.0.1 — srv.URL's host — so the redirect to "localhost" (same
+// process, different hostname) must be refused before any request reaches
+// it.
+func TestGoogleAvatarImportRefusesRedirectsOffTheAllowlist(t *testing.T) {
+	a := testrig.App(t)
+	var hits int32
+	var srv *httptest.Server
+	srv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		port := srv.URL[strings.LastIndex(srv.URL, ":")+1:]
+		http.Redirect(w, r, "https://localhost:"+port+"/photo", http.StatusFound)
+	}))
+	t.Cleanup(srv.Close)
+
+	a.Configure(func(d *api.Deps) {
+		d.AvatarImport = &api.AvatarImporter{
+			Client:      srv.Client(),
+			AllowedHost: func(h string) bool { return h == "127.0.0.1" },
+		}
+	})
+	id := a.SignUp("Google Person", "g@example.com")
+	setGoogleImage(t, a, id, srv.URL+"/photo")
+	cookie := a.SignIn("g@example.com")
+
+	res := a.Do(http.MethodGet, "/api/me", cookie, nil)
+	if res.JSON["avatarUrl"] != nil {
+		t.Errorf("avatarUrl = %v, want null", res.JSON["avatarUrl"])
+	}
+	if n := atomic.LoadInt32(&hits); n != 1 {
+		t.Errorf("redirecting server hit %d times, want 1", n)
 	}
 }
 

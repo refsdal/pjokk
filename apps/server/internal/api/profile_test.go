@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
+
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
 	"github.com/refsdal/pjokk/server/internal/testrig"
 )
@@ -47,6 +49,39 @@ func TestDisplayNameFallsBackToFullName(t *testing.T) {
 	p, _ = a.Deps.Q.GetUserProfile(ctx, id)
 	if p.DisplayName != "Anders Olsen" {
 		t.Errorf("display_name after blank nickname = %q, want the full name", p.DisplayName)
+	}
+}
+
+// TestMarkAvatarImportAttemptedClaimsOnce pins the atomic-claim fix
+// (profile.sql's WHERE avatar_imported_at IS NULL AND avatar_key IS NULL
+// guard): only the FIRST of several concurrent callers may ever flip a
+// user's avatar_imported_at, so importGoogleAvatar's rows==0 branch has
+// something real to check.
+func TestMarkAvatarImportAttemptedClaimsOnce(t *testing.T) {
+	a := testrig.App(t)
+	ctx := context.Background()
+	id := a.SignUp("Google Person", "g2@example.com")
+
+	rows, err := a.Deps.Q.MarkAvatarImportAttempted(ctx, dbgen.MarkAvatarImportAttemptedParams{
+		ID:               id,
+		AvatarImportedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("first MarkAvatarImportAttempted: %v", err)
+	}
+	if rows != 1 {
+		t.Errorf("first claim rows = %d, want 1", rows)
+	}
+
+	rows, err = a.Deps.Q.MarkAvatarImportAttempted(ctx, dbgen.MarkAvatarImportAttemptedParams{
+		ID:               id,
+		AvatarImportedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("second MarkAvatarImportAttempted: %v", err)
+	}
+	if rows != 0 {
+		t.Errorf("second claim rows = %d, want 0 (already claimed)", rows)
 	}
 }
 

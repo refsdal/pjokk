@@ -30,10 +30,15 @@ UPDATE "users"
 SET "avatar_key" = $2, "updated_at" = now()
 WHERE "id" = $1;
 
--- name: MarkAvatarImportAttempted :exec
+-- name: MarkAvatarImportAttempted :execrows
+-- The atomic claim on the Google avatar import (internal/api/avatar_import.go):
+-- the WHERE guard means only ONE of several concurrent callers can ever flip
+-- this row from unattempted to attempted. 0 rows back means another request
+-- already claimed the import (or a photo already exists); the caller must
+-- treat that as "someone else has it" and do nothing further.
 UPDATE "users"
 SET "avatar_imported_at" = $2
-WHERE "id" = $1;
+WHERE "id" = $1 AND "avatar_imported_at" IS NULL AND "avatar_key" IS NULL;
 
 -- name: GetAvatarForViewer :one
 -- The viewer may see the target's photo when they ARE the target or share

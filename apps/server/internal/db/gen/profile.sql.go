@@ -90,10 +90,10 @@ func (q *Queries) GetUserProfile(ctx context.Context, id string) (GetUserProfile
 	return i, err
 }
 
-const markAvatarImportAttempted = `-- name: MarkAvatarImportAttempted :exec
+const markAvatarImportAttempted = `-- name: MarkAvatarImportAttempted :execrows
 UPDATE "users"
 SET "avatar_imported_at" = $2
-WHERE "id" = $1
+WHERE "id" = $1 AND "avatar_imported_at" IS NULL AND "avatar_key" IS NULL
 `
 
 type MarkAvatarImportAttemptedParams struct {
@@ -101,9 +101,17 @@ type MarkAvatarImportAttemptedParams struct {
 	AvatarImportedAt pgtype.Timestamptz
 }
 
-func (q *Queries) MarkAvatarImportAttempted(ctx context.Context, arg MarkAvatarImportAttemptedParams) error {
-	_, err := q.db.Exec(ctx, markAvatarImportAttempted, arg.ID, arg.AvatarImportedAt)
-	return err
+// The atomic claim on the Google avatar import (internal/api/avatar_import.go):
+// the WHERE guard means only ONE of several concurrent callers can ever flip
+// this row from unattempted to attempted. 0 rows back means another request
+// already claimed the import (or a photo already exists); the caller must
+// treat that as "someone else has it" and do nothing further.
+func (q *Queries) MarkAvatarImportAttempted(ctx context.Context, arg MarkAvatarImportAttemptedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markAvatarImportAttempted, arg.ID, arg.AvatarImportedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const setUserAvatar = `-- name: SetUserAvatar :exec

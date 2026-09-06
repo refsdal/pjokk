@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -21,12 +22,19 @@ import (
 // GET /api/me after sign-in copies it, once, into our own object store.
 //
 // The URL is data from a third party: the host allowlist is what stops
-// this becoming a server-side request forgery primitive.
+// this becoming a server-side request forgery primitive — and that
+// allowlist is checked against the initial URL AND every redirect hop
+// (CheckRedirect below), since the default net/http client would otherwise
+// follow a redirect straight off the allowlist.
 
 const (
 	avatarImportTimeout  = 3 * time.Second
 	avatarImportMaxBytes = 1 << 20 // 1 MiB
 )
+
+// errRedirectOffAllowlist aborts a redirect chain that would leave the
+// allowlisted host set — see importGoogleAvatar's CheckRedirect.
+var errRedirectOffAllowlist = errors.New("avatar import: redirect left the allowlist")
 
 // AvatarImporter is the outbound half of the import, handed in through Deps
 // so tests point it at an httptest server (with the allowlist widened) and
@@ -69,12 +77,19 @@ func (d Deps) importGoogleAvatar(ctx context.Context, userID string) {
 		return
 	}
 
-	// Mark FIRST: whatever happens below happens once.
-	if err := d.Q.MarkAvatarImportAttempted(ctx, dbgen.MarkAvatarImportAttemptedParams{
+	// Mark FIRST: the atomic claim (profile.sql's WHERE guard). rows == 0
+	// means another concurrent request already claimed the import (or a
+	// photo now exists some other way) — treat that as "someone else has
+	// it" and do nothing further, rather than fetch and store a duplicate.
+	rows, err := d.Q.MarkAvatarImportAttempted(ctx, dbgen.MarkAvatarImportAttemptedParams{
 		ID:               userID,
 		AvatarImportedAt: pgtype.Timestamptz{Time: d.Now(), Valid: true},
-	}); err != nil {
+	})
+	if err != nil {
 		log.Printf("api: mark avatar import for %s: %v", userID, err)
+		return
+	}
+	if rows == 0 {
 		return
 	}
 
@@ -84,7 +99,16 @@ func (d Deps) importGoogleAvatar(ctx context.Context, userID string) {
 	if err != nil {
 		return
 	}
-	res, err := d.AvatarImport.Client.Do(req)
+	// A shallow copy so CheckRedirect is scoped to this one request rather
+	// than mutating the shared *http.Client every caller of Deps uses.
+	c := *d.AvatarImport.Client
+	c.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if req.URL.Scheme != "https" || !d.AvatarImport.AllowedHost(req.URL.Hostname()) {
+			return errRedirectOffAllowlist
+		}
+		return nil
+	}
+	res, err := c.Do(req)
 	if err != nil {
 		log.Printf("api: avatar import for %s: %v", userID, err)
 		return
