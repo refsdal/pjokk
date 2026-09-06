@@ -1494,8 +1494,11 @@ type MedicineLogUnit string
 
 // Member defines model for Member.
 type Member struct {
-	Email string  `json:"email"`
-	Image *string `json:"image"`
+	Email string `json:"email"`
+
+	// HasPush Whether this member has at least one device subscribed to push. The help picker dims members a ping cannot reach.
+	HasPush bool    `json:"hasPush"`
+	Image   *string `json:"image"`
 
 	// MemberId The family-membership row id (NOT the user id).
 	MemberId string `json:"memberId"`

@@ -1268,6 +1268,8 @@ export interface components {
             email: string;
             role: string;
             image: string | null;
+            /** @description Whether this member has at least one device subscribed to push. The help picker dims members a ping cannot reach. */
+            hasPush: boolean;
         };
         Family: {
             id: string;

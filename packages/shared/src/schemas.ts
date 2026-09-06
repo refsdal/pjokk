@@ -525,6 +525,8 @@ export const MemberSchema = z.object({
   email: z.string(),
   role: z.string(),
   image: z.string().nullable(),
+  // At least one device subscribed to push — the help picker dims the rest.
+  hasPush: z.boolean(),
 });
 
 export const FamilySchema = z.object({

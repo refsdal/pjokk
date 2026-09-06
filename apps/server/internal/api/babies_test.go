@@ -465,3 +465,28 @@ func TestDeleteFamilyMemberAllowsRemovingANonLastAdmin(t *testing.T) {
 		t.Errorf("members after refused removal = %v, want 1 (the sole admin still present)", membersAfter.JSON)
 	}
 }
+
+// hasPush is what lets the help picker (HelpSheet) dim a member a ping
+// cannot reach. It flips as soon as ANY device of theirs subscribes.
+func TestListFamilyMembersReportsPushSubscriptions(t *testing.T) {
+	a := testrig.App(t)
+	_, cookie := a.NewFamily("Hansen", "parent@example.com")
+
+	before := a.DoArray(http.MethodGet, "/api/family/members", cookie, nil)
+	if before.Status != http.StatusOK {
+		t.Fatalf("status = %d, body %s", before.Status, before.Raw)
+	}
+	if got := before.JSON[0].(map[string]any)["hasPush"]; got != false {
+		t.Errorf("hasPush before subscribing = %v, want false", got)
+	}
+
+	sub := a.Do(http.MethodPost, "/api/push/subscribe", cookie, subscribeBody("https://fcm.googleapis.com/fcm/send/has-push"))
+	if sub.Status != http.StatusOK {
+		t.Fatalf("subscribe status = %d, body %s", sub.Status, sub.Raw)
+	}
+
+	after := a.DoArray(http.MethodGet, "/api/family/members", cookie, nil)
+	if got := after.JSON[0].(map[string]any)["hasPush"]; got != true {
+		t.Errorf("hasPush after subscribing = %v, want true", got)
+	}
+}

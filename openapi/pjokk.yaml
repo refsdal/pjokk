@@ -2675,7 +2675,7 @@ components:
           nullable: true
     Member:
       type: object
-      required: [memberId, userId, name, email, role, image]
+      required: [memberId, userId, name, email, role, image, hasPush]
       properties:
         memberId:
           type: string
@@ -2691,6 +2691,11 @@ components:
         image:
           type: string
           nullable: true
+        hasPush:
+          type: boolean
+          description: >-
+            Whether this member has at least one device subscribed to push.
+            The help picker dims members a ping cannot reach.
     Family:
       type: object
       required: [id, name, slug, plan]
