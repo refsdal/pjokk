@@ -2,10 +2,12 @@ package jobs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	pjokkdb "github.com/refsdal/pjokk/server/internal/db"
@@ -44,6 +46,18 @@ func PurgeOrphanUsers(ctx context.Context, d Deps, now time.Time) (int, error) {
 
 	purged := 0
 	for _, id := range orphans {
+		// Read the avatar key before the row goes; the object is only
+		// deleted once the row actually is (below), never on the
+		// FK-blocked branch.
+		profile, err := d.Q.GetUserProfile(ctx, id)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				// Vanished between the list and here — nothing left to purge.
+				continue
+			}
+			return purged, fmt.Errorf("jobs: read orphan profile %s: %w", id, err)
+		}
+
 		if _, err := d.Q.DeleteOrphanUser(ctx, id); err != nil {
 			if pjokkdb.IsForeignKeyViolation(err) {
 				// FK-protected (historical data) — leave it alone.
@@ -55,6 +69,12 @@ func PurgeOrphanUsers(ctx context.Context, d Deps, now time.Time) (int, error) {
 		// Id, never the email: logs are outside our retention control, and an
 		// address in them is personal data we cannot later erase.
 		log.Printf("purge: removed orphan account %s", id)
+
+		if profile.AvatarKey != nil {
+			if err := d.Storage.Delete(ctx, *profile.AvatarKey); err != nil {
+				log.Printf("purge: delete avatar of orphan %s: %v", id, err)
+			}
+		}
 	}
 	return purged, nil
 }

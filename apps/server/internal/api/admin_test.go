@@ -1264,3 +1264,29 @@ func TestUserDeleteCoversEveryNonCascadingUserReference(t *testing.T) {
 		}
 	}
 }
+
+// The admin cascade delete removes the users row, but the avatar photo
+// lives in object storage, not Postgres — nothing in ReassignUserReferences
+// or the CASCADE-away tables touches it, so it must be deleted explicitly
+// or it survives as an orphaned object forever.
+func TestDeleteAdminUserRemovesTheAvatarObject(t *testing.T) {
+	a, _, adminCookie, _ := sysadminRig(t, "Hansen")
+	a.SignUp("Target", "target@example.com")
+	targetCookie := a.SignIn("target@example.com")
+	targetID := userIDByEmail(t, a, "target@example.com")
+
+	if res := a.DoRequest(avatarUpload(t, targetCookie, "image/png", solidPNG(t, 40, 40))); res.Status != http.StatusOK {
+		t.Fatalf("upload: %d %s", res.Status, res.Raw)
+	}
+	if got := avatarKeys(t, a); len(got) != 1 {
+		t.Fatalf("precondition: objects = %v", got)
+	}
+
+	res := a.Do(http.MethodPost, "/api/admin/users/"+targetID+"/delete", adminCookie, nil)
+	if res.Status != http.StatusOK {
+		t.Fatalf("delete user: %d %s", res.Status, res.Raw)
+	}
+	if got := avatarKeys(t, a); len(got) != 0 {
+		t.Errorf("avatar object survived the account delete: %v", got)
+	}
+}

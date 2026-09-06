@@ -2,9 +2,11 @@ package jobs_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
+	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
 	"github.com/refsdal/pjokk/server/internal/jobs"
 	"github.com/refsdal/pjokk/server/internal/testrig"
 )
@@ -107,6 +109,31 @@ func TestPurgeOrphanUsersSwallowsForeignKeyBlockedDeletes(t *testing.T) {
 
 	if !contains(allUserIDs(t, a), blockedID) {
 		t.Errorf("FK-blocked orphan was removed, want kept")
+	}
+}
+
+// The avatar photo lives in object storage, not in the users row the purge
+// deletes, so it must be removed explicitly or it survives the account
+// forever as an orphaned object nothing ever cleans up.
+func TestPurgeOrphanUsersRemovesTheAvatarObject(t *testing.T) {
+	a := testrig.App(t)
+	ctx := context.Background()
+	orphanID := a.SignUp("Orphan", "orphan@example.com")
+	setCreatedAt(t, a, orphanID, time.Now().Add(-8*24*time.Hour))
+
+	key := "avatars/" + orphanID + "/photo.jpg"
+	if err := a.Deps.Storage.Put(ctx, key, strings.NewReader("jpeg-ish"), 8, "image/jpeg"); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Deps.Q.SetUserAvatar(ctx, dbgen.SetUserAvatarParams{ID: orphanID, AvatarKey: &key}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := jobs.PurgeOrphanUsers(ctx, depsFor(a), time.Now()); err != nil {
+		t.Fatalf("PurgeOrphanUsers: %v", err)
+	}
+	if _, found, _ := a.Deps.Storage.GetStream(ctx, key); found {
+		t.Errorf("avatar object survived the orphan purge")
 	}
 }
 
