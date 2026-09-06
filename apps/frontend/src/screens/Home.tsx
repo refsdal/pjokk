@@ -7,7 +7,12 @@ import {
   IconTemperature,
 } from "@tabler/icons-react";
 import { useState } from "react";
-import type { HelpRequest, MeasurementType, PlayType } from "@pjokk/shared";
+import type {
+  HelpRequest,
+  MeasurementType,
+  PlayType,
+  SleepLog,
+} from "@pjokk/shared";
 import { useNavigate } from "@tanstack/react-router";
 import {
   ActivePlayBanner,
@@ -53,6 +58,7 @@ type OpenSheet =
   | "feed"
   | "diaper"
   | "sleep"
+  | "sleep-edit"
   | "more"
   | "other"
   | "play"
@@ -114,6 +120,10 @@ export function HomeScreen() {
   const [measurementType, setMeasurementType] =
     useState<MeasurementType>("weight");
   const [playType, setPlayType] = useState<PlayType>("tummy");
+  // The running session as it was when tapped. A snapshot rather than the
+  // live summary value so a Wake from another device mid-edit cannot turn
+  // the open edit sheet into a "start sleep" sheet under the user's thumb.
+  const [editSleep, setEditSleep] = useState<SleepLog | null>(null);
   const { night } = useAppearance();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -197,7 +207,15 @@ export function HomeScreen() {
             the first thing to see, but it must not displace whose home this
             is. */}
         {openHelp && <HelpCard request={openHelp} />}
-        {active && <ActiveSleepBanner session={active} />}
+        {active && (
+          <ActiveSleepBanner
+            session={active}
+            onEdit={(session) => {
+              setEditSleep(session);
+              setSheet("sleep-edit");
+            }}
+          />
+        )}
         {activePlay && <ActivePlayBanner session={activePlay} />}
 
         {/* Status before action: last feed / last diaper at a glance */}
@@ -317,10 +335,13 @@ export function HomeScreen() {
         lastDiaper={s?.lastDiaper ?? null}
       />
       <SleepSheet
-        open={sheet === "sleep"}
-        onOpenChange={(o) => setSheet(o ? "sleep" : null)}
+        open={sheet === "sleep" || sheet === "sleep-edit"}
+        onOpenChange={(o) => {
+          if (!o) setSheet(null);
+        }}
         babyId={baby.id}
         lastLocation={s?.lastSleep?.location ?? null}
+        edit={sheet === "sleep-edit" ? editSleep : null}
       />
       <MoreSheet
         open={sheet === "more"}
