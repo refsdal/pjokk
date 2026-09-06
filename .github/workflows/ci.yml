@@ -246,8 +246,8 @@ jobs:
       - name: E2E tests
         env:
           E2E_BASE_URL: http://127.0.0.1:3000
-          # settings.spec.ts asserts the footer shows the version the
-          # binary was stamped with (the pinned preview tag, above).
+          # install.spec.ts asserts the Settings footer shows the version
+          # the binary was stamped with (the pinned preview tag, above).
           PJOKK_VERSION: ${{ steps.version.outputs.pinned }}
         run: cd e2e && bunx playwright test
 

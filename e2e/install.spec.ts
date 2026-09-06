@@ -99,5 +99,16 @@ test("Settings keeps the install instructions reachable after a dismissal", asyn
   await expect(
     page.getByText("Scroll down and tap Add to Home Screen"),
   ).toBeVisible();
+
+  // While on Settings: the footer's version is the binary's own build
+  // version, stamped by scripts/build-artifacts.sh from PJOKK_VERSION —
+  // the same string the preview image is tagged with in CI — or "dev".
+  // Asserted here rather than in a spec of its own because every extra
+  // sign-in counts against the 20-per-10-minutes credential limiter the
+  // whole suite shares (api.go's auth-signin), and the suite sits close
+  // to it.
+  await expect(
+    page.getByText(`Pjokk ${process.env.PJOKK_VERSION ?? "dev"}`),
+  ).toBeVisible();
   await ctx.close();
 });

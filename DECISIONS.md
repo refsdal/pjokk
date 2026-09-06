@@ -1671,8 +1671,10 @@ any person did; a screenshot is not a regression test.
 which of its several tags it was pulled by, so the honest value is the one
 GoReleaser tags with: `0.8.0` for a release, `0.9.0-pr.42.abc1234` (the
 pinned preview tag) for a PR. CI stamps the pinned tag into the binary and
-`e2e/settings.spec.ts` asserts the footer shows it, so the tag someone
-pulls and the version they see under Settings cannot drift.
+`e2e/install.spec.ts`'s Settings test asserts the footer shows it, so the
+tag someone pulls and the version they see under Settings cannot drift.
+(Not a spec of its own: every sign-in counts against the shared
+20-per-10-minutes credential limiter, and the suite sits close to it.)
 
 **OpenTelemetry, when it lands, reads the same variable.** The resource's
 `service.version` must be `buildinfo.Version` — not a second `-X` symbol,
