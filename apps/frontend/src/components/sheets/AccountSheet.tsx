@@ -1,6 +1,6 @@
 import { IconCheck } from "@tabler/icons-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Sheet } from "@/components/Sheet";
@@ -23,7 +23,6 @@ export function AccountSheet({
 }) {
   const me = useMe();
   const qc = useQueryClient();
-  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
 
   // Limen's own list route (allowlisted server-side). Never persisted.
@@ -50,20 +49,32 @@ export function AccountSheet({
       return;
     }
     setBusy(true);
+    // Two phases, deliberately not one try/catch: the server-side switch is
+    // the part that can genuinely fail and must be reported as such. Once it
+    // has succeeded, the local cleanup (forgetting the selected baby,
+    // resetting the cache) can still throw — a blocked/quota-limited
+    // IndexedDB in private browsing, say — but that is never a failed
+    // switch, just a cache that a full reload below re-derives anyway.
     try {
       await authClient.organization.switch({ id });
-      clearSelectedBaby();
-      await resetCache();
-      onOpenChange(false);
-      void navigate({ to: "/home" });
     } catch (err) {
       toast(
         err instanceof Error ? err.message : t("Could not switch family"),
         "error",
       );
-    } finally {
       setBusy(false);
+      return;
     }
+    clearSelectedBaby();
+    try {
+      await resetCache();
+    } catch {
+      // The persister can refuse (private browsing, quota); the full
+      // document load below re-derives everything from the server and the
+      // family fence records the new family.
+    }
+    onOpenChange(false);
+    window.location.assign("/home");
   };
 
   return (
