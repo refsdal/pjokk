@@ -470,6 +470,22 @@ const nb: Record<string, string> = {
   "Family name (e.g. “The Olsens”)": "Familienavn (f.eks. «Olsen»)",
   "Baby's name": "Babyens navn",
   Failed: "Feilet",
+
+  // Profile
+  "Your profile": "Din profil",
+  "About you": "Om deg",
+  "Full name": "Fullt navn",
+  Nickname: "Kallenavn",
+  "Shown instead of your full name everywhere":
+    "Vises i stedet for fullt navn overalt",
+  "Sign-in address": "Innloggingsadresse",
+  "Change photo": "Bytt bilde",
+  "Remove photo": "Fjern bilde",
+  "Photo updated": "Bilde oppdatert",
+  "Photo removed": "Bilde fjernet",
+  "Profile saved": "Profil lagret",
+  "Name cannot be blank": "Navn kan ikke være tomt",
+  "Could not read that image": "Kunne ikke lese bildet",
 };
 
 function readMode(): LanguageMode {
