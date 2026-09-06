@@ -208,7 +208,8 @@ var operationAuthTiers = map[string]authTier{
 	// comment.
 	"GetConfig": tierPublic,
 
-	"GetMe": tierSession,
+	"GetMe":    tierSession,
+	"UpdateMe": tierSession,
 
 	"ListBabies":        tierFamily,
 	"CreateBaby":        tierFamily,

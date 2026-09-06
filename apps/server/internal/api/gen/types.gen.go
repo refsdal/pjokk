@@ -1479,12 +1479,21 @@ type InviteInfoRole string
 
 // Me familyId/memberRole/plan/impersonatedBy are null when the caller has no active family (or, for impersonatedBy, is not impersonated).
 type Me struct {
+	// AvatarUrl "/api/users/{userId}/avatar?v=<key>" when the user has a photo, else null. The v parameter is the cache-busting version — a new upload is a new key.
+	AvatarUrl *string `json:"avatarUrl"`
+
+	// DisplayName Nickname when set, else name — what every other member sees (users.display_name, a generated column).
+	DisplayName    string  `json:"displayName"`
 	Email          string  `json:"email"`
 	FamilyId       *string `json:"familyId"`
 	ImpersonatedBy *string `json:"impersonatedBy"`
 	MemberRole     *string `json:"memberRole"`
 	Name           string  `json:"name"`
-	Plan           *string `json:"plan"`
+	Nickname       *string `json:"nickname"`
+
+	// Phone Private to the user; never on Member.
+	Phone *string `json:"phone"`
+	Plan  *string `json:"plan"`
 
 	// Role Ours, system-admin role. "admin" or null.
 	Role   *string `json:"role"`
@@ -1527,11 +1536,12 @@ type MedicineLogUnit string
 
 // Member defines model for Member.
 type Member struct {
-	Email string `json:"email"`
+	// AvatarUrl Same shape as Me.avatarUrl; null without a photo.
+	AvatarUrl *string `json:"avatarUrl"`
+	Email     string  `json:"email"`
 
 	// HasPush Whether this member has at least one device subscribed to push. The help picker dims members a ping cannot reach.
-	HasPush bool    `json:"hasPush"`
-	Image   *string `json:"image"`
+	HasPush bool `json:"hasPush"`
 
 	// MemberId The family-membership row id (NOT the user id).
 	MemberId string `json:"memberId"`
@@ -1839,6 +1849,13 @@ type UpdateFeedSide string
 
 // UpdateFeedType defines model for UpdateFeed.Type.
 type UpdateFeedType string
+
+// UpdateMe Every field optional. `nickname` and `phone` accept `null` to clear; the handler reads the raw body (internal/api/patch.go) to tell null from absent.
+type UpdateMe struct {
+	Name     *string `json:"name,omitempty"`
+	Nickname *string `json:"nickname,omitempty"`
+	Phone    *string `json:"phone,omitempty"`
+}
 
 // UpdateMeasurement Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time`/`type`/`value` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
 type UpdateMeasurement struct {
@@ -2204,6 +2221,9 @@ type RedeemInviteJSONRequestBody = Redeem
 
 // CreateApiKeyJSONRequestBody defines body for CreateApiKey for application/json ContentType.
 type CreateApiKeyJSONRequestBody = CreateApiKey
+
+// UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
+type UpdateMeJSONRequestBody = UpdateMe
 
 // CreateMeasurementJSONRequestBody defines body for CreateMeasurement for application/json ContentType.
 type CreateMeasurementJSONRequestBody = CreateMeasurement

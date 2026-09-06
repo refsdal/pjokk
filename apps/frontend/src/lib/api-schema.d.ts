@@ -830,7 +830,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Edit the caller's own profile. Global across families, so a session but NOT an active family is required. `null` clears nickname or phone; an absent field is left alone. Name is trimmed and must not be blank; phone may hold digits, spaces, +, -, ( and ). */
+        patch: operations["updateMe"];
         trace?: never;
     };
     "/api/push/config": {
@@ -1311,6 +1312,12 @@ export interface components {
             /** @enum {string|null} */
             sex?: "girl" | "boy" | null;
         };
+        /** @description Every field optional. `nickname` and `phone` accept `null` to clear; the handler reads the raw body (internal/api/patch.go) to tell null from absent. */
+        UpdateMe: {
+            name?: string;
+            nickname?: string | null;
+            phone?: string | null;
+        };
         Member: {
             /** @description The family-membership row id (NOT the user id). */
             memberId: string;
@@ -1318,7 +1325,8 @@ export interface components {
             name: string;
             email: string;
             role: string;
-            image: string | null;
+            /** @description Same shape as Me.avatarUrl; null without a photo. */
+            avatarUrl: string | null;
             /** @description Whether this member has at least one device subscribed to push. The help picker dims members a ping cannot reach. */
             hasPush: boolean;
         };
@@ -1336,6 +1344,13 @@ export interface components {
         Me: {
             userId: string;
             name: string;
+            /** @description Nickname when set, else name — what every other member sees (users.display_name, a generated column). */
+            displayName: string;
+            nickname: string | null;
+            /** @description Private to the user; never on Member. */
+            phone: string | null;
+            /** @description "/api/users/{userId}/avatar?v=<key>" when the user has a photo, else null. The v parameter is the cache-busting version — a new upload is a new key. */
+            avatarUrl: string | null;
             email: string;
             /** @description The server's build version — the same string the container image is tagged with ("0.8.0", "0.9.0-pr.42.abc1234"), or "dev" for an unstamped build. Shown in the Settings footer. */
             version: string;
@@ -4646,6 +4661,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Me"];
+                };
+            };
+        };
+    };
+    updateMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMe"];
+            };
+        };
+        responses: {
+            /** @description The updated profile, same shape as GET. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            /** @description Blank name, or a phone with characters outside the allowed set. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };

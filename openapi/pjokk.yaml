@@ -1931,6 +1931,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Me"
+    patch:
+      operationId: updateMe
+      summary: >-
+        Edit the caller's own profile. Global across families, so a session
+        but NOT an active family is required. `null` clears nickname or
+        phone; an absent field is left alone. Name is trimmed and must not
+        be blank; phone may hold digits, spaces, +, -, ( and ).
+      tags: [me]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMe"
+      responses:
+        "200":
+          description: The updated profile, same shape as GET.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "400":
+          description: Blank name, or a phone with characters outside the allowed set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /api/push/config:
     get:
@@ -2771,9 +2798,28 @@ components:
           type: string
           enum: [girl, boy]
           nullable: true
+    UpdateMe:
+      type: object
+      description: >-
+        Every field optional. `nickname` and `phone` accept `null` to
+        clear; the handler reads the raw body (internal/api/patch.go) to
+        tell null from absent.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        nickname:
+          type: string
+          maxLength: 40
+          nullable: true
+        phone:
+          type: string
+          maxLength: 32
+          nullable: true
     Member:
       type: object
-      required: [memberId, userId, name, email, role, image, hasPush]
+      required: [memberId, userId, name, email, role, avatarUrl, hasPush]
       properties:
         memberId:
           type: string
@@ -2786,9 +2832,10 @@ components:
           type: string
         role:
           type: string
-        image:
+        avatarUrl:
           type: string
           nullable: true
+          description: Same shape as Me.avatarUrl; null without a photo.
         hasPush:
           type: boolean
           description: >-
@@ -2822,6 +2869,10 @@ components:
         [
           userId,
           name,
+          displayName,
+          nickname,
+          phone,
+          avatarUrl,
           email,
           role,
           familyId,
@@ -2835,6 +2886,25 @@ components:
           type: string
         name:
           type: string
+        displayName:
+          type: string
+          description: >-
+            Nickname when set, else name — what every other member sees
+            (users.display_name, a generated column).
+        nickname:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+          description: Private to the user; never on Member.
+        avatarUrl:
+          type: string
+          nullable: true
+          description: >-
+            "/api/users/{userId}/avatar?v=<key>" when the user has a photo,
+            else null. The v parameter is the cache-busting version — a new
+            upload is a new key.
         email:
           type: string
         version:

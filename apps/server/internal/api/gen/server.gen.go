@@ -181,6 +181,9 @@ type ServerInterface interface {
 	// GetMe Session info for the SPA shell. Requires a session but NOT an active family — the family/member/plan fields are null when the caller has none.
 	// (GET /api/me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// UpdateMe Edit the caller's own profile. Global across families, so a session but NOT an active family is required. `null` clears nickname or phone; an absent field is left alone. Name is trimmed and must not be blank; phone may hold digits, spaces, +, -, ( and ).
+	// (PATCH /api/me)
+	UpdateMe(w http.ResponseWriter, r *http.Request)
 	// ListMeasurements Measurement logs in the caller's active family, newest first.
 	// (GET /api/measurements)
 	ListMeasurements(w http.ResponseWriter, r *http.Request, params ListMeasurementsParams)
@@ -1570,6 +1573,20 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateMe operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMe(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3206,6 +3223,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/timeline", wrapper.ListTimeline)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/stats", wrapper.GetStats)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/me", wrapper.GetMe)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/me", wrapper.UpdateMe)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/push/config", wrapper.GetPushConfig)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/push/subscribe", wrapper.SubscribePush)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/push/unsubscribe", wrapper.UnsubscribePush)
@@ -5124,6 +5142,42 @@ func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) e
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMeRequestObject struct {
+	Body *UpdateMeJSONRequestBody
+}
+
+type UpdateMeResponseObject interface {
+	VisitUpdateMeResponse(w http.ResponseWriter) error
+}
+
+type UpdateMe200JSONResponse Me
+
+func (response UpdateMe200JSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMe400JSONResponse Error
+
+func (response UpdateMe400JSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -7057,6 +7111,9 @@ type StrictServerInterface interface {
 	// GetMe Session info for the SPA shell. Requires a session but NOT an active family — the family/member/plan fields are null when the caller has none.
 	// (GET /api/me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// UpdateMe Edit the caller's own profile. Global across families, so a session but NOT an active family is required. `null` clears nickname or phone; an absent field is left alone. Name is trimmed and must not be blank; phone may hold digits, spaces, +, -, ( and ).
+	// (PATCH /api/me)
+	UpdateMe(ctx context.Context, request UpdateMeRequestObject) (UpdateMeResponseObject, error)
 	// ListMeasurements Measurement logs in the caller's active family, newest first.
 	// (GET /api/measurements)
 	ListMeasurements(ctx context.Context, request ListMeasurementsRequestObject) (ListMeasurementsResponseObject, error)
@@ -8754,6 +8811,37 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateMe operation middleware
+func (sh *strictHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	var request UpdateMeRequestObject
+
+	var body UpdateMeJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateMe(ctx, request.(UpdateMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateMeResponseObject); ok {
+		if err := validResponse.VisitUpdateMeResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
