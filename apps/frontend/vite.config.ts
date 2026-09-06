@@ -56,8 +56,22 @@ export default defineConfig({
         orientation: "portrait",
         // An installed app opens the app, never the marketing page at "/".
         start_url: "/home",
-        background_color: "#faf9f7",
-        theme_color: "#faf9f7",
+        // Both are DARK on purpose, and neither tracks the app's theme —
+        // they cannot. An installed Android app is a WebAPK and these two
+        // values are baked into it when it is generated, long before anyone
+        // picks a theme (https://web.dev/articles/webapks). Chrome then takes
+        // the status bar's glyph colour from the live theme-color meta, so a
+        // light bar under a dark app meant white glyphs on white and an
+        // unreadable clock — the reported bug. src/lib/system-chrome.ts locks
+        // the meta dark whenever we are installed; this is the other half of
+        // that agreement, and the splash screen matches rather than flashing
+        // white on a 3am launch.
+        //
+        // A manifest change only reaches an ALREADY-installed app when Chrome
+        // regenerates the WebAPK (lazily: app closed, charging, on wifi), so
+        // reinstalling is the way to see this on a phone that has the old one.
+        background_color: "#171512",
+        theme_color: "#171512",
         // SVG first for the engines that take it, then PNG fallbacks —
         // WebKit accepts NO SVG icon in a manifest, and an iPhone with only
         // SVGs on offer uses a screenshot of the page as the home-screen

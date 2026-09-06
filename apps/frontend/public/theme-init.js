@@ -19,10 +19,12 @@
 // (internal/web/web.go). An inline bootstrap would work in `vite dev` and be
 // silently blocked in the container — which is the worst way to find out.
 //
-// The logic below is deliberately duplicated from lib/appearance.tsx and
-// lib/night.ts, because nothing from the bundle can run this early. A test
-// (test/contrast.test.ts) asserts the colours here still match styles.css,
-// so the copies cannot drift apart silently.
+// The logic below is deliberately duplicated from lib/appearance.tsx,
+// lib/night.ts and lib/system-chrome.ts, because nothing from the bundle can
+// run this early. Two tests keep the copy honest: test/contrast.test.ts
+// asserts the colours still match styles.css, and test/theme-init.test.ts
+// executes THIS FILE against a stub DOM and asserts it resolves the same
+// colour lib/system-chrome.ts would.
 (() => {
   try {
     const el = document.documentElement;
@@ -71,12 +73,27 @@
     el.classList.toggle("dark", dark);
     el.classList.toggle("night", night);
 
-    // Same mapping as AppearanceProvider's effect; --color-bg per theme.
-    const color = night ? "#171310" : dark ? "#171512" : "#faf9f7";
+    // An installed app never gets a light colour, whatever its theme: its
+    // status-bar background is baked from the manifest and cannot follow, so
+    // a light value here means light glyphs on that bar and an unreadable
+    // clock. lib/system-chrome.ts carries the whole account.
+    const standalone =
+      !!window.matchMedia &&
+      window.matchMedia(
+        "(display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui)",
+      ).matches;
+
+    // Same mapping as systemChromeColor(); --color-bg per theme.
+    const color = night
+      ? "#171310"
+      : dark || standalone
+        ? "#171512"
+        : "#faf9f7";
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", color);
   } catch (e) {
-    // Storage unavailable, or anything else: leave the light default in
-    // place. This must never be the reason the app fails to start.
+    // Storage unavailable, or anything else: leave index.html's default in
+    // place — dark, because that is the value an installed app's baked status
+    // bar needs. This must never be the reason the app fails to start.
   }
 })();
