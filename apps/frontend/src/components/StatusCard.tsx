@@ -10,6 +10,7 @@ export function StatusCard({
   icon: Icon,
   label,
   time,
+  format = formatRelative,
   detail,
   sub,
   tintClass,
@@ -19,6 +20,11 @@ export function StatusCard({
   icon: TablerIcon;
   label: string;
   time: Date | null;
+  // How `time` reads. "N ago" by default; the awake card passes
+  // formatElapsed for a duration. A function rather than a ready-made
+  // string so the minute tick below recomputes it — a string computed in
+  // the parent's render would sit stale until the parent re-rendered.
+  format?: (time: Date) => string;
   detail?: string;
   sub?: string;
   tintClass: string;
@@ -53,7 +59,7 @@ export function StatusCard({
           {label}
         </p>
         <p className="truncate text-base font-bold text-ink">
-          {time ? formatRelative(time) : "—"}
+          {time ? format(time) : "—"}
           {detail ? (
             <span className="ml-1.5 font-medium text-ink-soft">{detail}</span>
           ) : null}

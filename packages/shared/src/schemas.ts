@@ -420,6 +420,8 @@ export const SummarySchema = z.object({
     dirty: z.number().int(),
     both: z.number().int(),
     sleepMin: z.number().int(),
+    // Sessions with any part inside today, on the same rule as sleepMin.
+    sleeps: z.number().int(),
   }),
 });
 

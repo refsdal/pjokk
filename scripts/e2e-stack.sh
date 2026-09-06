@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Starts (or tears down) the stack the Playwright suite runs against: a
 # throwaway Postgres and the REAL container image with OPEN_SIGNUP=1 (the
-# suite creates its own accounts) on port 3300.
+# suite creates its own accounts) and TRUSTED_PROXY_HOPS=1 (each test sends
+# its own X-Forwarded-For, so the per-client sign-in limiters see one client
+# per test rather than the whole suite as one — e2e/fixtures.ts) on port
+# 3300.
 #
 #   bash scripts/e2e-stack.sh up      # builds pjokk:e2e if missing
 #   bash scripts/e2e-stack.sh down
@@ -57,6 +60,7 @@ docker run -d --name "$APP" --network "$NET" -p "$PORT":3000 \
   -e AUTH_SECRET=e2e-stack-secret-at-least-32-bytes-ok \
   -e STORAGE_DRIVER=fs -e STORAGE_FS_PATH=/data \
   -e OPEN_SIGNUP=1 \
+  -e TRUSTED_PROXY_HOPS=1 \
   pjokk:e2e >/dev/null
 
 for i in $(seq 1 30); do

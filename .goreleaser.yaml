@@ -37,7 +37,12 @@ builds:
     goos: [linux]
     goarch: [amd64, arm64]
     flags: [-trimpath]
-    ldflags: ["-s -w"]
+    # {{ .Version }} is also what the image below is tagged with, and what
+    # the Settings footer shows: one string, stamped once
+    # (internal/buildinfo). scripts/build-artifacts.sh sets the same
+    # symbol for the CI preview image.
+    ldflags:
+      - -s -w -X github.com/refsdal/pjokk/server/internal/buildinfo.Version={{ .Version }}
 
 archives:
   - formats: [tar.gz]

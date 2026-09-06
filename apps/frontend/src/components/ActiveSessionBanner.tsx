@@ -31,7 +31,7 @@ function SessionBanner({
   onOpen,
   openLabel,
   disabled,
-  emphasis = false,
+  emphasis = "ring",
 }: {
   icon: TablerIcon;
   tint: string;
@@ -45,7 +45,11 @@ function SessionBanner({
   onOpen?: () => void;
   openLabel?: string;
   disabled: boolean;
-  emphasis?: boolean;
+  // How the card says "this is running". Play gets the accent ring (an
+  // activity to come back to); sleep breathes in its own tint — the same
+  // radiating ring as the help card, but slower and fainter, since it can
+  // be on screen for hours (styles.css animate-sleep-breathe).
+  emphasis?: "ring" | "breathe";
 }) {
   const now = useNow();
   const body = (
@@ -75,9 +79,9 @@ function SessionBanner({
     <div
       className={cn(
         "flex items-center gap-3 rounded-xl2 border bg-surface p-4",
-        // A running activity is the only thing on this screen the caretaker
-        // has to come back to, so it gets the ring; sleep keeps the hairline.
-        emphasis ? "border-accent ring-1 ring-accent/40" : "border-line",
+        emphasis === "ring"
+          ? "border-accent ring-1 ring-accent/40"
+          : "border-sleep animate-sleep-breathe",
       )}
     >
       {onOpen ? (
@@ -124,6 +128,7 @@ export function ActiveSleepBanner({
       onOpen={editable ? () => onEdit(session) : undefined}
       openLabel={t("Edit sleep")}
       disabled={wakeSleep.isPending || session.id === "optimistic"}
+      emphasis="breathe"
     />
   );
 }
@@ -140,7 +145,7 @@ export function ActivePlayBanner({ session }: { session: PlayLog }) {
       action={t("Stop")}
       onAction={() => stopPlay.mutate({ id: session.id })}
       disabled={stopPlay.isPending || session.id === "optimistic"}
-      emphasis
+      emphasis="ring"
     />
   );
 }

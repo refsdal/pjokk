@@ -118,7 +118,9 @@ export function SettingsScreen() {
           <a href="/api/docs" className="underline">
             {t("API docs")}
           </a>
-          {" · Pjokk 0.1"}
+          {/* The server's build version — the image tag, not a number kept
+              by hand (internal/buildinfo). */}
+          {me.data ? ` · Pjokk ${me.data.version}` : null}
         </p>
       </div>
     </div>

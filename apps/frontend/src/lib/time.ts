@@ -30,6 +30,37 @@ export function formatDay(d: Date): string {
 // silence, which is the exact failure that script exists to catch.
 const minutes = (n: number) => (n === 1 ? t("minute") : t("minutes"));
 const hours = (n: number) => (n === 1 ? t("hour") : t("hours"));
+const days = (n: number) => (n === 1 ? t("day") : t("days"));
+
+// "45 minutes", "1 hour 32 minutes", "2 hours" — the minutes survive the
+// hour mark, and vanish only when there are none: "1 hour 0 minutes" reads
+// worse than the rounding it replaced. Shared by the "ago" and the elapsed
+// forms so the two cards next to each other never word the same span
+// differently.
+function hoursMinutes(min: number): string {
+  if (min < 60) return `${min} ${minutes(min)}`;
+  const h = Math.floor(min / 60);
+  const rem = min % 60;
+  return rem === 0
+    ? `${h} ${hours(h)}`
+    : `${h} ${hours(h)} ${rem} ${minutes(rem)}`;
+}
+
+/**
+ * Elapsed time as a duration rather than a point in the past: "under a
+ * minute", "1 hour 32 minutes", "1 day 2 hours". For the awake card, where
+ * "ago" is wrong (the baby is awake NOW) and a clock reading past 24 h would
+ * hide that nothing has been logged for a day.
+ */
+export function formatElapsed(since: Date, now = new Date()): string {
+  const min = Math.floor((now.getTime() - since.getTime()) / 60_000);
+  if (min < 1) return t("under a minute");
+  if (min < 24 * 60) return hoursMinutes(min);
+  const d = Math.floor(min / (24 * 60));
+  const h = Math.floor((min % (24 * 60)) / 60);
+  // Past a day the minutes are noise; days and hours are the reading.
+  return h === 0 ? `${d} ${days(d)}` : `${d} ${days(d)} ${h} ${hours(h)}`;
+}
 
 /**
  * "just now", "45 minutes ago", "1 hour 32 minutes ago", "yesterday 21:14",
@@ -44,19 +75,9 @@ export function formatRelative(date: Date, now = new Date()): string {
   const diffMs = now.getTime() - date.getTime();
   const min = Math.floor(diffMs / 60_000);
   if (min < 1) return t("just now");
-  if (min < 60) return `${min} ${minutes(min)} ${t("ago")}`;
-  const h = Math.floor(min / 60);
   // Relative for anything within 24h regardless of the calendar day —
   // "yesterday 22:30" at 00:30 is exactly wrong at 3am.
-  if (h < 24) {
-    const rem = min % 60;
-    const whole = `${h} ${hours(h)}`;
-    // On the hour, say so: "1 hour 0 minutes ago" reads worse than the
-    // rounding this replaced.
-    return rem === 0
-      ? `${whole} ${t("ago")}`
-      : `${whole} ${rem} ${minutes(rem)} ${t("ago")}`;
-  }
+  if (min < 24 * 60) return `${hoursMinutes(min)} ${t("ago")}`;
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
   if (date.toDateString() === yesterday.toDateString())

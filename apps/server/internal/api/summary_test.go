@@ -127,6 +127,56 @@ func TestSummaryTodayBlockCountsFeedsDiapersSleep(t *testing.T) {
 	if today["sleepMin"] != float64(20) {
 		t.Errorf("today.sleepMin = %v, want 20 (a 20-minute completed nap fully inside the window)", today["sleepMin"])
 	}
+	if today["sleeps"] != float64(1) {
+		t.Errorf("today.sleeps = %v, want 1", today["sleeps"])
+	}
+}
+
+// today.sleeps counts sessions on the same rule as today.sleepMin counts
+// minutes: a session counts once if any part of it falls inside today's
+// window, so an overnight sleep that ended this morning is one of today's
+// sessions, a nap that lay entirely inside yesterday is not, and a running
+// session counts as soon as it starts. Backs the Home screen's "3 naps ·
+// 2:10 today" line on the awake card.
+func TestSummaryTodayCountsSleepSessionsOverlappingTheWindow(t *testing.T) {
+	a := testrig.App(t)
+	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
+	babyID := a.NewBaby(familyID, "Nora")
+
+	now := time.Date(2026, 3, 15, 12, 0, 0, 0, time.UTC)
+	a.SetNow(now)
+	midnight := time.Date(2026, 3, 15, 0, 0, 0, 0, time.UTC)
+
+	post := func(start, end time.Time) {
+		body := map[string]any{"babyId": babyID, "startTime": start.Format(time.RFC3339)}
+		if !end.IsZero() {
+			body["endTime"] = end.Format(time.RFC3339)
+		}
+		res := a.Do(http.MethodPost, "/api/sleep", cookie, body)
+		if res.Status != http.StatusCreated {
+			t.Fatalf("POST /api/sleep status = %d, body %s", res.Status, res.Raw)
+		}
+	}
+	// Entirely yesterday: not today's.
+	post(midnight.Add(-5*time.Hour), midnight.Add(-4*time.Hour))
+	// Straddles midnight: today's, for the 20 minutes inside the window.
+	post(midnight.Add(-30*time.Minute), midnight.Add(20*time.Minute))
+	// A morning nap fully inside the window.
+	post(now.Add(-3*time.Hour), now.Add(-2*time.Hour))
+	// Running right now.
+	post(now.Add(-10*time.Minute), time.Time{})
+
+	res := a.Do(http.MethodGet, "/api/summary?babyId="+babyID+"&tz=0", cookie, nil)
+	if res.Status != http.StatusOK {
+		t.Fatalf("status = %d, body %s", res.Status, res.Raw)
+	}
+	today := res.JSON["today"].(map[string]any)
+	if today["sleeps"] != float64(3) {
+		t.Errorf("today.sleeps = %v, want 3 (overnight + nap + running; not yesterday's)", today["sleeps"])
+	}
+	if today["sleepMin"] != float64(20+60+10) {
+		t.Errorf("today.sleepMin = %v, want 90", today["sleepMin"])
+	}
 }
 
 // tz edge: the SAME event counts as "today" under one offset and

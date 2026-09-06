@@ -104,6 +104,12 @@ type Deps struct {
 	VAPIDPublicKey   string
 	TrustedProxyHops int
 
+	// Version is internal/buildinfo.Version as the composition root read
+	// it — passed in rather than imported here so the handlers stay
+	// dependency-free and the test rig can pin a known value. Surfaces on
+	// GET /api/me for the Settings footer.
+	Version string
+
 	// OpenSignup and OAuthProviders back GetConfig (GET /api/config,
 	// tierPublic): the /login and /join screens' pre-sign-in read of which
 	// account-creation paths to offer. Mirrors config.Config's own

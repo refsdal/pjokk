@@ -1337,6 +1337,8 @@ export interface components {
             userId: string;
             name: string;
             email: string;
+            /** @description The server's build version — the same string the container image is tagged with ("0.8.0", "0.9.0-pr.42.abc1234"), or "dev" for an unstamped build. Shown in the Settings footer. */
+            version: string;
             /** @description Ours, system-admin role. "admin" or null. */
             role: string | null;
             familyId: string | null;
@@ -1675,6 +1677,11 @@ export interface components {
                 both: number;
                 /** Format: int32 */
                 sleepMin: number;
+                /**
+                 * Format: int32
+                 * @description Sleep sessions with any part inside today's window, on the same rule sleepMin uses for minutes — an overnight sleep that ended this morning counts, a running one counts already.
+                 */
+                sleeps: number;
             };
         };
         MedicineLog: {

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { formatRelative, toLocalDateInput } from "../src/lib/time";
+import {
+  formatElapsed,
+  formatRelative,
+  toLocalDateInput,
+} from "../src/lib/time";
 
 // Relative time is the whole of "status before action" (CLAUDE.md §1): the
 // home screen answers "when did she last eat / sleep / get changed" without a
@@ -62,6 +66,34 @@ describe("formatRelative", () => {
     // The last minute that is still elapsed time, and the first that is not.
     expect(ago(23, 59)).toBe("23 hours 59 minutes ago");
     expect(ago(24, 0)).not.toContain("ago");
+  });
+});
+
+// The awake card reads "Awake · 1 hour 32 minutes": the same minute-accurate
+// wording as formatRelative, but as a duration rather than a point in the
+// past, so it never says "ago" and never hands over to a clock reading.
+describe("formatElapsed", () => {
+  const since = (h: number, m: number) =>
+    formatElapsed(
+      new Date(new Date(2026, 7, 25, 12, 0).getTime() - (h * 60 + m) * 60_000),
+      new Date(2026, 7, 25, 12, 0),
+    );
+
+  it("matches formatRelative's wording without the ago", () => {
+    expect(since(0, 45)).toBe("45 minutes");
+    expect(since(1, 32)).toBe("1 hour 32 minutes");
+    expect(since(2, 0)).toBe("2 hours");
+    expect(since(1, 1)).toBe("1 hour 1 minute");
+  });
+
+  it("says under a minute rather than zero minutes", () => {
+    expect(since(0, 0)).toBe("under a minute");
+  });
+
+  it("keeps counting in days past 24 hours instead of showing a date", () => {
+    expect(since(24, 0)).toBe("1 day");
+    expect(since(26, 5)).toBe("1 day 2 hours");
+    expect(since(49, 0)).toBe("2 days 1 hour");
   });
 });
 

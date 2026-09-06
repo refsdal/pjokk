@@ -1,4 +1,4 @@
-import { expect, seedDayMode, test } from "./fixtures";
+import { asDevice, expect, seedDayMode, test } from "./fixtures";
 import { apiSignIn, apiSignup, freshEmail, freshFamily } from "./helpers";
 
 // The closed-alpha join path: admin mints an invite in Settings, the other
@@ -11,7 +11,7 @@ import { apiSignIn, apiSignup, freshEmail, freshFamily } from "./helpers";
 // window to click "Join family" for either shape, since `busy` flips true,
 // and the button's label with it, before a UI click could land.
 
-test("a second caretaker joins via an invite link", async ({ browser, page, request }) => {
+test("a second caretaker joins via an invite link", async ({ browser, page, request }, testInfo) => {
   await freshFamily(page, request, "inviter");
 
   await page.goto("/settings");
@@ -24,7 +24,7 @@ test("a second caretaker joins via an invite link", async ({ browser, page, requ
   const inviteeEmail = freshEmail("invitee");
   await apiSignup(request, inviteeEmail);
 
-  const ctx = await browser.newContext();
+  const ctx = await browser.newContext(asDevice(testInfo, 1));
   await seedDayMode(ctx);
   const invitee = await ctx.newPage();
   await apiSignIn(invitee, inviteeEmail);
@@ -35,7 +35,7 @@ test("a second caretaker joins via an invite link", async ({ browser, page, requ
   await ctx.close();
 });
 
-test("a brand-new invitee auto-redeems on opening the join link", async ({ page, request, browser }) => {
+test("a brand-new invitee auto-redeems on opening the join link", async ({ page, request, browser }, testInfo) => {
   await freshFamily(page, request, "autojoin");
   await page.goto("/settings");
   await page.getByRole("button", { name: "New invite link" }).click();
@@ -44,7 +44,7 @@ test("a brand-new invitee auto-redeems on opening the join link", async ({ page,
 
   const inviteeEmail = freshEmail("autoinvitee");
   await apiSignup(request, inviteeEmail);
-  const ctx = await browser.newContext();
+  const ctx = await browser.newContext(asDevice(testInfo, 1));
   await seedDayMode(ctx);
   const invitee = await ctx.newPage();
   await apiSignIn(invitee, inviteeEmail);
