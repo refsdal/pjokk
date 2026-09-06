@@ -13,7 +13,6 @@ import {
 } from "@/lib/help-ui";
 import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
 
 // Ask one other member for a hand. Two taps in the common case: the
 // last-asked member is prefilled, so open → Send. The message is optional
@@ -88,7 +87,7 @@ export function HelpSheet({
             options={others.map((m) => ({
               value: m.memberId,
               label: (
-                <span className={cn(!m.hasPush && "opacity-60")}>
+                <span>
                   {m.name || m.email}
                   {!m.hasPush && (
                     <span className="block text-[10px] font-normal leading-tight">

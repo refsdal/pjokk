@@ -61,19 +61,19 @@ export function HelpCard({ request }: { request: HelpRequest }) {
         <p className="text-xs font-semibold tracking-wide text-muted uppercase">
           {open ? t("Help requested") : t("On the way")}
         </p>
-        <p className="truncate text-base font-bold text-ink">
+        <p className="line-clamp-2 break-words text-base font-bold text-ink">
           {headline}
-          <span className="ml-1.5 font-medium text-ink-soft">
-            · {formatRelative(view.at)}
-          </span>
         </p>
-        {request.message ? (
-          <p className="truncate text-xs text-muted">{request.message}</p>
-        ) : null}
+        <p className="truncate text-xs text-muted">
+          {formatRelative(view.at)}
+          {request.message ? ` · ${request.message}` : ""}
+        </p>
       </div>
       {view.action === "acknowledge" && (
         <Button
           variant="secondary"
+          size="sm"
+          className="shrink-0"
           onClick={() => acknowledge.mutate({ id: request.id })}
           disabled={busy}
         >
@@ -83,6 +83,8 @@ export function HelpCard({ request }: { request: HelpRequest }) {
       {view.action === "cancel" && (
         <Button
           variant="secondary"
+          size="sm"
+          className="shrink-0"
           onClick={() => dismiss.mutate({ id: request.id })}
           disabled={busy}
         >
@@ -92,6 +94,8 @@ export function HelpCard({ request }: { request: HelpRequest }) {
       {view.action === "done" && (
         <Button
           variant="secondary"
+          size="sm"
+          className="shrink-0"
           onClick={() => dismiss.mutate({ id: request.id })}
           disabled={busy}
         >
