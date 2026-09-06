@@ -30,13 +30,20 @@ trap 'bash scripts/restore-embed-overlay.sh' EXIT
 bash scripts/spa-embed-overlay.sh
 bash scripts/landing-embed-overlay.sh
 
-echo "==> server binaries"
+# The version stamped into the binary (internal/buildinfo) — shown in the
+# Settings footer and the boot log. CI passes the preview image's pinned
+# tag so the two match; releases get theirs from .goreleaser.yaml's
+# identical ldflag; a local build says "dev".
+VERSION="${PJOKK_VERSION:-dev}"
+
+echo "==> server binaries ($VERSION)"
 rm -rf dist/server
 mkdir -p dist/server
 for arch in amd64 arm64; do
   mkdir -p "dist/server/linux/$arch"
   (cd apps/server && CGO_ENABLED=0 GOOS=linux GOARCH="$arch" \
-    go build -trimpath -ldflags="-s -w" \
+    go build -trimpath \
+    -ldflags="-s -w -X github.com/refsdal/pjokk/server/internal/buildinfo.Version=$VERSION" \
     -o "../../dist/server/linux/$arch/pjokk" ./cmd/pjokk)
   echo "    dist/server/linux/$arch/pjokk"
 done

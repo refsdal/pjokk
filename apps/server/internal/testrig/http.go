@@ -49,6 +49,10 @@ const rigPassword = "Testrig-password-123"
 // requests straight through httptest.NewRequest rather than a TLS listener.
 const rigAppURL = "http://127.0.0.1"
 
+// Version is what the rig puts in api.Deps.Version: a recognisable
+// non-"dev" value so a test can tell "carried through" from "defaulted".
+const Version = "0.0.0-test"
+
 // sessionCookieName mirrors auth.go's unexported constant of the same name;
 // duplicated here because AppRig only ever needs the one name and pulling
 // in an export for it would be more machinery than the constant itself.
@@ -173,6 +177,7 @@ func App(t *testing.T) *AppRig {
 		AppURL:           rigAppURL,
 		VAPIDPublicKey:   vapidPublic,
 		TrustedProxyHops: 0,
+		Version:          Version,
 	}
 
 	ar.mu.Lock()

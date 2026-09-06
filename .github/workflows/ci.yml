@@ -68,13 +68,25 @@ jobs:
         id: version
         run: |
           tag=$(svu next --v0)
-          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          short=$(echo "${{ github.event.pull_request.head.sha }}" | cut -c1-7)
+          pr="${{ github.event.pull_request.number }}"
+          {
+            echo "version=${tag#v}"
+            echo "tag=$tag"
+            # The two preview tags (see the push step): the moving one
+            # follows the PR, the pinned one never moves. The pinned one
+            # is also stamped into the binary, so `docker pull <tag>` and
+            # the Settings footer name the same thing.
+            echo "moving=${tag#v}-pr.${pr}"
+            echo "pinned=${tag#v}-pr.${pr}.${short}"
+          } >> "$GITHUB_OUTPUT"
 
       # Everything the image COPYs, compiled natively — the Dockerfile
       # itself is COPY-only, so the buildx assemble below takes seconds and
       # nothing ever runs under QEMU.
       - name: Build artifacts (SPA + both server binaries)
+        env:
+          PJOKK_VERSION: ${{ steps.version.outputs.pinned }}
         run: bash scripts/build-artifacts.sh
 
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
@@ -234,6 +246,9 @@ jobs:
       - name: E2E tests
         env:
           E2E_BASE_URL: http://127.0.0.1:3000
+          # settings.spec.ts asserts the footer shows the version the
+          # binary was stamped with (the pinned preview tag, above).
+          PJOKK_VERSION: ${{ steps.version.outputs.pinned }}
         run: cd e2e && bunx playwright test
 
       - name: Upload Playwright report
@@ -253,10 +268,8 @@ jobs:
       - name: Push preview image (multi-arch)
         if: steps.gate.outputs.push == 'true'
         run: |
-          short=$(echo "${{ github.event.pull_request.head.sha }}" | cut -c1-7)
-          pr="${{ github.event.pull_request.number }}"
-          moving="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}-pr.${pr}"
-          pinned="${moving}.${short}"
+          moving="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.moving }}"
+          pinned="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.pinned }}"
           # The same context the smoke-tested image came from; buildx just
           # re-runs the COPYs per platform and pushes the manifest list.
           docker buildx build --platform linux/amd64,linux/arm64 \

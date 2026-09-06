@@ -1489,6 +1489,9 @@ type Me struct {
 	// Role Ours, system-admin role. "admin" or null.
 	Role   *string `json:"role"`
 	UserId string  `json:"userId"`
+
+	// Version The server's build version — the same string the container image is tagged with ("0.8.0", "0.9.0-pr.42.abc1234"), or "dev" for an unstamped build. Shown in the Settings footer.
+	Version string `json:"version"`
 }
 
 // MeasurementLog defines model for MeasurementLog.

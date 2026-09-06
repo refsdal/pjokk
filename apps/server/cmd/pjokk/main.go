@@ -45,6 +45,7 @@ import (
 
 	"github.com/refsdal/pjokk/server/internal/api"
 	"github.com/refsdal/pjokk/server/internal/auth"
+	"github.com/refsdal/pjokk/server/internal/buildinfo"
 	"github.com/refsdal/pjokk/server/internal/config"
 	"github.com/refsdal/pjokk/server/internal/cron"
 	"github.com/refsdal/pjokk/server/internal/db"
@@ -232,7 +233,7 @@ func landingMode() int {
 		IdleTimeout:       idleTimeout,
 	}
 
-	log.Printf("pjokk landing listening on http://0.0.0.0:%d", cfg.Port)
+	log.Printf("pjokk %s landing listening on http://0.0.0.0:%d", buildinfo.Version, cfg.Port)
 	log.Printf("  site: %s", cfg.SiteURL)
 	log.Printf("  app:  %s", cfg.AppURL)
 	if cfg.Indexable {
@@ -379,7 +380,7 @@ func serveMode(migrate, scheduler bool) int {
 		IdleTimeout:       idleTimeout,
 	}
 
-	log.Printf("pjokk listening on http://0.0.0.0:%d", cfg.Port)
+	log.Printf("pjokk %s listening on http://0.0.0.0:%d", buildinfo.Version, cfg.Port)
 	logStartupConfig(cfg)
 
 	var stopScheduler func()
@@ -595,6 +596,7 @@ func buildDeps(ctx context.Context, cfg *config.Config) (api.Deps, func(), error
 		AppURL:           cfg.AppURL,
 		VAPIDPublicKey:   cfg.VAPIDPublicKey,
 		TrustedProxyHops: cfg.TrustedProxyHops,
+		Version:          buildinfo.Version,
 
 		OpenSignup:     cfg.OpenSignup,
 		OAuthProviders: oauthProviders(cfg),

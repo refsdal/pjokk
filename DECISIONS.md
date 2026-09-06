@@ -1656,3 +1656,26 @@ artifact through the whole round trip in two browser contexts (send,
 card on both Homes, acknowledge, dismiss) and asserts the open card's
 animation classes. It found the headline clipping at phone width before
 any person did; a screenshot is not a regression test.
+
+## One version string: image tag, Settings footer, boot log (2026-09-06)
+
+**The version lives in the binary, and nowhere else.**
+`internal/buildinfo.Version` is stamped at link time — by
+`.goreleaser.yaml` from `{{ .Version }}` for releases, by
+`scripts/build-artifacts.sh` from `PJOKK_VERSION` for the CI preview image
+— and defaults to `dev`. The Settings footer used to say a hand-kept
+"Pjokk 0.1"; it now reads `version` off `/api/me`, which carries
+`Deps.Version`. The boot log prints the same string.
+
+**It is deliberately the image tag, verbatim.** A container cannot know
+which of its several tags it was pulled by, so the honest value is the one
+GoReleaser tags with: `0.8.0` for a release, `0.9.0-pr.42.abc1234` (the
+pinned preview tag) for a PR. CI stamps the pinned tag into the binary and
+`e2e/settings.spec.ts` asserts the footer shows it, so the tag someone
+pulls and the version they see under Settings cannot drift.
+
+**OpenTelemetry, when it lands, reads the same variable.** The resource's
+`service.version` must be `buildinfo.Version` — not a second `-X` symbol,
+not a package.json field, not `git describe` at runtime. Three places
+naming one string is the whole point; a second source is a second thing to
+drift.

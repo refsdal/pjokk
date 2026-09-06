@@ -68,3 +68,22 @@ func TestGetMeWithActiveFamily(t *testing.T) {
 		t.Errorf("impersonatedBy = %v, want null (not impersonating)", v)
 	}
 }
+
+// The version the SPA shows under Settings is the binary's own build
+// version (internal/buildinfo), handed in through Deps like every other
+// collaborator — the same string GoReleaser tags the image with, so the
+// footer, the image tag and (later) OpenTelemetry's service.version can
+// never drift apart.
+func TestGetMeCarriesBuildVersion(t *testing.T) {
+	a := testrig.App(t)
+	a.SignUp("Solo", "solo@example.com")
+	cookie := a.SignIn("solo@example.com")
+
+	res := a.Do(http.MethodGet, "/api/me", cookie, nil)
+	if res.Status != http.StatusOK {
+		t.Fatalf("status = %d, body %s", res.Status, res.Raw)
+	}
+	if res.JSON["version"] != testrig.Version {
+		t.Errorf("version = %v, want %q (what the rig put in Deps)", res.JSON["version"], testrig.Version)
+	}
+}

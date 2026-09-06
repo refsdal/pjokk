@@ -34,9 +34,10 @@ func (d Deps) GetMe(ctx context.Context, _ gen.GetMeRequestObject) (gen.GetMeRes
 	}
 
 	me := gen.Me{
-		UserId: session.UserID,
-		Name:   session.Name,
-		Email:  session.Email,
+		UserId:  session.UserID,
+		Name:    session.Name,
+		Email:   session.Email,
+		Version: d.Version,
 	}
 	if session.Role != "" {
 		role := session.Role
