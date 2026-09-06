@@ -247,13 +247,6 @@ func RequireFamily(d Deps) func(http.Handler) http.Handler {
 	}
 }
 
-// RequireAdmin gates the family-administration surface — settings, invites,
-// keys, billing (REF §A5 item 3). It reads the role RequireFamily resolved,
-// so it must be mounted behind it.
-//
-// "owner" is accepted alongside "admin": Pjokk assigns neither by name but
-// Limen's organization plugin can, and a family owner locked out of their own
-// settings would be an absurd failure mode.
 // IsAdminRole reports whether role is a family-administration role. "owner"
 // is accepted alongside "admin" for the reason RequireAdmin's comment gives.
 // Exported for handlers that gate ONE branch on the role (a help request
@@ -263,6 +256,13 @@ func IsAdminRole(role string) bool {
 	return role == auth.RoleAdmin || role == roleOwner
 }
 
+// RequireAdmin gates the family-administration surface — settings, invites,
+// keys, billing (REF §A5 item 3). It reads the role RequireFamily resolved,
+// so it must be mounted behind it.
+//
+// "owner" is accepted alongside "admin": Pjokk assigns neither by name but
+// Limen's organization plugin can, and a family owner locked out of their own
+// settings would be an absurd failure mode.
 func RequireAdmin() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
