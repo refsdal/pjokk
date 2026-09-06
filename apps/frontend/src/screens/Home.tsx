@@ -35,6 +35,7 @@ import { TemperatureSparkline } from "@/components/TemperatureSparkline";
 import { useMeasurements } from "@/lib/data/other";
 import type { TemperatureStatus, TemperatureTrend } from "@/lib/measurements";
 import { Button } from "@/components/ui/button";
+import { AccountSheet } from "@/components/sheets/AccountSheet";
 import { DiaperSheet } from "@/components/sheets/DiaperSheet";
 import { FeedSheet } from "@/components/sheets/FeedSheet";
 import { HelpSheet } from "@/components/sheets/HelpSheet";
@@ -64,6 +65,7 @@ type OpenSheet =
   | "other"
   | "play"
   | "help"
+  | "account"
   | null;
 
 function feedDetail(feed: {
@@ -195,11 +197,18 @@ export function HomeScreen() {
       {/* Baby header */}
       <header className="flex items-center justify-between py-4">
         <BabySwitcher />
-        <Avatar
-          src={me.data?.avatarUrl}
-          name={me.data?.displayName ?? "?"}
-          size={11}
-        />
+        <button
+          type="button"
+          aria-label={t("Account")}
+          onClick={() => setSheet("account")}
+          className="rounded-full active:scale-95"
+        >
+          <Avatar
+            src={me.data?.avatarUrl}
+            name={me.data?.displayName ?? "?"}
+            size={11}
+          />
+        </button>
       </header>
 
       <div className="space-y-3 pb-tabbar">
@@ -384,6 +393,10 @@ export function HomeScreen() {
       <HelpSheet
         open={sheet === "help"}
         onOpenChange={(o) => setSheet(o ? "help" : null)}
+      />
+      <AccountSheet
+        open={sheet === "account"}
+        onOpenChange={(o) => setSheet(o ? "account" : null)}
       />
 
       {/* Day-mode Home only: night mode is three actions and nothing else. */}

@@ -26,6 +26,19 @@ export function selectBaby(id: string) {
   for (const fn of listeners) fn();
 }
 
+// Forget the device's baby selection — a family switch leaves it pointing
+// at a baby the new family does not have (it would self-heal to the first
+// baby anyway; clearing keeps the reasoning simple).
+export function clearSelectedBaby() {
+  current = null;
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    // storage unavailable
+  }
+  for (const fn of listeners) fn();
+}
+
 function subscribe(fn: () => void) {
   listeners.add(fn);
   return () => listeners.delete(fn);

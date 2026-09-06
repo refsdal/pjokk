@@ -1,8 +1,10 @@
+import { useEffect } from "react";
 import { Navigate, Outlet } from "@tanstack/react-router";
 import { TabBar } from "@/components/TabBar";
 import { client, unwrap } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
 import { useMe } from "@/lib/data";
+import { judgeFamily, readFence, writeFence } from "@/lib/family-fence";
 import { resetCache } from "@/lib/query";
 import { toast } from "@/lib/toast";
 
@@ -17,6 +19,17 @@ import { toast } from "@/lib/toast";
 export function AppShell() {
   const { data: session, isPending } = useSession();
   const me = useMe();
+
+  const familyId = me.data?.familyId ?? null;
+  // Family fence (lib/family-fence.ts): a mismatch means the family behind
+  // this session changed outside this tab's switch flow.
+  useEffect(() => {
+    const verdict = judgeFamily(readFence(), familyId);
+    if (verdict === "recorded") writeFence(familyId as string);
+    if (verdict === "changed") {
+      void resetCache().then(() => window.location.reload());
+    }
+  }, [familyId]);
 
   // me refetches on every mount (see useMe) — wait for THAT fetch to settle
   // before trusting familyId, so a reload never routes on the persisted
