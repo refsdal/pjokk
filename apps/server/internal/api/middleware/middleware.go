@@ -254,6 +254,15 @@ func RequireFamily(d Deps) func(http.Handler) http.Handler {
 // "owner" is accepted alongside "admin": Pjokk assigns neither by name but
 // Limen's organization plugin can, and a family owner locked out of their own
 // settings would be an absurd failure mode.
+// IsAdminRole reports whether role is a family-administration role. "owner"
+// is accepted alongside "admin" for the reason RequireAdmin's comment gives.
+// Exported for handlers that gate ONE branch on the role (a help request
+// may be dismissed by its sender OR an admin — internal/api/help.go) rather
+// than the whole operation, which is what the tierAdmin chain is for.
+func IsAdminRole(role string) bool {
+	return role == auth.RoleAdmin || role == roleOwner
+}
+
 func RequireAdmin() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -262,7 +271,7 @@ func RequireAdmin() func(http.Handler) http.Handler {
 				respond.Error(w, http.StatusForbidden, "Not available to API keys", "FORBIDDEN")
 				return
 			}
-			if family.MemberRole != auth.RoleAdmin && family.MemberRole != roleOwner {
+			if !IsAdminRole(family.MemberRole) {
 				respond.Error(w, http.StatusForbidden, "Admin only", "FORBIDDEN")
 				return
 			}

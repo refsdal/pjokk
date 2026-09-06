@@ -2055,6 +2055,104 @@ paths:
               schema:
                 $ref: "#/components/schemas/PushTestResult"
 
+  /api/help:
+    post:
+      operationId: createHelpRequest
+      summary: >-
+        Ask another member of the active family for a hand. The target gets
+        a push notification naming the caller; the request itself is family
+        state (Summary.openHelp) until acknowledged, dismissed, or two hours
+        old. Session-only: the notification is attributed to a person and a
+        pjk_ key has none. Rate-limited per CALLER (5 per 5 minutes) inside
+        the handler — the IP-keyed middleware limiter would throttle a whole
+        household together. A push failure does not fail the request; read
+        `delivered`.
+      tags: [help]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateHelpRequest"
+      responses:
+        "201":
+          description: Created. `delivered` counts the devices the push reached.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelpRequest"
+        "400":
+          description: The target is the caller (SELF_HELP).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such member in the caller's family (MEMBER_NOT_FOUND).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: More than 5 requests in 5 minutes from this caller (RATE_LIMITED).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/help/{id}/acknowledge:
+    post:
+      operationId: acknowledgeHelpRequest
+      summary: >-
+        "On my way". ANY family member may acknowledge, not only the target
+        — whoever is closer answers. Idempotent: a second acknowledge
+        returns the row unchanged and sends nothing. The first one pushes
+        "<name> is on the way" to the sender, unless the sender is
+        acknowledging their own request.
+      tags: [help]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: The request, acknowledged.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelpRequest"
+        "404":
+          description: No such request in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/help/{id}:
+    delete:
+      operationId: deleteHelpRequest
+      summary: >-
+        Dismiss a request ("Never mind" while open, "Done" once answered).
+        Sender or family admin only.
+      tags: [help]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Dismissed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "403":
+          description: Neither the sender nor an admin (NOT_SENDER).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such request in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/keys:
     get:
       operationId: listApiKeys
@@ -3385,6 +3483,70 @@ components:
           description: >-
             Opaque keyset cursor ("<epochMs>|<id>"); pass back as ?before=
             for the next (older) page. Null when there is no further page.
+    HelpRequest:
+      type: object
+      description: >-
+        One caretaker asking a specific other member of the family for a
+        hand. Family state, not a log: it is not on the timeline and has no
+        baby. Open until someone acknowledges it; shown on Home (see
+        Summary.openHelp) for two hours after creation whatever its state,
+        then simply no longer returned. Names are denormalised so the card
+        never needs a second lookup and still reads correctly after a
+        member leaves.
+      required:
+        - id
+        - fromUserId
+        - fromName
+        - toUserId
+        - toName
+        - message
+        - createdAt
+        - acknowledgedAt
+        - acknowledgedByName
+        - delivered
+      properties:
+        id:
+          type: string
+        fromUserId:
+          type: string
+        fromName:
+          type: string
+          description: The sender's display name, '' if they have none.
+        toUserId:
+          type: string
+        toName:
+          type: string
+        message:
+          type: string
+          description: "'' when the sender sent none."
+        createdAt:
+          type: string
+          format: date-time
+        acknowledgedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: null while open.
+        acknowledgedByName:
+          type: string
+          nullable: true
+          description: Who answered ('' if nameless); null while open.
+        delivered:
+          type: integer
+          description: >-
+            Devices the creation push reached. Only meaningful on the
+            createHelpRequest response; every other place that returns a
+            HelpRequest sets it to 0.
+    CreateHelpRequest:
+      type: object
+      required: [memberId]
+      properties:
+        memberId:
+          type: string
+          description: The target's family-membership id (Member.memberId).
+        message:
+          type: string
+          maxLength: 200
     Summary:
       type: object
       required:
@@ -3394,6 +3556,7 @@ components:
         - lastSleep
         - activePlay
         - lastTemperature
+        - openHelp
         - today
       properties:
         lastFeed:
@@ -3424,6 +3587,14 @@ components:
             temperature card.
           allOf:
             - $ref: "#/components/schemas/MeasurementLog"
+          nullable: true
+        openHelp:
+          description: >-
+            The family's newest help request created within the last two
+            hours, open or acknowledged, or null. Family-level (not per
+            baby) but carried here because Home already polls this query.
+          allOf:
+            - $ref: "#/components/schemas/HelpRequest"
           nullable: true
         today:
           type: object

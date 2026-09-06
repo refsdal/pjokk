@@ -919,6 +919,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/help": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask another member of the active family for a hand. The target gets a push notification naming the caller; the request itself is family state (Summary.openHelp) until acknowledged, dismissed, or two hours old. Session-only: the notification is attributed to a person and a pjk_ key has none. Rate-limited per CALLER (5 per 5 minutes) inside the handler — the IP-keyed middleware limiter would throttle a whole household together. A push failure does not fail the request; read `delivered`. */
+        post: operations["createHelpRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/help/{id}/acknowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** "On my way". ANY family member may acknowledge, not only the target — whoever is closer answers. Idempotent: a second acknowledge returns the row unchanged and sends nothing. The first one pushes "<name> is on the way" to the sender, unless the sender is acknowledging their own request. */
+        post: operations["acknowledgeHelpRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/help/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Dismiss a request ("Never mind" while open, "Done" once answered). Sender or family admin only. */
+        delete: operations["deleteHelpRequest"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/keys": {
         parameters: {
             query?: never;
@@ -1572,6 +1623,33 @@ export interface components {
             /** @description Opaque keyset cursor ("<epochMs>|<id>"); pass back as ?before= for the next (older) page. Null when there is no further page. */
             nextCursor: string | null;
         };
+        /** @description One caretaker asking a specific other member of the family for a hand. Family state, not a log: it is not on the timeline and has no baby. Open until someone acknowledges it; shown on Home (see Summary.openHelp) for two hours after creation whatever its state, then simply no longer returned. Names are denormalised so the card never needs a second lookup and still reads correctly after a member leaves. */
+        HelpRequest: {
+            id: string;
+            fromUserId: string;
+            /** @description The sender's display name, '' if they have none. */
+            fromName: string;
+            toUserId: string;
+            toName: string;
+            /** @description '' when the sender sent none. */
+            message: string;
+            /** Format: date-time */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description null while open.
+             */
+            acknowledgedAt: string | null;
+            /** @description Who answered ('' if nameless); null while open. */
+            acknowledgedByName: string | null;
+            /** @description Devices the creation push reached. Only meaningful on the createHelpRequest response; every other place that returns a HelpRequest sets it to 0. */
+            delivered: number;
+        };
+        CreateHelpRequest: {
+            /** @description The target's family-membership id (Member.memberId). */
+            memberId: string;
+            message?: string;
+        };
         Summary: {
             lastFeed: components["schemas"]["FeedLog"] | null;
             lastDiaper: components["schemas"]["DiaperLog"] | null;
@@ -1580,6 +1658,8 @@ export interface components {
             activePlay: components["schemas"]["PlayLog"] | null;
             /** @description The newest `temperature` measurement, or null. Specifically the newest of that TYPE, not the newest measurement — a weight taken after a temperature must not displace it. Backs the Home screen's temperature card. */
             lastTemperature: components["schemas"]["MeasurementLog"] | null;
+            /** @description The family's newest help request created within the last two hours, open or acknowledged, or null. Family-level (not per baby) but carried here because Home already polls this query. */
+            openHelp: components["schemas"]["HelpRequest"] | null;
             today: {
                 /** Format: int32 */
                 feeds: number;
@@ -4700,6 +4780,130 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PushTestResult"];
+                };
+            };
+        };
+    };
+    createHelpRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateHelpRequest"];
+            };
+        };
+        responses: {
+            /** @description Created. `delivered` counts the devices the push reached. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HelpRequest"];
+                };
+            };
+            /** @description The target is the caller (SELF_HELP). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such member in the caller's family (MEMBER_NOT_FOUND). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description More than 5 requests in 5 minutes from this caller (RATE_LIMITED). */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    acknowledgeHelpRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request, acknowledged. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HelpRequest"];
+                };
+            };
+            /** @description No such request in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteHelpRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dismissed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description Neither the sender nor an admin (NOT_SENDER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such request in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };

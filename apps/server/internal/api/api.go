@@ -330,6 +330,13 @@ var operationAuthTiers = map[string]authTier{
 	"UpdatePushPrefs": tierFamilyNoAPIKey,
 	"TestPush":        tierFamilyNoAPIKey,
 
+	// Help requests (docs/superpowers/specs/2026-09-06-help-request-design.md).
+	// Session-bound like push: the notification names the caller, and a pjk_
+	// key has no person behind it — see internal/api/help.go.
+	"CreateHelpRequest":      tierFamilyNoAPIKey,
+	"AcknowledgeHelpRequest": tierFamilyNoAPIKey,
+	"DeleteHelpRequest":      tierFamilyNoAPIKey,
+
 	"DeleteBaby":          tierAdmin,
 	"DeleteFamilyMember":  tierAdmin,
 	"SetFamilyMemberRole": tierAdmin,

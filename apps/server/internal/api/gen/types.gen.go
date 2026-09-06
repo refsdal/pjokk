@@ -1250,6 +1250,13 @@ type CreateFeedSide string
 // CreateFeedType defines model for CreateFeed.Type.
 type CreateFeedType string
 
+// CreateHelpRequest defines model for CreateHelpRequest.
+type CreateHelpRequest struct {
+	// MemberId The target's family-membership id (Member.memberId).
+	MemberId string  `json:"memberId"`
+	Message  *string `json:"message,omitempty"`
+}
+
 // CreateInvite Every field is optional; an empty (or absent) body uses every default.
 type CreateInvite struct {
 	ExpiresInHours *int              `json:"expiresInHours,omitempty"`
@@ -1415,6 +1422,29 @@ type FeedLogSide string
 
 // FeedLogType defines model for FeedLog.Type.
 type FeedLogType string
+
+// HelpRequest One caretaker asking a specific other member of the family for a hand. Family state, not a log: it is not on the timeline and has no baby. Open until someone acknowledges it; shown on Home (see Summary.openHelp) for two hours after creation whatever its state, then simply no longer returned. Names are denormalised so the card never needs a second lookup and still reads correctly after a member leaves.
+type HelpRequest struct {
+	// AcknowledgedAt null while open.
+	AcknowledgedAt *time.Time `json:"acknowledgedAt"`
+
+	// AcknowledgedByName Who answered ('' if nameless); null while open.
+	AcknowledgedByName *string   `json:"acknowledgedByName"`
+	CreatedAt          time.Time `json:"createdAt"`
+
+	// Delivered Devices the creation push reached. Only meaningful on the createHelpRequest response; every other place that returns a HelpRequest sets it to 0.
+	Delivered int `json:"delivered"`
+
+	// FromName The sender's display name, '' if they have none.
+	FromName   string `json:"fromName"`
+	FromUserId string `json:"fromUserId"`
+	Id         string `json:"id"`
+
+	// Message '' when the sender sent none.
+	Message  string `json:"message"`
+	ToName   string `json:"toName"`
+	ToUserId string `json:"toUserId"`
+}
 
 // Invite defines model for Invite.
 type Invite struct {
@@ -1687,7 +1717,10 @@ type Summary struct {
 
 	// LastTemperature The newest `temperature` measurement, or null. Specifically the newest of that TYPE, not the newest measurement — a weight taken after a temperature must not displace it. Backs the Home screen's temperature card.
 	LastTemperature *MeasurementLog `json:"lastTemperature"`
-	Today           struct {
+
+	// OpenHelp The family's newest help request created within the last two hours, open or acknowledged, or null. Family-level (not per baby) but carried here because Home already polls this query.
+	OpenHelp *HelpRequest `json:"openHelp"`
+	Today    struct {
 		Both     int32 `json:"both"`
 		Dirty    int32 `json:"dirty"`
 		Feeds    int32 `json:"feeds"`
@@ -2153,6 +2186,9 @@ type CreateFeedJSONRequestBody = CreateFeed
 
 // UpdateFeedJSONRequestBody defines body for UpdateFeed for application/json ContentType.
 type UpdateFeedJSONRequestBody = UpdateFeed
+
+// CreateHelpRequestJSONRequestBody defines body for CreateHelpRequest for application/json ContentType.
+type CreateHelpRequestJSONRequestBody = CreateHelpRequest
 
 // CreateInviteJSONRequestBody defines body for CreateInvite for application/json ContentType.
 type CreateInviteJSONRequestBody = CreateInvite
