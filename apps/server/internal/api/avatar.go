@@ -170,11 +170,16 @@ func (d Deps) deleteAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if profile.AvatarKey != nil {
-		if err := d.Q.SetUserAvatar(ctx, dbgen.SetUserAvatarParams{ID: session.UserID, AvatarKey: nil}); err != nil {
+		// Delete the object BEFORE clearing the key. If Storage.Delete fails,
+		// return without touching the row: the key stays in place, so a
+		// retried DELETE sees the same AvatarKey and tries the object again
+		// instead of reporting success while an orphaned object lingers
+		// forever in the store.
+		if err := d.Storage.Delete(ctx, *profile.AvatarKey); err != nil {
 			internalError(w, r, err)
 			return
 		}
-		if err := d.Storage.Delete(ctx, *profile.AvatarKey); err != nil {
+		if err := d.Q.SetUserAvatar(ctx, dbgen.SetUserAvatarParams{ID: session.UserID, AvatarKey: nil}); err != nil {
 			internalError(w, r, err)
 			return
 		}

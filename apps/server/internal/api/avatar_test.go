@@ -3,6 +3,7 @@ package api_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -14,6 +15,7 @@ import (
 	"net/textproto"
 	"testing"
 
+	"github.com/refsdal/pjokk/server/internal/api"
 	"github.com/refsdal/pjokk/server/internal/auth"
 	"github.com/refsdal/pjokk/server/internal/storage"
 	"github.com/refsdal/pjokk/server/internal/testrig"
@@ -247,5 +249,54 @@ func TestAvatarDeleteRemovesTheObject(t *testing.T) {
 	// Deleting twice is fine.
 	if res := a.Do(http.MethodDelete, "/api/me/avatar", cookie, nil); res.Status != http.StatusOK {
 		t.Errorf("second delete: %d, want 200", res.Status)
+	}
+}
+
+// failingDelete wraps a storage.Storage and makes every Delete call fail,
+// to prove deleteAvatar orders its writes so a storage failure leaves the
+// avatar_key column untouched (and therefore retryable) rather than
+// reporting success while the object leaks.
+type failingDelete struct {
+	storage.Storage
+}
+
+func (failingDelete) Delete(ctx context.Context, keys ...string) error {
+	return errors.New("simulated storage outage")
+}
+
+func TestAvatarDeleteLeavesTheKeyInPlaceWhenStorageFails(t *testing.T) {
+	a := testrig.App(t)
+	a.SignUp("Solo", "solo@example.com")
+	cookie := a.SignIn("solo@example.com")
+
+	if res := a.DoRequest(avatarUpload(t, cookie, "image/png", solidPNG(t, 40, 40))); res.Status != http.StatusOK {
+		t.Fatalf("upload: %d %s", res.Status, res.Raw)
+	}
+
+	real := a.Deps.Storage
+	a.Configure(func(d *api.Deps) { d.Storage = failingDelete{Storage: real} })
+
+	res := a.Do(http.MethodDelete, "/api/me/avatar", cookie, nil)
+	if res.Status != http.StatusInternalServerError {
+		t.Fatalf("delete during storage outage: %d %s, want 500", res.Status, res.Raw)
+	}
+
+	me := a.Do(http.MethodGet, "/api/me", cookie, nil)
+	if v, _ := me.JSON["avatarUrl"].(string); v == "" {
+		t.Errorf("avatarUrl after failed delete = %v, want it still set (key must not be cleared)", me.JSON["avatarUrl"])
+	}
+
+	// Swap the real store back in and retry: the key survived, so the retry
+	// can still find and delete the object.
+	a.Configure(func(d *api.Deps) { d.Storage = real })
+	res = a.Do(http.MethodDelete, "/api/me/avatar", cookie, nil)
+	if res.Status != http.StatusOK {
+		t.Fatalf("retried delete: %d %s, want 200", res.Status, res.Raw)
+	}
+	if v := res.JSON["avatarUrl"]; v != nil {
+		t.Errorf("avatarUrl after retried delete = %v, want null", v)
+	}
+	if got := avatarKeys(t, a); len(got) != 0 {
+		t.Errorf("object survived the retried delete: %v", got)
 	}
 }
