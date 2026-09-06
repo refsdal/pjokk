@@ -196,14 +196,26 @@ banners and status cards**, so it is the first card the eye lands on
 without displacing the baby's name. Styled like `StatusCard` (icon, label,
 relative time, detail line), danger tint on the icon only:
 
-- Open: **border-2 border-danger** with a CSS keyframe pulse
-  (`help-pulse`: border opacity 1 → 0.25 → 1, ~1.2 s, infinite), defined
-  in `styles.css` next to the existing animations. Under
-  `@media (prefers-reduced-motion: reduce)` the animation is removed and
-  the border stays solid red — same prominence, no strobe. Night mode gets
-  the same treatment: red is not blue light, and this is exactly the case
-  worth waking someone for.
-- Acknowledged: normal hairline border, no animation.
+- Open: **border-2 border-danger**, plus two animations that share one
+  2.4 s cycle (chosen from mock-ups, see
+  `.superpowers/brainstorm/…/help-card-animation-v2.html`):
+  - `help-ping` on the card — a `box-shadow` ring in the danger colour
+    expanding from 0 to 14 px and fading to transparent, `cubic-bezier(0,
+    0, .2, 1)`, infinite. The border itself stays solid; nothing in the
+    layout moves.
+  - `help-wave` on the hand icon (`IconHandStop`) — a short rotate wave
+    (+14° → −12° → +10° → −6° → 0) in the first half of the cycle, then
+    still; `transform-origin: 50% 90%` so it pivots at the wrist.
+  Both keyframes live in `styles.css` next to the existing animations and
+  read the ring colour from `--color-danger`, so night mode's amber-red
+  variant is picked up automatically. Under `@media
+  (prefers-reduced-motion: reduce)` both animations are removed and the
+  solid red border alone carries the state — same prominence, no motion.
+  Night mode keeps the animations: red/amber is not blue light, and this
+  is exactly the case worth waking someone for.
+- Acknowledged: animations stop, the border transitions (~350 ms) to the
+  normal hairline `border-line`, and the icon tint goes from `text-danger`
+  to `text-ok`. No further motion.
 - Label/detail copy:
   - Open, viewer is target: "**Anders** needs a hand" / message / "3 min ago".
   - Open, viewer is anyone else: "**Anders** needs a hand from **Kari**" / message / time.
