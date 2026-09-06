@@ -31,7 +31,10 @@ separate test deploy).
 
 1. **Status before action.** The most common use is a glance, not a log. The home
    screen must answer "when did she last eat / sleep / get changed" with zero taps,
-   in relative time ("2 h ago", never a bare clock time).
+   in relative time ("1 hour 32 minutes ago", never a bare clock time), and it
+   stays minute-accurate for the whole 24 hours rather than rounding to whole
+   hours once past the first — the precision matters most exactly where the
+   rounding used to start.
 2. **Five-second transactions.** Logging is done one-handed, often in the dark,
    by a sleep-deprived person. Every log flow: open sheet → (adjust) → save.
    The happy path is two taps.

@@ -23,16 +23,40 @@ export function formatDay(d: Date): string {
   return dayFmt.format(d);
 }
 
-/** "just now", "5 m ago", "2 h ago", "yesterday 21:14", "man. 12. jan 08:30" */
+// Both words of each pair get their own call rather than one
+// t(n === 1 ? … : …): scripts/check-i18n.mjs matches a `t(` followed directly
+// by a quote, so a ternary inside the call matches NOTHING and would leave
+// both keys unguarded — renaming either would orphan its translation in
+// silence, which is the exact failure that script exists to catch.
+const minutes = (n: number) => (n === 1 ? t("minute") : t("minutes"));
+const hours = (n: number) => (n === 1 ? t("hour") : t("hours"));
+
+/**
+ * "just now", "45 minutes ago", "1 hour 32 minutes ago", "yesterday 21:14",
+ * "man. 12. jan 08:30"
+ *
+ * Minutes survive the hour mark on purpose. Collapsing to "1 hour" for the
+ * whole of the following hour lost precision exactly where it starts to
+ * matter — a parent reading a sleep card wants to know whether the baby woke
+ * five minutes ago or fifty.
+ */
 export function formatRelative(date: Date, now = new Date()): string {
   const diffMs = now.getTime() - date.getTime();
   const min = Math.floor(diffMs / 60_000);
   if (min < 1) return t("just now");
-  if (min < 60) return `${min} ${t("m ago")}`;
-  const hours = Math.floor(min / 60);
+  if (min < 60) return `${min} ${minutes(min)} ${t("ago")}`;
+  const h = Math.floor(min / 60);
   // Relative for anything within 24h regardless of the calendar day —
   // "yesterday 22:30" at 00:30 is exactly wrong at 3am.
-  if (hours < 24) return `${hours} ${t("h ago")}`;
+  if (h < 24) {
+    const rem = min % 60;
+    const whole = `${h} ${hours(h)}`;
+    // On the hour, say so: "1 hour 0 minutes ago" reads worse than the
+    // rounding this replaced.
+    return rem === 0
+      ? `${whole} ${t("ago")}`
+      : `${whole} ${rem} ${minutes(rem)} ${t("ago")}`;
+  }
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
   if (date.toDateString() === yesterday.toDateString())
