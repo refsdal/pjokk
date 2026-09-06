@@ -8,6 +8,7 @@ export * from "./calendar";
 export * from "./config";
 export * from "./contacts";
 export * from "./family";
+export * from "./help";
 export * from "./insights";
 export * from "./keys";
 export * from "./logs";

@@ -35,6 +35,11 @@ const nb: Record<string, string> = {
   "Add baby": "Legg til baby",
   solids: "fast føde",
 
+  // Help requests
+  "Too many requests — wait a few minutes":
+    "For mange forespørsler – vent noen minutter",
+  "Could not send": "Kunne ikke sende",
+
   // Sheets: shared
   Save: "Lagre",
   Delete: "Slett",
