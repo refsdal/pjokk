@@ -6,10 +6,14 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
-    <!-- The light default. theme-init.js overwrites it before the first
-         paint, and AppearanceProvider keeps it in step afterwards; an
-         installed PWA takes its status-bar colour from this. -->
-    <meta name="theme-color" content="#faf9f7" />
+    <!-- theme-init.js overwrites this before the first paint and
+         AppearanceProvider keeps it in step afterwards; this value only
+         survives if both fail. It matches the manifest's baked theme_color
+         rather than the light palette, because the case where nothing runs is
+         exactly the case an installed app cannot recover from: the system
+         picks its status-bar glyphs from here, and a light value under a bar
+         baked dark is an invisible clock (src/lib/system-chrome.ts). -->
+    <meta name="theme-color" content="#171512" />
     <!-- Render-blocking on purpose: it must set the theme classes and the
          colour above BEFORE anything paints. External rather than inline
          because the app runs under script-src 'self'. -->

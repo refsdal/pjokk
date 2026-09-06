@@ -12,6 +12,7 @@ import {
   type LanguageMode,
 } from "./i18n";
 import { useNight } from "./night";
+import { STANDALONE_QUERY, systemChromeColor } from "./system-chrome";
 
 // Two independent layers:
 //  - theme (system/light/dark): normal visual preference
@@ -54,10 +55,23 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false,
   );
+  // Whether we are running as an installed app. It decides the status-bar
+  // colour (see lib/system-chrome.ts) and it is not fixed for the life of the
+  // tab: accepting Chrome's install prompt flips it under a running page.
+  const [standalone, setStandalone] = useState(
+    () => window.matchMedia?.(STANDALONE_QUERY).matches ?? false,
+  );
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia(STANDALONE_QUERY);
+    const onChange = (e: MediaQueryListEvent) => setStandalone(e.matches);
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, []);
@@ -69,11 +83,15 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   }, [dark]);
 
   useEffect(() => {
-    const color = nightValue.night ? "#171310" : dark ? "#171512" : "#faf9f7";
+    const color = systemChromeColor({
+      night: nightValue.night,
+      dark,
+      standalone,
+    });
     document
       .querySelector('meta[name="theme-color"]')
       ?.setAttribute("content", color);
-  }, [nightValue.night, dark]);
+  }, [nightValue.night, dark, standalone]);
 
   const setThemeMode = useCallback((m: ThemeMode) => {
     try {
