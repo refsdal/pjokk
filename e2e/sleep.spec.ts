@@ -13,6 +13,11 @@ test("starts a sleep session, sees the banner, wakes", async ({ page, request })
   await page.getByRole("button", { name: "Wake" }).click();
 
   await expect(page.getByText("Sleeping")).toHaveCount(0, { timeout: 10_000 });
+  // Awake now: the card reads the wake window as a duration, not "N ago",
+  // and counts the session that just ended among today's naps.
+  await expect(page.getByText("Awake", { exact: true })).toBeVisible();
+  await expect(page.getByText("under a minute")).toBeVisible();
+  await expect(page.getByText(/^1 nap · /)).toBeVisible();
 });
 
 test("tapping the sleep banner opens the edit sheet for the running session", async ({

@@ -51,7 +51,7 @@ import {
 } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { useSelectedBaby } from "@/lib/selected-baby";
-import { formatDuration } from "@/lib/time";
+import { formatDuration, formatElapsed } from "@/lib/time";
 import { useAppearance } from "@/lib/appearance";
 
 type OpenSheet =
@@ -248,12 +248,21 @@ export function HomeScreen() {
             tintClass="text-diaper"
             onClick={() => setSheet("diaper")}
           />
+          {/* The wake window, not "last sleep N ago": the same instant read
+              as a duration, because how long she has been up is what decides
+              whether the next nap is due. The last sleep's length rides
+              along as the detail. */}
           {!active && s?.lastSleep?.endTime && (
             <StatusCard
               icon={IconMoon}
-              label={t("Last sleep")}
+              label={t("Awake")}
               time={new Date(s.lastSleep.endTime)}
-              sub={`${formatDuration(s.today.sleepMin * 60_000)} ${t("today")}`}
+              format={formatElapsed}
+              detail={`${formatDuration(
+                new Date(s.lastSleep.endTime).getTime() -
+                  new Date(s.lastSleep.startTime).getTime(),
+              )} ${t("nap")}`}
+              sub={`${s.today.sleeps} ${s.today.sleeps === 1 ? t("nap") : t("naps")} · ${formatDuration(s.today.sleepMin * 60_000)} ${t("today")}`}
               tintClass="text-sleep"
               onClick={() => setSheet("sleep")}
             />

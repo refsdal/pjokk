@@ -21,7 +21,7 @@ const nb: Record<string, string> = {
   // Home
   "Last feed": "Siste måltid",
   "Last diaper": "Siste bleie",
-  "Last sleep": "Siste søvn",
+  Awake: "Våken",
   Feed: "Måltid",
   Diaper: "Bleie",
   Sleep: "Søvn",
@@ -81,6 +81,9 @@ const nb: Record<string, string> = {
   minutes: "minutter",
   hour: "time",
   hours: "timer",
+  day: "dag",
+  days: "dager",
+  "under a minute": "under ett minutt",
   yesterday: "i går",
   min: "min",
   d: "d",

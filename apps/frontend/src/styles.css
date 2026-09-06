@@ -158,13 +158,19 @@ input[type="number"] {
    radiates from the card and the hand icon waves, on one shared 2.4 s
    cycle. The ring takes its colour from --color-danger so night mode's
    amber-red comes through unchanged. Both stop on acknowledge. */
-@keyframes help-ping {
+/* One ring, two tempos. --ping-color and --ping-spread are set by the
+   consuming class: the help card pings in danger red, the sleep banner
+   (components/ActiveSessionBanner.tsx) breathes in the sleep tint — slower,
+   smaller, fainter, because a sleep lasts hours and a ring that read as an
+   alarm for that long would be exactly the wrong signal. */
+@keyframes ring-ping {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-danger) 55%, transparent);
+    box-shadow: 0 0 0 0
+      color-mix(in srgb, var(--ping-color) var(--ping-start), transparent);
   }
   100% {
-    box-shadow: 0 0 0 14px
-      color-mix(in srgb, var(--color-danger) 0%, transparent);
+    box-shadow: 0 0 0 var(--ping-spread)
+      color-mix(in srgb, var(--ping-color) 0%, transparent);
   }
 }
 @keyframes help-wave {
@@ -190,7 +196,16 @@ input[type="number"] {
   }
 }
 .animate-help-ping {
-  animation: help-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+  --ping-color: var(--color-danger);
+  --ping-start: 55%;
+  --ping-spread: 14px;
+  animation: ring-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.animate-sleep-breathe {
+  --ping-color: var(--color-sleep);
+  --ping-start: 35%;
+  --ping-spread: 10px;
+  animation: ring-ping 4s ease-out infinite;
 }
 .animate-help-wave {
   animation: help-wave 2.4s ease-in-out infinite;
@@ -201,9 +216,10 @@ input[type="number"] {
   .animate-pulse-soft {
     animation: none;
   }
-  /* The solid red border alone carries the state. */
+  /* The solid tinted border alone carries the state. */
   .animate-help-ping,
-  .animate-help-wave {
+  .animate-help-wave,
+  .animate-sleep-breathe {
     animation: none;
   }
   * {
