@@ -18,7 +18,13 @@ SELECT
     COALESCE(u."name", '') AS name,
     u."email",
     COALESCE(r."role", '') AS role,
-    u."image"
+    u."image",
+    -- Whether this member has any device subscribed to push — the help
+    -- picker (HelpSheet) dims people a ping cannot reach before the sender
+    -- commits.
+    EXISTS (
+        SELECT 1 FROM "push_subscription" ps WHERE ps."user_id" = om."user_id"
+    ) AS has_push
 FROM "organization_members" om
 JOIN "users" u ON u."id" = om."user_id"
 LEFT JOIN LATERAL (

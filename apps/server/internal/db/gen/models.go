@@ -148,6 +148,17 @@ type FeedLog struct {
 	CreatedAt   pgtype.Timestamptz
 }
 
+type HelpRequest struct {
+	ID             string
+	FamilyID       string
+	FromUserID     string
+	ToUserID       string
+	Message        string
+	CreatedAt      pgtype.Timestamptz
+	AcknowledgedAt pgtype.Timestamptz
+	AcknowledgedBy *string
+}
+
 type Impersonation struct {
 	ImpersonatedToken string
 	AdminToken        string

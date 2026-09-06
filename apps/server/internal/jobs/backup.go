@@ -65,6 +65,7 @@ var BackupTables = []string{
 	"push_pref",
 	"api_key",
 	"admin_audit",
+	"help_request",
 }
 
 // DeliberatelyExcluded names tables that exist in the live schema but are
