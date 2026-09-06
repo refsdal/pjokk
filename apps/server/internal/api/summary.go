@@ -177,6 +177,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		Feeds    int32
 		IntakeMl int32
 		SleepMin int32
+		Sleeps   int32
 		SolidsG  int32
 		Wet      int32
 	}
@@ -216,8 +217,12 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		if rangeTo < to {
 			to = rangeTo
 		}
+		// One rule for both numbers: a session is today's if any part of
+		// it lies inside the window, so the count and the minutes never
+		// disagree about an overnight sleep.
 		if to > from {
 			today.SleepMin += int32(roundDiv(to-from, 60_000))
+			today.Sleeps++
 		}
 	}
 
@@ -235,6 +240,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 			Feeds    int32 `json:"feeds"`
 			IntakeMl int32 `json:"intakeMl"`
 			SleepMin int32 `json:"sleepMin"`
+			Sleeps   int32 `json:"sleeps"`
 			SolidsG  int32 `json:"solidsG"`
 			Wet      int32 `json:"wet"`
 		}{
@@ -243,6 +249,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 			Feeds:    today.Feeds,
 			IntakeMl: today.IntakeMl,
 			SleepMin: today.SleepMin,
+			Sleeps:   today.Sleeps,
 			SolidsG:  today.SolidsG,
 			Wet:      today.Wet,
 		},

@@ -3598,7 +3598,7 @@ components:
           nullable: true
         today:
           type: object
-          required: [feeds, intakeMl, solidsG, wet, dirty, both, sleepMin]
+          required: [feeds, intakeMl, solidsG, wet, dirty, both, sleepMin, sleeps]
           properties:
             feeds:
               type: integer
@@ -3621,6 +3621,13 @@ components:
             sleepMin:
               type: integer
               format: int32
+            sleeps:
+              type: integer
+              format: int32
+              description: >-
+                Sleep sessions with any part inside today's window, on the
+                same rule sleepMin uses for minutes — an overnight sleep that
+                ended this morning counts, a running one counts already.
     MedicineLog:
       type: object
       required:

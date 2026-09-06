@@ -1726,8 +1726,11 @@ type Summary struct {
 		Feeds    int32 `json:"feeds"`
 		IntakeMl int32 `json:"intakeMl"`
 		SleepMin int32 `json:"sleepMin"`
-		SolidsG  int32 `json:"solidsG"`
-		Wet      int32 `json:"wet"`
+
+		// Sleeps Sleep sessions with any part inside today's window, on the same rule sleepMin uses for minutes — an overnight sleep that ended this morning counts, a running one counts already.
+		Sleeps  int32 `json:"sleeps"`
+		SolidsG int32 `json:"solidsG"`
+		Wet     int32 `json:"wet"`
 	} `json:"today"`
 }
 

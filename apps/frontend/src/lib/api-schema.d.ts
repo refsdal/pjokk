@@ -1675,6 +1675,11 @@ export interface components {
                 both: number;
                 /** Format: int32 */
                 sleepMin: number;
+                /**
+                 * Format: int32
+                 * @description Sleep sessions with any part inside today's window, on the same rule sleepMin uses for minutes — an overnight sleep that ended this morning counts, a running one counts already.
+                 */
+                sleeps: number;
             };
         };
         MedicineLog: {
