@@ -36,6 +36,10 @@ func (d Deps) GetMe(ctx context.Context, _ gen.GetMeRequestObject) (gen.GetMeRes
 		// broken.
 		return nil, fmt.Errorf("api: GetMe reached with no session (RequireSession not wired?)")
 	}
+	// Once per account: copy Google's picture into our store (no-op unless
+	// this is the first /api/me after a Google sign-in — see avatar_import.go).
+	d.importGoogleAvatar(ctx, session.UserID)
+
 	me, err := d.buildMe(ctx, session)
 	if err != nil {
 		return nil, err

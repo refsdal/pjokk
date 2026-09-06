@@ -601,6 +601,14 @@ func buildDeps(ctx context.Context, cfg *config.Config) (api.Deps, func(), error
 		OpenSignup:     cfg.OpenSignup,
 		OAuthProviders: oauthProviders(cfg),
 
+		// Always wired: harmless without Google sign-in (users.image is only
+		// ever set by the Google profile mapping), and the host allowlist is
+		// the guard, not the presence of credentials.
+		AvatarImport: &api.AvatarImporter{
+			Client:      &http.Client{Timeout: 5 * time.Second},
+			AllowedHost: api.GoogleAvatarHost,
+		},
+
 		// ExtraRoutes stays nil, always. It is internal/testrig's seam for
 		// proving the middleware chain end-to-end; a real composition that
 		// set it would be mounting routes that exist in no OpenAPI spec.

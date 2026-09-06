@@ -118,6 +118,12 @@ type Deps struct {
 	OpenSignup     bool
 	OAuthProviders []string
 
+	// AvatarImport copies a Google profile picture into the object store on
+	// the first GET /api/me after sign-in (internal/api/avatar_import.go).
+	// nil disables the import; the test rig leaves it nil unless a test
+	// Configure()s one.
+	AvatarImport *AvatarImporter
+
 	// ExtraRoutes, when non-nil, is called while building the mux, after the
 	// standard routes are registered and before the /api/ catch-all. protect
 	// wraps a handler in the SAME Session + RequireFamily chain every real
