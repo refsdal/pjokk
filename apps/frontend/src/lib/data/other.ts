@@ -136,9 +136,9 @@ export function useMeasurements(babyId: string | undefined) {
     queryKey: ["other", "measurement", babyId, "all"],
     enabled: !!babyId,
     queryFn: async () =>
-      unwrap<
-        { time: string; type: "weight" | "length" | "head"; value: number }[]
-      >(otherGet("measurement", babyId!, 200)),
+      unwrap<{ time: string; type: MeasurementType; value: number }[]>(
+        otherGet("measurement", babyId!, 200),
+      ),
   });
 }
 

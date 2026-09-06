@@ -135,12 +135,16 @@ export function OtherLogSheet({
   babyId,
   kind,
   edit = null,
+  initialMeasurementType = "weight",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   babyId: string;
   kind: OtherKind;
   edit?: OtherEntry | null;
+  // Which measurement type the sheet opens on. Only meaningful for
+  // kind="measurement"; ignored otherwise.
+  initialMeasurementType?: MeasurementType;
 }) {
   const recent = useOtherList(kind, babyId, open && !edit);
 
@@ -151,7 +155,7 @@ export function OtherLogSheet({
   const [unit, setUnit] = useState<MedicineUnit>("ml");
   const [content, setContent] = useState("");
   const [title, setTitle] = useState("");
-  const [mtype, setMtype] = useState<MeasurementType>("weight");
+  const [mtype, setMtype] = useState<MeasurementType>(initialMeasurementType);
   const [value, setValue] = useState(5);
   const [side, setSide] = useState<"left" | "right" | "both">("left");
   const [amountMl, setAmountMl] = useState(100);
@@ -205,8 +209,14 @@ export function OtherLogSheet({
       if (kind === "note") setContent("");
       if (kind === "milestone") setTitle("");
       if (kind === "measurement") {
-        setMtype("weight");
-        setValue(lastMeasurement("weight") ?? measurementMeta.weight.fallback);
+        // Opening from the Home temperature card should land ON temperature:
+        // the type is already known, so making the user re-pick it is a tap
+        // spent restating something they just said.
+        setMtype(initialMeasurementType);
+        setValue(
+          lastMeasurement(initialMeasurementType) ??
+            measurementMeta[initialMeasurementType].fallback,
+        );
       }
       if (kind === "pump") {
         setSide(

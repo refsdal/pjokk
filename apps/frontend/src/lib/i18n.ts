@@ -182,6 +182,9 @@ const nb: Record<string, string> = {
   Temperature: "Temperatur",
   "Last temperature": "Siste temperatur",
   Fever: "Feber",
+  "Fever, rising": "Feber, stigende",
+  "Fever, easing": "Feber, synkende",
+  "Fever, steady": "Feber, stabil",
   "Could not save: ": "Kunne ikke lagre: ",
   "Could not update: ": "Kunne ikke oppdatere: ",
 

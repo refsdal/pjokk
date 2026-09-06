@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Icon as TablerIcon } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { formatRelative } from "@/lib/time";
@@ -13,6 +14,7 @@ export function StatusCard({
   sub,
   tintClass,
   onClick,
+  accessory,
 }: {
   icon: TablerIcon;
   label: string;
@@ -21,6 +23,9 @@ export function StatusCard({
   sub?: string;
   tintClass: string;
   onClick?: () => void;
+  // Optional trailing slot, pushed to the right edge. The temperature card
+  // puts its three-day sparkline here; nothing else uses it yet.
+  accessory?: ReactNode;
 }) {
   // Re-render each minute so "5 m ago" stays honest.
   const [, tick] = useState(0);
@@ -55,6 +60,9 @@ export function StatusCard({
         </p>
         {sub ? <p className="truncate text-xs text-muted">{sub}</p> : null}
       </div>
+      {accessory ? (
+        <div className="ml-auto shrink-0 pl-2">{accessory}</div>
+      ) : null}
     </button>
   );
 }
