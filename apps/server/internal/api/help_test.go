@@ -289,6 +289,47 @@ func TestHelpRoutesForbidAPIKeyAuth(t *testing.T) {
 	}
 }
 
-// Keeps the time import honest for Task 4's summary tests, which live in
-// this file too.
-var _ = time.Second
+func TestSummaryCarriesTheNewestHelpRequestWithinTwoHours(t *testing.T) {
+	a := testrig.App(t)
+	f := newHelpFamily(t, a)
+	babyID := a.NewBaby(f.familyID, "Nora")
+
+	none := a.Do(http.MethodGet, "/api/summary?babyId="+babyID, f.kariCookie, nil)
+	if none.Status != http.StatusOK {
+		t.Fatalf("summary status = %d, body %s", none.Status, none.Raw)
+	}
+	if none.JSON["openHelp"] != nil {
+		t.Errorf("openHelp with no requests = %v, want null", none.JSON["openHelp"])
+	}
+
+	first := a.Do(http.MethodPost, "/api/help", f.adminCookie, map[string]any{"memberId": f.kariMemberID, "message": "first"})
+	second := a.Do(http.MethodPost, "/api/help", f.adminCookie, map[string]any{"memberId": f.kariMemberID, "message": "second"})
+	if first.Status != http.StatusCreated || second.Status != http.StatusCreated {
+		t.Fatalf("create statuses = %d/%d", first.Status, second.Status)
+	}
+
+	// Everyone in the family sees it, and it is the NEWEST one.
+	got := a.Do(http.MethodGet, "/api/summary?babyId="+babyID, f.kariCookie, nil)
+	open, _ := got.JSON["openHelp"].(map[string]any)
+	if open == nil || open["id"] != second.JSON["id"] {
+		t.Fatalf("openHelp = %v, want the second request", got.JSON["openHelp"])
+	}
+	if open["delivered"] != float64(0) {
+		t.Errorf("delivered on summary = %v, want 0", open["delivered"])
+	}
+
+	// Acknowledged requests stay visible inside the window (the card goes calm).
+	id, _ := second.JSON["id"].(string)
+	a.Do(http.MethodPost, "/api/help/"+id+"/acknowledge", f.kariCookie, nil)
+	acked := a.Do(http.MethodGet, "/api/summary?babyId="+babyID, f.adminCookie, nil)
+	if open, _ := acked.JSON["openHelp"].(map[string]any); open == nil || open["acknowledgedByName"] != "Kari" {
+		t.Errorf("openHelp after ack = %v, want acknowledged by Kari", acked.JSON["openHelp"])
+	}
+
+	// Two hours and a minute later it is gone — no cron, just the window.
+	a.SetNow(time.Now().Add(2*time.Hour + time.Minute))
+	stale := a.Do(http.MethodGet, "/api/summary?babyId="+babyID, f.adminCookie, nil)
+	if stale.JSON["openHelp"] != nil {
+		t.Errorf("openHelp after the window = %v, want null", stale.JSON["openHelp"])
+	}
+}
