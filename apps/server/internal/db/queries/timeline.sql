@@ -22,7 +22,7 @@
 
 -- name: ListFeedsPage :many
 SELECT
-    f."id", f."baby_id", f."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    f."id", f."baby_id", f."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
     f."left_min", f."right_min", f."notes"
 FROM "feed_log" f
@@ -38,7 +38,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: ListDiapersPage :many
 SELECT
-    d."id", d."baby_id", d."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    d."id", d."baby_id", d."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     d."time", d."type", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
@@ -53,7 +53,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: ListSleepsPage :many
 SELECT
-    s."id", s."baby_id", s."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    s."id", s."baby_id", s."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     s."start_time", s."end_time", s."location", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
@@ -68,7 +68,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: ListMedicinePage :many
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     m."time", m."name", m."amount", m."unit", m."notes"
 FROM "medicine_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
@@ -83,7 +83,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: ListBathsPage :many
 SELECT
-    b."id", b."baby_id", b."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    b."id", b."baby_id", b."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     b."time", b."notes"
 FROM "bath_log" b
 JOIN "users" u ON u."id" = b."caretaker_id"
@@ -98,7 +98,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: ListNotesPage :many
 SELECT
-    n."id", n."baby_id", n."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    n."id", n."baby_id", n."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     n."time", n."content", n."notes"
 FROM "note_log" n
 JOIN "users" u ON u."id" = n."caretaker_id"
@@ -113,7 +113,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: ListMilestonesPage :many
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     m."time", m."title", m."notes"
 FROM "milestone_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
@@ -128,7 +128,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: ListMeasurementsPage :many
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     m."time", m."type", m."value", m."notes"
 FROM "measurement_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
@@ -143,7 +143,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: ListPumpsPage :many
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     p."time", p."side", p."amount_ml", p."duration_min", p."notes"
 FROM "pump_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"
@@ -158,7 +158,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: ListPlaysPage :many
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     p."type", p."start_time", p."end_time", p."notes"
 FROM "play_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"
@@ -173,7 +173,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: ListVaccinesPage :many
 SELECT
-    v."id", v."baby_id", v."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    v."id", v."baby_id", v."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     v."time", v."name", v."dose_number", v."schedule_slot", v."notes"
 FROM "vaccine_log" v
 JOIN "users" u ON u."id" = v."caretaker_id"

@@ -13,7 +13,7 @@ import (
 
 const activeSleep = `-- name: ActiveSleep :one
 SELECT
-    s."id", s."baby_id", s."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    s."id", s."baby_id", s."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     s."start_time", s."end_time", s."location", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
@@ -112,7 +112,7 @@ func (q *Queries) DeleteSleep(ctx context.Context, arg DeleteSleepParams) (int64
 
 const getSleep = `-- name: GetSleep :one
 SELECT
-    s."id", s."baby_id", s."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    s."id", s."baby_id", s."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     s."start_time", s."end_time", s."location", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
@@ -154,7 +154,7 @@ func (q *Queries) GetSleep(ctx context.Context, arg GetSleepParams) (GetSleepRow
 const listSleeps = `-- name: ListSleeps :many
 
 SELECT
-    s."id", s."baby_id", s."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    s."id", s."baby_id", s."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     s."start_time", s."end_time", s."location", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"

@@ -60,7 +60,7 @@ func (q *Queries) DeleteDiaper(ctx context.Context, arg DeleteDiaperParams) (int
 
 const getDiaper = `-- name: GetDiaper :one
 SELECT
-    d."id", d."baby_id", d."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    d."id", d."baby_id", d."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     d."time", d."type", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
@@ -100,7 +100,7 @@ func (q *Queries) GetDiaper(ctx context.Context, arg GetDiaperParams) (GetDiaper
 const listDiapers = `-- name: ListDiapers :many
 
 SELECT
-    d."id", d."baby_id", d."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    d."id", d."baby_id", d."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     d."time", d."type", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"

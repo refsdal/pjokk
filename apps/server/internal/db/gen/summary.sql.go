@@ -114,7 +114,7 @@ func (q *Queries) FeedsInRange(ctx context.Context, arg FeedsInRangeParams) ([]F
 
 const lastMeasurementOfType = `-- name: LastMeasurementOfType :many
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     m."time", m."type", m."value", m."notes"
 FROM "measurement_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"

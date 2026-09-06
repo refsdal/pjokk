@@ -339,21 +339,26 @@ type SleepLog struct {
 }
 
 type Users struct {
-	ID              string
-	PublicID        string
-	FirstName       *string
-	LastName        *string
-	Email           string
-	Password        *string
-	EmailVerifiedAt pgtype.Timestamptz
-	CreatedAt       pgtype.Timestamptz
-	UpdatedAt       pgtype.Timestamptz
-	DeletedAt       pgtype.Timestamptz
-	Name            *string
-	Image           *string
-	Role            *string
-	Banned          bool
-	BanReason       *string
+	ID               string
+	PublicID         string
+	FirstName        *string
+	LastName         *string
+	Email            string
+	Password         *string
+	EmailVerifiedAt  pgtype.Timestamptz
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+	DeletedAt        pgtype.Timestamptz
+	Name             *string
+	Image            *string
+	Role             *string
+	Banned           bool
+	BanReason        *string
+	Nickname         *string
+	Phone            *string
+	AvatarKey        *string
+	AvatarImportedAt pgtype.Timestamptz
+	DisplayName      *string
 }
 
 type VaccineDismissal struct {

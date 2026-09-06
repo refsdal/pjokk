@@ -1,0 +1,55 @@
+-- Queries backing the user profile (GET/PATCH /api/me, the avatar routes in
+-- internal/api/avatar.go, and the Google import in avatar_import.go). All
+-- user-scoped: a profile is global, not a family resource.
+
+-- name: GetUserProfile :one
+-- display_name is a generated column and therefore nullable to sqlc's eyes;
+-- COALESCE so Go sees a string.
+SELECT
+    "id",
+    COALESCE("name", '') AS name,
+    "nickname",
+    "phone",
+    COALESCE("display_name", '') AS display_name,
+    "avatar_key",
+    "avatar_imported_at",
+    "image"
+FROM "users"
+WHERE "id" = $1;
+
+-- name: UpdateUserProfile :exec
+-- Full-row write of the three editable fields; the handler resolves the
+-- PATCH tri-state (absent / null / value) before calling this.
+UPDATE "users"
+SET "name" = $2, "nickname" = $3, "phone" = $4, "updated_at" = now()
+WHERE "id" = $1;
+
+-- name: SetUserAvatar :exec
+-- NULL clears the photo. The caller deletes the previous object.
+UPDATE "users"
+SET "avatar_key" = $2, "updated_at" = now()
+WHERE "id" = $1;
+
+-- name: MarkAvatarImportAttempted :exec
+UPDATE "users"
+SET "avatar_imported_at" = $2
+WHERE "id" = $1;
+
+-- name: GetAvatarForViewer :one
+-- The viewer may see the target's photo when they ARE the target or share
+-- at least one family with them. No row for anyone else — and no row for a
+-- user without a photo — so the route answers 404 either way and never
+-- confirms that a user id exists.
+SELECT u."avatar_key"
+FROM "users" u
+WHERE u."id" = @target_id
+  AND u."avatar_key" IS NOT NULL
+  AND (
+    u."id" = @viewer_id
+    OR EXISTS (
+      SELECT 1
+      FROM "organization_members" a
+      JOIN "organization_members" b ON b."organization_id" = a."organization_id"
+      WHERE a."user_id" = @viewer_id AND b."user_id" = @target_id
+    )
+  );

@@ -15,10 +15,12 @@
 SELECT
     om."id" AS member_id,
     om."user_id",
-    COALESCE(u."name", '') AS name,
+    COALESCE(u."display_name", '') AS name,
     u."email",
     COALESCE(r."role", '') AS role,
-    u."image",
+    -- The storage key, not a URL: internal/api/babies.go's ListFamilyMembers
+    -- turns it into /api/users/{id}/avatar?v=… (nil = no photo).
+    u."avatar_key",
     -- Whether this member has any device subscribed to push — the help
     -- picker (HelpSheet) dims people a ping cannot reach before the sender
     -- commits.

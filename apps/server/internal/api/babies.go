@@ -239,7 +239,7 @@ func (d Deps) ListFamilyMembers(ctx context.Context, _ gen.ListFamilyMembersRequ
 			Name:     row.Name,
 			Email:    row.Email,
 			Role:     row.Role,
-			Image:    row.Image,
+			Image:    nil,
 			HasPush:  row.HasPush,
 		}
 	}
