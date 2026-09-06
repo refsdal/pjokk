@@ -547,7 +547,8 @@ export const MemberSchema = z.object({
   name: z.string(),
   email: z.string(),
   role: z.string(),
-  image: z.string().nullable(),
+  // "/api/users/{userId}/avatar?v=…" or null; see components/Avatar.tsx.
+  avatarUrl: z.string().nullable(),
   // At least one device subscribed to push — the help picker dims the rest.
   hasPush: z.boolean(),
 });

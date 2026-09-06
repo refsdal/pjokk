@@ -18,6 +18,7 @@ import {
   ActivePlayBanner,
   ActiveSleepBanner,
 } from "@/components/ActiveSessionBanner";
+import { Avatar } from "@/components/Avatar";
 import { BabySwitcher } from "@/components/BabySwitcher";
 import { HelpCard } from "@/components/HelpCard";
 import { InstallBanner } from "@/components/InstallBanner";
@@ -194,12 +195,11 @@ export function HomeScreen() {
       {/* Baby header */}
       <header className="flex items-center justify-between py-4">
         <BabySwitcher />
-        <div
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-accent-soft text-base font-bold text-accent"
-          title={me.data?.name}
-        >
-          {(me.data?.name ?? "?").slice(0, 1).toUpperCase()}
-        </div>
+        <Avatar
+          src={me.data?.avatarUrl}
+          name={me.data?.displayName ?? "?"}
+          size={11}
+        />
       </header>
 
       <div className="space-y-3 pb-tabbar">
