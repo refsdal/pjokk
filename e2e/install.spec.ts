@@ -1,5 +1,5 @@
-import type { Browser } from "@playwright/test";
-import { expect, seedDayMode, test } from "./fixtures";
+import type { Browser, TestInfo } from "@playwright/test";
+import { asDevice, expect, seedDayMode, test } from "./fixtures";
 import { freshFamily } from "./helpers";
 
 // The install hint, driven through a real browser because the frontend unit
@@ -20,8 +20,8 @@ const IOS_SAFARI =
 const IOS_WEBVIEW =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBAV/450.0.0.35.108]";
 
-async function iosContext(browser: Browser, userAgent: string) {
-  const ctx = await browser.newContext({ userAgent });
+async function iosContext(browser: Browser, testInfo: TestInfo, userAgent: string) {
+  const ctx = await browser.newContext({ ...asDevice(testInfo, 1), userAgent });
   await seedDayMode(ctx);
   return ctx;
 }
@@ -29,8 +29,8 @@ async function iosContext(browser: Browser, userAgent: string) {
 test("iOS Safari is shown how to add Pjokk to the home screen", async ({
   browser,
   request,
-}) => {
-  const ctx = await iosContext(browser, IOS_SAFARI);
+}, testInfo) => {
+  const ctx = await iosContext(browser, testInfo, IOS_SAFARI);
   const page = await ctx.newPage();
   await freshFamily(page, request, "installios");
 
@@ -50,8 +50,8 @@ test("iOS Safari is shown how to add Pjokk to the home screen", async ({
 test("an in-app browser is sent to Safari instead of hunting for a menu", async ({
   browser,
   request,
-}) => {
-  const ctx = await iosContext(browser, IOS_WEBVIEW);
+}, testInfo) => {
+  const ctx = await iosContext(browser, testInfo, IOS_WEBVIEW);
   const page = await ctx.newPage();
   await freshFamily(page, request, "installwv");
 
@@ -65,8 +65,8 @@ test("an in-app browser is sent to Safari instead of hunting for a menu", async 
 test("dismissing the install banner sticks across a reload", async ({
   browser,
   request,
-}) => {
-  const ctx = await iosContext(browser, IOS_SAFARI);
+}, testInfo) => {
+  const ctx = await iosContext(browser, testInfo, IOS_SAFARI);
   const page = await ctx.newPage();
   await freshFamily(page, request, "installdismiss");
 
@@ -88,8 +88,8 @@ test("dismissing the install banner sticks across a reload", async ({
 test("Settings keeps the install instructions reachable after a dismissal", async ({
   browser,
   request,
-}) => {
-  const ctx = await iosContext(browser, IOS_SAFARI);
+}, testInfo) => {
+  const ctx = await iosContext(browser, testInfo, IOS_SAFARI);
   const page = await ctx.newPage();
   await freshFamily(page, request, "installsettings");
   await page.getByRole("button", { name: "Dismiss", exact: true }).click();
@@ -103,10 +103,6 @@ test("Settings keeps the install instructions reachable after a dismissal", asyn
   // While on Settings: the footer's version is the binary's own build
   // version, stamped by scripts/build-artifacts.sh from PJOKK_VERSION —
   // the same string the preview image is tagged with in CI — or "dev".
-  // Asserted here rather than in a spec of its own because every extra
-  // sign-in counts against the 20-per-10-minutes credential limiter the
-  // whole suite shares (api.go's auth-signin), and the suite sits close
-  // to it.
   await expect(
     page.getByText(`Pjokk ${process.env.PJOKK_VERSION ?? "dev"}`),
   ).toBeVisible();

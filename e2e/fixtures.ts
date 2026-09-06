@@ -1,8 +1,47 @@
 import {
   type BrowserContext,
+  type TestInfo,
   expect,
   test as base,
 } from "@playwright/test";
+
+// Every test is its own client.
+//
+// The app rate-limits credential sign-in per client address — Limen's 5 per
+// 10 s, and Pjokk's own 20 per 10 minutes (api.go's auth-signin, in
+// Postgres) — and every test here creates a fresh account and signs in. From
+// one address the whole suite is one client with ~19 sign-ins per run, so a
+// single retry anywhere tipped the last tests into 429. Real users never
+// look like that; a whole family behind one ingress does not either, since
+// the ingress forwards each device's address. So the e2e stack runs with
+// TRUSTED_PROXY_HOPS=1 (scripts/e2e-stack.sh, ci.yml) and each test sends
+// its own X-Forwarded-For — a distinct 10.x.y.z per test and per retry, so
+// no test's budget is another's. The production limit is untouched.
+function hash(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h;
+}
+
+// `device` tells apart the contexts one test opens (the second caretaker's
+// phone in help.spec.ts and invite.spec.ts): 0 is the default context.
+export function clientAddress(testInfo: TestInfo, device = 0): string {
+  const h = hash(testInfo.testId);
+  return `10.${(h >>> 8) & 255}.${h & 255}.${testInfo.retry * 16 + device + 1}`;
+}
+
+// Options for a context a spec opens by hand — `browser.newContext(
+// asDevice(testInfo, 1))` — so it, too, is its own client. Spread extra
+// options after it.
+export function asDevice(
+  testInfo: TestInfo,
+  device: number,
+): { extraHTTPHeaders: Record<string, string> } {
+  return { extraHTTPHeaders: { "X-Forwarded-For": clientAddress(testInfo, device) } };
+}
 
 // Force day-mode for the whole suite.
 //
@@ -30,10 +69,15 @@ export async function seedDayMode(context: BrowserContext): Promise<void> {
   });
 }
 
-// Every test's default `context` (and the `page` built on it) is seeded.
+// Every test's default `context` (and the `page` built on it) is seeded,
+// and it and the `request` fixture carry the test's own client address.
 // Specs that create their own context via `browser.newContext()` must call
-// `seedDayMode(ctx)` themselves — a raw context bypasses this fixture.
+// `seedDayMode(ctx)` themselves and pass `asDevice(testInfo, n)` — a raw
+// context bypasses both.
 export const test = base.extend({
+  extraHTTPHeaders: async ({}, use, testInfo) => {
+    await use(asDevice(testInfo, 0).extraHTTPHeaders);
+  },
   context: async ({ context }, use) => {
     await seedDayMode(context);
     await use(context);

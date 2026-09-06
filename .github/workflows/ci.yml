@@ -219,6 +219,10 @@ jobs:
       # browser — sign-in, family setup, logging flows. It needs signup open
       # (the suite creates its own accounts), so the app container restarts
       # with OPEN_SIGNUP=1 against the same database.
+      # TRUSTED_PROXY_HOPS=1 mirrors scripts/e2e-stack.sh: every test sends
+      # its own X-Forwarded-For (e2e/fixtures.ts) so the per-client sign-in
+      # limiters see one client per test, not the suite as one client. The
+      # smoke test above ran the image at its defaults.
       - name: Restart app with signup open
         run: |
           docker rm -f app
@@ -228,6 +232,7 @@ jobs:
             -e AUTH_SECRET=ci-smoke-test-secret-at-least-32-bytes-long \
             -e STORAGE_DRIVER=fs -e STORAGE_FS_PATH=/data \
             -e OPEN_SIGNUP=1 \
+            -e TRUSTED_PROXY_HOPS=1 \
             pjokk:ci
           for i in $(seq 1 30); do
             curl -fsS http://localhost:3000/healthz && break

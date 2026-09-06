@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { Locator, Page } from "@playwright/test";
-import { expect, seedDayMode, test } from "./fixtures";
+import { asDevice, expect, seedDayMode, test } from "./fixtures";
 import { apiSignIn, apiSignup, freshEmail, freshFamily } from "./helpers";
 
 // The whole "Ask for help" round trip between two caretakers, against the
@@ -53,7 +53,7 @@ test("a caretaker asks another for help and gets an answer", async ({
   browser,
   page,
   request,
-}) => {
+}, testInfo) => {
   // Two 16 s cache waits (see refetchHome) put this well past the 30 s default.
   test.setTimeout(120_000);
   // ---- 1. Sender: a fresh family, on Home ------------------------------
@@ -70,7 +70,7 @@ test("a caretaker asks another for help and gets an answer", async ({
 
   const targetEmail = freshEmail("helpee");
   await apiSignup(request, targetEmail);
-  const ctx = await browser.newContext();
+  const ctx = await browser.newContext(asDevice(testInfo, 1));
   await seedDayMode(ctx);
   const target = await ctx.newPage();
   await apiSignIn(target, targetEmail);

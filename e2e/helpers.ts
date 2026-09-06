@@ -21,7 +21,9 @@ export function freshEmail(tag: string): string {
  * weakened. The window only clears 10s after the *last accepted* request to
  * that path (a 429 response does not touch it), so once capped, nothing
  * shorter than a full 10s wait gets back in — 8 attempts at 1.5s gives ~12s
- * of headroom past that floor rather than landing right on it.
+ * of headroom past that floor rather than landing right on it. Since every
+ * test is its own client (fixtures.ts), that window is per test now, and
+ * the 20-per-10-minutes limiter above it is no longer a suite-wide budget.
  */
 async function postWithBackoff(
   request: APIRequestContext,
@@ -63,9 +65,9 @@ export async function apiSignup(
  * Signs in via the API: the response's session cookie lands in the page's
  * browser context (page.request shares the cookie jar). Fixtures use this —
  * the login SCREEN is exercised by auth.spec.ts alone, which also keeps the
- * suite's pressure on the auth-signin rate limiter (5/10s per IP, see
- * postWithBackoff above) low. Recreating the e2e stack resets the limiter
- * (its counters live in Postgres).
+ * suite's pressure on the auth-signin rate limiters (see postWithBackoff
+ * above) low. Each test has its own client address (fixtures.ts), so one
+ * test's sign-ins never count against another's.
  */
 export async function apiSignIn(page: Page, email: string): Promise<void> {
   const res = await postWithBackoff(page.request, "/api/auth/signin/credential", {

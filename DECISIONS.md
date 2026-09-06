@@ -1673,11 +1673,27 @@ GoReleaser tags with: `0.8.0` for a release, `0.9.0-pr.42.abc1234` (the
 pinned preview tag) for a PR. CI stamps the pinned tag into the binary and
 `e2e/install.spec.ts`'s Settings test asserts the footer shows it, so the
 tag someone pulls and the version they see under Settings cannot drift.
-(Not a spec of its own: every sign-in counts against the shared
-20-per-10-minutes credential limiter, and the suite sits close to it.)
 
 **OpenTelemetry, when it lands, reads the same variable.** The resource's
 `service.version` must be `buildinfo.Version` — not a second `-X` symbol,
 not a package.json field, not `git describe` at runtime. Three places
 naming one string is the whole point; a second source is a second thing to
 drift.
+
+## The e2e suite is many clients, not one (2026-09-06)
+
+**Each test sends its own client address.** Every spec creates a fresh
+account and signs in, and credential sign-in is rate-limited per client:
+Limen's 5 per 10 s and Pjokk's own 20 per 10 minutes (`api.go`'s
+`auth-signin`, in Postgres). From 127.0.0.1 the whole suite was ONE client
+with ~19 sign-ins a run — one CI retry anywhere pushed the tests after it
+into 429, which is how a flake in `auth.spec.ts` sank `sleep.spec.ts`.
+
+**The stack trusts one proxy hop; the limits are untouched.** The e2e
+stack (`scripts/e2e-stack.sh`, the `image` job in `ci.yml`) runs with
+`TRUSTED_PROXY_HOPS=1`, and `e2e/fixtures.ts` gives every test — and every
+retry, and every extra context a test opens — a distinct `10.x.y.z` in
+`X-Forwarded-For`. That is what production behind an ingress looks like
+too: a family on one router is many devices, not one. Weakening the limit
+for tests, or adding an env knob to do so, would have been the wrong lever;
+the smoke test before it still runs the image at its defaults.
