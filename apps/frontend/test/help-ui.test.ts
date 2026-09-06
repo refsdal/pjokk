@@ -133,6 +133,12 @@ describe("last-picked member storage", () => {
     expect(() => writeLastHelpMember("fam-1", "m-kari")).not.toThrow();
     expect(readLastHelpMember("fam-1")).toBeNull();
   });
+
+  it("survives a stored value that parses but isn't an object", () => {
+    store.set("pjokk.help.lastMember", "null");
+    expect(() => readLastHelpMember("fam-1")).not.toThrow();
+    expect(readLastHelpMember("fam-1")).toBeNull();
+  });
 });
 
 describe("presets", () => {

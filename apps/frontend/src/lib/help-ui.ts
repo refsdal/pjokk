@@ -71,7 +71,11 @@ const LAST_MEMBER_KEY = "pjokk.help.lastMember";
 function readMap(): Record<string, string> {
   try {
     const raw = localStorage.getItem(LAST_MEMBER_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
+      return {};
+    return parsed as Record<string, string>;
   } catch {
     return {};
   }

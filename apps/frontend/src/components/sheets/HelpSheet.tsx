@@ -26,7 +26,7 @@ export function HelpSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const me = useMe();
-  const members = useMembers();
+  const members = useMembers(open);
   const create = useCreateHelpRequest();
   const [picked, setPicked] = useState<string | null>(null);
   const [message, setMessage] = useState("");

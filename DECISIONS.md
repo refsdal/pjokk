@@ -1640,6 +1640,17 @@ stop the moment someone answers.
 **Session-only, no API keys.** The push says who is asking; a `pjk_` key
 has no person behind it. Same tier as `/api/push/*`.
 
+**A member without push is not dimmed, only labelled.** The design said
+"dimmed"; the first cut used `opacity-60` on the chip label, which washed
+out the SELECTED chip (white on accent). The "No notifications" sub-line
+carries the information on its own, so the opacity went.
+
+**`openHelp` rides along on `GET /api/summary` for API keys too.** Only
+the three help *writes* are session-only. The summary is family state
+(like a running sleep), and a Home Assistant dashboard that can show
+"Anders needs a hand" is a feature, not a leak — a read-only key already
+sees every caretaker's name on every log row.
+
 **The e2e spec is the visual check.** `e2e/help.spec.ts` drives the built
 artifact through the whole round trip in two browser contexts (send,
 card on both Homes, acknowledge, dismiss) and asserts the open card's

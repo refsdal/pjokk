@@ -170,11 +170,12 @@ func (d Deps) CreateHelpRequest(ctx context.Context, req gen.CreateHelpRequestRe
 	})
 	if err != nil {
 		// The row is already committed and the card will show regardless.
-		// ToUser still reports how many of the caller's devices succeeded
-		// even when it also errors (e.g. one of several subscriptions
-		// 410'd) — keep that count rather than zeroing it, so the sender
-		// only sees "hasn't turned on notifications" when nothing at all
-		// got through.
+		// The count is kept rather than zeroed so a Sender that reports
+		// partial success (e.g. delivered to some of several subscriptions
+		// before one 410'd) is honoured, and the sender only sees "hasn't
+		// turned on notifications" when nothing at all got through. The
+		// shipped WebPush.ToUser returns 0 alongside any error today, so
+		// this is defensive rather than load-bearing.
 		log.Printf("help: push to %s failed: %v", toUserID, err)
 	}
 	return gen.CreateHelpRequest201JSONResponse(serHelpRequest(row, delivered)), nil

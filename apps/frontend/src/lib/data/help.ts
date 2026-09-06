@@ -9,7 +9,11 @@ import { toast } from "../toast";
 // reaches nobody, and one that fires an hour later when the phone
 // reconnects is worse than an error toast now. The summary query carries
 // the request back to every screen (openHelp), so success just invalidates
-// it.
+// it. Each mutation also sets networkMode: "always": TanStack Query v5's
+// default ("online") would otherwise PAUSE an offline mutate() rather than
+// fail it, and persistQueryClient would then resume it whenever the phone
+// reconnects — exactly the queued-ping behaviour the paragraph above rules
+// out. "always" makes an offline call fail immediately into onError below.
 
 export type CreateHelpVars = { memberId: string; message?: string };
 export type HelpIdVars = { id: string };
@@ -22,6 +26,7 @@ export function useCreateHelpRequest() {
   return useMutation<HelpRequest, Error, CreateHelpVars>({
     mutationFn: async (vars) =>
       unwrap<HelpRequest>(client.POST("/api/help", { body: vars })),
+    networkMode: "always",
     onSuccess: () => invalidateSummary(qc),
     onError: (err) =>
       toast(
@@ -42,6 +47,7 @@ export function useAcknowledgeHelpRequest() {
           params: { path: { id } },
         }),
       ),
+    networkMode: "always",
     onSuccess: () => invalidateSummary(qc),
     onError: (err) => toast(`${t("Could not save")}: ${err.message}`, "error"),
   });
@@ -52,6 +58,7 @@ export function useDeleteHelpRequest() {
   return useMutation<unknown, Error, HelpIdVars>({
     mutationFn: async ({ id }) =>
       unwrap(client.DELETE("/api/help/{id}", { params: { path: { id } } })),
+    networkMode: "always",
     onSuccess: () => invalidateSummary(qc),
     onError: (err) => toast(t("Could not delete: ") + err.message, "error"),
   });
