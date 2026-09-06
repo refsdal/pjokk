@@ -9,7 +9,9 @@ import (
 	"github.com/refsdal/pjokk/server/internal/web"
 )
 
-// wantHeaders is REF §A9's exact header set, CSP included byte-for-byte.
+// wantHeaders is REF §A9's exact header set, CSP included byte-for-byte
+// except for one deliberate addition: `blob:` in img-src, for the
+// on-device avatar crop (see web.go's csp comment).
 var wantHeaders = map[string]string{
 	"X-Content-Type-Options":    "nosniff",
 	"X-Frame-Options":           "DENY",
@@ -17,7 +19,7 @@ var wantHeaders = map[string]string{
 	"Strict-Transport-Security": "max-age=31536000; includeSubDomains",
 	"Permissions-Policy":        "camera=(), microphone=(), geolocation=()",
 	"X-Robots-Tag":              "noindex, nofollow",
-	"Content-Security-Policy":   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+	"Content-Security-Policy":   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
 }
 
 func assertA9Headers(t *testing.T, h http.Header) {

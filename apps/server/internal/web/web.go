@@ -36,8 +36,13 @@ var scalarHTML []byte
 // to serve at GET /api/docs after its own session gate.
 func ScalarHTML() []byte { return scalarHTML }
 
-// csp is REF §A9's Content-Security-Policy value, reproduced byte-exact.
-const csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+// csp is REF §A9's Content-Security-Policy value, reproduced byte-exact
+// except for one deliberate addition: `blob:` in img-src. The on-device
+// avatar crop (apps/frontend/src/lib/avatar-image.ts) decodes the picked
+// file through an object URL before uploading it, and object URLs are
+// created by the page itself — this does not open the door to loading a
+// third party's images, only the page's own in-memory blobs.
+const csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 
 // robotsBody is served at GET /robots.txt. Unconditional, and deliberately
 // so: this is the APP host, which is entirely behind auth and has nothing
