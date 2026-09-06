@@ -47,8 +47,13 @@ const nb: Record<string, string> = {
   "Saved offline — will sync": "Lagret uten nett — synkroniseres",
   "Could not save": "Kunne ikke lagre",
   "just now": "akkurat nå",
-  "m ago": "min siden",
-  "h ago": "t siden",
+  // formatRelative composes these: "1 time 32 minutter siden". "siden"
+  // trails in both languages, so one word order serves both.
+  ago: "siden",
+  minute: "minutt",
+  minutes: "minutter",
+  hour: "time",
+  hours: "timer",
   yesterday: "i går",
   min: "min",
   d: "d",
