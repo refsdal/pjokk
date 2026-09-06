@@ -31,6 +31,7 @@ import type { TemperatureStatus, TemperatureTrend } from "@/lib/measurements";
 import { Button } from "@/components/ui/button";
 import { DiaperSheet } from "@/components/sheets/DiaperSheet";
 import { FeedSheet } from "@/components/sheets/FeedSheet";
+import { HelpSheet } from "@/components/sheets/HelpSheet";
 import { MoreSheet, OtherLogSheet } from "@/components/sheets/OtherLogSheet";
 import { PlaySheet } from "@/components/sheets/PlaySheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
@@ -48,7 +49,15 @@ import { useSelectedBaby } from "@/lib/selected-baby";
 import { formatDuration } from "@/lib/time";
 import { useAppearance } from "@/lib/appearance";
 
-type OpenSheet = "feed" | "diaper" | "sleep" | "more" | "other" | "play" | null;
+type OpenSheet =
+  | "feed"
+  | "diaper"
+  | "sleep"
+  | "more"
+  | "other"
+  | "play"
+  | "help"
+  | null;
 
 function feedDetail(feed: {
   type: string;
@@ -327,6 +336,7 @@ export function HomeScreen() {
           setPlayType(type);
           setSheet("play");
         }}
+        onPickHelp={() => setSheet("help")}
       />
       <OtherLogSheet
         open={sheet === "other"}
@@ -340,6 +350,10 @@ export function HomeScreen() {
         onOpenChange={(o) => setSheet(o ? "play" : null)}
         babyId={baby.id}
         type={playType}
+      />
+      <HelpSheet
+        open={sheet === "help"}
+        onOpenChange={(o) => setSheet(o ? "help" : null)}
       />
 
       {/* Day-mode Home only: night mode is three actions and nothing else. */}

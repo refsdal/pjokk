@@ -49,6 +49,18 @@ const nb: Record<string, string> = {
   "On my way": "Jeg kommer",
   "Never mind": "Glem det",
   Done: "Ferdig",
+  "Ask for help": "Be om hjelp",
+  "Who?": "Hvem?",
+  "No one else in the family yet": "Ingen andre i familien ennå",
+  "No notifications": "Ingen varsler",
+  Message: "Melding",
+  "Message (optional)": "Melding (valgfritt)",
+  "Come here": "Kom hit",
+  "Bring a bottle": "Ta med en flaske",
+  "Take over": "Ta over",
+  Send: "Send",
+  "Sent to": "Sendt til",
+  "hasn't turned on notifications": "har ikke slått på varsler",
 
   // Sheets: shared
   Save: "Lagre",
