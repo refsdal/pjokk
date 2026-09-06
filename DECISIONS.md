@@ -1604,3 +1604,55 @@ that library deliberately and lazily, and a dozen points on a status card do
 not justify it. Its y-domain always contains 38.0 and draws it as a dashed
 line, because a squiggle scaled only to its own values has no reference —
 "below fever" needs something to be below.
+
+## Help requests (2026-09-06)
+
+**A help request is family state, not a notification.** "Ask for help"
+could have been a fire-and-forget push. It is a `help_request` row instead,
+because two things wanted persistence: an acknowledgement ("On my way")
+that pushes back to the sender, and a card everyone in the family sees
+until it is answered. The card reads the row through `/api/summary`'s
+`openHelp`, exactly as running sleep and play sessions do.
+
+**Any member may acknowledge; only the sender or an admin may dismiss.**
+The target gets the push, but whoever is closer should be able to answer.
+Dismissing someone else's call for help is the one thing the feature must
+not allow.
+
+**Expiry is a read-side two-hour window, not a job.** The summary query
+filters on `created_at`; nothing has to fire for a stale request to
+disappear. The nightly job purges rows after seven days purely so the
+table does not grow.
+
+**The rate limit is per user, inside the handler.** The existing
+`middleware.RateLimit` keys on the client address and runs before the
+session is resolved — right for invite-code guessing, wrong for a
+household on one IP where the abuse to slow is one person pinging
+another. `help.go`'s `hitUserLimit` uses the same key shape against the
+same store, keyed on the user id.
+
+**The card breaks the "tints on icons only" rule on purpose.** While open it
+has a red border, a radiating ring and a waving hand, in night mode too:
+red is not blue light, and a call for help is exactly the case worth waking
+someone for. `prefers-reduced-motion` gets the solid border alone. Both
+stop the moment someone answers.
+
+**Session-only, no API keys.** The push says who is asking; a `pjk_` key
+has no person behind it. Same tier as `/api/push/*`.
+
+**A member without push is not dimmed, only labelled.** The design said
+"dimmed"; the first cut used `opacity-60` on the chip label, which washed
+out the SELECTED chip (white on accent). The "No notifications" sub-line
+carries the information on its own, so the opacity went.
+
+**`openHelp` rides along on `GET /api/summary` for API keys too.** Only
+the three help *writes* are session-only. The summary is family state
+(like a running sleep), and a Home Assistant dashboard that can show
+"Anders needs a hand" is a feature, not a leak — a read-only key already
+sees every caretaker's name on every log row.
+
+**The e2e spec is the visual check.** `e2e/help.spec.ts` drives the built
+artifact through the whole round trip in two browser contexts (send,
+card on both Homes, acknowledge, dismiss) and asserts the open card's
+animation classes. It found the headline clipping at phone width before
+any person did; a screenshot is not a regression test.

@@ -54,9 +54,10 @@ export function useBabies() {
   });
 }
 
-export function useMembers() {
+export function useMembers(enabled = true) {
   return useQuery({
     queryKey: ["members"],
+    enabled,
     queryFn: async () => unwrap<Member[]>(client.GET("/api/family/members")),
   });
 }

@@ -1,6 +1,7 @@
 import { measurementMeta } from "@/lib/measurements";
 import {
   IconBath,
+  IconHandStop,
   IconMilk,
   IconNote,
   IconPill,
@@ -51,17 +52,20 @@ export const otherKindMeta: Record<
   pump: { label: "Pump", icon: IconMilk, tint: "text-feed" },
 };
 
-// The "More" picker: six activity types, one tap each.
+// The "More" picker: the extra activity types, vaccines, and asking another
+// caretaker for a hand — one tap each.
 export function MoreSheet({
   open,
   onOpenChange,
   onPick,
   onPickPlay,
+  onPickHelp,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPick: (kind: OtherKind) => void;
   onPickPlay: (type: PlayType) => void;
+  onPickHelp: () => void;
 }) {
   const navigate = useNavigate();
 
@@ -95,6 +99,15 @@ export function MoreSheet({
         onOpenChange(false);
         void navigate({ to: "/vaccines" });
       },
+    },
+    // Not a log at all — a ping to another caretaker. Lives here because
+    // More is the one place every extra action is reachable from.
+    {
+      key: "help",
+      label: "Ask for help",
+      icon: IconHandStop,
+      tint: "text-danger",
+      pick: onPickHelp,
     },
   ];
 

@@ -7,13 +7,14 @@ import {
   IconTemperature,
 } from "@tabler/icons-react";
 import { useState } from "react";
-import type { MeasurementType, PlayType } from "@pjokk/shared";
+import type { HelpRequest, MeasurementType, PlayType } from "@pjokk/shared";
 import { useNavigate } from "@tanstack/react-router";
 import {
   ActivePlayBanner,
   ActiveSleepBanner,
 } from "@/components/ActiveSessionBanner";
 import { BabySwitcher } from "@/components/BabySwitcher";
+import { HelpCard } from "@/components/HelpCard";
 import { InstallBanner } from "@/components/InstallBanner";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { LogButton } from "@/components/LogButton";
@@ -30,6 +31,7 @@ import type { TemperatureStatus, TemperatureTrend } from "@/lib/measurements";
 import { Button } from "@/components/ui/button";
 import { DiaperSheet } from "@/components/sheets/DiaperSheet";
 import { FeedSheet } from "@/components/sheets/FeedSheet";
+import { HelpSheet } from "@/components/sheets/HelpSheet";
 import { MoreSheet, OtherLogSheet } from "@/components/sheets/OtherLogSheet";
 import { PlaySheet } from "@/components/sheets/PlaySheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
@@ -47,7 +49,15 @@ import { useSelectedBaby } from "@/lib/selected-baby";
 import { formatDuration } from "@/lib/time";
 import { useAppearance } from "@/lib/appearance";
 
-type OpenSheet = "feed" | "diaper" | "sleep" | "more" | "other" | "play" | null;
+type OpenSheet =
+  | "feed"
+  | "diaper"
+  | "sleep"
+  | "more"
+  | "other"
+  | "play"
+  | "help"
+  | null;
 
 function feedDetail(feed: {
   type: string;
@@ -141,6 +151,7 @@ export function HomeScreen() {
   const s = summary.data;
   const active = s?.activeSleep ?? null;
   const activePlay = s?.activePlay ?? null;
+  const openHelp = s?.openHelp ?? null;
   const tempStatus = temperatureStatus(
     s?.lastTemperature?.value ?? 0,
     tempTrend,
@@ -163,6 +174,7 @@ export function HomeScreen() {
         activeSleepId={active?.id ?? null}
         recentFeeds={feeds.data ?? []}
         lastDiaper={s?.lastDiaper ?? null}
+        openHelp={openHelp}
       />
     );
   }
@@ -181,6 +193,10 @@ export function HomeScreen() {
       </header>
 
       <div className="space-y-3 pb-tabbar">
+        {/* Below the baby header, above everything else: a call for help is
+            the first thing to see, but it must not displace whose home this
+            is. */}
+        {openHelp && <HelpCard request={openHelp} />}
         {active && <ActiveSleepBanner session={active} />}
         {activePlay && <ActivePlayBanner session={activePlay} />}
 
@@ -320,6 +336,7 @@ export function HomeScreen() {
           setPlayType(type);
           setSheet("play");
         }}
+        onPickHelp={() => setSheet("help")}
       />
       <OtherLogSheet
         open={sheet === "other"}
@@ -333,6 +350,10 @@ export function HomeScreen() {
         onOpenChange={(o) => setSheet(o ? "play" : null)}
         babyId={baby.id}
         type={playType}
+      />
+      <HelpSheet
+        open={sheet === "help"}
+        onOpenChange={(o) => setSheet(o ? "help" : null)}
       />
 
       {/* Day-mode Home only: night mode is three actions and nothing else. */}
@@ -350,6 +371,7 @@ function NightHome({
   activeSleepId,
   recentFeeds,
   lastDiaper,
+  openHelp,
 }: {
   babyId: string;
   sheet: OpenSheet;
@@ -357,6 +379,7 @@ function NightHome({
   activeSleepId: string | null;
   recentFeeds: Parameters<typeof FeedSheet>[0]["recentFeeds"];
   lastDiaper: Parameters<typeof DiaperSheet>[0]["lastDiaper"];
+  openHelp: HelpRequest | null;
 }) {
   const wakeSleep = useWakeSleep();
   const nightAction = (
@@ -381,6 +404,7 @@ function NightHome({
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-end px-4 pb-tabbar">
       <div className="space-y-3 pb-4">
         <IconBabyCarriage className="mx-auto h-6 w-6 text-muted" />
+        {openHelp && <HelpCard request={openHelp} />}
         {activeSleepId
           ? nightAction(t("Wake"), IconMoon, () =>
               wakeSleep.mutate({ id: activeSleepId }),

@@ -31,3 +31,4 @@ test-results/
 # real health data about a child. They are working files, never artifacts.
 /backup/
 .import.sql
+.superpowers/

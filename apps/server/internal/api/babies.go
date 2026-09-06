@@ -224,7 +224,7 @@ func (d Deps) GetFamily(ctx context.Context, _ gen.GetFamilyRequestObject) (gen.
 }
 
 // ListFamilyMembers implements GET /api/family/members. REF: "Member[]
-// {memberId, userId, name, email, role, image}".
+// {memberId, userId, name, email, role, image, hasPush}".
 func (d Deps) ListFamilyMembers(ctx context.Context, _ gen.ListFamilyMembersRequestObject) (gen.ListFamilyMembersResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	rows, err := d.Q.ListFamilyMembers(ctx, fam.FamilyID)
@@ -240,6 +240,7 @@ func (d Deps) ListFamilyMembers(ctx context.Context, _ gen.ListFamilyMembersRequ
 			Email:    row.Email,
 			Role:     row.Role,
 			Image:    row.Image,
+			HasPush:  row.HasPush,
 		}
 	}
 	return gen.ListFamilyMembers200JSONResponse(out), nil

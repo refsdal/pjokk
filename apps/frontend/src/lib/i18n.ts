@@ -35,6 +35,33 @@ const nb: Record<string, string> = {
   "Add baby": "Legg til baby",
   solids: "fast føde",
 
+  // Help requests
+  "Too many requests — wait a few minutes":
+    "For mange forespørsler – vent noen minutter",
+  "Could not send": "Kunne ikke sende",
+  "Help requested": "Ber om hjelp",
+  "On the way": "På vei",
+  "needs a hand": "trenger en hånd",
+  "needs a hand from": "trenger hjelp fra",
+  "is on the way": "er på vei",
+  Someone: "Noen",
+  someone: "noen",
+  "On my way": "Jeg kommer",
+  "Never mind": "Glem det",
+  Done: "Ferdig",
+  "Ask for help": "Be om hjelp",
+  "Who?": "Hvem?",
+  "No one else in the family yet": "Ingen andre i familien ennå",
+  "No notifications": "Ingen varsler",
+  Message: "Melding",
+  "Message (optional)": "Melding (valgfritt)",
+  "Come here": "Kom hit",
+  "Bring a bottle": "Ta med en flaske",
+  "Take over": "Ta over",
+  Send: "Send",
+  "Sent to": "Sendt til",
+  "hasn't turned on notifications": "har ikke slått på varsler",
+
   // Sheets: shared
   Save: "Lagre",
   Delete: "Slett",

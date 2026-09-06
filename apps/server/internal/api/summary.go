@@ -54,7 +54,8 @@ func floorDivInt64(a, b int64) int64 {
 }
 
 // GetSummary implements GET /api/summary. REF: "{lastFeed, lastDiaper,
-// activeSleep, lastSleep, activePlay, today} / 404 unknown baby".
+// activeSleep, lastSleep, activePlay, lastTemperature, openHelp, today} /
+// 404 unknown baby".
 func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (gen.GetSummaryResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	babyID := req.Params.BabyId
@@ -143,6 +144,20 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		return nil, err
 	}
 
+	// Family-level, not per baby, but Home polls this query and nothing
+	// else — see help.go for the window. Newest request in the window,
+	// whatever its state; the SPA derives open/acknowledged from the row.
+	var openHelp *gen.HelpRequest
+	if h, err := d.Q.NewestHelpRequest(ctx, dbgen.NewestHelpRequestParams{
+		FamilyID: fam.FamilyID,
+		Since:    pgtype.Timestamptz{Time: d.Now().Add(-helpRequestWindow), Valid: true},
+	}); err == nil {
+		v := serNewestHelpRow(h)
+		openHelp = &v
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+
 	feeds, err := d.Q.FeedsInRange(ctx, dbgen.FeedsInRangeParams{FamilyID: fam.FamilyID, BabyID: babyID, FromTs: fromTS, ToTs: toTS})
 	if err != nil {
 		return nil, err
@@ -213,6 +228,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		LastSleep:       lastSleep,
 		ActivePlay:      activePlay,
 		LastTemperature: lastTemperature,
+		OpenHelp:        openHelp,
 		Today: struct {
 			Both     int32 `json:"both"`
 			Dirty    int32 `json:"dirty"`

@@ -10,7 +10,7 @@
 // Two jobs, matching the two cron expressions the Cloudflare deployment used
 // to carry in wrangler.jsonc:
 //
-//	nightly  — 15 3 * * *    backup → prune → purge orphans → sweep counters
+//	nightly  — 15 3 * * *    backup → prune → purge orphans → purge help requests → sweep counters
 //	frequent — */15 * * * *  feed reminders → calendar reminders
 //
 // Cloudflare guaranteed exactly one invocation per schedule no matter how
@@ -116,6 +116,14 @@ func runNightly(ctx context.Context, d Deps) error {
 	}
 	if purged > 0 {
 		log.Printf("cron: purged %d orphan account(s)", purged)
+	}
+
+	helpPurged, err := jobs.PurgeHelpRequests(ctx, d.Deps, now)
+	if err != nil {
+		return err
+	}
+	if helpPurged > 0 {
+		log.Printf("cron: purged %d old help request(s)", helpPurged)
 	}
 
 	// There is no plan reconciliation here. cron.ts ran reconcilePlans as a

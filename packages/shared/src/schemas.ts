@@ -377,6 +377,25 @@ export const TimelineSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
+// --- Help requests ---
+
+// One caretaker asking a specific other member for a hand. Family state,
+// not a log: no baby, not on the timeline. Open while acknowledgedAt is
+// null; shown on Home for two hours after createdAt whatever its state.
+export const HelpRequestSchema = z.object({
+  id: z.string(),
+  fromUserId: z.string(),
+  fromName: z.string(),
+  toUserId: z.string(),
+  toName: z.string(),
+  message: z.string(),
+  createdAt: isoTime(),
+  acknowledgedAt: isoTime().nullable(),
+  acknowledgedByName: z.string().nullable(),
+  // Devices the creation push reached; only meaningful on the POST response.
+  delivered: z.number().int(),
+});
+
 // --- Home screen summary: one query answers "when did she last …" ---
 
 export const SummarySchema = z.object({
@@ -390,6 +409,8 @@ export const SummarySchema = z.object({
   // of that TYPE, so weighing the baby afterwards does not displace it.
   // Backs the Home screen's temperature card.
   lastTemperature: MeasurementLogSchema.nullable(),
+  // The family's newest help request within the last two hours, or null.
+  openHelp: HelpRequestSchema.nullable(),
   // Local-day totals for the requester's timezone (see the `tz` query param).
   today: z.object({
     feeds: z.number().int(),
@@ -525,6 +546,8 @@ export const MemberSchema = z.object({
   email: z.string(),
   role: z.string(),
   image: z.string().nullable(),
+  // At least one device subscribed to push — the help picker dims the rest.
+  hasPush: z.boolean(),
 });
 
 export const FamilySchema = z.object({
@@ -704,6 +727,7 @@ export type DiaperLog = z.infer<typeof DiaperLogSchema>;
 export type SleepLog = z.infer<typeof SleepLogSchema>;
 export type SleepLocation = z.infer<typeof SleepLocationSchema>;
 export type Summary = z.infer<typeof SummarySchema>;
+export type HelpRequest = z.infer<typeof HelpRequestSchema>;
 export type Member = z.infer<typeof MemberSchema>;
 export type Invite = z.infer<typeof InviteSchema>;
 export type Family = z.infer<typeof FamilySchema>;

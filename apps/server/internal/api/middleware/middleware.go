@@ -247,6 +247,15 @@ func RequireFamily(d Deps) func(http.Handler) http.Handler {
 	}
 }
 
+// IsAdminRole reports whether role is a family-administration role. "owner"
+// is accepted alongside "admin" for the reason RequireAdmin's comment gives.
+// Exported for handlers that gate ONE branch on the role (a help request
+// may be dismissed by its sender OR an admin — internal/api/help.go) rather
+// than the whole operation, which is what the tierAdmin chain is for.
+func IsAdminRole(role string) bool {
+	return role == auth.RoleAdmin || role == roleOwner
+}
+
 // RequireAdmin gates the family-administration surface — settings, invites,
 // keys, billing (REF §A5 item 3). It reads the role RequireFamily resolved,
 // so it must be mounted behind it.
@@ -262,7 +271,7 @@ func RequireAdmin() func(http.Handler) http.Handler {
 				respond.Error(w, http.StatusForbidden, "Not available to API keys", "FORBIDDEN")
 				return
 			}
-			if family.MemberRole != auth.RoleAdmin && family.MemberRole != roleOwner {
+			if !IsAdminRole(family.MemberRole) {
 				respond.Error(w, http.StatusForbidden, "Admin only", "FORBIDDEN")
 				return
 			}

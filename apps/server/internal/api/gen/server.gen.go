@@ -145,6 +145,15 @@ type ServerInterface interface {
 	// UpdateFeed Partial update. A field sent as `null` clears the column; an omitted field is left unchanged; an empty body is a no-op that returns the feed unchanged. `time`/`type` are not nullable — only settable or omitted. See internal/api/feeds.go for how this endpoint tells "omitted" apart from "null" (the generated request type alone cannot).
 	// (PATCH /api/feeds/{id})
 	UpdateFeed(w http.ResponseWriter, r *http.Request, id IdPath)
+	// CreateHelpRequest Ask another member of the active family for a hand. The target gets a push notification naming the caller; the request itself is family state (Summary.openHelp) until acknowledged, dismissed, or two hours old. Session-only: the notification is attributed to a person and a pjk_ key has none. Rate-limited per CALLER (5 per 5 minutes) inside the handler — the IP-keyed middleware limiter would throttle a whole household together. A push failure does not fail the request; read `delivered`.
+	// (POST /api/help)
+	CreateHelpRequest(w http.ResponseWriter, r *http.Request)
+	// DeleteHelpRequest Dismiss a request ("Never mind" while open, "Done" once answered). Sender or family admin only.
+	// (DELETE /api/help/{id})
+	DeleteHelpRequest(w http.ResponseWriter, r *http.Request, id IdPath)
+	// AcknowledgeHelpRequest "On my way". ANY family member may acknowledge, not only the target — whoever is closer answers. Idempotent: a second acknowledge returns the row unchanged and sends nothing. The first one pushes "<name> is on the way" to the sender, unless the sender is acknowledging their own request.
+	// (POST /api/help/{id}/acknowledge)
+	AcknowledgeHelpRequest(w http.ResponseWriter, r *http.Request, id IdPath)
 	// ListInvites Invite codes ever issued for the family, newest first — used and revoked ones included. Family admin only.
 	// (GET /api/invites)
 	ListInvites(w http.ResponseWriter, r *http.Request)
@@ -1333,6 +1342,72 @@ func (siw *ServerInterfaceWrapper) UpdateFeed(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateFeed(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateHelpRequest operation middleware
+func (siw *ServerInterfaceWrapper) CreateHelpRequest(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateHelpRequest(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteHelpRequest operation middleware
+func (siw *ServerInterfaceWrapper) DeleteHelpRequest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteHelpRequest(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AcknowledgeHelpRequest operation middleware
+func (siw *ServerInterfaceWrapper) AcknowledgeHelpRequest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AcknowledgeHelpRequest(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3137,6 +3212,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/push/prefs", wrapper.GetPushPrefs)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/push/prefs", wrapper.UpdatePushPrefs)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/push/test", wrapper.TestPush)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/help", wrapper.CreateHelpRequest)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/help/{id}/acknowledge", wrapper.AcknowledgeHelpRequest)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/help/{id}", wrapper.DeleteHelpRequest)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/keys", wrapper.ListApiKeys)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/keys", wrapper.CreateApiKey)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/keys/{id}", wrapper.RevokeApiKey)
@@ -4638,6 +4716,156 @@ func (response UpdateFeed200JSONResponse) VisitUpdateFeedResponse(w http.Respons
 type UpdateFeed404JSONResponse Error
 
 func (response UpdateFeed404JSONResponse) VisitUpdateFeedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateHelpRequestRequestObject struct {
+	Body *CreateHelpRequestJSONRequestBody
+}
+
+type CreateHelpRequestResponseObject interface {
+	VisitCreateHelpRequestResponse(w http.ResponseWriter) error
+}
+
+type CreateHelpRequest201JSONResponse HelpRequest
+
+func (response CreateHelpRequest201JSONResponse) VisitCreateHelpRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateHelpRequest400JSONResponse Error
+
+func (response CreateHelpRequest400JSONResponse) VisitCreateHelpRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateHelpRequest404JSONResponse Error
+
+func (response CreateHelpRequest404JSONResponse) VisitCreateHelpRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateHelpRequest429JSONResponse Error
+
+func (response CreateHelpRequest429JSONResponse) VisitCreateHelpRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteHelpRequestRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteHelpRequestResponseObject interface {
+	VisitDeleteHelpRequestResponse(w http.ResponseWriter) error
+}
+
+type DeleteHelpRequest200JSONResponse Ok
+
+func (response DeleteHelpRequest200JSONResponse) VisitDeleteHelpRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteHelpRequest403JSONResponse Error
+
+func (response DeleteHelpRequest403JSONResponse) VisitDeleteHelpRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteHelpRequest404JSONResponse Error
+
+func (response DeleteHelpRequest404JSONResponse) VisitDeleteHelpRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcknowledgeHelpRequestRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type AcknowledgeHelpRequestResponseObject interface {
+	VisitAcknowledgeHelpRequestResponse(w http.ResponseWriter) error
+}
+
+type AcknowledgeHelpRequest200JSONResponse HelpRequest
+
+func (response AcknowledgeHelpRequest200JSONResponse) VisitAcknowledgeHelpRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcknowledgeHelpRequest404JSONResponse Error
+
+func (response AcknowledgeHelpRequest404JSONResponse) VisitAcknowledgeHelpRequestResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -6793,6 +7021,15 @@ type StrictServerInterface interface {
 	// UpdateFeed Partial update. A field sent as `null` clears the column; an omitted field is left unchanged; an empty body is a no-op that returns the feed unchanged. `time`/`type` are not nullable — only settable or omitted. See internal/api/feeds.go for how this endpoint tells "omitted" apart from "null" (the generated request type alone cannot).
 	// (PATCH /api/feeds/{id})
 	UpdateFeed(ctx context.Context, request UpdateFeedRequestObject) (UpdateFeedResponseObject, error)
+	// CreateHelpRequest Ask another member of the active family for a hand. The target gets a push notification naming the caller; the request itself is family state (Summary.openHelp) until acknowledged, dismissed, or two hours old. Session-only: the notification is attributed to a person and a pjk_ key has none. Rate-limited per CALLER (5 per 5 minutes) inside the handler — the IP-keyed middleware limiter would throttle a whole household together. A push failure does not fail the request; read `delivered`.
+	// (POST /api/help)
+	CreateHelpRequest(ctx context.Context, request CreateHelpRequestRequestObject) (CreateHelpRequestResponseObject, error)
+	// DeleteHelpRequest Dismiss a request ("Never mind" while open, "Done" once answered). Sender or family admin only.
+	// (DELETE /api/help/{id})
+	DeleteHelpRequest(ctx context.Context, request DeleteHelpRequestRequestObject) (DeleteHelpRequestResponseObject, error)
+	// AcknowledgeHelpRequest "On my way". ANY family member may acknowledge, not only the target — whoever is closer answers. Idempotent: a second acknowledge returns the row unchanged and sends nothing. The first one pushes "<name> is on the way" to the sender, unless the sender is acknowledging their own request.
+	// (POST /api/help/{id}/acknowledge)
+	AcknowledgeHelpRequest(ctx context.Context, request AcknowledgeHelpRequestRequestObject) (AcknowledgeHelpRequestResponseObject, error)
 	// ListInvites Invite codes ever issued for the family, newest first — used and revoked ones included. Family admin only.
 	// (GET /api/invites)
 	ListInvites(ctx context.Context, request ListInvitesRequestObject) (ListInvitesResponseObject, error)
@@ -8188,6 +8425,89 @@ func (sh *strictHandler) UpdateFeed(w http.ResponseWriter, r *http.Request, id I
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateFeedResponseObject); ok {
 		if err := validResponse.VisitUpdateFeedResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateHelpRequest operation middleware
+func (sh *strictHandler) CreateHelpRequest(w http.ResponseWriter, r *http.Request) {
+	var request CreateHelpRequestRequestObject
+
+	var body CreateHelpRequestJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateHelpRequest(ctx, request.(CreateHelpRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateHelpRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateHelpRequestResponseObject); ok {
+		if err := validResponse.VisitCreateHelpRequestResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteHelpRequest operation middleware
+func (sh *strictHandler) DeleteHelpRequest(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteHelpRequestRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteHelpRequest(ctx, request.(DeleteHelpRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteHelpRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteHelpRequestResponseObject); ok {
+		if err := validResponse.VisitDeleteHelpRequestResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AcknowledgeHelpRequest operation middleware
+func (sh *strictHandler) AcknowledgeHelpRequest(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request AcknowledgeHelpRequestRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AcknowledgeHelpRequest(ctx, request.(AcknowledgeHelpRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AcknowledgeHelpRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AcknowledgeHelpRequestResponseObject); ok {
+		if err := validResponse.VisitAcknowledgeHelpRequestResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
