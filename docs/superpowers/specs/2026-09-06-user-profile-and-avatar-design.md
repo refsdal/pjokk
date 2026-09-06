@@ -10,9 +10,10 @@ header shows an "A" in a circle where a face should be, the timeline says
 "by Anders Refsdal Olsen" where the family says "by Pappa", and there is no
 screen where a user can change any of it. Google already hands us a display
 name and a picture URL at sign-in — the URL is even stored — but nothing
-renders it, and the app's Content-Security-Policy (`img-src 'self' data:`)
-would block it if something did. There is also no way to move between
-families for a member of more than one, although the server, Limen's
+renders it, and the app's Content-Security-Policy (`img-src 'self' data:
+blob: — blob: was added by this work for the crop`) would block it if
+something did. There is also no way to move between families for a member
+of more than one, although the server, Limen's
 `organizations:switch` route and the CLAUDE.md IA ("caretaker chip
 (avatar → family switcher)") all already provide for it.
 

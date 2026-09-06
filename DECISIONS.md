@@ -1697,3 +1697,48 @@ retry, and every extra context a test opens — a distinct `10.x.y.z` in
 too: a family on one router is many devices, not one. Weakening the limit
 for tests, or adding an env knob to do so, would have been the wrong lever;
 the smoke test before it still runs the image at its defaults.
+
+## User profile, avatars, and no family in the URL (2026-09-06)
+
+- **`display_name` is a stored generated column** — nickname when set, else
+  the full name. Every join that shows a person to their family reads it
+  (logs, timeline, summary, CSV export, members, calendar). The session's
+  own name, the admin audit trail and the API-key join keep the full name.
+  Neither the handlers nor the SPA know the rule.
+- **The login email is shown, not edited, and there is no contact email.**
+  Limen's `users.email` is NOT NULL, UNIQUE and the credential subject;
+  every account today has a real address. A nullable `contact_email` is a
+  one-column change if a provider without email ever ships. Deferred, not
+  rejected.
+- **Phone is private.** Not on `Member`, not in the Caretakers list, not on
+  the help card. A "share with my families" toggle is the natural way to
+  open that later.
+- **Avatars go through the storage port and are re-encoded server-side to
+  JPEG.** Proves the bytes are an image whatever the declared type, bounds
+  the pixel count from the header before decoding, and strips EXIF (no GPS
+  fix reaches the store). They are outside the nightly row dump, like
+  vaccine documents. Served only through `/api/users/{id}/avatar`, to the
+  owner and to co-members; everyone else gets 404, never 403. Removing a
+  photo deletes the object BEFORE clearing the key, so a failed delete
+  leaves the key in place and a retry finishes the job.
+- **The Google picture is imported once**, on the first `GET /api/me`,
+  synchronously with a 3 s cap, host-allowlisted to googleusercontent.com.
+  The attempt is marked whatever happens, so a removed photo never comes
+  back on the next Google sign-in. The allowlist is re-checked on every
+  redirect hop, and the "attempted" mark is an atomic conditional UPDATE so
+  two simultaneous first loads cannot both import.
+- **No family slug in the URL.** The server resolves the family from the
+  session and scopes every query; the client never names one. A URL family
+  would be a second source of truth (tabs disagree, a switch per
+  navigation, PWA start URL / precache / push links / `/join/CODE` all
+  harder) for a switch that happens rarely. The client-side hazards — stale
+  family-level caches, replayed offline writes, a second tab — are handled
+  by the switch flow (refuse with paused mutations, then `resetCache`) and
+  the family fence in the shell (`localStorage` family id vs `/api/me`,
+  reset + reload on mismatch).
+- **Nothing else moved out of Settings.** Notifications are per user but
+  configured per device; Appearance is per device.
+- **The SPA CSP allows `blob:` images.** The on-device avatar crop decodes
+  the picked file through an object URL before uploading; `blob:` URLs are
+  created by the page itself, so no third-party image load is enabled. The
+  landing site's CSP is unchanged.
