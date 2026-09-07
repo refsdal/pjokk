@@ -412,6 +412,17 @@ const nb: Record<string, string> = {
   Notifications: "Varsler",
   "Enable notifications": "Slå på varsler",
   "Disable on this device": "Slå av på denne enheten",
+  // Milestone photos (#48)
+  Photos: "Bilder",
+  Photo: "Bilde",
+  "Add photo": "Legg til bilde",
+  "Delete photo": "Slett bilde",
+  "Photo ready": "Bilde klart",
+  "Could not upload the photo": "Kunne ikke laste opp bildet",
+  "Saved offline — add the photo from the timeline later":
+    "Lagret uten nett — legg til bildet fra tidslinjen senere",
+  of: "av",
+  "no limit": "ingen grense",
   // Nap window guide (#46)
   "Nap window": "Lurvindu",
   "In the nap window": "I lurvinduet",

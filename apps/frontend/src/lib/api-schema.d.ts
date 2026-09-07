@@ -1999,6 +1999,20 @@ export interface components {
             content?: string;
             notes?: string | null;
         };
+        /** @description One photo attached to a milestone (issue #48): a server re-encoded JPEG, fetched through `/api/photos/{id}` — the object store is never public. Uploaded as multipart to `POST /api/milestones/{id}/photos` (hand-routed, see internal/api/photos.go); at most three per milestone and a per-family quota (PHOTO_QUOTA_MB). */
+        MilestonePhoto: {
+            id: string;
+            /** Format: int32 */
+            width: number;
+            /** Format: int32 */
+            height: number;
+            /**
+             * Format: int32
+             * @description Stored bytes.
+             */
+            size: number;
+            url: string;
+        };
         MilestoneLog: {
             id: string;
             babyId: string;
@@ -2008,6 +2022,7 @@ export interface components {
             /** Format: date-time */
             time: string;
             title: string;
+            photos: components["schemas"]["MilestonePhoto"][];
         };
         CreateMilestone: {
             babyId: string;

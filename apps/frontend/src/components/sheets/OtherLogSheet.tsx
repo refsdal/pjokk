@@ -4,9 +4,11 @@ import {
   IconHandStop,
   IconMilk,
   IconNote,
+  IconPhoto,
   IconPill,
   IconRuler,
   IconSparkles,
+  IconTrash,
   IconVaccine,
   type Icon as TablerIcon,
 } from "@tabler/icons-react";
@@ -15,6 +17,7 @@ import { useEffect, useState } from "react";
 import type {
   FeedTimer,
   MeasurementType,
+  MilestonePhoto,
   MedicineUnit,
   PlayType,
   TimelineEntry,
@@ -28,9 +31,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   isOptimisticTimer,
+  photoSrc,
   useCreateOther,
+  useDeleteMilestonePhoto,
   useDeleteOther,
   useOtherList,
+  useUploadMilestonePhoto,
   useStartFeedTimer,
   useStopFeedTimer,
   useUpdateOther,
@@ -195,6 +201,28 @@ export function OtherLogSheet({
   const [side, setSide] = useState<"left" | "right" | "both">("left");
   const [amountMl, setAmountMl] = useState(100);
   const [durationMin, setDurationMin] = useState(15);
+  // A photo picked while creating a milestone (issue #48): uploaded right
+  // after the row exists. Editing uploads straight away instead.
+  const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
+  const uploadPhoto = useUploadMilestonePhoto();
+  const deletePhoto = useDeleteMilestonePhoto();
+  // `edit` is the row as it was when tapped; after an upload or delete the
+  // photos must come from the live list, or the sheet shows the old set
+  // until it is reopened.
+  const liveMilestones = useOtherList(
+    "milestone",
+    babyId,
+    open && kind === "milestone" && !!edit,
+  );
+  const editPhotos =
+    edit && edit.kind === "milestone"
+      ? ((
+          (liveMilestones.data ?? []) as {
+            id: string;
+            photos: MilestonePhoto[];
+          }[]
+        ).find((m) => m.id === edit.id)?.photos ?? edit.photos)
+      : [];
   const [instance, setInstance] = useState(0);
   const [wasOpen, setWasOpen] = useState(false);
 
@@ -208,6 +236,7 @@ export function OtherLogSheet({
     setWasOpen(true);
     setInstance((i) => i + 1);
     setNotes(edit && "notes" in edit ? (edit.notes ?? "") : "");
+    setPendingPhoto(null);
     setTime(edit ? new Date(edit.time) : null);
     if (edit) {
       if (edit.kind === "medicine") {
@@ -342,6 +371,36 @@ export function OtherLogSheet({
         id: edit.id,
         patch: { ...fields, time: when, notes: trimmedNotes || null },
       });
+    } else if (kind === "milestone" && pendingPhoto) {
+      // The photo needs the row's id, and a connection: the create is
+      // queued offline like every log, but a File does not survive a reload,
+      // so the upload is attempted once, now, and says so if it cannot.
+      const file = pendingPhoto;
+      const vars = {
+        kind,
+        babyId,
+        time: when,
+        ...fields,
+        ...(trimmedNotes ? { notes: trimmedNotes } : {}),
+      } as CreateOtherVars;
+      if (!navigator.onLine) {
+        toast(t("Saved offline — add the photo from the timeline later"));
+        createOther.mutate(vars);
+      } else {
+        void createOther
+          .mutateAsync(vars)
+          .then((row) =>
+            uploadPhoto.mutateAsync({ id: (row as { id: string }).id, file }),
+          )
+          .catch((err: Error) =>
+            toast(
+              `${t("Could not upload the photo")}: ${err.message}`,
+              "error",
+            ),
+          );
+      }
+      onOpenChange(false);
+      return;
     } else {
       createOther.mutate({
         kind,
@@ -415,11 +474,75 @@ export function OtherLogSheet({
         )}
 
         {kind === "milestone" && (
-          <Input
-            placeholder={t("Milestone (e.g. “First steps”)")}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
+          <>
+            <Input
+              placeholder={t("Milestone (e.g. “First steps”)")}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+            <div className="space-y-2">
+              <p className="text-xs font-semibold tracking-wide text-muted uppercase">
+                {t("Photos")}
+              </p>
+              {editPhotos.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {editPhotos.map((photo) => (
+                    <div key={photo.id} className="relative">
+                      <img
+                        src={photoSrc(photo)}
+                        alt={t("Photo")}
+                        width={photo.width}
+                        height={photo.height}
+                        className="h-24 w-24 rounded-xl2 object-cover"
+                      />
+                      <button
+                        type="button"
+                        aria-label={t("Delete photo")}
+                        onClick={() =>
+                          deletePhoto.mutate(photo.id, {
+                            onError: (err) => toast(err.message, "error"),
+                          })
+                        }
+                        className="absolute -top-1.5 -right-1.5 flex h-7 w-7 items-center justify-center rounded-full border border-line bg-surface text-muted shadow-sm active:bg-surface-2"
+                      >
+                        <IconTrash className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {pendingPhoto && (
+                <p className="text-sm text-ink-soft">
+                  {t("Photo ready")}: {pendingPhoto.name}
+                </p>
+              )}
+              {(edit ? editPhotos.length < 3 : !pendingPhoto) && (
+                <label className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-semibold text-ink-soft active:scale-[0.97]">
+                  <IconPhoto className="h-4 w-4" />
+                  {uploadPhoto.isPending ? t("Uploading…") : t("Add photo")}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    disabled={uploadPhoto.isPending}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!file) return;
+                      if (edit) {
+                        uploadPhoto.mutate(
+                          { id: edit.id, file },
+                          { onError: (err) => toast(err.message, "error") },
+                        );
+                      } else {
+                        setPendingPhoto(file);
+                      }
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+          </>
         )}
 
         {kind === "measurement" && (

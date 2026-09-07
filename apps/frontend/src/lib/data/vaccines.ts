@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { VaccineDismissal, VaccineLog } from "@pjokk/shared";
 import { API_BASE, client, unwrap } from "../api";
+import { downscaleImage } from "../image";
 import { invalidateLogs } from "./keys";
 
 export type CreateVaccineVars = {
@@ -137,31 +138,4 @@ export function useDeleteVaccineDocument() {
       ),
     onSuccess: () => invalidateLogs(qc),
   });
-}
-
-const MAX_EDGE = 1600;
-
-async function downscaleImage(file: File): Promise<File> {
-  if (!file.type.startsWith("image/")) return file;
-  try {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
-    if (scale === 1 && file.size < 1_000_000) return file;
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return file;
-    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/jpeg", 0.82),
-    );
-    if (!blob) return file;
-    const renamed = file.name.replace(/\.[^.]+$/, "") || "photo";
-    return new File([blob], `${renamed}.jpg`, { type: "image/jpeg" });
-  } catch {
-    // HEIC that the browser can't decode, canvas unavailable, … — send the
-    // original and let the server's allowlist and size cap decide.
-    return file;
-  }
 }
