@@ -2113,3 +2113,31 @@ a photographed clinic card can carry a fødselsnummer) and avatars. A
 - **DTSTART carries a TZID with a static Oslo VTIMEZONE**, so the client
   steps the RRULE on the same local calendar `internal/recur` does; a UTC
   DTSTART would drift the rule an hour at each DST change.
+
+## 2026-09-07 — the persisted cache is keyed on the build; a real error screen
+
+- **What broke.** PR #62 added required fields to `/api/stats`. The
+  persisted query cache (IndexedDB, 14 days) restored the previous
+  build's Stats snapshot before the network answered, and the new screen
+  crashed on `nights.length` — a white page with "Cannot read properties
+  of undefined". The persister's `buster` was a hand-bumped "v2" that
+  nobody bumped, because nothing made you.
+- **The buster is now the build version.** `__PJOKK_VERSION__` is
+  defined at Vite build time from the same `PJOKK_VERSION` the Go binary
+  is stamped with (build-artifacts.sh in CI; the GoReleaser steps now
+  pass it too, since the SPA is built in a before hook). A deploy drops
+  the previous build's snapshot; within a build, offline data survives
+  reloads exactly as before. The trade: the first open after an update
+  fetches everything again — and an update only arrives online, so that
+  open is online. No tolerance code for old shapes was added to Stats:
+  the cause was the snapshot, and fixing the reader would have left the
+  next shape change to find the same trap.
+- **A render error is caught, said plainly, and recoverable.** The
+  router's `defaultErrorComponent` and an `ErrorBoundary` around the app
+  both render one screen: "Something went wrong", the message in small
+  type for a bug report, and three buttons in the order they are likely
+  to help — try again (remount), reload, and clear saved data and reload
+  (keeps the session; the exact remedy for a stale snapshot). The e2e
+  spec reproduces the original bug by serving an old-shaped Stats
+  response and checks that "Try again" recovers once the real one is
+  back.

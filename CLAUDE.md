@@ -248,7 +248,13 @@ separate test deploy).
   reformatting it would make regeneration a diff.
 - Offline: `persistQueryClient` to IndexedDB (timeline renders instantly
   offline) + paused mutations that queue and auto-resume. Logging a feed with
-  no signal must not fail.
+  no signal must not fail. The persisted cache's `buster` is the BUILD
+  version (`__PJOKK_VERSION__`, the same string stamped into the binary),
+  so a response-shape change never renders a previous build's snapshot —
+  no hand-bumped string to forget. A render error anywhere lands on
+  `components/ErrorBoundary.tsx`'s screen (router `defaultErrorComponent`
+  + a boundary around the app): try again, reload, or clear saved data
+  and reload.
 - PWA from day 1: `vite-plugin-pwa` + Workbox. Precache app shell, NetworkFirst
   for API GETs, NEVER cache auth endpoints or mutations. Implement an "update
   available" toast wired to registerSW (no silent stale versions).

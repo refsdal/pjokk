@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { registerSW } from "virtual:pwa-register";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { registerMutationDefaults } from "@/lib/data";
 import { initInstallPrompt } from "@/lib/install";
 import { announceUpdate } from "@/lib/pwa";
@@ -24,15 +25,17 @@ const updateSW = registerSW({
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <PersistQueryClientProvider
-      client={queryClient}
-      persistOptions={persistOptions}
-      onSuccess={() => {
-        // Mutations queued offline resume as soon as the cache is restored.
-        void queryClient.resumePausedMutations();
-      }}
-    >
-      <RouterProvider router={router} />
-    </PersistQueryClientProvider>
+    <ErrorBoundary>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={persistOptions}
+        onSuccess={() => {
+          // Mutations queued offline resume as soon as the cache is restored.
+          void queryClient.resumePausedMutations();
+        }}
+      >
+        <RouterProvider router={router} />
+      </PersistQueryClientProvider>
+    </ErrorBoundary>
   </StrictMode>,
 );
