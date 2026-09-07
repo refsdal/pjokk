@@ -410,6 +410,14 @@ const nb: Record<string, string> = {
   Notifications: "Varsler",
   "Enable notifications": "Slå på varsler",
   "Disable on this device": "Slå av på denne enheten",
+  // Nap window guide (#46)
+  "Nap window": "Lurvindu",
+  "In the nap window": "I lurvinduet",
+  until: "til",
+  "Past the usual nap window": "Forbi det vanlige lurvinduet",
+  On: "På",
+  "Shows a typical nap window for her age on the Awake card, from a pediatrician-reviewed table (Cleveland Clinic, 2024). A guide, not advice: babies differ from day to day, and tired signs beat any table.":
+    "Viser et typisk lurvindu for alderen på Våken-kortet, fra en tabell gjennomgått av barnelege (Cleveland Clinic, 2024). En veiledning, ikke et råd: barn varierer fra dag til dag, og tretthetstegn slår enhver tabell.",
   // Reminders (#45)
   Reminders: "Påminnelser",
   "Add reminder": "Legg til påminnelse",

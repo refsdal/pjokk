@@ -1,0 +1,29 @@
+{
+  "_comment": "Typical wake windows (time awake between sleeps) by age, for the Home screen's nap-window guide (issue #46). Sourced, never from memory — the same rule as the WHO LMS tables next to this file. Ages are month bounds [fromMonths, toMonths); minutes are the source's range verbatim. Beyond the last row the guide shows nothing rather than guess.",
+  "source": {
+    "title": "Wake Windows by Age",
+    "publisher": "Cleveland Clinic (health.clevelandclinic.org)",
+    "url": "https://health.clevelandclinic.org/wake-windows-by-age",
+    "reviewedBy": "Kristin Barrett, MD (pediatrician)",
+    "published": "2024-04-25",
+    "caveat": "Babies are individuals. So, one baby's wake window may look a little different from another baby's. And your baby's wake windows may even look a little different from one day to the next.",
+    "framing": {
+      "publisher": "Helsenorge, «Søvn hos barn 0-2 år»",
+      "url": "https://www.helsenorge.no/barn/sovn-hos-barn",
+      "quote": "Se etter tegn på tretthet, som gjesping, uro eller at barnet ser vekk.",
+      "newborn": "Våkenperiodene varer ofte bare 30 til 60 minutter."
+    }
+  },
+  "notes": [
+    "The source lists 3–4 months and 5–7 months with no 4–5 row; the 3–4 row (1.25–2.5 h) is carried to 5 months here so the guide has no hole, which errs on the shorter window.",
+    "The source stops at 12 months; so does this table."
+  ],
+  "rows": [
+    { "fromMonths": 0, "toMonths": 1, "minMin": 30, "maxMin": 60 },
+    { "fromMonths": 1, "toMonths": 3, "minMin": 60, "maxMin": 120 },
+    { "fromMonths": 3, "toMonths": 5, "minMin": 75, "maxMin": 150 },
+    { "fromMonths": 5, "toMonths": 7, "minMin": 120, "maxMin": 240 },
+    { "fromMonths": 7, "toMonths": 10, "minMin": 150, "maxMin": 270 },
+    { "fromMonths": 10, "toMonths": 12, "minMin": 180, "maxMin": 360 }
+  ]
+}
