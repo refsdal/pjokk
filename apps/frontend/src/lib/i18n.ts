@@ -375,6 +375,13 @@ const nb: Record<string, string> = {
   // Contacts
   Contacts: "Kontakter",
   "Add contact": "Legg til kontakt",
+  "Something went wrong": "Noe gikk galt",
+  "Nothing you logged is lost. Try again, or reload the app.":
+    "Ingenting du har logget er borte. Prøv igjen, eller last appen på nytt.",
+  "Reload the app": "Last appen på nytt",
+  "Clear saved data and reload": "Tøm lagrede data og last på nytt",
+  "Clearing saved data keeps you signed in; unsent entries queued offline are discarded.":
+    "Du forblir innlogget når lagrede data tømmes; usendte oppføringer i frakoblet kø forkastes.",
   Search: "Søk",
   "Search notes, medicines, milestones…":
     "Søk i notater, medisiner, milepæler…",

@@ -23,6 +23,11 @@ export default defineConfig({
   // baked into the client bundle at build time, not read at runtime.
   define: {
     __SITE_URL__: JSON.stringify(process.env.SITE_URL ?? "https://pjokk.no"),
+    // The build's version (scripts/build-artifacts.sh stamps the same
+    // value into the Go binary). lib/query.ts keys the persisted query
+    // cache on it, so a deploy that changes a response shape can never
+    // render a snapshot from the previous build.
+    __PJOKK_VERSION__: JSON.stringify(process.env.PJOKK_VERSION ?? "dev"),
   },
   build: {
     // Where main.ts serves static files from (STATIC_DIR).

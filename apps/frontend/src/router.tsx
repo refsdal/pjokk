@@ -7,6 +7,7 @@ import {
   Outlet,
   redirect,
 } from "@tanstack/react-router";
+import { AppErrorScreen } from "@/components/ErrorBoundary";
 import { Toaster } from "@/components/Toaster";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { AppearanceProvider } from "@/lib/appearance";
@@ -226,6 +227,11 @@ function NotFoundScreen() {
 }
 
 export const router = createRouter({
+  // A screen that throws while rendering lands here, not on a blank page
+  // with a stack trace (see components/ErrorBoundary.tsx).
+  defaultErrorComponent: ({ error, reset }) => (
+    <AppErrorScreen error={error} reset={reset} />
+  ),
   routeTree,
   defaultNotFoundComponent: NotFoundScreen,
 });
