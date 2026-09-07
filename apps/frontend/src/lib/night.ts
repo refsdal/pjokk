@@ -46,6 +46,18 @@ function readMode(): NightMode {
   return "auto";
 }
 
+// The default for a new sleep entry's nap/night type: "night" when the
+// moment falls inside the device's scheduled night window, else "nap". The
+// SCHEDULE alone decides — a manual "night on" at 14:00 is about the
+// screen, not the baby — and the chip in the sheet is one tap away for the
+// 19:00 bedtime the default window does not cover.
+export function sleepTypeAt(
+  d: Date,
+  schedule: NightSchedule = readSchedule(),
+): "nap" | "night" {
+  return inNightWindow(schedule, d) ? "night" : "nap";
+}
+
 export function isNightActive(
   mode: NightMode = readMode(),
   schedule: NightSchedule = readSchedule(),

@@ -251,7 +251,7 @@ export function HomeScreen() {
             detail={s?.lastDiaper ? t(s.lastDiaper.type) : undefined}
             sub={
               s
-                ? `${s.today.wet} ${t("wet")} · ${s.today.dirty} ${t("dirty")} · ${s.today.both} ${t("both")}`
+                ? `${s.today.wet} ${t("wet")} · ${s.today.dirty} ${t("dirty")} · ${s.today.both} ${t("both")}${s.today.dry > 0 ? ` · ${s.today.dry} ${t("dry")}` : ""}`
                 : undefined
             }
             tintClass="text-diaper"

@@ -13,6 +13,7 @@ import {
   useUpdateSleep,
 } from "@/lib/data";
 import { t } from "@/lib/i18n";
+import { sleepTypeAt } from "@/lib/night";
 import { toast } from "@/lib/toast";
 
 // ONE component for create and edit. Create starts a session (waking happens
@@ -32,6 +33,10 @@ export function SleepSheet({
   edit?: SleepLog | null;
 }) {
   const [location, setLocation] = useState<string | null>(null);
+  // Nap or night. Defaulted from the device's night-mode schedule at the
+  // moment the sheet opens; null on an edit of a row logged before the
+  // field existed, and the server never guesses (it has no timezone).
+  const [type, setType] = useState<"nap" | "night" | null>(null);
   const [time, setTime] = useState<Date | null>(null);
   const [endTime, setEndTime] = useState<Date | null>(null);
   const [notes, setNotes] = useState("");
@@ -44,10 +49,12 @@ export function SleepSheet({
     setNotes(edit?.notes ?? "");
     if (edit) {
       setLocation(edit.location ?? null);
+      setType(edit.type ?? null);
       setTime(new Date(edit.startTime));
       setEndTime(edit.endTime ? new Date(edit.endTime) : null);
     } else {
       setLocation(lastLocation);
+      setType(sleepTypeAt(new Date()));
       setTime(null);
       setEndTime(null);
     }
@@ -86,6 +93,7 @@ export function SleepSheet({
             ? {}
             : { endTime: (endTime ?? new Date()).toISOString() }),
           location,
+          type,
           notes: trimmedNotes || null,
         },
       });
@@ -94,6 +102,7 @@ export function SleepSheet({
         babyId,
         startTime: (time ?? new Date()).toISOString(),
         ...(location ? { location } : {}),
+        ...(type ? { type } : {}),
       });
     }
     if (!navigator.onLine) toast(t("Saved offline — will sync"));
@@ -117,6 +126,15 @@ export function SleepSheet({
           options={locationOptions}
           value={location}
           onChange={setLocation}
+        />
+
+        <ChipGroup
+          options={[
+            { value: "nap", label: t("Nap") },
+            { value: "night", label: t("Night") },
+          ]}
+          value={type}
+          onChange={setType}
         />
 
         {edit && (

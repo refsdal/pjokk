@@ -13,7 +13,7 @@
 -- an inner-joined column NOT NULL from a bare alias).
 SELECT
     s."id", s."baby_id", s."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    s."start_time", s."end_time", s."location", s."notes"
+    s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
 WHERE s."family_id" = sqlc.arg(family_id)
@@ -24,7 +24,7 @@ LIMIT sqlc.arg(lim);
 -- name: GetSleep :one
 SELECT
     s."id", s."baby_id", s."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    s."start_time", s."end_time", s."location", s."notes"
+    s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
 WHERE s."family_id" = $1 AND s."id" = $2;
@@ -37,7 +37,7 @@ WHERE s."family_id" = $1 AND s."id" = $2;
 -- one baby.
 SELECT
     s."id", s."baby_id", s."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    s."start_time", s."end_time", s."location", s."notes"
+    s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
 WHERE s."family_id" = sqlc.arg(family_id)
@@ -47,8 +47,8 @@ ORDER BY s."start_time" DESC
 LIMIT 1;
 
 -- name: CreateSleep :one
-INSERT INTO "sleep_log" ("family_id", "baby_id", "caretaker_id", "start_time", "end_time", "location", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO "sleep_log" ("family_id", "baby_id", "caretaker_id", "start_time", "end_time", "location", "type", "notes")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING "id";
 
 -- name: WakeSleep :execrows
@@ -66,6 +66,7 @@ SET
     "start_time" = CASE WHEN sqlc.arg(start_time_set)::bool THEN sqlc.narg(start_time_val)::timestamptz ELSE "start_time" END,
     "end_time" = CASE WHEN sqlc.arg(end_time_set)::bool THEN sqlc.narg(end_time_val)::timestamptz ELSE "end_time" END,
     "location" = CASE WHEN sqlc.arg(location_set)::bool THEN sqlc.narg(location_val)::text ELSE "location" END,
+    "type" = CASE WHEN sqlc.arg(type_set)::bool THEN sqlc.narg(type_val)::text ELSE "type" END,
     "notes" = CASE WHEN sqlc.arg(notes_set)::bool THEN sqlc.narg(notes_val)::text ELSE "notes" END
 WHERE "family_id" = sqlc.arg(family_id) AND "id" = sqlc.arg(id);
 

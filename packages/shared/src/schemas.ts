@@ -15,7 +15,22 @@ import { z } from "zod";
 
 export const feedTypes = ["bottle", "breast", "solids"] as const;
 export const feedSides = ["left", "right", "both"] as const;
-export const diaperTypes = ["wet", "dirty", "both"] as const;
+export const diaperTypes = ["wet", "dirty", "both", "dry"] as const;
+// Detail on the core logs (issue #43). Every one is optional and nullable;
+// null means "not recorded", which the UI renders as nothing.
+export const feedContents = ["formula", "breast_milk", "mixed"] as const;
+export const diaperColors = [
+  "yellow",
+  "green",
+  "brown",
+  "black",
+  "red",
+  "other",
+] as const;
+export const diaperConsistencies = ["normal", "loose", "firm"] as const;
+// Named `type` like the feed/diaper enums: `kind` is the timeline's
+// discriminator and must stay free.
+export const sleepTypes = ["nap", "night"] as const;
 export const inviteRoles = ["admin", "member"] as const;
 
 const isoTime = () => z.iso.datetime({ offset: true });
@@ -62,6 +77,9 @@ export const FeedLogSchema = z.object({
   durationMin: z.number().int().nullable(),
   leftMin: z.number().int().nullable(),
   rightMin: z.number().int().nullable(),
+  contents: z.enum(feedContents).nullable(),
+  food: z.string().nullable(),
+  reaction: z.boolean().nullable(),
 });
 
 export const CreateFeedSchema = z.object({
@@ -73,6 +91,9 @@ export const CreateFeedSchema = z.object({
   durationMin: z.number().int().min(0).max(600).optional(),
   leftMin: z.number().int().min(0).max(600).nullable().optional(),
   rightMin: z.number().int().min(0).max(600).nullable().optional(),
+  contents: z.enum(feedContents).optional(),
+  food: z.string().max(100).optional(),
+  reaction: z.boolean().optional(),
   notes: z.string().max(1000).optional(),
 });
 
@@ -86,6 +107,9 @@ export const UpdateFeedSchema = z.object({
   durationMin: z.number().int().min(0).max(600).nullable().optional(),
   leftMin: z.number().int().min(0).max(600).nullable().optional(),
   rightMin: z.number().int().min(0).max(600).nullable().optional(),
+  contents: z.enum(feedContents).nullable().optional(),
+  food: z.string().max(100).nullable().optional(),
+  reaction: z.boolean().nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
 });
 
@@ -93,18 +117,24 @@ export const DiaperLogSchema = z.object({
   ...logBase,
   time: isoTime(),
   type: z.enum(diaperTypes),
+  color: z.enum(diaperColors).nullable(),
+  consistency: z.enum(diaperConsistencies).nullable(),
 });
 
 export const CreateDiaperSchema = z.object({
   babyId: z.string(),
   time: isoTime(),
   type: z.enum(diaperTypes),
+  color: z.enum(diaperColors).optional(),
+  consistency: z.enum(diaperConsistencies).optional(),
   notes: z.string().max(1000).optional(),
 });
 
 export const UpdateDiaperSchema = z.object({
   time: isoTime().optional(),
   type: z.enum(diaperTypes).optional(),
+  color: z.enum(diaperColors).nullable().optional(),
+  consistency: z.enum(diaperConsistencies).nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
 });
 
@@ -113,6 +143,7 @@ export const SleepLogSchema = z.object({
   startTime: isoTime(),
   endTime: isoTime().nullable(),
   location: z.string().nullable(),
+  type: z.enum(sleepTypes).nullable(),
 });
 
 export const CreateSleepSchema = z.object({
@@ -121,6 +152,7 @@ export const CreateSleepSchema = z.object({
   // Omitted endTime = start an active sleep session.
   endTime: isoTime().optional(),
   location: z.string().max(100).optional(),
+  type: z.enum(sleepTypes).optional(),
   notes: z.string().max(1000).optional(),
 });
 
@@ -128,6 +160,7 @@ export const UpdateSleepSchema = z.object({
   startTime: isoTime().optional(),
   endTime: isoTime().nullable().optional(),
   location: z.string().max(100).nullable().optional(),
+  type: z.enum(sleepTypes).nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
 });
 
@@ -419,6 +452,7 @@ export const SummarySchema = z.object({
     wet: z.number().int(),
     dirty: z.number().int(),
     both: z.number().int(),
+    dry: z.number().int(),
     sleepMin: z.number().int(),
     // Sessions with any part inside today, on the same rule as sleepMin.
     sleeps: z.number().int(),

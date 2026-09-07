@@ -31,6 +31,7 @@ import { BabySwitcher } from "@/components/BabySwitcher";
 import { useFeeds, useMemberAvatars, useTimeline } from "@/lib/data";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import { t } from "@/lib/i18n";
+import { diaperDetail, feedDetail, sleepTitle } from "@/lib/log-detail";
 import { playKindMeta } from "@/lib/play-ui";
 import { formatClock, formatDay, formatDuration } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -67,12 +68,16 @@ const diaperLabel: Record<string, string> = {
   wet: "Wet diaper",
   dirty: "Dirty diaper",
   both: "Wet + dirty diaper",
+  dry: "Dry diaper",
 };
 
 function entryMain(e: TimelineEntry): { title: string; detail: string | null } {
   if (e.kind === "feed") {
     if (e.type === "bottle")
-      return { title: t("Bottle"), detail: `${e.amountMl ?? "?"} ml` };
+      return {
+        title: t("Bottle"),
+        detail: feedDetail(`${e.amountMl ?? "?"} ml`, e),
+      };
     if (e.type === "breast")
       return {
         title: t("Breast"),
@@ -82,23 +87,26 @@ function entryMain(e: TimelineEntry): { title: string; detail: string | null } {
       };
     return {
       title: t("Solids"),
-      detail: e.amountMl ? `${e.amountMl} g` : null,
+      detail: feedDetail(e.amountMl ? `${e.amountMl} g` : null, e),
     };
   }
   if (e.kind === "diaper") {
-    return { title: t(diaperLabel[e.type] ?? "Diaper"), detail: null };
+    return {
+      title: t(diaperLabel[e.type] ?? "Diaper"),
+      detail: diaperDetail(e),
+    };
   }
   if (e.kind === "sleep") {
     const start = new Date(e.startTime);
     if (!e.endTime) {
       return {
-        title: t("Sleep"),
+        title: sleepTitle(e.type),
         detail: `${t("since")} ${formatClock(start)}`,
       };
     }
     const end = new Date(e.endTime);
     return {
-      title: t("Sleep"),
+      title: sleepTitle(e.type),
       detail: `${formatClock(start)}–${formatClock(end)} · ${formatDuration(end.getTime() - start.getTime())}`,
     };
   }

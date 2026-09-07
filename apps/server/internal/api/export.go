@@ -112,6 +112,23 @@ func fmtTS(t pgtype.Timestamptz) *string {
 	return str(t.Time.UTC().Format(time.RFC3339Nano))
 }
 
+// joinDetail renders the optional detail parts of a row into the CSV's free
+// `detail` column, " · "-separated, nil when there is nothing to say — the
+// header stays export.ts's HEADERS verbatim, so spreadsheets built on the
+// old file keep their column positions.
+func joinDetail(parts ...*string) *string {
+	var out []string
+	for _, p := range parts {
+		if p != nil && *p != "" {
+			out = append(out, *p)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return str(strings.Join(out, " · "))
+}
+
 func rowFeed(r dbgen.ExportFeedsRow) exportRow {
 	var unit *string
 	if r.AmountMl != nil {
@@ -121,6 +138,12 @@ func rowFeed(r dbgen.ExportFeedsRow) exportRow {
 			unit = str("ml")
 		}
 	}
+	// A bottle's detail is what it held; a solids feed's is the food plus a
+	// "reaction" flag when one was recorded.
+	var reaction *string
+	if r.Reaction != nil && *r.Reaction {
+		reaction = str("reaction")
+	}
 	return exportRow{
 		sortTime: r.Time.Time,
 		cells: map[string]*string{
@@ -128,6 +151,7 @@ func rowFeed(r dbgen.ExportFeedsRow) exportRow {
 			"baby":         str(r.BabyName),
 			"time":         fmtTS(r.Time),
 			"type":         str(r.Type),
+			"detail":       joinDetail(r.Contents, r.Food, reaction),
 			"amount":       fmtInt32(r.AmountMl),
 			"unit":         unit,
 			"side":         r.Side,
@@ -146,6 +170,7 @@ func rowDiaper(r dbgen.ExportDiapersRow) exportRow {
 			"baby":      str(r.BabyName),
 			"time":      fmtTS(r.Time),
 			"type":      str(r.Type),
+			"detail":    joinDetail(r.Color, r.Consistency),
 			"caretaker": str(r.CaretakerName),
 			"notes":     r.Notes,
 		},
@@ -160,6 +185,7 @@ func rowSleep(r dbgen.ExportSleepsRow) exportRow {
 			"baby":      str(r.BabyName),
 			"time":      fmtTS(r.StartTime),
 			"end_time":  fmtTS(r.EndTime),
+			"detail":    r.Type,
 			"location":  r.Location,
 			"caretaker": str(r.CaretakerName),
 			"notes":     r.Notes,

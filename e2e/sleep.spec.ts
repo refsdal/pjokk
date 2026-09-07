@@ -50,7 +50,9 @@ test("tapping the sleep banner opens the edit sheet for the running session", as
   // render there as an icon, not text) opens the same sheet with it filled.
   await page.goto("/timeline");
   // The row, not the "Sleep" filter chip: the row's name carries its detail.
-  await page.getByRole("button", { name: /^Sleep · / }).first().click();
+  // The sheet defaults the session's type from the clock (#43), so the row
+  // is "Nap · …" by day and "Night sleep · …" inside the night window.
+  await page.getByRole("button", { name: /^(Nap|Night sleep) · / }).first().click();
   await expect(page.getByRole("heading", { name: "Edit sleep" })).toBeVisible({
     timeout: 10_000,
   });

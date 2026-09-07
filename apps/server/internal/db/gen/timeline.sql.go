@@ -80,7 +80,7 @@ func (q *Queries) ListBathsPage(ctx context.Context, arg ListBathsPageParams) ([
 const listDiapersPage = `-- name: ListDiapersPage :many
 SELECT
     d."id", d."baby_id", d."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    d."time", d."type", d."notes"
+    d."time", d."type", d."color", d."consistency", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
 WHERE d."family_id" = $1
@@ -108,6 +108,8 @@ type ListDiapersPageRow struct {
 	CaretakerName string
 	Time          pgtype.Timestamptz
 	Type          string
+	Color         *string
+	Consistency   *string
 	Notes         *string
 }
 
@@ -133,6 +135,8 @@ func (q *Queries) ListDiapersPage(ctx context.Context, arg ListDiapersPageParams
 			&i.CaretakerName,
 			&i.Time,
 			&i.Type,
+			&i.Color,
+			&i.Consistency,
 			&i.Notes,
 		); err != nil {
 			return nil, err
@@ -150,7 +154,7 @@ const listFeedsPage = `-- name: ListFeedsPage :many
 SELECT
     f."id", f."baby_id", f."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
-    f."left_min", f."right_min", f."notes"
+    f."left_min", f."right_min", f."contents", f."food", f."reaction", f."notes"
 FROM "feed_log" f
 JOIN "users" u ON u."id" = f."caretaker_id"
 WHERE f."family_id" = $1
@@ -183,6 +187,9 @@ type ListFeedsPageRow struct {
 	DurationMin   *int32
 	LeftMin       *int32
 	RightMin      *int32
+	Contents      *string
+	Food          *string
+	Reaction      *bool
 	Notes         *string
 }
 
@@ -234,6 +241,9 @@ func (q *Queries) ListFeedsPage(ctx context.Context, arg ListFeedsPageParams) ([
 			&i.DurationMin,
 			&i.LeftMin,
 			&i.RightMin,
+			&i.Contents,
+			&i.Food,
+			&i.Reaction,
 			&i.Notes,
 		); err != nil {
 			return nil, err
@@ -669,7 +679,7 @@ func (q *Queries) ListPumpsPage(ctx context.Context, arg ListPumpsPageParams) ([
 const listSleepsPage = `-- name: ListSleepsPage :many
 SELECT
     s."id", s."baby_id", s."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    s."start_time", s."end_time", s."location", s."notes"
+    s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
 WHERE s."family_id" = $1
@@ -698,6 +708,7 @@ type ListSleepsPageRow struct {
 	StartTime     pgtype.Timestamptz
 	EndTime       pgtype.Timestamptz
 	Location      *string
+	Type          *string
 	Notes         *string
 }
 
@@ -724,6 +735,7 @@ func (q *Queries) ListSleepsPage(ctx context.Context, arg ListSleepsPageParams) 
 			&i.StartTime,
 			&i.EndTime,
 			&i.Location,
+			&i.Type,
 			&i.Notes,
 		); err != nil {
 			return nil, err

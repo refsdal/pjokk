@@ -19,7 +19,7 @@ import (
 // (patch.go's withRawBody/rawBodyFields/patchField) this file reuses
 // verbatim for `notes`, the one clearable field diaper_log has.
 
-func serDiaperRow(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, typ string, notes *string) gen.DiaperLog {
+func serDiaperRow(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, typ string, color, consistency, notes *string) gen.DiaperLog {
 	return gen.DiaperLog{
 		Id:            id,
 		BabyId:        babyID,
@@ -28,15 +28,28 @@ func serDiaperRow(id, babyID, caretakerID, caretakerName string, t pgtype.Timest
 		Notes:         notes,
 		Time:          t.Time,
 		Type:          gen.DiaperLogType(typ),
+		Color:         enumPtr[gen.DiaperLogColor](color),
+		Consistency:   enumPtr[gen.DiaperLogConsistency](consistency),
 	}
 }
 
+// enumPtr is enumStr's inverse: a nullable text column to an optional
+// generated enum pointer. The CHECK constraint already guarantees the value
+// is one of the enum's members.
+func enumPtr[T ~string](s *string) *T {
+	if s == nil {
+		return nil
+	}
+	v := T(*s)
+	return &v
+}
+
 func serDiaper(row dbgen.GetDiaperRow) gen.DiaperLog {
-	return serDiaperRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Type, row.Notes)
+	return serDiaperRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Type, row.Color, row.Consistency, row.Notes)
 }
 
 func serDiaperListRow(row dbgen.ListDiapersRow) gen.DiaperLog {
-	return serDiaperRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Type, row.Notes)
+	return serDiaperRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Type, row.Color, row.Consistency, row.Notes)
 }
 
 // ListDiapers implements GET /api/diapers. REF: "DiaperLog[] newest first".
@@ -85,6 +98,8 @@ func (d Deps) CreateDiaper(ctx context.Context, req gen.CreateDiaperRequestObjec
 		CaretakerID: fam.UserID,
 		Time:        pgtype.Timestamptz{Time: body.Time, Valid: true},
 		Type:        string(body.Type),
+		Color:       enumStr(body.Color),
+		Consistency: enumStr(body.Consistency),
 		Notes:       body.Notes,
 	})
 	if err != nil {
@@ -128,12 +143,20 @@ func (d Deps) UpdateDiaper(ctx context.Context, req gen.UpdateDiaperRequestObjec
 	if err != nil {
 		return nil, err
 	}
+	colorSet, colorVal, err := patchField[string](fields, "color")
+	if err != nil {
+		return nil, err
+	}
+	consistencySet, consistencyVal, err := patchField[string](fields, "consistency")
+	if err != nil {
+		return nil, err
+	}
 	notesSet, notesVal, err := patchField[string](fields, "notes")
 	if err != nil {
 		return nil, err
 	}
 
-	if !timeSet && !typeSet && !notesSet {
+	if !timeSet && !typeSet && !colorSet && !consistencySet && !notesSet {
 		return gen.UpdateDiaper200JSONResponse(serDiaper(existing)), nil
 	}
 
@@ -143,14 +166,18 @@ func (d Deps) UpdateDiaper(ctx context.Context, req gen.UpdateDiaperRequestObjec
 	}
 
 	if _, err := d.Q.UpdateDiaper(ctx, dbgen.UpdateDiaperParams{
-		FamilyID: fam.FamilyID,
-		ID:       req.Id,
-		TimeSet:  timeSet,
-		TimeVal:  timeParam,
-		TypeSet:  typeSet,
-		TypeVal:  typeVal,
-		NotesSet: notesSet,
-		NotesVal: notesVal,
+		FamilyID:       fam.FamilyID,
+		ID:             req.Id,
+		TimeSet:        timeSet,
+		TimeVal:        timeParam,
+		TypeSet:        typeSet,
+		TypeVal:        typeVal,
+		ColorSet:       colorSet,
+		ColorVal:       colorVal,
+		ConsistencySet: consistencySet,
+		ConsistencyVal: consistencyVal,
+		NotesSet:       notesSet,
+		NotesVal:       notesVal,
 	}); err != nil {
 		return nil, err
 	}

@@ -16,7 +16,8 @@
 -- name: ExportFeeds :many
 SELECT
     f."baby_id", bb."name" AS baby_name, f."time", f."type", f."amount_ml",
-    f."side", f."duration_min", COALESCE(u."display_name", '') AS caretaker_name, f."notes"
+    f."side", f."duration_min", f."contents", f."food", f."reaction",
+    COALESCE(u."display_name", '') AS caretaker_name, f."notes"
 FROM "feed_log" f
 JOIN "baby" bb ON bb."id" = f."baby_id"
 JOIN "users" u ON u."id" = f."caretaker_id"
@@ -26,7 +27,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: ExportDiapers :many
 SELECT
-    d."baby_id", bb."name" AS baby_name, d."time", d."type",
+    d."baby_id", bb."name" AS baby_name, d."time", d."type", d."color", d."consistency",
     COALESCE(u."display_name", '') AS caretaker_name, d."notes"
 FROM "diaper_log" d
 JOIN "baby" bb ON bb."id" = d."baby_id"
@@ -38,7 +39,7 @@ LIMIT sqlc.arg(lim);
 -- name: ExportSleeps :many
 SELECT
     s."baby_id", bb."name" AS baby_name, s."start_time", s."end_time",
-    s."location", COALESCE(u."display_name", '') AS caretaker_name, s."notes"
+    s."location", s."type", COALESCE(u."display_name", '') AS caretaker_name, s."notes"
 FROM "sleep_log" s
 JOIN "baby" bb ON bb."id" = s."baby_id"
 JOIN "users" u ON u."id" = s."caretaker_id"

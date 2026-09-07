@@ -8,7 +8,7 @@
 -- an inner-joined column NOT NULL from a bare alias).
 SELECT
     d."id", d."baby_id", d."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    d."time", d."type", d."notes"
+    d."time", d."type", d."color", d."consistency", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
 WHERE d."family_id" = sqlc.arg(family_id)
@@ -19,14 +19,14 @@ LIMIT sqlc.arg(lim);
 -- name: GetDiaper :one
 SELECT
     d."id", d."baby_id", d."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    d."time", d."type", d."notes"
+    d."time", d."type", d."color", d."consistency", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
 WHERE d."family_id" = $1 AND d."id" = $2;
 
 -- name: CreateDiaper :one
-INSERT INTO "diaper_log" ("family_id", "baby_id", "caretaker_id", "time", "type", "notes")
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO "diaper_log" ("family_id", "baby_id", "caretaker_id", "time", "type", "color", "consistency", "notes")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING "id";
 
 -- name: UpdateDiaper :execrows
@@ -34,6 +34,8 @@ UPDATE "diaper_log"
 SET
     "time" = CASE WHEN sqlc.arg(time_set)::bool THEN sqlc.narg(time_val)::timestamptz ELSE "time" END,
     "type" = CASE WHEN sqlc.arg(type_set)::bool THEN sqlc.narg(type_val)::text ELSE "type" END,
+    "color" = CASE WHEN sqlc.arg(color_set)::bool THEN sqlc.narg(color_val)::text ELSE "color" END,
+    "consistency" = CASE WHEN sqlc.arg(consistency_set)::bool THEN sqlc.narg(consistency_val)::text ELSE "consistency" END,
     "notes" = CASE WHEN sqlc.arg(notes_set)::bool THEN sqlc.narg(notes_val)::text ELSE "notes" END
 WHERE "family_id" = sqlc.arg(family_id) AND "id" = sqlc.arg(id);
 

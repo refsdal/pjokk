@@ -174,6 +174,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 	var today struct {
 		Both     int32
 		Dirty    int32
+		Dry      int32
 		Feeds    int32
 		IntakeMl int32
 		SleepMin int32
@@ -200,6 +201,9 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 			today.Wet++
 		case "dirty":
 			today.Dirty++
+		case "dry":
+			// A dry check is its own count: it must never inflate wet.
+			today.Dry++
 		default: // "both"
 			today.Both++
 		}
@@ -237,6 +241,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		Today: struct {
 			Both     int32 `json:"both"`
 			Dirty    int32 `json:"dirty"`
+			Dry      int32 `json:"dry"`
 			Feeds    int32 `json:"feeds"`
 			IntakeMl int32 `json:"intakeMl"`
 			SleepMin int32 `json:"sleepMin"`
@@ -246,6 +251,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		}{
 			Both:     today.Both,
 			Dirty:    today.Dirty,
+			Dry:      today.Dry,
 			Feeds:    today.Feeds,
 			IntakeMl: today.IntakeMl,
 			SleepMin: today.SleepMin,

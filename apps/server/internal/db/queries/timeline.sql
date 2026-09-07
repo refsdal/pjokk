@@ -24,7 +24,7 @@
 SELECT
     f."id", f."baby_id", f."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
-    f."left_min", f."right_min", f."notes"
+    f."left_min", f."right_min", f."contents", f."food", f."reaction", f."notes"
 FROM "feed_log" f
 JOIN "users" u ON u."id" = f."caretaker_id"
 WHERE f."family_id" = sqlc.arg(family_id)
@@ -39,7 +39,7 @@ LIMIT sqlc.arg(lim);
 -- name: ListDiapersPage :many
 SELECT
     d."id", d."baby_id", d."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    d."time", d."type", d."notes"
+    d."time", d."type", d."color", d."consistency", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
 WHERE d."family_id" = sqlc.arg(family_id)
@@ -54,7 +54,7 @@ LIMIT sqlc.arg(lim);
 -- name: ListSleepsPage :many
 SELECT
     s."id", s."baby_id", s."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    s."start_time", s."end_time", s."location", s."notes"
+    s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
 WHERE s."family_id" = sqlc.arg(family_id)

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDeleteFeed, useLogFeed, useUpdateFeed } from "@/lib/data";
 import { t } from "@/lib/i18n";
+import { type FeedContents, feedContentsOptions } from "@/lib/log-detail";
 import {
   clearNursing,
   loadNursing,
@@ -89,8 +90,25 @@ export function FeedSheet({
     return map;
   }, [recentFeeds]);
 
+  // Distinct foods from the recent solids feeds, newest first, as keyboard
+  // suggestions — the second banana of the day is one tap, not a word.
+  const recentFoods = useMemo(() => {
+    const seen = new Set<string>();
+    for (const f of recentFeeds) {
+      if (f.type === "solids" && f.food) seen.add(f.food);
+    }
+    return [...seen].slice(0, 12);
+  }, [recentFeeds]);
+
   const [type, setType] = useState<FeedType>("bottle");
   const [amountMl, setAmountMl] = useState(120);
+  // Optional detail (issue #43): what a bottle held; what the solids were
+  // and whether they caused a reaction. Contents and food prefill from the
+  // last feed of the same type (the same formula, the same puree twice a
+  // day); a reaction is an observation of THIS meal and never prefills.
+  const [contents, setContents] = useState<FeedContents | null>(null);
+  const [food, setFood] = useState("");
+  const [reaction, setReaction] = useState(false);
   const [leftMin, setLeftMin] = useState(10);
   const [rightMin, setRightMin] = useState(0);
   const [timer, setTimer] = useState<NursingTimer>(emptyTimer);
@@ -116,8 +134,15 @@ export function FeedSheet({
     currentTimer: NursingTimer = timer,
   ) => {
     const last = lastByType.get(feedType);
-    if (feedType === "bottle") setAmountMl(last?.amountMl ?? 120);
-    if (feedType === "solids") setAmountMl(last?.amountMl ?? 40);
+    if (feedType === "bottle") {
+      setAmountMl(last?.amountMl ?? 120);
+      setContents(last?.contents ?? null);
+    }
+    if (feedType === "solids") {
+      setAmountMl(last?.amountMl ?? 40);
+      setFood(last?.food ?? "");
+      setReaction(false);
+    }
     if (feedType === "breast") {
       const hasAccrual =
         currentTimer.leftSec > 0 ||
@@ -146,6 +171,9 @@ export function FeedSheet({
     if (edit) {
       setType(edit.type);
       setAmountMl(edit.amountMl ?? (edit.type === "solids" ? 40 : 120));
+      setContents(edit.contents ?? null);
+      setFood(edit.food ?? "");
+      setReaction(edit.reaction === true);
       const sides = sidesFromFeed(edit) ?? { left: 10, right: 0 };
       setLeftMin(sides.left);
       setRightMin(sides.right);
@@ -211,6 +239,7 @@ export function FeedSheet({
     if (!canSave) return;
     const when = (time ?? new Date()).toISOString();
     const trimmedNotes = notes.trim();
+    const trimmedFood = food.trim().slice(0, 100);
     if (edit) {
       updateFeed.mutate({
         id: edit.id,
@@ -222,6 +251,10 @@ export function FeedSheet({
           durationMin: type === "breast" ? leftMin + rightMin : null,
           leftMin: type === "breast" ? leftMin : null,
           rightMin: type === "breast" ? rightMin : null,
+          // Detail follows the type: a switch clears what no longer applies.
+          contents: type === "bottle" ? contents : null,
+          food: type === "solids" ? trimmedFood || null : null,
+          reaction: type === "solids" && reaction ? true : null,
           notes: trimmedNotes || null,
         },
       });
@@ -238,6 +271,9 @@ export function FeedSheet({
               rightMin,
             }
           : { amountMl }),
+        ...(type === "bottle" && contents ? { contents } : {}),
+        ...(type === "solids" && trimmedFood ? { food: trimmedFood } : {}),
+        ...(type === "solids" && reaction ? { reaction: true } : {}),
         ...(trimmedNotes ? { notes: trimmedNotes } : {}),
       });
     }
@@ -288,6 +324,40 @@ export function FeedSheet({
             max={500}
             unit={type === "solids" ? "g" : "ml"}
           />
+        )}
+
+        {type === "bottle" && (
+          <ChipGroup
+            options={feedContentsOptions.map((o) => ({
+              value: o.value,
+              label: t(o.label),
+            }))}
+            value={contents}
+            // Optional field: tapping the selected chip clears it.
+            onChange={(v) => setContents(v === contents ? null : v)}
+          />
+        )}
+
+        {type === "solids" && (
+          <div className="space-y-3">
+            <Input
+              list="pjokk-recent-foods"
+              placeholder={t("Food (optional)")}
+              value={food}
+              maxLength={100}
+              onChange={(e) => setFood(e.target.value)}
+            />
+            <datalist id="pjokk-recent-foods">
+              {recentFoods.map((f) => (
+                <option key={f} value={f} />
+              ))}
+            </datalist>
+            <ChipGroup
+              options={[{ value: "reaction", label: t("Reaction") }]}
+              value={reaction ? "reaction" : null}
+              onChange={() => setReaction((r) => !r)}
+            />
+          </div>
         )}
 
         {type === "breast" && (
