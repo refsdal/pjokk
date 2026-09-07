@@ -12,7 +12,10 @@ import { freshFamily } from "./helpers";
 const SHOT_DIR = process.env.E2E_SHOT_DIR ?? "test-results/growth-shots";
 const shot = (name: string) => join(SHOT_DIR, name);
 
+// Scroll to the end first: the growth card is the last thing on Stats and
+// the page's bottom padding keeps it clear of the fixed tab bar only there.
 async function settle(page: Page): Promise<void> {
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.mouse.move(0, 0);
   await page.waitForTimeout(600);
 }
