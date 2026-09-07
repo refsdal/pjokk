@@ -94,13 +94,18 @@ export interface LogFeedVars {
   durationMin?: number;
   leftMin?: number;
   rightMin?: number;
+  contents?: "formula" | "breast_milk" | "mixed";
+  food?: string;
+  reaction?: boolean;
   notes?: string;
 }
 
 export interface LogDiaperVars {
   babyId: string;
   time: string;
-  type: "wet" | "dirty" | "both";
+  type: "wet" | "dirty" | "both" | "dry";
+  color?: "yellow" | "green" | "brown" | "black" | "red" | "other";
+  consistency?: "normal" | "loose" | "firm";
   notes?: string;
 }
 
@@ -108,6 +113,7 @@ export interface StartSleepVars {
   babyId: string;
   startTime: string;
   location?: string;
+  type?: "nap" | "night";
 }
 
 export interface WakeSleepVars {
@@ -126,6 +132,9 @@ export interface UpdateFeedVars {
     durationMin?: number | null;
     leftMin?: number | null;
     rightMin?: number | null;
+    contents?: "formula" | "breast_milk" | "mixed" | null;
+    food?: string | null;
+    reaction?: boolean | null;
     notes?: string | null;
   };
 }
@@ -134,7 +143,9 @@ export interface UpdateDiaperVars {
   id: string;
   patch: {
     time?: string;
-    type?: "wet" | "dirty" | "both";
+    type?: "wet" | "dirty" | "both" | "dry";
+    color?: "yellow" | "green" | "brown" | "black" | "red" | "other" | null;
+    consistency?: "normal" | "loose" | "firm" | null;
     notes?: string | null;
   };
 }
@@ -145,6 +156,7 @@ export interface UpdateSleepVars {
     startTime?: string;
     endTime?: string | null;
     location?: string | null;
+    type?: "nap" | "night" | null;
     notes?: string | null;
   };
 }
@@ -177,6 +189,9 @@ export function registerLogMutationDefaults(qc: QueryClient) {
                 durationMin: vars.durationMin ?? null,
                 leftMin: vars.leftMin ?? null,
                 rightMin: vars.rightMin ?? null,
+                contents: vars.contents ?? null,
+                food: vars.food ?? null,
+                reaction: vars.reaction ?? null,
                 notes: null,
               },
             }
@@ -206,6 +221,8 @@ export function registerLogMutationDefaults(qc: QueryClient) {
                 caretakerName: "",
                 time: vars.time,
                 type: vars.type,
+                color: vars.color ?? null,
+                consistency: vars.consistency ?? null,
                 notes: null,
               },
             }
@@ -234,6 +251,7 @@ export function registerLogMutationDefaults(qc: QueryClient) {
           startTime: vars.startTime,
           endTime: null,
           location: vars.location ?? null,
+          type: vars.type ?? null,
           notes: null,
         },
       }));

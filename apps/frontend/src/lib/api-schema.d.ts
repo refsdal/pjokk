@@ -1381,6 +1381,15 @@ export interface components {
             leftMin: number | null;
             /** Format: int32 */
             rightMin: number | null;
+            /**
+             * @description What a bottle held. Only meaningful for `type: bottle`; null = not recorded.
+             * @enum {string|null}
+             */
+            contents: "formula" | "breast_milk" | "mixed" | null;
+            /** @description What a solids feed was, free text ("Banana"). Only meaningful for `type: solids`; null = not recorded. */
+            food: string | null;
+            /** @description Whether a solids feed produced a reaction (details go in `notes`). null = not recorded, which is not the same as false. */
+            reaction: boolean | null;
         };
         CreateFeed: {
             babyId: string;
@@ -1398,6 +1407,10 @@ export interface components {
             leftMin?: number | null;
             /** Format: int32 */
             rightMin?: number | null;
+            /** @enum {string} */
+            contents?: "formula" | "breast_milk" | "mixed";
+            food?: string;
+            reaction?: boolean;
             notes?: string;
         };
         /** @description Every field is optional; an empty object is a no-op. `amountMl`, `side`, `durationMin`, `leftMin`, `rightMin` and `notes` may also be sent as `null` to CLEAR that column; `time`/`type` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs, which the generated request type alone cannot provide). */
@@ -1416,6 +1429,10 @@ export interface components {
             leftMin?: number | null;
             /** Format: int32 */
             rightMin?: number | null;
+            /** @enum {string|null} */
+            contents?: "formula" | "breast_milk" | "mixed" | null;
+            food?: string | null;
+            reaction?: boolean | null;
             notes?: string | null;
         };
         DiaperLog: {
@@ -1426,23 +1443,44 @@ export interface components {
             notes: string | null;
             /** Format: date-time */
             time: string;
-            /** @enum {string} */
-            type: "wet" | "dirty" | "both";
+            /**
+             * @description `dry` is a checked-and-clean diaper; it is counted separately so a dry check never inflates the wet count.
+             * @enum {string}
+             */
+            type: "wet" | "dirty" | "both" | "dry";
+            /**
+             * @description Stool colour. Only meaningful for dirty/both.
+             * @enum {string|null}
+             */
+            color: "yellow" | "green" | "brown" | "black" | "red" | "other" | null;
+            /**
+             * @description Stool consistency. Only meaningful for dirty/both.
+             * @enum {string|null}
+             */
+            consistency: "normal" | "loose" | "firm" | null;
         };
         CreateDiaper: {
             babyId: string;
             /** Format: date-time */
             time: string;
             /** @enum {string} */
-            type: "wet" | "dirty" | "both";
+            type: "wet" | "dirty" | "both" | "dry";
+            /** @enum {string} */
+            color?: "yellow" | "green" | "brown" | "black" | "red" | "other";
+            /** @enum {string} */
+            consistency?: "normal" | "loose" | "firm";
             notes?: string;
         };
-        /** @description Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time`/`type` are not nullable — only settable or omitted (see internal/api/feeds.go for the presence-detection pattern this endpoint shares with UpdateFeed). */
+        /** @description Every field is optional; an empty object is a no-op. `color`, `consistency` and `notes` may also be sent as `null` to CLEAR them; `time`/`type` are not nullable — only settable or omitted (see internal/api/feeds.go for the presence-detection pattern this endpoint shares with UpdateFeed). */
         UpdateDiaper: {
             /** Format: date-time */
             time?: string;
             /** @enum {string} */
-            type?: "wet" | "dirty" | "both";
+            type?: "wet" | "dirty" | "both" | "dry";
+            /** @enum {string|null} */
+            color?: "yellow" | "green" | "brown" | "black" | "red" | "other" | null;
+            /** @enum {string|null} */
+            consistency?: "normal" | "loose" | "firm" | null;
             notes?: string | null;
         };
         SleepLog: {
@@ -1459,6 +1497,11 @@ export interface components {
              */
             endTime: string | null;
             location: string | null;
+            /**
+             * @description Nap or night sleep. The client defaults it from the device's night-mode schedule; the server never guesses (it has no timezone), so an omitted type stays null. (Named `type` like the feed and diaper enums; `kind` is the timeline's discriminator and must stay free.)
+             * @enum {string|null}
+             */
+            type: "nap" | "night" | null;
         };
         CreateSleep: {
             babyId: string;
@@ -1470,6 +1513,8 @@ export interface components {
              */
             endTime?: string;
             location?: string;
+            /** @enum {string} */
+            type?: "nap" | "night";
             notes?: string;
         };
         /** @description Every field is optional; an empty object is a no-op. `endTime`, `location` and `notes` may also be sent as `null` to CLEAR that column — clearing `endTime` reopens the session and can 409 if another session for the same baby is already active (see internal/api/sleep.go). `startTime` is not nullable — only settable or omitted. */
@@ -1479,6 +1524,8 @@ export interface components {
             /** Format: date-time */
             endTime?: string | null;
             location?: string | null;
+            /** @enum {string|null} */
+            type?: "nap" | "night" | null;
             notes?: string | null;
         };
         /** @description Defaults endTime to now on the server when omitted. */
@@ -1690,6 +1737,8 @@ export interface components {
                 dirty: number;
                 /** Format: int32 */
                 both: number;
+                /** Format: int32 */
+                dry: number;
                 /** Format: int32 */
                 sleepMin: number;
                 /**
