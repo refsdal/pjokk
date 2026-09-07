@@ -153,6 +153,20 @@ type FeedLog struct {
 	Reaction    *bool
 }
 
+type FeedTimer struct {
+	ID            string
+	FamilyID      string
+	BabyID        string
+	CaretakerID   string
+	Kind          string
+	StartTime     pgtype.Timestamptz
+	RunningSide   *string
+	SideStartedAt pgtype.Timestamptz
+	LeftSec       int32
+	RightSec      int32
+	CreatedAt     pgtype.Timestamptz
+}
+
 type HelpRequest struct {
 	ID             string
 	FamilyID       string

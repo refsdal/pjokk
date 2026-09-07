@@ -139,6 +139,21 @@ type ServerInterface interface {
 	// CreateFeed Log a feed for a baby in the caller's active family.
 	// (POST /api/feeds)
 	CreateFeed(w http.ResponseWriter, r *http.Request)
+	// GetFeedTimer The running nursing and pump timers for a baby, either null. One call for both because Home Assistant and the SPA both want the pair; /api/summary carries the same two objects as activeFeed / activePump.
+	// (GET /api/feeds/timer)
+	GetFeedTimer(w http.ResponseWriter, r *http.Request, params GetFeedTimerParams)
+	// StartFeedTimer Start a nursing or pump timer for a baby. One running timer per (baby, kind) — enforced by a unique index, not just the pre-check — so a second start for the same kind is 409 while a pump timer next to a running nursing timer is fine. `startTime` lets an offline client replay the moment it actually tapped Start.
+	// (POST /api/feeds/timer)
+	StartFeedTimer(w http.ResponseWriter, r *http.Request)
+	// DiscardFeedTimer Throw a running timer away without logging anything.
+	// (DELETE /api/feeds/timer/{id})
+	DiscardFeedTimer(w http.ResponseWriter, r *http.Request, id IdPath)
+	// SetFeedTimerSide Switch the running side of a nursing timer, or pause it with `side: null`. The stretch that was running is banked on the server's clock first. A pump timer is one clock and cannot be paused (400).
+	// (POST /api/feeds/timer/{id}/side)
+	SetFeedTimerSide(w http.ResponseWriter, r *http.Request, id IdPath)
+	// StopFeedTimer Stop a timer and log it: a nursing timer becomes a breast FeedLog (time = the timer's start, per-side minutes from the banked seconds, 20 s still counts as 1 min), a pump timer becomes a PumpLog. Both happen in one transaction with the timer's deletion, so a replayed stop is a 404 rather than a second row. The sheet's steppers may override the clock through the body.
+	// (POST /api/feeds/timer/{id}/stop)
+	StopFeedTimer(w http.ResponseWriter, r *http.Request, id IdPath)
 	// DeleteFeed Delete a feed log.
 	// (DELETE /api/feeds/{id})
 	DeleteFeed(w http.ResponseWriter, r *http.Request, id IdPath)
@@ -1293,6 +1308,131 @@ func (siw *ServerInterfaceWrapper) CreateFeed(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateFeed(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetFeedTimer operation middleware
+func (siw *ServerInterfaceWrapper) GetFeedTimer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetFeedTimerParams
+
+	// ------------- Required query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFeedTimer(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartFeedTimer operation middleware
+func (siw *ServerInterfaceWrapper) StartFeedTimer(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartFeedTimer(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DiscardFeedTimer operation middleware
+func (siw *ServerInterfaceWrapper) DiscardFeedTimer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DiscardFeedTimer(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetFeedTimerSide operation middleware
+func (siw *ServerInterfaceWrapper) SetFeedTimerSide(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetFeedTimerSide(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StopFeedTimer operation middleware
+func (siw *ServerInterfaceWrapper) StopFeedTimer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StopFeedTimer(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3161,6 +3301,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/feeds", wrapper.CreateFeed)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/feeds/{id}", wrapper.DeleteFeed)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/feeds/{id}", wrapper.UpdateFeed)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/feeds/timer", wrapper.GetFeedTimer)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/feeds/timer", wrapper.StartFeedTimer)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/feeds/timer/{id}/side", wrapper.SetFeedTimerSide)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/feeds/timer/{id}/stop", wrapper.StopFeedTimer)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/feeds/timer/{id}", wrapper.DiscardFeedTimer)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/diapers", wrapper.ListDiapers)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/diapers", wrapper.CreateDiaper)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/diapers/{id}", wrapper.DeleteDiaper)
@@ -4661,6 +4806,216 @@ func (response CreateFeed201JSONResponse) VisitCreateFeedResponse(w http.Respons
 type CreateFeed404JSONResponse Error
 
 func (response CreateFeed404JSONResponse) VisitCreateFeedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFeedTimerRequestObject struct {
+	Params GetFeedTimerParams
+}
+
+type GetFeedTimerResponseObject interface {
+	VisitGetFeedTimerResponse(w http.ResponseWriter) error
+}
+
+type GetFeedTimer200JSONResponse FeedTimers
+
+func (response GetFeedTimer200JSONResponse) VisitGetFeedTimerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFeedTimer404JSONResponse Error
+
+func (response GetFeedTimer404JSONResponse) VisitGetFeedTimerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartFeedTimerRequestObject struct {
+	Body *StartFeedTimerJSONRequestBody
+}
+
+type StartFeedTimerResponseObject interface {
+	VisitStartFeedTimerResponse(w http.ResponseWriter) error
+}
+
+type StartFeedTimer201JSONResponse FeedTimer
+
+func (response StartFeedTimer201JSONResponse) VisitStartFeedTimerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartFeedTimer404JSONResponse Error
+
+func (response StartFeedTimer404JSONResponse) VisitStartFeedTimerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartFeedTimer409JSONResponse Error
+
+func (response StartFeedTimer409JSONResponse) VisitStartFeedTimerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DiscardFeedTimerRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DiscardFeedTimerResponseObject interface {
+	VisitDiscardFeedTimerResponse(w http.ResponseWriter) error
+}
+
+type DiscardFeedTimer200JSONResponse Ok
+
+func (response DiscardFeedTimer200JSONResponse) VisitDiscardFeedTimerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DiscardFeedTimer404JSONResponse Error
+
+func (response DiscardFeedTimer404JSONResponse) VisitDiscardFeedTimerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetFeedTimerSideRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *SetFeedTimerSideJSONRequestBody
+}
+
+type SetFeedTimerSideResponseObject interface {
+	VisitSetFeedTimerSideResponse(w http.ResponseWriter) error
+}
+
+type SetFeedTimerSide200JSONResponse FeedTimer
+
+func (response SetFeedTimerSide200JSONResponse) VisitSetFeedTimerSideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetFeedTimerSide400JSONResponse Error
+
+func (response SetFeedTimerSide400JSONResponse) VisitSetFeedTimerSideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetFeedTimerSide404JSONResponse Error
+
+func (response SetFeedTimerSide404JSONResponse) VisitSetFeedTimerSideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopFeedTimerRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *StopFeedTimerJSONRequestBody
+}
+
+type StopFeedTimerResponseObject interface {
+	VisitStopFeedTimerResponse(w http.ResponseWriter) error
+}
+
+type StopFeedTimer201JSONResponse FeedTimerStopped
+
+func (response StopFeedTimer201JSONResponse) VisitStopFeedTimerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopFeedTimer404JSONResponse Error
+
+func (response StopFeedTimer404JSONResponse) VisitStopFeedTimerResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -7069,6 +7424,21 @@ type StrictServerInterface interface {
 	// CreateFeed Log a feed for a baby in the caller's active family.
 	// (POST /api/feeds)
 	CreateFeed(ctx context.Context, request CreateFeedRequestObject) (CreateFeedResponseObject, error)
+	// GetFeedTimer The running nursing and pump timers for a baby, either null. One call for both because Home Assistant and the SPA both want the pair; /api/summary carries the same two objects as activeFeed / activePump.
+	// (GET /api/feeds/timer)
+	GetFeedTimer(ctx context.Context, request GetFeedTimerRequestObject) (GetFeedTimerResponseObject, error)
+	// StartFeedTimer Start a nursing or pump timer for a baby. One running timer per (baby, kind) — enforced by a unique index, not just the pre-check — so a second start for the same kind is 409 while a pump timer next to a running nursing timer is fine. `startTime` lets an offline client replay the moment it actually tapped Start.
+	// (POST /api/feeds/timer)
+	StartFeedTimer(ctx context.Context, request StartFeedTimerRequestObject) (StartFeedTimerResponseObject, error)
+	// DiscardFeedTimer Throw a running timer away without logging anything.
+	// (DELETE /api/feeds/timer/{id})
+	DiscardFeedTimer(ctx context.Context, request DiscardFeedTimerRequestObject) (DiscardFeedTimerResponseObject, error)
+	// SetFeedTimerSide Switch the running side of a nursing timer, or pause it with `side: null`. The stretch that was running is banked on the server's clock first. A pump timer is one clock and cannot be paused (400).
+	// (POST /api/feeds/timer/{id}/side)
+	SetFeedTimerSide(ctx context.Context, request SetFeedTimerSideRequestObject) (SetFeedTimerSideResponseObject, error)
+	// StopFeedTimer Stop a timer and log it: a nursing timer becomes a breast FeedLog (time = the timer's start, per-side minutes from the banked seconds, 20 s still counts as 1 min), a pump timer becomes a PumpLog. Both happen in one transaction with the timer's deletion, so a replayed stop is a 404 rather than a second row. The sheet's steppers may override the clock through the body.
+	// (POST /api/feeds/timer/{id}/stop)
+	StopFeedTimer(ctx context.Context, request StopFeedTimerRequestObject) (StopFeedTimerResponseObject, error)
 	// DeleteFeed Delete a feed log.
 	// (DELETE /api/feeds/{id})
 	DeleteFeed(ctx context.Context, request DeleteFeedRequestObject) (DeleteFeedResponseObject, error)
@@ -8423,6 +8793,158 @@ func (sh *strictHandler) CreateFeed(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateFeedResponseObject); ok {
 		if err := validResponse.VisitCreateFeedResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetFeedTimer operation middleware
+func (sh *strictHandler) GetFeedTimer(w http.ResponseWriter, r *http.Request, params GetFeedTimerParams) {
+	var request GetFeedTimerRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetFeedTimer(ctx, request.(GetFeedTimerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetFeedTimer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetFeedTimerResponseObject); ok {
+		if err := validResponse.VisitGetFeedTimerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StartFeedTimer operation middleware
+func (sh *strictHandler) StartFeedTimer(w http.ResponseWriter, r *http.Request) {
+	var request StartFeedTimerRequestObject
+
+	var body StartFeedTimerJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StartFeedTimer(ctx, request.(StartFeedTimerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartFeedTimer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartFeedTimerResponseObject); ok {
+		if err := validResponse.VisitStartFeedTimerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DiscardFeedTimer operation middleware
+func (sh *strictHandler) DiscardFeedTimer(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DiscardFeedTimerRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DiscardFeedTimer(ctx, request.(DiscardFeedTimerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DiscardFeedTimer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DiscardFeedTimerResponseObject); ok {
+		if err := validResponse.VisitDiscardFeedTimerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetFeedTimerSide operation middleware
+func (sh *strictHandler) SetFeedTimerSide(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request SetFeedTimerSideRequestObject
+
+	request.Id = id
+
+	var body SetFeedTimerSideJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetFeedTimerSide(ctx, request.(SetFeedTimerSideRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetFeedTimerSide")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetFeedTimerSideResponseObject); ok {
+		if err := validResponse.VisitSetFeedTimerSideResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StopFeedTimer operation middleware
+func (sh *strictHandler) StopFeedTimer(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request StopFeedTimerRequestObject
+
+	request.Id = id
+
+	var body StopFeedTimerJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StopFeedTimer(ctx, request.(StopFeedTimerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StopFeedTimer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StopFeedTimerResponseObject); ok {
+		if err := validResponse.VisitStopFeedTimerResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
