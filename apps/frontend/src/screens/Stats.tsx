@@ -10,7 +10,12 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { IconBabyBottle, IconMoon, IconRuler } from "@tabler/icons-react";
+import {
+  IconBabyBottle,
+  IconMoon,
+  IconMoonStars,
+  IconRuler,
+} from "@tabler/icons-react";
 import type { Baby } from "@pjokk/shared";
 import { ErrorState } from "@/components/QueryStates";
 import { ChipGroup } from "@/components/Chips";
@@ -29,7 +34,8 @@ import {
 } from "@/lib/growth";
 import { measurementMeta } from "@/lib/measurements";
 import { t } from "@/lib/i18n";
-import { formatRelative } from "@/lib/time";
+import { lastNight } from "@/lib/stats-ui";
+import { formatDay, formatRelative } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
 function sleepFmt(min: number): string {
@@ -47,12 +53,14 @@ function StatCard({
   label,
   value,
   sub,
+  sub2,
 }: {
   icon: typeof IconMoon;
   tint: string;
   label: string;
   value: string;
   sub?: string;
+  sub2?: string;
 }) {
   return (
     <Card className="flex-1">
@@ -69,6 +77,7 @@ function StatCard({
       </p>
       <p className="text-xl font-extrabold text-ink">{value}</p>
       {sub && <p className="text-xs text-muted">{sub}</p>}
+      {sub2 && <p className="text-xs text-muted">{sub2}</p>}
     </Card>
   );
 }
@@ -195,14 +204,31 @@ export function StatsScreen() {
 
   const chartData = (s?.days ?? []).map((d) => {
     const date = new Date(`${d.date}T00:00:00`);
+    // Stacked: night on the bottom, day sleep (naps + untyped) on top,
+    // both in the sleep tint (issue #50 — two shades, not a new colour).
     return {
       label:
         days === 30
           ? String(date.getDate())
           : weekdayFmt.format(date).replace(".", ""),
-      hours: Math.round((d.sleepMin / 60) * 10) / 10,
+      night: Math.round((d.nightSleepMin / 60) * 10) / 10,
+      day: Math.round(((d.sleepMin - d.nightSleepMin) / 60) * 10) / 10,
     };
   });
+  const night = s ? lastNight(s.nights) : null;
+  // "3.2 bottle · 1.5 breast" — only the types with any feeds at all.
+  const feedTypes = s
+    ? (
+        [
+          ["bottle", s.avgFeedsByType.bottle],
+          ["breast", s.avgFeedsByType.breast],
+          ["solids", s.avgFeedsByType.solids],
+        ] as const
+      )
+        .filter(([, v]) => v > 0)
+        .map(([k, v]) => `${v} ${t(k)}`)
+        .join(" · ")
+    : "";
 
   const weightDelta =
     s?.weight?.prevValue != null
@@ -245,6 +271,11 @@ export function StatsScreen() {
             tint="text-sleep"
             label={days === 1 ? t("Sleep today") : t("Sleep / day")}
             value={s ? sleepFmt(s.avgSleepMin) : "—"}
+            sub={
+              s
+                ? `${sleepFmt(s.avgNightSleepMin)} ${t("night")} · ${sleepFmt(s.avgSleepMin - s.avgNightSleepMin)} ${t("day")}`
+                : undefined
+            }
           />
           <StatCard
             icon={IconBabyBottle}
@@ -256,8 +287,46 @@ export function StatsScreen() {
                 ? `${s.avgFeeds} ${t("feeds")} · ${s.avgDiapers} ${t("diapers")}`
                 : undefined
             }
+            sub2={feedTypes || undefined}
           />
         </div>
+
+        {/* The number a parent of a newborn asks the next morning (issue
+            #50): the longest single night session, with the trend against
+            the window's earlier nights the way the weight row shows its Δ. */}
+        <Card className="flex items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-2 text-sleep">
+            <IconMoonStars className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold tracking-wide text-muted uppercase">
+              {t("Longest stretch")}
+            </p>
+            {night ? (
+              <p className="text-base font-bold text-ink">
+                {sleepFmt(night.night.longestStretchMin)}
+                {night.deltaMin != null && night.deltaMin !== 0 && (
+                  <span className="ml-1.5 font-medium text-ink-soft">
+                    {night.deltaMin > 0 ? "+" : "−"}
+                    {sleepFmt(Math.abs(night.deltaMin))}
+                  </span>
+                )}
+                <span className="block text-xs font-medium text-muted">
+                  {night.night.wakings === 1
+                    ? `1 ${t("waking")}`
+                    : `${night.night.wakings} ${t("wakings")}`}
+                  {" · "}
+                  {t("night of")}{" "}
+                  {formatDay(new Date(`${night.night.date}T00:00:00`))}
+                </span>
+              </p>
+            ) : (
+              <p className="text-sm text-muted">
+                {t("Log a night sleep to see last night's longest stretch")}
+              </p>
+            )}
+          </div>
+        </Card>
 
         <Card>
           <p className="pb-3 text-xs font-semibold tracking-wide text-muted uppercase">
@@ -288,12 +357,23 @@ export function StatsScreen() {
                     fontSize: 12,
                     color: "var(--color-ink)",
                   }}
-                  formatter={(value) => [`${value as number} ${t("h")}`, null]}
+                  formatter={(value, name) => [
+                    `${value as number} ${t("h")}`,
+                    name === "night" ? t("Night") : t("Day"),
+                  ]}
                   labelStyle={{ color: "var(--color-muted)" }}
                 />
                 <Bar
-                  dataKey="hours"
+                  dataKey="night"
+                  stackId="sleep"
                   fill="var(--color-sleep)"
+                  maxBarSize={days === 30 ? 8 : 28}
+                />
+                <Bar
+                  dataKey="day"
+                  stackId="sleep"
+                  fill="var(--color-sleep)"
+                  fillOpacity={0.45}
                   radius={[5, 5, 0, 0]}
                   maxBarSize={days === 30 ? 8 : 28}
                 />

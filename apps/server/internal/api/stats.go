@@ -80,6 +80,12 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 
 	fromTS := pgtype.Timestamptz{Time: time.UnixMilli(rangeFrom), Valid: true}
 	toTS := pgtype.Timestamptz{Time: time.UnixMilli(rangeTo), Valid: true}
+	// Sleep is read from noon of the day BEFORE the window (issue #50): the
+	// night that ended this morning began yesterday afternoon, and a
+	// one-day window must still be able to answer "how long was the
+	// longest stretch last night?". The day buckets clip to rangeFrom
+	// below, so the extra sessions never leak into a day outside the window.
+	sleepFromTS := pgtype.Timestamptz{Time: time.UnixMilli(rangeFrom - summaryDayMs/2), Valid: true}
 
 	feeds, err := d.Q.FeedsInRange(ctx, dbgen.FeedsInRangeParams{FamilyID: fam.FamilyID, BabyID: babyID, FromTs: fromTS, ToTs: toTS})
 	if err != nil {
@@ -89,7 +95,7 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 	if err != nil {
 		return nil, err
 	}
-	sleeps, err := d.Q.SleepsInRange(ctx, dbgen.SleepsInRangeParams{FamilyID: fam.FamilyID, BabyID: babyID, FromTs: fromTS, ToTs: toTS})
+	sleeps, err := d.Q.SleepsInRange(ctx, dbgen.SleepsInRangeParams{FamilyID: fam.FamilyID, BabyID: babyID, FromTs: sleepFromTS, ToTs: toTS})
 	if err != nil {
 		return nil, err
 	}
@@ -104,10 +110,14 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 
 	// TS lines 56-62: one bucket per local day in [startIdx, todayIdx].
 	type bucket struct {
-		sleepMs  int64
-		intakeMl int32
-		feeds    int32
-		diapers  int32
+		sleepMs      int64
+		nightSleepMs int64
+		intakeMl     int32
+		feeds        int32
+		bottle       int32
+		breast       int32
+		solids       int32
+		diapers      int32
 	}
 	buckets := make(map[int64]*bucket, days)
 	for i := startIdx; i <= todayIdx; i++ {
@@ -118,10 +128,16 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 	for _, f := range feeds {
 		if b, ok := buckets[dayIndex(f.Time.Time.UnixMilli())]; ok {
 			b.feeds++
-			if f.Type == "bottle" {
+			switch f.Type {
+			case "bottle":
+				b.bottle++
 				if f.AmountMl != nil {
 					b.intakeMl += *f.AmountMl
 				}
+			case "breast":
+				b.breast++
+			case "solids":
+				b.solids++
 			}
 		}
 	}
@@ -131,9 +147,38 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 			b.diapers++
 		}
 	}
+	// Nights (issue #50): a `night` session belongs to the night it STARTED
+	// in, night D = [noon of local day D, noon of D+1). One entry per day
+	// of the window plus the night before it (see sleepFromTS); the noon
+	// shift is the same fixed-offset arithmetic as the day buckets (so,
+	// like them, it does not follow a DST change inside the window — see
+	// the StatsNight schema description).
+	type night struct {
+		longestMs int64
+		sessions  int32
+	}
+	nights := make(map[int64]*night, days+1)
+	for i := startIdx - 1; i <= todayIdx; i++ {
+		nights[i] = &night{}
+	}
+	nightIndex := func(utcMs int64) int64 { return dayIndex(utcMs - summaryDayMs/2) }
+
 	// TS lines 76-89: split each session across the local midnights it
 	// crosses. Active sessions (EndTime not Valid) count up to now.
 	for _, sl := range sleeps {
+		isNight := sl.Type != nil && *sl.Type == "night"
+		if isNight {
+			if n, ok := nights[nightIndex(sl.StartTime.Time.UnixMilli())]; ok {
+				end := now
+				if sl.EndTime.Valid && sl.EndTime.Time.UnixMilli() < end {
+					end = sl.EndTime.Time.UnixMilli()
+				}
+				n.sessions++
+				if d := end - sl.StartTime.Time.UnixMilli(); d > n.longestMs {
+					n.longestMs = d
+				}
+			}
+		}
 		cur := sl.StartTime.Time.UnixMilli()
 		if cur < rangeFrom {
 			cur = rangeFrom
@@ -159,6 +204,9 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 			}
 			if b, ok := buckets[idx]; ok {
 				b.sleepMs += chunkEnd - cur
+				if isNight {
+					b.nightSleepMs += chunkEnd - cur
+				}
 			}
 			cur = chunkEnd
 		}
@@ -170,21 +218,39 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 	// idx*DAY as a bare UTC instant reproduces the correct calendar-date
 	// label without double-applying the offset.
 	statsDays := make([]gen.StatsDay, 0, todayIdx-startIdx+1)
-	var sumSleep, sumIntake, sumFeeds, sumDiapers int64
+	statsNights := make([]gen.StatsNight, 0, todayIdx-startIdx+2)
+	for i := startIdx - 1; i <= todayIdx; i++ {
+		sn := gen.StatsNight{Date: time.UnixMilli(i * summaryDayMs).UTC().Format("2006-01-02")}
+		if n := nights[i]; n.sessions > 0 {
+			longest := int32(roundDiv(n.longestMs, 60_000))
+			wakings := n.sessions - 1
+			sn.LongestStretchMin = &longest
+			sn.Wakings = &wakings
+		}
+		statsNights = append(statsNights, sn)
+	}
+	var sumSleep, sumNight, sumIntake, sumFeeds, sumBottle, sumBreast, sumSolids, sumDiapers int64
 	for i := startIdx; i <= todayIdx; i++ {
 		b := buckets[i]
 		sleepMin := int32(roundDiv(b.sleepMs, 60_000))
+		nightMin := int32(roundDiv(b.nightSleepMs, 60_000))
 		date := time.UnixMilli(i * summaryDayMs).UTC().Format("2006-01-02")
 		statsDays = append(statsDays, gen.StatsDay{
-			Date:     date,
-			SleepMin: sleepMin,
-			IntakeMl: b.intakeMl,
-			Feeds:    b.feeds,
-			Diapers:  b.diapers,
+			Date:          date,
+			SleepMin:      sleepMin,
+			NightSleepMin: nightMin,
+			IntakeMl:      b.intakeMl,
+			Feeds:         b.feeds,
+			FeedsByType:   gen.StatsFeedsByType{Bottle: float64(b.bottle), Breast: float64(b.breast), Solids: float64(b.solids)},
+			Diapers:       b.diapers,
 		})
 		sumSleep += int64(sleepMin)
+		sumNight += int64(nightMin)
 		sumIntake += int64(b.intakeMl)
 		sumFeeds += int64(b.feeds)
+		sumBottle += int64(b.bottle)
+		sumBreast += int64(b.breast)
+		sumSolids += int64(b.solids)
 		sumDiapers += int64(b.diapers)
 	}
 
@@ -193,9 +259,11 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 	// (Math.round(x*10)/10).
 	daysF := float64(days)
 	avgSleepMin := int32(math.Round(float64(sumSleep) / daysF))
+	avgNightSleepMin := int32(math.Round(float64(sumNight) / daysF))
 	avgIntakeMl := int32(math.Round(float64(sumIntake) / daysF))
-	avgFeeds := math.Round(float64(sumFeeds)/daysF*10) / 10
-	avgDiapers := math.Round(float64(sumDiapers)/daysF*10) / 10
+	avg1 := func(sum int64) float64 { return math.Round(float64(sum)/daysF*10) / 10 }
+	avgFeeds := avg1(sumFeeds)
+	avgDiapers := avg1(sumDiapers)
 
 	// TS lines 102-119: latest + predecessor `type === "weight"`
 	// measurement, in the newest-first order ListMeasurements already
@@ -225,11 +293,14 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 	}
 
 	return gen.GetStats200JSONResponse{
-		Days:        statsDays,
-		AvgSleepMin: avgSleepMin,
-		AvgIntakeMl: avgIntakeMl,
-		AvgFeeds:    avgFeeds,
-		AvgDiapers:  avgDiapers,
-		Weight:      weight,
+		Days:             statsDays,
+		Nights:           statsNights,
+		AvgSleepMin:      avgSleepMin,
+		AvgNightSleepMin: avgNightSleepMin,
+		AvgIntakeMl:      avgIntakeMl,
+		AvgFeeds:         avgFeeds,
+		AvgFeedsByType:   gen.StatsFeedsByType{Bottle: avg1(sumBottle), Breast: avg1(sumBreast), Solids: avg1(sumSolids)},
+		AvgDiapers:       avgDiapers,
+		Weight:           weight,
 	}, nil
 }

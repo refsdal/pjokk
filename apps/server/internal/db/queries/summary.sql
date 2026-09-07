@@ -27,7 +27,7 @@ WHERE "family_id" = sqlc.arg(family_id) AND "baby_id" = sqlc.arg(baby_id)
 -- edges, so this is a range-overlap test, not a containment one. Active
 -- sessions (end_time IS NULL) are treated as open-ended, matching
 -- apps/api/src/db/scoped.ts's sleepsInRange.
-SELECT "start_time", "end_time"
+SELECT "start_time", "end_time", "type"
 FROM "sleep_log"
 WHERE "family_id" = sqlc.arg(family_id) AND "baby_id" = sqlc.arg(baby_id)
   AND "start_time" < sqlc.arg(to_ts)::timestamptz
