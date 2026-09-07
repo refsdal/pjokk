@@ -1912,3 +1912,31 @@ parent. Fourth in the competitor comparison.
   a real baby shows the table to be wrong for her; a range that wide rarely
   needs it.
 
+## 2026-09-07 — length and head join the growth chart (#47)
+
+Pjokk logged all three growth measures but charted only weight; every
+general tracker in the competitor comparison charts all three against
+WHO, and the helsestasjon plots exactly these.
+
+- **Two more WHO LMS tables, same provenance as the first.** The weight
+  table came from GlobalStrategies/jsgrowup (repackaged WHO igrowup
+  tables, BSD-3); `lhfa_*_0_5` and `hcfa_*_0_5` from the same repository
+  become `who-length-for-age-lms.json` and `who-head-for-age-lms.json`,
+  in the weight file's exact shape (`[L, M, S]` per month, 0–60). Anchors
+  checked in the test against the WHO published medians (boys' length at
+  birth 49.8842 cm, girls' head at 12 months 44.8965 cm).
+- **Month 24 is listed twice in the WHO length table** — recumbent length
+  up to 24 months, standing height from 24 on, 0.7 cm apart. The length
+  row is kept: it is what Pjokk's `length` type stores, and a toddler
+  measured standing is a per-row unit question this table should not
+  quietly answer.
+- **One percentile function over a type**, `growthPercentile(type, sex,
+  age, value)`; the weight wrappers stay so the Stats weight row and its
+  tests read as before.
+- **One chart, chips for the type**, not three charts. The chips only
+  list the types with data, and the chart shows the first type that has
+  any, so a family that has only ever weighed sees what it always saw.
+- **Not added:** CDC curves and preterm-corrected age. The audience is
+  Norwegian and helsestasjonen uses WHO; a corrected age can arrive later
+  as a `baby.dueDate` column without touching the charts.
+
