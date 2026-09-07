@@ -49,6 +49,9 @@ jobs:
 
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
+        # mise itself, pinned like every other tool: the action otherwise
+        # resolves "latest", which once pointed at a tag with no assets.
+        version: 2026.9.1
           install_args: "go bun aqua:caarlos0/svu"
 
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
