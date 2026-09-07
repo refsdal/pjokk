@@ -17,6 +17,8 @@ const nb: Record<string, string> = {
   Update: "Oppdater",
   "Page not found": "Fant ikke siden",
   "Back to Pjokk": "Tilbake til Pjokk",
+  "Unsynced entries were discarded because the family changed":
+    "Usynkroniserte oppføringer ble forkastet fordi familien ble byttet",
 
   // Home
   "Last feed": "Siste måltid",

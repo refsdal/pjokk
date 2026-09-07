@@ -6,6 +6,7 @@
 // rendered, and resets on a mismatch.
 
 const KEY = "pjokk.familyId";
+const DISCARDED_KEY = "pjokk.familyFence.discarded";
 
 export type FenceVerdict = "recorded" | "same" | "changed";
 
@@ -40,5 +41,30 @@ export function clearFence(): void {
     localStorage.removeItem(KEY);
   } catch {
     // storage unavailable
+  }
+}
+
+// A fence trip that finds paused (offline-queued) mutations discards them —
+// the server has already switched families by the time this device notices,
+// so a write queued for the old family can never be replayed. Recorded here
+// and consumed once, after the reload, so the shell can tell the person
+// rather than silently dropping their entry.
+export function recordDiscarded(n: number): void {
+  if (n <= 0) return;
+  try {
+    localStorage.setItem(DISCARDED_KEY, String(n));
+  } catch {
+    // storage unavailable
+  }
+}
+
+export function takeDiscarded(): number {
+  try {
+    const raw = localStorage.getItem(DISCARDED_KEY);
+    localStorage.removeItem(DISCARDED_KEY);
+    const n = raw === null ? 0 : Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    return 0;
   }
 }

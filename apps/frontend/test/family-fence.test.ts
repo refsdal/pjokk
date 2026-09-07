@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { judgeFamily } from "../src/lib/family-fence";
+import { judgeFamily, takeDiscarded } from "../src/lib/family-fence";
 
 // The fence is the one guard the switch flow cannot provide: it compares
 // the family the app last rendered with what /api/me says now, so a switch
@@ -18,5 +18,15 @@ describe("judgeFamily", () => {
   it("ignores a session with no family yet (the Welcome flow)", () => {
     expect(judgeFamily(null, null)).toBe("same");
     expect(judgeFamily("fam-1", null)).toBe("same");
+  });
+});
+
+// bun test has no localStorage, so every family-fence accessor's try/catch
+// path is what actually runs here — this pins takeDiscarded's "nothing
+// recorded" (or "storage unavailable") case returning 0 rather than
+// throwing.
+describe("takeDiscarded", () => {
+  it("returns 0 when nothing was recorded", () => {
+    expect(takeDiscarded()).toBe(0);
   });
 });

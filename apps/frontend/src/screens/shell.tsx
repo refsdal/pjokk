@@ -4,8 +4,15 @@ import { TabBar } from "@/components/TabBar";
 import { client, unwrap } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
 import { useMe } from "@/lib/data";
-import { judgeFamily, readFence, writeFence } from "@/lib/family-fence";
-import { resetCache } from "@/lib/query";
+import {
+  judgeFamily,
+  readFence,
+  recordDiscarded,
+  takeDiscarded,
+  writeFence,
+} from "@/lib/family-fence";
+import { t } from "@/lib/i18n";
+import { queryClient, resetCache } from "@/lib/query";
 import { toast } from "@/lib/toast";
 
 // Authed shell: session required; users without a family go to /welcome
@@ -27,9 +34,31 @@ export function AppShell() {
     const verdict = judgeFamily(readFence(), familyId);
     if (verdict === "recorded") writeFence(familyId as string);
     if (verdict === "changed") {
+      // The server has already switched families by the time this device
+      // notices, so any mutation still paused (queued offline) for the OLD
+      // family can never be replayed against the new one. resetCache() must
+      // still run — the alternative is serving the wrong family's cache —
+      // but count what it is about to discard first, so the toast below (a
+      // separate effect, fired once after the reload) can tell the person
+      // rather than silently dropping their entry.
+      const discarded = queryClient
+        .getMutationCache()
+        .getAll()
+        .filter((m) => m.state.isPaused).length;
+      recordDiscarded(discarded);
       void resetCache().then(() => window.location.reload());
     }
   }, [familyId]);
+
+  useEffect(() => {
+    const n = takeDiscarded();
+    if (n > 0) {
+      toast(
+        t("Unsynced entries were discarded because the family changed"),
+        "error",
+      );
+    }
+  }, []);
 
   // me refetches on every mount (see useMe) — wait for THAT fetch to settle
   // before trusting familyId, so a reload never routes on the persisted
