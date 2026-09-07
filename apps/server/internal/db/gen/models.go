@@ -416,6 +416,7 @@ type Users struct {
 	AvatarKey        *string
 	AvatarImportedAt pgtype.Timestamptz
 	DisplayName      *string
+	Units            string
 }
 
 type VaccineDismissal struct {

@@ -2141,3 +2141,31 @@ a photographed clinic card can carry a fødselsnummer) and avatars. A
   spec reproduces the original bug by serving an old-shaped Stats
   response and checks that "Try again" recovers once the real one is
   back.
+
+## 2026-09-07 — imperial units are a display preference; the PDF is built on the device (#53)
+
+- **Units live on the person, not the family, and never on a row.**
+  `users.units` (metric | imperial) follows the caretaker across families
+  and devices; a Norwegian grandmother and an American parent read the
+  same rows in their own units. Every stored value stays in its canonical
+  metric unit (2026-09-05), the API speaks metric, and `lib/units.ts` is
+  the single place oz / lb / in / °F are derived — cards, timeline,
+  Stats (including the growth chart, converted after the WHO maths) and
+  the steppers all go through it.
+- **Sheets keep canonical state and convert only what was touched.** The
+  stepper shows 4.1 oz for a 120 ml prefill but the sheet still holds
+  120 ml; only a stepped value is converted back (4.6 oz → 136 ml). A
+  naive round trip would have saved 121 ml for a feed nobody changed.
+  Imperial steps are what the hand expects: 0.5 oz, 0.1 lb, 0.25 in,
+  0.1 °F, over the same clinical ranges as the metric ones.
+- **Left metric on purpose:** solids in grams (no imperial kitchen unit is
+  standard for baby food), medicine doses (the unit is part of the dose
+  the family chose and the catalogue stores), and the CSV export (a data
+  file is canonical; the card says so).
+- **The PDF is rendered in the browser, never on the server.** jsPDF +
+  autotable are lazy-loaded (the SPA is embedded in the binary, so bundle
+  size is image size), the data comes from the same reads the screens
+  use, and health data never passes through a server-side renderer.
+  Tables only: a nurse reads numbers, not sparklines. Norwegian letters
+  render through Helvetica's WinAnsi set; the file name slugs ø → o and
+  æ → ae because NFD does not decompose them.

@@ -35,6 +35,14 @@ import {
 import { measurementMeta } from "@/lib/measurements";
 import { t } from "@/lib/i18n";
 import { lastNight } from "@/lib/stats-ui";
+import {
+  KG_PER_LB,
+  formatMeasurementIn,
+  formatVolume,
+  measurementScale,
+  measurementUnit,
+  useUnits,
+} from "@/lib/units";
 import { formatDay, formatRelative } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
@@ -94,6 +102,7 @@ const growthTitle: Record<GrowthType, string> = {
 // only when sex is set and there's data.
 function GrowthChart({ baby }: { baby: Baby }) {
   const measurements = useMeasurements(baby.id);
+  const units = useUnits();
   const [type, setType] = useState<GrowthType>("weight");
   const sex = baby.sex;
   if (!sex) return null;
@@ -119,16 +128,20 @@ function GrowthChart({ baby }: { baby: Baby }) {
     60,
     Math.max(12, Math.ceil(points[points.length - 1]!.age) + 2),
   );
+  // The WHO maths runs on canonical values; only the plotted numbers are
+  // converted, so the curves and the dots move together.
+  const scale = measurementScale(shown, units);
+  const conv = (v: number | null) => (v == null ? null : scale.toDisplay(v));
   const chartData: Record<string, number | null>[] = [];
   for (let m = 0; m <= maxAge; m++) {
     const row: Record<string, number | null> = { age: m };
     for (const curve of referenceCurves) {
-      row[curve.label] = referenceValue(shown, sex, m, curve.z);
+      row[curve.label] = conv(referenceValue(shown, sex, m, curve.z));
     }
     chartData.push(row);
   }
   for (const p of points) {
-    chartData.push({ age: p.age, baby: p.value });
+    chartData.push({ age: p.age, baby: scale.toDisplay(p.value) });
   }
   chartData.sort((a, b) => (a.age ?? 0) - (b.age ?? 0));
 
@@ -142,7 +155,7 @@ function GrowthChart({ baby }: { baby: Baby }) {
           className="pb-3"
           options={available.map((g) => ({
             value: g,
-            label: `${t(measurementMeta[g].label)} (${measurementMeta[g].unit})`,
+            label: `${t(measurementMeta[g].label)} (${measurementUnit(g, units)})`,
           }))}
           value={shown}
           onChange={setType}
@@ -200,6 +213,7 @@ export function StatsScreen() {
   const [days, setDays] = useState<1 | 7 | 30>(7);
   const [measureOpen, setMeasureOpen] = useState(false);
   const stats = useStats(baby?.id, days);
+  const units = useUnits();
   const s = stats.data;
 
   const chartData = (s?.days ?? []).map((d) => {
@@ -281,7 +295,7 @@ export function StatsScreen() {
             icon={IconBabyBottle}
             tint="text-feed"
             label={days === 1 ? t("Intake today") : t("Intake / day")}
-            value={s ? `${s.avgIntakeMl} ml` : "—"}
+            value={s ? formatVolume(s.avgIntakeMl, units) : "—"}
             sub={
               s
                 ? `${s.avgFeeds} ${t("feeds")} · ${s.avgDiapers} ${t("diapers")}`
@@ -396,11 +410,13 @@ export function StatsScreen() {
             </p>
             {s?.weight ? (
               <p className="text-base font-bold text-ink">
-                {s.weight.value.toFixed(1)} kg
+                {formatMeasurementIn("weight", s.weight.value, units)}
                 {weightDelta != null && (
                   <span className="ml-1.5 font-medium text-ink-soft">
                     {weightDelta >= 0 ? "+" : "−"}
-                    {Math.abs(weightDelta)} g
+                    {units === "imperial"
+                      ? `${(Math.abs(weightDelta) / 1000 / KG_PER_LB).toFixed(2)} lb`
+                      : `${Math.abs(weightDelta)} g`}
                   </span>
                 )}
                 <span className="block text-xs font-medium text-muted">

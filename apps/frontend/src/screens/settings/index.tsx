@@ -20,6 +20,7 @@ import { NapGuideSection } from "./NapGuideSection";
 import { PhotoUsageLine } from "./PhotoUsageLine";
 import { SectionTitle } from "./lib";
 import { NotificationsSection } from "./NotificationsSection";
+import { ReportCard } from "./ReportCard";
 import { SleepLocationsSection } from "./SleepLocationsSection";
 
 export function SettingsScreen() {
@@ -66,7 +67,8 @@ export function SettingsScreen() {
         <SectionTitle>{t("Data")}</SectionTitle>
         <Card className="space-y-3">
           <p className="text-sm text-muted">
-            {t("Everything ever logged, one row per entry — plain CSV.")}
+            {t("Everything ever logged, one row per entry — plain CSV.")}{" "}
+            {t("Always metric (ml, kg, cm, °C), whatever your display units.")}
           </p>
           {/* Never paywalled: this is how a family exercises their right of
               access and portability. */}
@@ -79,6 +81,9 @@ export function SettingsScreen() {
           </Button>
           <PhotoUsageLine />
         </Card>
+
+        <SectionTitle>{t("PDF report")}</SectionTitle>
+        <ReportCard />
 
         <SectionTitle>{t("Calendar subscription")}</SectionTitle>
         <CalendarFeedCard />

@@ -833,6 +833,24 @@ func (e InviteInfoRole) Valid() bool {
 	}
 }
 
+// Defines values for MeUnits.
+const (
+	MeUnitsImperial MeUnits = "imperial"
+	MeUnitsMetric   MeUnits = "metric"
+)
+
+// Valid indicates whether the value is a known member of the MeUnits enum.
+func (e MeUnits) Valid() bool {
+	switch e {
+	case MeUnitsImperial:
+		return true
+	case MeUnitsMetric:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for MeasurementLogType.
 const (
 	MeasurementLogTypeHead        MeasurementLogType = "head"
@@ -1436,6 +1454,24 @@ func (e UpdateFeedType) Valid() bool {
 	case UpdateFeedTypeBreast:
 		return true
 	case UpdateFeedTypeSolids:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateMeUnits.
+const (
+	UpdateMeUnitsImperial UpdateMeUnits = "imperial"
+	UpdateMeUnitsMetric   UpdateMeUnits = "metric"
+)
+
+// Valid indicates whether the value is a known member of the UpdateMeUnits enum.
+func (e UpdateMeUnits) Valid() bool {
+	switch e {
+	case UpdateMeUnitsImperial:
+		return true
+	case UpdateMeUnitsMetric:
 		return true
 	default:
 		return false
@@ -2281,12 +2317,18 @@ type Me struct {
 	Plan  *string `json:"plan"`
 
 	// Role Ours, system-admin role. "admin" or null.
-	Role   *string `json:"role"`
+	Role *string `json:"role"`
+
+	// Units Display units (issue #53). Stored values are always metric; the SPA converts at the edge. Follows the person across families and devices.
+	Units  MeUnits `json:"units"`
 	UserId string  `json:"userId"`
 
 	// Version The server's build version — the same string the container image is tagged with ("0.8.0", "0.9.0-pr.42.abc1234"), or "dev" for an unstamped build. Shown in the Settings footer.
 	Version string `json:"version"`
 }
+
+// MeUnits Display units (issue #53). Stored values are always metric; the SPA converts at the edge. Follows the person across families and devices.
+type MeUnits string
 
 // MeasurementLog defines model for MeasurementLog.
 type MeasurementLog struct {
@@ -2802,10 +2844,14 @@ type UpdateFeedType string
 
 // UpdateMe Every field optional. `nickname` and `phone` accept `null` to clear; the handler reads the raw body (internal/api/patch.go) to tell null from absent.
 type UpdateMe struct {
-	Name     *string `json:"name,omitempty"`
-	Nickname *string `json:"nickname,omitempty"`
-	Phone    *string `json:"phone,omitempty"`
+	Name     *string        `json:"name,omitempty"`
+	Nickname *string        `json:"nickname,omitempty"`
+	Phone    *string        `json:"phone,omitempty"`
+	Units    *UpdateMeUnits `json:"units,omitempty"`
 }
+
+// UpdateMeUnits defines model for UpdateMe.Units.
+type UpdateMeUnits string
 
 // UpdateMeasurement Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time`/`type`/`value` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
 type UpdateMeasurement struct {
