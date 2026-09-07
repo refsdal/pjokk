@@ -2040,3 +2040,33 @@ a photographed clinic card can carry a fødselsnummer) and avatars. A
 - **Feeds by type as averages, not a chart.** `avgFeedsByType` on the
   intake card, only the types with any feeds; a stacked feeds chart would
   be the third chart on a screen that is meant to stay minimal.
+
+## 2026-09-07 — what the installed icon can do without a native shell (#51)
+
+- **Manifest shortcuts, an app badge and push actions; nothing else.**
+  Widgets, lock-screen live activities, Watch and Siri are native
+  extensions and stay on the Phase 7 backlog with the Capacitor shell.
+  The three things a PWA can do today all ship as one small door:
+  `/home?log=<kind>`, which Home reads on arrival, opens as that sheet,
+  and immediately strips from the URL (`replace: true`) so a reload or a
+  back-swipe never reopens it. Shortcuts point at it; push actions point
+  at it; a future widget would too.
+- **The shortcut icons are the app icon.** WebKit-style hosts refuse SVG
+  in a manifest, and a changed manifest only reaches an installed Android
+  app when the WebAPK regenerates; three extra PNGs were not worth that
+  for a menu nobody looks at for long.
+- **The badge is a dot, not a count**, set while the selected baby has a
+  running sleep, play, nursing or pump session and cleared when it ends —
+  or when the shell unmounts (sign-out, no family), so a stale dot cannot
+  outlive a session. `navigator.setAppBadge` refusing is silently a no-op;
+  it is not worth a toast. Selected baby only: a family with twins would
+  otherwise see a dot for a session it cannot see on Home.
+- **Push actions carry their own URL**, and the service worker
+  *navigates* an already-open window to it rather than only focusing it:
+  focusing lands on whatever tab was open, which is not "log feed now".
+  A plain tap on the body keeps the old focus-or-open behaviour.
+- **No "Snooze 15 min" on calendar reminders yet.** A snooze is server
+  state (the reminder job would need a `snoozed_until` to honour) plus an
+  authed fetch from the service worker; the issue's other three items
+  were free and this one was not. Filed as follow-up material rather than
+  shipped as a half.

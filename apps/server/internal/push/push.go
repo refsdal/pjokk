@@ -18,6 +18,18 @@ type PushPayload struct {
 	Title string `json:"title"`
 	Body  string `json:"body"`
 	URL   string `json:"url,omitempty"`
+	// Actions are the notification's buttons (issue #51). Android and
+	// desktop Chrome show them; iOS and Firefox ignore the field and the
+	// tap opens URL as before. public/push-sw.js reads them back.
+	Actions []PushAction `json:"actions,omitempty"`
+}
+
+// PushAction is one notification button: the URL the app opens when it is
+// tapped, e.g. "/home?log=feed" to land straight in the feed sheet.
+type PushAction struct {
+	Action string `json:"action"`
+	Title  string `json:"title"`
+	URL    string `json:"url"`
 }
 
 // Sender delivers a push notification to every subscription registered for

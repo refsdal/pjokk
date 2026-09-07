@@ -252,6 +252,14 @@ separate test deploy).
 - PWA from day 1: `vite-plugin-pwa` + Workbox. Precache app shell, NetworkFirst
   for API GETs, NEVER cache auth endpoints or mutations. Implement an "update
   available" toast wired to registerSW (no silent stale versions).
+  The installed icon does three more things (#51): manifest `shortcuts`
+  (Feed / Diaper / Sleep → `/home?log=<kind>`, which Home opens as that
+  sheet and then strips from the URL), an app badge while a session is
+  running (`lib/badge.ts`, mounted in the shell), and push notifications
+  with a "log it now" button (`PushPayload.actions`, read by
+  `public/push-sw.js`, which navigates the open window to the action's
+  URL). Widgets, Live Activities and Watch need a native shell and stay on
+  the Phase 7 backlog.
 - `viewport-fit=cover` + `env(safe-area-inset-*)` padding from the start.
 - Push subscription logic behind a small interface (web push now; native push
   token later is a second implementation of the same interface).

@@ -107,9 +107,10 @@ func RunReminders(ctx context.Context, d Deps, now time.Time) (int, error) {
 			body = name + ": " + body
 		}
 		delivered, err := d.Push.ToUser(ctx, r.UserID, push.PushPayload{
-			Title: "Pjokk",
-			Body:  body,
-			URL:   "/home",
+			Title:   "Pjokk",
+			Body:    body,
+			URL:     "/home",
+			Actions: reminderActions(r.Kind),
 		})
 		if err != nil {
 			return sent, fmt.Errorf("jobs: deliver reminder %s to %s: %w", r.ID, r.UserID, err)
@@ -216,4 +217,22 @@ func slotBody(r dbgen.Reminder) string {
 		return "Medicine reminder"
 	}
 	return "Feed reminder"
+}
+
+// reminderActions is the notification's "log it now" button (issue #51):
+// the deep link Home understands (screens/Home.tsx reads ?log=), which
+// opens the matching sheet with the time at now. A custom reminder has no
+// sheet to open.
+func reminderActions(kind string) []push.PushAction {
+	switch kind {
+	case "feed":
+		return []push.PushAction{{Action: "log", Title: "Log feed", URL: "/home?log=feed"}}
+	case "diaper":
+		return []push.PushAction{{Action: "log", Title: "Log diaper", URL: "/home?log=diaper"}}
+	case "pump":
+		return []push.PushAction{{Action: "log", Title: "Log pump", URL: "/home?log=pump"}}
+	case "medicine":
+		return []push.PushAction{{Action: "log", Title: "Log dose", URL: "/home?log=medicine"}}
+	}
+	return nil
 }
