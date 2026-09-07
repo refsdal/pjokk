@@ -72,7 +72,7 @@ func (q *Queries) DeleteFeed(ctx context.Context, arg DeleteFeedParams) (int64, 
 
 const getFeed = `-- name: GetFeed :one
 SELECT
-    f."id", f."baby_id", f."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    f."id", f."baby_id", f."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
     f."left_min", f."right_min", f."notes"
 FROM "feed_log" f
@@ -123,7 +123,7 @@ func (q *Queries) GetFeed(ctx context.Context, arg GetFeedParams) (GetFeedRow, e
 const listFeeds = `-- name: ListFeeds :many
 
 SELECT
-    f."id", f."baby_id", f."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    f."id", f."baby_id", f."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
     f."left_min", f."right_min", f."notes"
 FROM "feed_log" f
@@ -165,7 +165,7 @@ type ListFeedsRow struct {
 // sets/clears/leaves without a query per combination. `_set = false` means
 // "leave alone" regardless of what `_val` carries; `_set = true` with a NULL
 // `_val` means "clear"; `_set = true` with a non-NULL `_val` means "set".
-// COALESCE(u.name, ”) rather than a bare u."name": sqlc's static analysis
+// COALESCE(u.name, ”) rather than a bare u."display_name": sqlc's static analysis
 // can't prove an inner-joined column NOT NULL, so a bare alias would come
 // back as a *string; the family.sql ListFamilyMembers query uses the same
 // trick for the same reason.

@@ -197,7 +197,7 @@ func (q *Queries) DeleteVaccineDocument(ctx context.Context, arg DeleteVaccineDo
 
 const getVaccine = `-- name: GetVaccine :one
 SELECT
-    v."id", v."baby_id", v."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    v."id", v."baby_id", v."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     v."time", v."name", v."dose_number", v."schedule_slot", v."notes"
 FROM "vaccine_log" v
 JOIN "users" u ON u."id" = v."caretaker_id"
@@ -434,7 +434,7 @@ func (q *Queries) ListVaccineDocumentsForLogs(ctx context.Context, arg ListVacci
 const listVaccines = `-- name: ListVaccines :many
 
 SELECT
-    v."id", v."baby_id", v."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    v."id", v."baby_id", v."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     v."time", v."name", v."dose_number", v."schedule_slot", v."notes"
 FROM "vaccine_log" v
 JOIN "users" u ON u."id" = v."caretaker_id"

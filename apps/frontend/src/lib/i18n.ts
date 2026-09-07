@@ -17,6 +17,8 @@ const nb: Record<string, string> = {
   Update: "Oppdater",
   "Page not found": "Fant ikke siden",
   "Back to Pjokk": "Tilbake til Pjokk",
+  "Unsynced entries were discarded because the family changed":
+    "Usynkroniserte oppføringer ble forkastet fordi familien ble byttet",
 
   // Home
   "Last feed": "Siste måltid",
@@ -432,6 +434,10 @@ const nb: Record<string, string> = {
     "Alt som noen gang er logget, én rad per oppføring — ren CSV.",
   "Export CSV": "Eksporter CSV",
   Account: "Konto",
+  Families: "Familier",
+  "Finish syncing before switching family":
+    "Vent til alt er synkronisert før du bytter familie",
+  "Could not switch family": "Kunne ikke bytte familie",
   "Sign out": "Logg ut",
   "API docs": "API-dokumentasjon",
   "Admin console": "Adminkonsoll",
@@ -470,6 +476,22 @@ const nb: Record<string, string> = {
   "Family name (e.g. “The Olsens”)": "Familienavn (f.eks. «Olsen»)",
   "Baby's name": "Babyens navn",
   Failed: "Feilet",
+
+  // Profile
+  "Your profile": "Din profil",
+  "About you": "Om deg",
+  "Full name": "Fullt navn",
+  Nickname: "Kallenavn",
+  "Shown instead of your full name everywhere":
+    "Vises i stedet for fullt navn overalt",
+  "Sign-in address": "Innloggingsadresse",
+  "Change photo": "Bytt bilde",
+  "Remove photo": "Fjern bilde",
+  "Photo updated": "Bilde oppdatert",
+  "Photo removed": "Bilde fjernet",
+  "Profile saved": "Profil lagret",
+  "Name cannot be blank": "Navn kan ikke være tomt",
+  "Could not read that image": "Kunne ikke lese bildet",
 };
 
 function readMode(): LanguageMode {

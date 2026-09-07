@@ -14,6 +14,7 @@ import { t } from "@/lib/i18n";
 import { HomeScreen } from "@/screens/Home";
 import { JoinScreen } from "@/screens/Join";
 import { LoginScreen } from "@/screens/Login";
+import { ProfileScreen } from "@/screens/Profile";
 import { SettingsScreen } from "@/screens/settings";
 import { AppShell } from "@/screens/shell";
 import { TimelineScreen } from "@/screens/Timeline";
@@ -81,6 +82,14 @@ const settingsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/settings",
   component: SettingsScreen,
+});
+
+// The person, not the family: reached from the account sheet on Home and
+// from Settings → Account.
+const profileRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/profile",
+  component: ProfileScreen,
 });
 
 const loginRoute = createRoute({
@@ -184,6 +193,7 @@ export const routeTree = rootRoute.addChildren([
     statsRoute,
     vaccinesRoute,
     settingsRoute,
+    profileRoute,
   ]),
   loginRoute,
   joinRoute,

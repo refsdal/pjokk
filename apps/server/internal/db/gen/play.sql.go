@@ -13,7 +13,7 @@ import (
 
 const activePlay = `-- name: ActivePlay :one
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     p."type", p."start_time", p."end_time", p."notes"
 FROM "play_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"
@@ -111,7 +111,7 @@ func (q *Queries) DeletePlay(ctx context.Context, arg DeletePlayParams) (int64, 
 
 const getPlay = `-- name: GetPlay :one
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     p."type", p."start_time", p."end_time", p."notes"
 FROM "play_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"
@@ -153,7 +153,7 @@ func (q *Queries) GetPlay(ctx context.Context, arg GetPlayParams) (GetPlayRow, e
 const listPlays = `-- name: ListPlays :many
 
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     p."type", p."start_time", p."end_time", p."notes"
 FROM "play_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"

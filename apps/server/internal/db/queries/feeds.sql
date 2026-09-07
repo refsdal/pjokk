@@ -10,12 +10,12 @@
 -- `_val` means "clear"; `_set = true` with a non-NULL `_val` means "set".
 
 -- name: ListFeeds :many
--- COALESCE(u.name, '') rather than a bare u."name": sqlc's static analysis
--- can't prove an inner-joined column NOT NULL, so a bare alias would come
--- back as a *string; the family.sql ListFamilyMembers query uses the same
--- trick for the same reason.
+-- COALESCE(u."display_name", '') rather than a bare u."display_name": sqlc's
+-- static analysis can't prove an inner-joined column NOT NULL, so a bare
+-- alias would come back as a *string; the family.sql ListFamilyMembers query
+-- uses the same trick for the same reason.
 SELECT
-    f."id", f."baby_id", f."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    f."id", f."baby_id", f."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
     f."left_min", f."right_min", f."notes"
 FROM "feed_log" f
@@ -27,7 +27,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetFeed :one
 SELECT
-    f."id", f."baby_id", f."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    f."id", f."baby_id", f."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
     f."left_min", f."right_min", f."notes"
 FROM "feed_log" f

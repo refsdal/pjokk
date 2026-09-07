@@ -305,7 +305,7 @@ func (q *Queries) DeletePump(ctx context.Context, arg DeletePumpParams) (int64, 
 
 const getBath = `-- name: GetBath :one
 SELECT
-    b."id", b."baby_id", b."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    b."id", b."baby_id", b."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     b."time", b."notes"
 FROM "bath_log" b
 JOIN "users" u ON u."id" = b."caretaker_id"
@@ -342,7 +342,7 @@ func (q *Queries) GetBath(ctx context.Context, arg GetBathParams) (GetBathRow, e
 
 const getMeasurement = `-- name: GetMeasurement :one
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     m."time", m."type", m."value", m."notes"
 FROM "measurement_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
@@ -383,7 +383,7 @@ func (q *Queries) GetMeasurement(ctx context.Context, arg GetMeasurementParams) 
 
 const getMedicine = `-- name: GetMedicine :one
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     m."time", m."name", m."amount", m."unit", m."notes"
 FROM "medicine_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
@@ -426,7 +426,7 @@ func (q *Queries) GetMedicine(ctx context.Context, arg GetMedicineParams) (GetMe
 
 const getMilestone = `-- name: GetMilestone :one
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     m."time", m."title", m."notes"
 FROM "milestone_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
@@ -465,7 +465,7 @@ func (q *Queries) GetMilestone(ctx context.Context, arg GetMilestoneParams) (Get
 
 const getNote = `-- name: GetNote :one
 SELECT
-    n."id", n."baby_id", n."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    n."id", n."baby_id", n."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     n."time", n."content", n."notes"
 FROM "note_log" n
 JOIN "users" u ON u."id" = n."caretaker_id"
@@ -504,7 +504,7 @@ func (q *Queries) GetNote(ctx context.Context, arg GetNoteParams) (GetNoteRow, e
 
 const getPump = `-- name: GetPump :one
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     p."time", p."side", p."amount_ml", p."duration_min", p."notes"
 FROM "pump_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"
@@ -548,7 +548,7 @@ func (q *Queries) GetPump(ctx context.Context, arg GetPumpParams) (GetPumpRow, e
 const listBaths = `-- name: ListBaths :many
 
 SELECT
-    b."id", b."baby_id", b."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    b."id", b."baby_id", b."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     b."time", b."notes"
 FROM "bath_log" b
 JOIN "users" u ON u."id" = b."caretaker_id"
@@ -604,7 +604,7 @@ func (q *Queries) ListBaths(ctx context.Context, arg ListBathsParams) ([]ListBat
 const listMeasurements = `-- name: ListMeasurements :many
 
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     m."time", m."type", m."value", m."notes"
 FROM "measurement_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
@@ -665,7 +665,7 @@ const listMedicine = `-- name: ListMedicine :many
 
 
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     m."time", m."name", m."amount", m."unit", m."notes"
 FROM "medicine_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
@@ -737,7 +737,7 @@ func (q *Queries) ListMedicine(ctx context.Context, arg ListMedicineParams) ([]L
 const listMilestones = `-- name: ListMilestones :many
 
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     m."time", m."title", m."notes"
 FROM "milestone_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
@@ -795,7 +795,7 @@ func (q *Queries) ListMilestones(ctx context.Context, arg ListMilestonesParams) 
 const listNotes = `-- name: ListNotes :many
 
 SELECT
-    n."id", n."baby_id", n."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    n."id", n."baby_id", n."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     n."time", n."content", n."notes"
 FROM "note_log" n
 JOIN "users" u ON u."id" = n."caretaker_id"
@@ -853,7 +853,7 @@ func (q *Queries) ListNotes(ctx context.Context, arg ListNotesParams) ([]ListNot
 const listPumps = `-- name: ListPumps :many
 
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     p."time", p."side", p."amount_ml", p."duration_min", p."notes"
 FROM "pump_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"

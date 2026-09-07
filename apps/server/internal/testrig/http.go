@@ -249,6 +249,17 @@ func (a *AppRig) MountProtected(pattern string, h http.HandlerFunc) {
 	a.handler = nil // force a rebuild before the next request
 }
 
+// Configure mutates the rig's Deps and marks the handler stale, for a test
+// that needs a collaborator the default rig leaves nil or wants swapped.
+// The next request rebuilds the handler.
+func (a *AppRig) Configure(fn func(d *api.Deps)) {
+	a.t.Helper()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	fn(&a.Deps)
+	a.handler = nil
+}
+
 // SignUp creates a user with the rig's fixed test password (see rigPassword)
 // and returns its id. Equivalent to apps/api/test/helpers.ts's createUser,
 // minus the caller having to think about the credential.

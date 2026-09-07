@@ -23,11 +23,12 @@ import {
 import { PlaySheet } from "@/components/sheets/PlaySheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
 import { VaccineSheet } from "@/components/sheets/VaccineSheet";
+import { Avatar } from "@/components/Avatar";
 import { ChipGroup } from "@/components/Chips";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { Button } from "@/components/ui/button";
 import { BabySwitcher } from "@/components/BabySwitcher";
-import { useFeeds, useTimeline } from "@/lib/data";
+import { useFeeds, useMemberAvatars, useTimeline } from "@/lib/data";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import { t } from "@/lib/i18n";
 import { playKindMeta } from "@/lib/play-ui";
@@ -170,9 +171,11 @@ const kindStyle: Record<
 
 function Row({
   entry,
+  avatarUrl,
   onClick,
 }: {
   entry: TimelineEntry;
+  avatarUrl: string | null | undefined;
   onClick: () => void;
 }) {
   const { icon: Icon, tint: baseTint } = kindStyle[entry.kind];
@@ -219,6 +222,7 @@ function Row({
           {t("by")} {entry.caretakerName}
         </span>
       </span>
+      <Avatar src={avatarUrl} name={entry.caretakerName} size={8} />
     </button>
   );
 }
@@ -228,6 +232,7 @@ export function TimelineScreen() {
   const [filter, setFilter] = useState<TimelineFilter | null>(null);
   const timeline = useTimeline(baby?.id, filter);
   const feeds = useFeeds(baby?.id);
+  const avatars = useMemberAvatars();
   const [editEntry, setEditEntry] = useState<TimelineEntry | null>(null);
 
   const entries = timeline.data?.pages.flatMap((p) => p.entries) ?? [];
@@ -286,6 +291,7 @@ export function TimelineScreen() {
                 <Row
                   key={`${entry.kind}-${entry.id}`}
                   entry={entry}
+                  avatarUrl={avatars[entry.caretakerId]}
                   onClick={() => setEditEntry(entry)}
                 />
               ))}

@@ -18,7 +18,7 @@
 -- COALESCE(u.name, '') — see feeds.sql's ListFeeds for why (sqlc can't prove
 -- an inner-joined column NOT NULL from a bare alias).
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     p."type", p."start_time", p."end_time", p."notes"
 FROM "play_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"
@@ -29,7 +29,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetPlay :one
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     p."type", p."start_time", p."end_time", p."notes"
 FROM "play_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"
@@ -41,7 +41,7 @@ WHERE p."family_id" = $1 AND p."id" = $2;
 -- returns whichever running session across the family started most
 -- recently, mirroring sleep.sql's ActiveSleep exactly.
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     p."type", p."start_time", p."end_time", p."notes"
 FROM "play_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"

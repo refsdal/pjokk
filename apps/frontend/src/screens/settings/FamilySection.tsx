@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import type { Invite, Member } from "@pjokk/shared";
+import { Avatar } from "@/components/Avatar";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet } from "@/components/Sheet";
 import { Button } from "@/components/ui/button";
@@ -189,9 +190,7 @@ export function FamilySection({ isAdmin }: { isAdmin: boolean }) {
           const manageable = isAdmin && m.userId !== me.data?.userId;
           const row = (
             <>
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-soft text-sm font-bold text-accent">
-                {m.name.slice(0, 1).toUpperCase()}
-              </div>
+              <Avatar src={m.avatarUrl} name={m.name} size={9} />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold text-ink">{m.name}</p>
                 <p className="truncate text-xs text-muted">{m.email}</p>

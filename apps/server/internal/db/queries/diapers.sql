@@ -7,7 +7,7 @@
 -- COALESCE(u.name, '') — see feeds.sql's ListFeeds for why (sqlc can't prove
 -- an inner-joined column NOT NULL from a bare alias).
 SELECT
-    d."id", d."baby_id", d."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    d."id", d."baby_id", d."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     d."time", d."type", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
@@ -18,7 +18,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetDiaper :one
 SELECT
-    d."id", d."baby_id", d."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    d."id", d."baby_id", d."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     d."time", d."type", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"

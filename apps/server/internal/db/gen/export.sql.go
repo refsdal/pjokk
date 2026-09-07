@@ -14,7 +14,7 @@ import (
 const exportBaths = `-- name: ExportBaths :many
 SELECT
     b."baby_id", bb."name" AS baby_name, b."time",
-    COALESCE(u."name", '') AS caretaker_name, b."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, b."notes"
 FROM "bath_log" b
 JOIN "baby" bb ON bb."id" = b."baby_id"
 JOIN "users" u ON u."id" = b."caretaker_id"
@@ -65,7 +65,7 @@ func (q *Queries) ExportBaths(ctx context.Context, arg ExportBathsParams) ([]Exp
 const exportDiapers = `-- name: ExportDiapers :many
 SELECT
     d."baby_id", bb."name" AS baby_name, d."time", d."type",
-    COALESCE(u."name", '') AS caretaker_name, d."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, d."notes"
 FROM "diaper_log" d
 JOIN "baby" bb ON bb."id" = d."baby_id"
 JOIN "users" u ON u."id" = d."caretaker_id"
@@ -119,7 +119,7 @@ const exportFeeds = `-- name: ExportFeeds :many
 
 SELECT
     f."baby_id", bb."name" AS baby_name, f."time", f."type", f."amount_ml",
-    f."side", f."duration_min", COALESCE(u."name", '') AS caretaker_name, f."notes"
+    f."side", f."duration_min", COALESCE(u."display_name", '') AS caretaker_name, f."notes"
 FROM "feed_log" f
 JOIN "baby" bb ON bb."id" = f."baby_id"
 JOIN "users" u ON u."id" = f."caretaker_id"
@@ -192,7 +192,7 @@ func (q *Queries) ExportFeeds(ctx context.Context, arg ExportFeedsParams) ([]Exp
 const exportMeasurements = `-- name: ExportMeasurements :many
 SELECT
     m."baby_id", bb."name" AS baby_name, m."time", m."type", m."value",
-    COALESCE(u."name", '') AS caretaker_name, m."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, m."notes"
 FROM "measurement_log" m
 JOIN "baby" bb ON bb."id" = m."baby_id"
 JOIN "users" u ON u."id" = m."caretaker_id"
@@ -247,7 +247,7 @@ func (q *Queries) ExportMeasurements(ctx context.Context, arg ExportMeasurements
 const exportMedicine = `-- name: ExportMedicine :many
 SELECT
     m."baby_id", bb."name" AS baby_name, m."time", m."name", m."amount", m."unit",
-    COALESCE(u."name", '') AS caretaker_name, m."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, m."notes"
 FROM "medicine_log" m
 JOIN "baby" bb ON bb."id" = m."baby_id"
 JOIN "users" u ON u."id" = m."caretaker_id"
@@ -304,7 +304,7 @@ func (q *Queries) ExportMedicine(ctx context.Context, arg ExportMedicineParams) 
 const exportMilestones = `-- name: ExportMilestones :many
 SELECT
     m."baby_id", bb."name" AS baby_name, m."time", m."title",
-    COALESCE(u."name", '') AS caretaker_name, m."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, m."notes"
 FROM "milestone_log" m
 JOIN "baby" bb ON bb."id" = m."baby_id"
 JOIN "users" u ON u."id" = m."caretaker_id"
@@ -357,7 +357,7 @@ func (q *Queries) ExportMilestones(ctx context.Context, arg ExportMilestonesPara
 const exportNotes = `-- name: ExportNotes :many
 SELECT
     n."baby_id", bb."name" AS baby_name, n."time", n."content",
-    COALESCE(u."name", '') AS caretaker_name, n."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, n."notes"
 FROM "note_log" n
 JOIN "baby" bb ON bb."id" = n."baby_id"
 JOIN "users" u ON u."id" = n."caretaker_id"
@@ -410,7 +410,7 @@ func (q *Queries) ExportNotes(ctx context.Context, arg ExportNotesParams) ([]Exp
 const exportPlays = `-- name: ExportPlays :many
 SELECT
     p."baby_id", bb."name" AS baby_name, p."start_time", p."end_time", p."type",
-    COALESCE(u."name", '') AS caretaker_name, p."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, p."notes"
 FROM "play_log" p
 JOIN "baby" bb ON bb."id" = p."baby_id"
 JOIN "users" u ON u."id" = p."caretaker_id"
@@ -465,7 +465,7 @@ func (q *Queries) ExportPlays(ctx context.Context, arg ExportPlaysParams) ([]Exp
 const exportPumps = `-- name: ExportPumps :many
 SELECT
     p."baby_id", bb."name" AS baby_name, p."time", p."amount_ml", p."side", p."duration_min",
-    COALESCE(u."name", '') AS caretaker_name, p."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, p."notes"
 FROM "pump_log" p
 JOIN "baby" bb ON bb."id" = p."baby_id"
 JOIN "users" u ON u."id" = p."caretaker_id"
@@ -522,7 +522,7 @@ func (q *Queries) ExportPumps(ctx context.Context, arg ExportPumpsParams) ([]Exp
 const exportSleeps = `-- name: ExportSleeps :many
 SELECT
     s."baby_id", bb."name" AS baby_name, s."start_time", s."end_time",
-    s."location", COALESCE(u."name", '') AS caretaker_name, s."notes"
+    s."location", COALESCE(u."display_name", '') AS caretaker_name, s."notes"
 FROM "sleep_log" s
 JOIN "baby" bb ON bb."id" = s."baby_id"
 JOIN "users" u ON u."id" = s."caretaker_id"
@@ -577,7 +577,7 @@ func (q *Queries) ExportSleeps(ctx context.Context, arg ExportSleepsParams) ([]E
 const exportVaccines = `-- name: ExportVaccines :many
 SELECT
     v."baby_id", bb."name" AS baby_name, v."time", v."name", v."dose_number",
-    COALESCE(u."name", '') AS caretaker_name, v."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, v."notes"
 FROM "vaccine_log" v
 JOIN "baby" bb ON bb."id" = v."baby_id"
 JOIN "users" u ON u."id" = v."caretaker_id"

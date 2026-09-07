@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Baby, Family, Invite, Member } from "@pjokk/shared";
 import type { components } from "../api-schema";
@@ -68,4 +69,20 @@ export function useInvites(enabled: boolean) {
     enabled,
     queryFn: async () => unwrap<Invite[]>(client.GET("/api/invites")),
   });
+}
+
+// userId → avatarUrl for the active family's members. Log entries and
+// calendar assignees carry only a user id, so rows look their face up here;
+// a missing entry (an ex-member, or members not loaded yet) renders as the
+// initial. The timeline stays offline-viewable because it never WAITS on
+// this query.
+export function useMemberAvatars(): Record<string, string | null> {
+  const members = useMembers();
+  return useMemo(
+    () =>
+      Object.fromEntries(
+        (members.data ?? []).map((m) => [m.userId, m.avatarUrl] as const),
+      ),
+    [members.data],
+  );
 }

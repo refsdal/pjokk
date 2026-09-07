@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -268,6 +269,13 @@ func (d Deps) DeleteAdminUser(ctx context.Context, req gen.DeleteAdminUserReques
 		return nil, err
 	}
 
+	// Read the avatar key before the row goes; the object is deleted after
+	// the commit (a delete that rolls back must keep the photo).
+	profile, err := d.Q.GetUserProfile(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+
 	// Before the transaction, because it goes through Limen rather than our
 	// pool: any session this account is DRIVING through impersonation
 	// belongs to the target user, so the users-row delete below cascades
@@ -307,6 +315,12 @@ func (d Deps) DeleteAdminUser(ctx context.Context, req gen.DeleteAdminUserReques
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
+	}
+
+	if profile.AvatarKey != nil {
+		if err := d.Storage.Delete(ctx, *profile.AvatarKey); err != nil {
+			log.Printf("api: delete avatar of removed user %s: %v", req.Id, err)
+		}
 	}
 	return gen.DeleteAdminUser200JSONResponse{Ok: gen.OkOkTrue}, nil
 }

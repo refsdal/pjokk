@@ -51,7 +51,9 @@ separate test deploy).
    and badges, never as backgrounds. Category colors: sleep=purple, feeds=blue,
    diapers=teal, growth/measurements=coral.
 8. **Attribution is ambient.** Timeline entries show "by <caretaker>" from the
-   session. Useful the morning after; free from the auth model.
+   session. Useful the morning after; free from the auth model. Attribution
+   uses the display name (nickname, else full name) and the caretaker's
+   avatar.
 
 ## Stack (decided — do not substitute)
 
@@ -267,10 +269,10 @@ entry, More).
 No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
 (the invite flow IS onboarding).
 
-- **Home:** baby header w/ age + caretaker chip (avatar → family switcher),
-  active-session banner (live counter + Wake button when sleeping), last-feed /
-  last-diaper status cards, 2×2 grid of big log buttons (Feed, Diaper, Sleep,
-  More), tab bar.
+- **Home:** baby header w/ age + caretaker chip (the user's avatar → account
+  sheet: profile, family switcher, sign out), active-session banner (live
+  counter + Wake button when sleeping), last-feed / last-diaper status cards,
+  2×2 grid of big log buttons (Feed, Diaper, Sleep, More), tab bar.
 - **Log sheets (vaul):** type chips → prefilled stepper/fields → time chips
   (Now / 15 m ago / Pick time) → full-width Save at the very bottom. The SAME
   component handles create and edit.
@@ -285,6 +287,10 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
 - **Settings:** iOS-style grouped rows. Family (Babies, Caretakers, Invite
   link w/ QR), Preferences (Notifications, Units, Night mode schedule), Data
   (Export CSV, API access).
+- **Profile (`/profile`):** the person, not the family — full name,
+  nickname (shown instead of the name everywhere, via the users
+  `display_name` generated column), phone (private), photo. Reached from the
+  account sheet and Settings → Account. Global across families.
 - **Night mode:** scheduled + manual override; deliberate exit gesture.
 - **Active sessions are state, not screens:** one `activeSession` query,
   rendered everywhere (home banner, timeline badge, tab tint).

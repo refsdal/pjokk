@@ -1,4 +1,6 @@
+import { IconChevronRight } from "@tabler/icons-react";
 import { Link } from "@tanstack/react-router";
+import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { API_BASE } from "@/lib/api";
@@ -99,10 +101,25 @@ export function SettingsScreen() {
               {t("Admin console")}
             </Link>
           )}
-          <p className="text-sm text-ink-soft">
-            {me.data?.name}
-            <span className="block text-xs text-muted">{me.data?.email}</span>
-          </p>
+          <Link
+            to="/profile"
+            className="flex min-h-14 items-center gap-3 rounded-xl2 border border-line px-4 py-2 active:bg-surface-2"
+          >
+            <Avatar
+              src={me.data?.avatarUrl}
+              name={me.data?.displayName ?? "?"}
+              size={9}
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-semibold text-ink">
+                {me.data?.displayName}
+              </span>
+              <span className="block truncate text-xs text-muted">
+                {me.data?.email}
+              </span>
+            </span>
+            <IconChevronRight className="h-5 w-5 text-muted" />
+          </Link>
           <Button
             size="full"
             variant="outline"

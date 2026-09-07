@@ -40,7 +40,7 @@ WHERE "family_id" = sqlc.arg(family_id) AND "baby_id" = sqlc.arg(baby_id)
 -- would return the weight. :many with LIMIT 1 rather than :one so "none yet"
 -- is an empty slice instead of pgx.ErrNoRows at the call site.
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     m."time", m."type", m."value", m."notes"
 FROM "measurement_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"

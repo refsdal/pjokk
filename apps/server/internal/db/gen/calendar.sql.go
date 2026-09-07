@@ -12,11 +12,11 @@ import (
 )
 
 const calendarAssigneesForEvent = `-- name: CalendarAssigneesForEvent :many
-SELECT u."id" AS user_id, COALESCE(u."name", '') AS name
+SELECT u."id" AS user_id, COALESCE(u."display_name", '') AS name
 FROM "calendar_assignee" ca
 JOIN "users" u ON u."id" = ca."user_id"
 WHERE ca."event_id" = $1
-ORDER BY u."name"
+ORDER BY u."display_name"
 `
 
 type CalendarAssigneesForEventRow struct {
@@ -45,11 +45,11 @@ func (q *Queries) CalendarAssigneesForEvent(ctx context.Context, eventID string)
 }
 
 const calendarAssigneesForEvents = `-- name: CalendarAssigneesForEvents :many
-SELECT ca."event_id", u."id" AS user_id, COALESCE(u."name", '') AS name
+SELECT ca."event_id", u."id" AS user_id, COALESCE(u."display_name", '') AS name
 FROM "calendar_assignee" ca
 JOIN "users" u ON u."id" = ca."user_id"
 WHERE ca."event_id" = ANY($1)
-ORDER BY u."name"
+ORDER BY u."display_name"
 `
 
 type CalendarAssigneesForEventsRow struct {
@@ -256,7 +256,7 @@ const getCalendarEvent = `-- name: GetCalendarEvent :one
 SELECT
     e."id", e."title", e."description", e."location", e."category",
     e."start_time", e."all_day", e."duration_min", e."remind_minutes_before",
-    e."created_by", COALESCE(u."name", '') AS created_by_name
+    e."created_by", COALESCE(u."display_name", '') AS created_by_name
 FROM "calendar_event" e
 JOIN "users" u ON u."id" = e."created_by"
 WHERE e."family_id" = $1 AND e."id" = $2
@@ -305,7 +305,7 @@ const listCalendarEvents = `-- name: ListCalendarEvents :many
 SELECT
     e."id", e."title", e."description", e."location", e."category",
     e."start_time", e."all_day", e."duration_min", e."remind_minutes_before",
-    e."created_by", COALESCE(u."name", '') AS created_by_name
+    e."created_by", COALESCE(u."display_name", '') AS created_by_name
 FROM "calendar_event" e
 JOIN "users" u ON u."id" = e."created_by"
 WHERE e."family_id" = $1

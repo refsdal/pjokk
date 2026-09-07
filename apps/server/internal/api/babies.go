@@ -234,13 +234,13 @@ func (d Deps) ListFamilyMembers(ctx context.Context, _ gen.ListFamilyMembersRequ
 	out := make([]gen.Member, len(rows))
 	for i, row := range rows {
 		out[i] = gen.Member{
-			MemberId: row.MemberID,
-			UserId:   row.UserID,
-			Name:     row.Name,
-			Email:    row.Email,
-			Role:     row.Role,
-			Image:    row.Image,
-			HasPush:  row.HasPush,
+			MemberId:  row.MemberID,
+			UserId:    row.UserID,
+			Name:      row.Name,
+			Email:     row.Email,
+			Role:      row.Role,
+			AvatarUrl: avatarURL(row.UserID, row.AvatarKey),
+			HasPush:   row.HasPush,
 		}
 	}
 	return gen.ListFamilyMembers200JSONResponse(out), nil

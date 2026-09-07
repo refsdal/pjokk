@@ -118,6 +118,12 @@ type Deps struct {
 	OpenSignup     bool
 	OAuthProviders []string
 
+	// AvatarImport copies a Google profile picture into the object store on
+	// the first GET /api/me after sign-in (internal/api/avatar_import.go).
+	// nil disables the import; the test rig leaves it nil unless a test
+	// Configure()s one.
+	AvatarImport *AvatarImporter
+
 	// ExtraRoutes, when non-nil, is called while building the mux, after the
 	// standard routes are registered and before the /api/ catch-all. protect
 	// wraps a handler in the SAME Session + RequireFamily chain every real
@@ -208,7 +214,8 @@ var operationAuthTiers = map[string]authTier{
 	// comment.
 	"GetConfig": tierPublic,
 
-	"GetMe": tierSession,
+	"GetMe":    tierSession,
+	"UpdateMe": tierSession,
 
 	"ListBabies":        tierFamily,
 	"CreateBaby":        tierFamily,
@@ -609,10 +616,16 @@ func familyChain(d Deps) func(http.Handler) http.Handler {
 // beneath it, one of the spec-validation exclusions below.
 var vaccineDocumentsPattern = regexp.MustCompile(`^/api/vaccines/[^/]+/documents(/|$)`)
 
+// avatarPattern matches exactly /api/users/{id}/avatar — the one streaming
+// route under /api/users/; a prefix match would silently exempt any future
+// JSON route mounted there from request validation.
+var avatarPattern = regexp.MustCompile(`^/api/users/[^/]+/avatar$`)
+
 // skipSpecValidation reports whether r's path is one of the routes that
 // never go through kin-openapi request validation: the auth handler (Limen
 // owns its own request shapes), raw file streaming, the CSV export stream,
-// and vaccine document uploads (multipart, not JSON). /api/auth/ is also
+// vaccine document uploads (multipart, not JSON), and the avatar upload
+// (multipart) and the avatar streaming route. /api/auth/ is also
 // structurally unreachable here (see NewHandler's mount order) — it is
 // listed anyway so this function documents the full exclusion set on its
 // own, independent of how the mux happens to be wired today.
@@ -625,6 +638,10 @@ func skipSpecValidation(r *http.Request) bool {
 	case r.URL.Path == "/api/export.csv":
 		return true
 	case vaccineDocumentsPattern.MatchString(r.URL.Path):
+		return true
+	case r.URL.Path == "/api/me/avatar":
+		return true
+	case avatarPattern.MatchString(r.URL.Path):
 		return true
 	default:
 		return false
@@ -754,6 +771,11 @@ func NewHandler(d Deps) http.Handler {
 	// apps/api/src/app.ts's filesApp sits behind the identical "/api/*"
 	// apiKeyAuth middleware every other route does, so this port must too.
 	d.mountFileRoutes(mux, familyChain(d))
+
+	// Avatars (internal/api/avatar.go): multipart in, JPEG out — hand-routed
+	// for the same reason as the files routes, but session tier (a profile
+	// is global) and never an API key.
+	d.mountAvatarRoutes(mux, sessionChain(d))
 
 	// CSV export (internal/api/export.go's package doc comment): same
 	// reasoning as the files routes above — a text/csv streamed body has

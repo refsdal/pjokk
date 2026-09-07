@@ -13,7 +13,7 @@
 
 -- name: ListMedicine :many
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     m."time", m."name", m."amount", m."unit", m."notes"
 FROM "medicine_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
@@ -24,7 +24,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetMedicine :one
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     m."time", m."name", m."amount", m."unit", m."notes"
 FROM "medicine_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
@@ -54,7 +54,7 @@ WHERE "family_id" = $1 AND "id" = $2;
 
 -- name: ListBaths :many
 SELECT
-    b."id", b."baby_id", b."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    b."id", b."baby_id", b."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     b."time", b."notes"
 FROM "bath_log" b
 JOIN "users" u ON u."id" = b."caretaker_id"
@@ -65,7 +65,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetBath :one
 SELECT
-    b."id", b."baby_id", b."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    b."id", b."baby_id", b."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     b."time", b."notes"
 FROM "bath_log" b
 JOIN "users" u ON u."id" = b."caretaker_id"
@@ -91,7 +91,7 @@ WHERE "family_id" = $1 AND "id" = $2;
 
 -- name: ListNotes :many
 SELECT
-    n."id", n."baby_id", n."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    n."id", n."baby_id", n."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     n."time", n."content", n."notes"
 FROM "note_log" n
 JOIN "users" u ON u."id" = n."caretaker_id"
@@ -102,7 +102,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetNote :one
 SELECT
-    n."id", n."baby_id", n."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    n."id", n."baby_id", n."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     n."time", n."content", n."notes"
 FROM "note_log" n
 JOIN "users" u ON u."id" = n."caretaker_id"
@@ -129,7 +129,7 @@ WHERE "family_id" = $1 AND "id" = $2;
 
 -- name: ListMilestones :many
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     m."time", m."title", m."notes"
 FROM "milestone_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
@@ -140,7 +140,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetMilestone :one
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     m."time", m."title", m."notes"
 FROM "milestone_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
@@ -167,7 +167,7 @@ WHERE "family_id" = $1 AND "id" = $2;
 
 -- name: ListMeasurements :many
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     m."time", m."type", m."value", m."notes"
 FROM "measurement_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
@@ -178,7 +178,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetMeasurement :one
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     m."time", m."type", m."value", m."notes"
 FROM "measurement_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
@@ -206,7 +206,7 @@ WHERE "family_id" = $1 AND "id" = $2;
 
 -- name: ListPumps :many
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     p."time", p."side", p."amount_ml", p."duration_min", p."notes"
 FROM "pump_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"
@@ -217,7 +217,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetPump :one
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     p."time", p."side", p."amount_ml", p."duration_min", p."notes"
 FROM "pump_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"

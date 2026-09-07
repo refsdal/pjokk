@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { CalendarCategory, CalendarEvent } from "@pjokk/shared";
+import { Avatar } from "@/components/Avatar";
 import { ChipGroup, MultiChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet } from "@/components/Sheet";
@@ -261,6 +262,7 @@ export function EventSheet({
             options={(members.data ?? []).map((m) => ({
               value: m.userId,
               label: m.name,
+              leading: <Avatar src={m.avatarUrl} name={m.name} size={5} />,
             }))}
             values={assignees}
             onToggle={(id) =>

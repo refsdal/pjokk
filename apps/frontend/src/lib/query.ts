@@ -1,6 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { del, get, set } from "idb-keyval";
+import { clearFence } from "./family-fence";
 
 const DAY = 24 * 3600_000;
 
@@ -33,7 +34,7 @@ export const persister = createAsyncStoragePersister({
 // second create is refused. Persistence exists for offline-viewable CONTENT
 // (timeline, home cards, stats) — those tolerate a stale-then-revalidate
 // render; "which family am I in" does not.
-const NEVER_PERSIST = new Set(["me", "family", "members"]);
+const NEVER_PERSIST = new Set(["me", "family", "members", "my-families"]);
 
 export const persistOptions = {
   persister,
@@ -51,6 +52,9 @@ export const persistOptions = {
 // would restore the previous account's `me`, family and members straight
 // from IndexedDB and render them before the network could correct it.
 export async function resetCache(): Promise<void> {
+  // The fence describes the cache being dropped; a fresh identity records
+  // its own family on the next /api/me.
+  clearFence();
   queryClient.clear();
   await persister.removeClient();
 }

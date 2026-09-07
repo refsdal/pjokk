@@ -44,7 +44,7 @@ export function MultiChipGroup<T extends string>({
   onToggle,
   className,
 }: {
-  options: { value: T; label: ReactNode }[];
+  options: { value: T; label: ReactNode; leading?: ReactNode }[];
   values: T[];
   onToggle: (v: T) => void;
   className?: string;
@@ -60,12 +60,14 @@ export function MultiChipGroup<T extends string>({
             aria-pressed={active}
             onClick={() => onToggle(opt.value)}
             className={cn(
-              "h-11 min-w-16 rounded-full border px-4 text-sm font-semibold transition-colors select-none active:scale-[0.97]",
+              "inline-flex h-11 min-w-16 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-colors select-none active:scale-[0.97]",
+              opt.leading && "pl-2",
               active
                 ? "border-accent bg-accent text-on-accent"
                 : "border-line bg-surface text-ink-soft",
             )}
           >
+            {opt.leading}
             {opt.label}
           </button>
         );
