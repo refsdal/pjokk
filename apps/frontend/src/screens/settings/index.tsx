@@ -14,6 +14,7 @@ import { BabiesSection } from "./BabiesSection";
 import { ContactsSection } from "./ContactsSection";
 import { FamilySection } from "./FamilySection";
 import { InstallSection } from "./InstallSection";
+import { NapGuideSection } from "./NapGuideSection";
 import { SectionTitle } from "./lib";
 import { NotificationsSection } from "./NotificationsSection";
 import { SleepLocationsSection } from "./SleepLocationsSection";
@@ -41,6 +42,8 @@ export function SettingsScreen() {
             <SleepLocationsSection />
           </>
         )}
+
+        <NapGuideSection />
 
         <SectionTitle>{t("Notifications")}</SectionTitle>
         <NotificationsSection />

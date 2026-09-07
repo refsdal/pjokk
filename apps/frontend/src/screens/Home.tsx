@@ -54,6 +54,7 @@ import {
   type OtherKind,
 } from "@/lib/data";
 import { t } from "@/lib/i18n";
+import { describeNapWindow, napWindow, useNapGuide } from "@/lib/nap-window";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import { formatDuration, formatElapsed } from "@/lib/time";
 import { useAppearance } from "@/lib/appearance";
@@ -133,6 +134,7 @@ export function HomeScreen() {
   // the open edit sheet into a "start sleep" sheet under the user's thumb.
   const [editSleep, setEditSleep] = useState<SleepLog | null>(null);
   const { night } = useAppearance();
+  const napGuide = useNapGuide();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -171,6 +173,15 @@ export function HomeScreen() {
   const activePlay = s?.activePlay ?? null;
   const activeFeed = s?.activeFeed ?? null;
   const activePump = s?.activePump ?? null;
+  // The nap-window guide (issue #46): a conclusion under the awake card,
+  // only while it has something honest to say (see lib/nap-window.ts).
+  const nap =
+    napGuide && baby && s?.lastSleep?.endTime
+      ? napWindow({
+          birthDate: new Date(baby.birthDate),
+          wakeAt: new Date(s.lastSleep.endTime),
+        })
+      : null;
   const openHelp = s?.openHelp ?? null;
   const tempStatus = temperatureStatus(
     s?.lastTemperature?.value ?? 0,
@@ -296,6 +307,7 @@ export function HomeScreen() {
                   new Date(s.lastSleep.startTime).getTime(),
               )} ${t("nap")}`}
               sub={`${s.today.sleeps} ${s.today.sleeps === 1 ? t("nap") : t("naps")} · ${formatDuration(s.today.sleepMin * 60_000)} ${t("today")}`}
+              note={nap ? describeNapWindow(nap) : undefined}
               tintClass="text-sleep"
               onClick={() => setSheet("sleep")}
             />

@@ -13,6 +13,7 @@ export function StatusCard({
   format = formatRelative,
   detail,
   sub,
+  note,
   tintClass,
   onClick,
   accessory,
@@ -27,6 +28,10 @@ export function StatusCard({
   format?: (time: Date) => string;
   detail?: string;
   sub?: string;
+  // A second small line under `sub`, for a conclusion rather than a count
+  // (the awake card's nap window). Ink-soft, not the category tint: a
+  // guide line must not read as an alarm.
+  note?: string;
   tintClass: string;
   onClick?: () => void;
   // Optional trailing slot, pushed to the right edge. The temperature card
@@ -65,6 +70,9 @@ export function StatusCard({
           ) : null}
         </p>
         {sub ? <p className="truncate text-xs text-muted">{sub}</p> : null}
+        {note ? (
+          <p className="truncate text-xs font-medium text-ink-soft">{note}</p>
+        ) : null}
       </div>
       {accessory ? (
         <div className="ml-auto shrink-0 pl-2">{accessory}</div>

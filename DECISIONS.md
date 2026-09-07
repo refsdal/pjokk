@@ -1881,3 +1881,34 @@ and medicine, at intervals or fixed times, with a night-time switch.
 - **GET / POST / DELETE only.** A reminder is cheap enough to recreate that
   an edit endpoint would buy a PATCH tri-state for nothing.
 
+## 2026-09-07 — the nap window is a guide from a cited table (#46)
+
+Napper and Huckleberry lead with "the next nap is around 13:20"; Pjokk's
+Awake card showed how long she had been up and left the conclusion to the
+parent. Fourth in the competitor comparison.
+
+- **Rule-based, from a cited table, never a prediction.** A typical wake
+  window for the age (`data/wake-windows.json`: Cleveland Clinic's
+  pediatrician-reviewed table, 2024-04-25, with Helsenorge's "look for
+  tired signs" framing quoted alongside) added to the moment of the last
+  wake. The copy says "window" and "usual", never "should". The one hole in
+  the source (4–5 months) is filled by carrying the shorter 3–4 row, and
+  the table stops where the source stops (12 months) — beyond it the line
+  is simply absent.
+- **A range, not a point.** The issue proposed ±15 min around a point; the
+  source gives a range and the line shows it ("Nap window 13:10–14:25").
+  Three states from one calculation: upcoming, open ("until 14:25"), past
+  ("Past the usual nap window").
+- **Silence over guessing.** No birth date, a wake older than 12 h, a wake
+  in the future, or an age past the table all render nothing. The line
+  lives on the Awake card, which only exists in the day layout, so night
+  mode never shows a nap window.
+- **Client-side only, per-device switch.** No API change; the switch sits
+  in Settings with the one-line disclaimer the feature owes, stored per
+  device like night mode. The optional push from the issue is deferred: it
+  would need the table on the server, and #45's reminders already cover
+  "no sleep logged for N hours" for a parent who wants a nudge.
+- **A per-family offset** ("our baby runs 30 min longer") is deferred until
+  a real baby shows the table to be wrong for her; a range that wide rarely
+  needs it.
+
