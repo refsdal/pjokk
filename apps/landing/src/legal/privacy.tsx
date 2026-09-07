@@ -52,6 +52,12 @@ export function En() {
         can record it. You can withdraw that consent at any time by deleting the
         data or your family.
       </p>
+      <p>
+        Photos you attach to a milestone are personal data about the child as
+        well. They are stored with the same processors, inside the EU, are never
+        public, and are deleted with the entry or the family — the nightly
+        backup keeps a copy for the same thirty days as everything else.
+      </p>
 
       <H>Why we store it, and on what basis</H>
       <List>
@@ -220,6 +226,13 @@ export function Nb() {
         krever ekstra varsomhet, og vi ber om ditt uttrykkelige samtykke før du
         kan registrere det. Du kan når som helst trekke samtykket tilbake ved å
         slette opplysningene eller familien din.
+      </p>
+      <p>
+        Bilder du legger ved en milepæl er også personopplysninger om barnet. De
+        lagres hos de samme leverandørene, innenfor EU, er aldri offentlige, og
+        slettes sammen med oppføringen eller familien — den nattlige
+        sikkerhetskopien beholder en kopi i de samme tretti dagene som alt
+        annet.
       </p>
 
       <H>Hvorfor vi lagrer det, og på hvilket grunnlag</H>

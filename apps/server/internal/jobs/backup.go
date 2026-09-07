@@ -48,6 +48,8 @@ var BackupTables = []string{
 	"bath_log",
 	"note_log",
 	"milestone_log",
+	// Rows only (object keys, sizes); the bytes are copied by RunPhotoBackup.
+	"milestone_photo",
 	"measurement_log",
 	"pump_log",
 	"play_log",

@@ -15,6 +15,7 @@ import { ContactsSection } from "./ContactsSection";
 import { FamilySection } from "./FamilySection";
 import { InstallSection } from "./InstallSection";
 import { NapGuideSection } from "./NapGuideSection";
+import { PhotoUsageLine } from "./PhotoUsageLine";
 import { SectionTitle } from "./lib";
 import { NotificationsSection } from "./NotificationsSection";
 import { SleepLocationsSection } from "./SleepLocationsSection";
@@ -73,6 +74,7 @@ export function SettingsScreen() {
           >
             {t("Export CSV")}
           </Button>
+          <PhotoUsageLine />
         </Card>
 
         <SectionTitle>{t("About")}</SectionTitle>

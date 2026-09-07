@@ -15,6 +15,7 @@ export * from "./insights";
 export * from "./keys";
 export * from "./logs";
 export * from "./other";
+export * from "./photos";
 export * from "./play";
 export * from "./profile";
 export * from "./reminders";

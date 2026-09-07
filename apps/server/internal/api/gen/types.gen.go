@@ -2139,13 +2139,25 @@ type Member struct {
 
 // MilestoneLog defines model for MilestoneLog.
 type MilestoneLog struct {
-	BabyId        string    `json:"babyId"`
-	CaretakerId   string    `json:"caretakerId"`
-	CaretakerName string    `json:"caretakerName"`
-	Id            string    `json:"id"`
-	Notes         *string   `json:"notes"`
-	Time          time.Time `json:"time"`
-	Title         string    `json:"title"`
+	BabyId        string           `json:"babyId"`
+	CaretakerId   string           `json:"caretakerId"`
+	CaretakerName string           `json:"caretakerName"`
+	Id            string           `json:"id"`
+	Notes         *string          `json:"notes"`
+	Photos        []MilestonePhoto `json:"photos"`
+	Time          time.Time        `json:"time"`
+	Title         string           `json:"title"`
+}
+
+// MilestonePhoto One photo attached to a milestone (issue #48): a server re-encoded JPEG, fetched through `/api/photos/{id}` — the object store is never public. Uploaded as multipart to `POST /api/milestones/{id}/photos` (hand-routed, see internal/api/photos.go); at most three per milestone and a per-family quota (PHOTO_QUOTA_MB).
+type MilestonePhoto struct {
+	Height int32  `json:"height"`
+	Id     string `json:"id"`
+
+	// Size Stored bytes.
+	Size  int32  `json:"size"`
+	Url   string `json:"url"`
+	Width int32  `json:"width"`
 }
 
 // NoteLog defines model for NoteLog.

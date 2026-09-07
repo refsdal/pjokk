@@ -240,10 +240,21 @@ export const UpdateNoteSchema = z.object({
   content: z.string().min(1).max(2000).optional(),
 });
 
+// One photo on a milestone (issue #48): a server re-encoded JPEG served by
+// /api/photos/{id}; the object store is never public.
+export const MilestonePhotoSchema = z.object({
+  id: z.string(),
+  width: z.number().int(),
+  height: z.number().int(),
+  size: z.number().int(),
+  url: z.string(),
+});
+
 export const MilestoneLogSchema = z.object({
   ...logBase,
   time: isoTime(),
   title: z.string(),
+  photos: z.array(MilestonePhotoSchema),
 });
 
 export const CreateMilestoneSchema = z.object({
@@ -799,6 +810,7 @@ export type MedicineLog = z.infer<typeof MedicineLogSchema>;
 export type BathLog = z.infer<typeof BathLogSchema>;
 export type NoteLog = z.infer<typeof NoteLogSchema>;
 export type MilestoneLog = z.infer<typeof MilestoneLogSchema>;
+export type MilestonePhoto = z.infer<typeof MilestonePhotoSchema>;
 export type MeasurementLog = z.infer<typeof MeasurementLogSchema>;
 export type PumpLog = z.infer<typeof PumpLogSchema>;
 export type MedicineUnit = (typeof medicineUnits)[number];

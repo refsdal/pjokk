@@ -32,6 +32,7 @@ import { useFeeds, useMemberAvatars, useTimeline } from "@/lib/data";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import { t } from "@/lib/i18n";
 import { diaperDetail, feedDetail, sleepTitle } from "@/lib/log-detail";
+import { photoSrc } from "@/lib/data/photos";
 import { playKindMeta } from "@/lib/play-ui";
 import { formatClock, formatDay, formatDuration } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -222,6 +223,15 @@ function Row({
           </span>
         )}
       </span>
+      {entry.kind === "milestone" && entry.photos.length > 0 && (
+        // The first photo, at row height: the reason a family opens the
+        // timeline a year later.
+        <img
+          src={photoSrc(entry.photos[0]!)}
+          alt=""
+          className="h-10 w-10 shrink-0 rounded-lg object-cover"
+        />
+      )}
       <span className="shrink-0 text-right">
         <span className="block text-sm font-semibold tabular-nums text-ink">
           {formatClock(entryTime(entry))}

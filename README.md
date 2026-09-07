@@ -137,6 +137,7 @@ The ones you will most likely also want:
 | `TRUSTED_PROXY_HOPS` | `0` | Number of proxies in front. At `0` the rate limiter ignores `X-Forwarded-For`, because it is caller-supplied and trusting it blindly lets anyone mint a fresh bucket per request |
 | `OPEN_SIGNUP` | `0` | The founder-bootstrap escape hatch. `1` allows account creation without an invite |
 | `PORT` | `3000` | |
+| `PHOTO_QUOTA_MB` | `500` | Milestone photos a family may store, on the stored (server re-encoded) JPEGs. `0` disables the quota. Under `fs` this is space on the volume |
 
 `GOOGLE_*` enables Google sign-in and `VAPID_*` enables web push. Absent means
 the feature is simply off — the app names the disabled subsystems in its boot
@@ -236,6 +237,11 @@ Three things to know before you rely on it:
   rate-limit counters and the migration bookkeeping. Its rows are pairs of
   live session tokens, and restoring them would be actively wrong rather than
   merely incomplete.
+- **Milestone photos are copied, not dumped.** The snapshot holds their rows
+  (object key, size); the bytes get one copy each under
+  `photo-backups/current/` the night after upload, and a deleted photo's copy
+  moves to `photo-backups/deleted/<date>/` and is pruned after the same 30
+  days. Avatars and vaccine documents are still outside the backup.
 
 If that is not enough for you, take an ordinary `pg_dump` of the same database
 on your own schedule. The two are complementary — and under `fs` the backups

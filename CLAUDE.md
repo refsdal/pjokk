@@ -338,6 +338,11 @@ Bun-era schema used. Domain tables kept their singular names:
   pump clock, UNIQUE (babyId, kind). Its own table, not a `feed_log` row
   with a NULL end, because a logged feed has one `time`; stopping turns it
   into a `feed_log` / `pump_log` row and deletes it in one transaction.
+- `milestone_photo(id, familyId, milestoneLogId, objectKey, width, height,
+  size)` — up to three photos per milestone, server re-encoded to JPEG
+  (EXIF gone) under a server-generated key, served only through
+  `/api/photos/{id}`, counted against `PHOTO_QUOTA_MB` per family, and
+  copied nightly by the photo backup (see README → Backups).
 - `reminder(id, familyId, userId, babyId?, kind feed|diaper|pump|medicine|
   custom, mode since_last|at_time, intervalMin?, atMinute?, daysMask, tz,
   quietStart?, quietEnd?, label?, lastFiredAt?)` — a caretaker's own

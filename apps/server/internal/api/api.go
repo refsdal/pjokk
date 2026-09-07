@@ -104,6 +104,10 @@ type Deps struct {
 	VAPIDPublicKey   string
 	TrustedProxyHops int
 
+	// PhotoQuotaBytes caps a family's stored milestone photos (photos.go);
+	// 0 means no quota. From PHOTO_QUOTA_MB in the composition root.
+	PhotoQuotaBytes int64
+
 	// Version is internal/buildinfo.Version as the composition root read
 	// it — passed in rather than imported here so the handlers stay
 	// dependency-free and the test rig can pin a known value. Surfaces on
@@ -781,6 +785,7 @@ func NewHandler(d Deps) http.Handler {
 	// apps/api/src/app.ts's filesApp sits behind the identical "/api/*"
 	// apiKeyAuth middleware every other route does, so this port must too.
 	d.mountFileRoutes(mux, familyChain(d))
+	d.mountPhotoRoutes(mux, familyChain(d))
 
 	// Avatars (internal/api/avatar.go): multipart in, JPEG out — hand-routed
 	// for the same reason as the files routes, but session tier (a profile

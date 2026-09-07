@@ -1940,3 +1940,42 @@ WHO, and the helsestasjon plots exactly these.
   Norwegian and helsestasjonen uses WHO; a corrected age can arrive later
   as a `baby.dueDate` column without touching the charts.
 
+## 2026-09-07 — photos on milestones (#48)
+
+The only files Pjokk stored were vaccine documents (uploads switched off —
+a photographed clinic card can carry a fødselsnummer) and avatars. A
+"first smile" had nowhere to go. Sixth in the competitor comparison.
+
+- **Milestones only, three per entry.** A photo on every diaper is another
+  product's problem; a photo on "first tooth" is the reason a family opens
+  the timeline a year later. The timeline row shows the first one at row
+  height; the edit sheet shows all three with delete and add.
+- **The avatar pipeline, not the document pipeline.** Every upload is
+  re-encoded to JPEG on the server: DecodeConfig bounds the pixel count
+  from the header, image.Decode proves the bytes are an image whatever the
+  declared type, and a JPEG written from pixels carries no EXIF, so no GPS
+  fix reaches the store. That is also why `/api/photos/{id}` may serve
+  inline where `/api/files/{id}` must say attachment: a stored photo is
+  bytes this server produced. The SPA downscales to 1600 px first, the
+  same helper vaccine documents use (now `lib/image.ts`).
+- **A per-family quota, `PHOTO_QUOTA_MB`, default 500, 0 = off.** Summed
+  from the rows on every upload rather than kept in a counter that could
+  drift; 413 QUOTA with a message the sheet shows. Settings → Data shows
+  "Photos: 12 MB of 500 MB". Under `fs` it is space on the volume, which
+  the README says.
+- **Copied nightly, not dumped.** The row dump carries a photo's key and
+  size; the bytes get one copy each under `photo-backups/current/` (not
+  `backups/`, which PruneBackups would eat after 30 days), a deleted
+  photo's copy moves to `photo-backups/deleted/<date>/` the next night,
+  and that tree is pruned after the same 30 days the row dump keeps —
+  which is also the erasure promise, so no longer. Avatars and vaccine
+  documents stay outside the backup as before.
+- **No `uploaded_by`.** The milestone carries the attribution; a users FK
+  would only add a branch to ReassignUserReferences for nothing.
+- **Creating with a photo uploads once, online.** The create is queued
+  offline like every log, but a File does not survive a reload, so the
+  sheet says "add the photo from the timeline later" when there is no
+  signal rather than pretending.
+- **The privacy policy names attached photos** in both languages, under
+  the health-information section, including the 30-day backup copy.
+

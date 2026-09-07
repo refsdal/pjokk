@@ -546,3 +546,20 @@ func TestLoadLandingReportsEveryProblemAtOnce(t *testing.T) {
 		}
 	}
 }
+
+func TestPhotoQuotaDefaultsAndValidates(t *testing.T) {
+	cfg, err := Load(minimal())
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.PhotoQuotaMB != 500 {
+		t.Errorf("PhotoQuotaMB default = %d, want 500", cfg.PhotoQuotaMB)
+	}
+	cfg, err = Load(clone(minimal(), map[string]string{"PHOTO_QUOTA_MB": "0"}))
+	if err != nil || cfg.PhotoQuotaMB != 0 {
+		t.Errorf("PHOTO_QUOTA_MB=0 → %d (%v), want 0 (quota off)", cfg.PhotoQuotaMB, err)
+	}
+	if _, err := Load(clone(minimal(), map[string]string{"PHOTO_QUOTA_MB": "-5"})); err == nil || !strings.Contains(err.Error(), "PHOTO_QUOTA_MB") {
+		t.Errorf("PHOTO_QUOTA_MB=-5 → %v, want an error naming the variable", err)
+	}
+}

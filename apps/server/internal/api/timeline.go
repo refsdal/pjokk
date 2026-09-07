@@ -187,10 +187,11 @@ func timelineNoteRow(r dbgen.ListNotesPageRow) timelineEntryRow {
 	return timelineEntryRow{sortKey: r.Time.Time.UnixMilli(), entry: e}
 }
 
-func timelineMilestoneRow(r dbgen.ListMilestonesPageRow) timelineEntryRow {
+func timelineMilestoneRow(r dbgen.ListMilestonesPageRow, photos []dbgen.ListMilestonePhotosForLogRow) timelineEntryRow {
 	e := timelineBase(gen.TimelineEntryKindMilestone, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.Notes)
 	e.Set("time", r.Time.Time)
 	e.Set("title", r.Title)
+	e.Set("photos", serMilestonePhotos(photos))
 	return timelineEntryRow{sortKey: r.Time.Time.UnixMilli(), entry: e}
 }
 
@@ -356,15 +357,29 @@ func (d Deps) ListTimeline(ctx context.Context, req gen.ListTimelineRequestObjec
 		return nil, err
 	}
 
-	milestoneRows, err := fetchTimelinePage(ctx, other,
-		func(ctx context.Context) ([]dbgen.ListMilestonesPageRow, error) {
-			return d.Q.ListMilestonesPage(ctx, dbgen.ListMilestonesPageParams{
-				FamilyID: fam.FamilyID, BabyID: babyID,
-				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit,
-			})
-		}, timelineMilestoneRow)
-	if err != nil {
-		return nil, err
+	// Milestones carry their photos (issue #48), hydrated in one batched
+	// query like the vaccines below.
+	var milestoneRows []timelineEntryRow
+	if other {
+		mRows, err := d.Q.ListMilestonesPage(ctx, dbgen.ListMilestonesPageParams{
+			FamilyID: fam.FamilyID, BabyID: babyID,
+			CursorTime: cursor.time, CursorID: cursor.id, Lim: limit,
+		})
+		if err != nil {
+			return nil, err
+		}
+		ids := make([]string, len(mRows))
+		for i, r := range mRows {
+			ids[i] = r.ID
+		}
+		photos, err := d.photosByMilestone(ctx, fam.FamilyID, ids)
+		if err != nil {
+			return nil, err
+		}
+		milestoneRows = make([]timelineEntryRow, len(mRows))
+		for i, r := range mRows {
+			milestoneRows[i] = timelineMilestoneRow(r, photos[r.ID])
+		}
 	}
 
 	measurementRows, err := fetchTimelinePage(ctx, other,

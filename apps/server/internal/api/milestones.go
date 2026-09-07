@@ -17,7 +17,9 @@ import (
 // for the shared createLog/updateLog/deleteLog engine and medicine.go for a
 // fuller worked example.
 
-func serMilestone(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, title string, notes *string) gen.MilestoneLog {
+// photos is the hydrated milestone_photo rows (issue #48; photos.go), the
+// vaccine-documents shape: always present, empty when there are none.
+func serMilestone(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, title string, notes *string, photos []dbgen.ListMilestonePhotosForLogRow) gen.MilestoneLog {
 	return gen.MilestoneLog{
 		Id:            id,
 		BabyId:        babyID,
@@ -26,6 +28,7 @@ func serMilestone(id, babyID, caretakerID, caretakerName string, t pgtype.Timest
 		Time:          t.Time,
 		Title:         title,
 		Notes:         notes,
+		Photos:        serMilestonePhotos(photos),
 	}
 }
 
@@ -40,9 +43,17 @@ func (d Deps) ListMilestones(ctx context.Context, req gen.ListMilestonesRequestO
 	if err != nil {
 		return nil, err
 	}
+	ids := make([]string, len(rows))
+	for i, row := range rows {
+		ids[i] = row.ID
+	}
+	photos, err := d.photosByMilestone(ctx, fam.FamilyID, ids)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]gen.MilestoneLog, len(rows))
 	for i, row := range rows {
-		out[i] = serMilestone(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Title, row.Notes)
+		out[i] = serMilestone(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Title, row.Notes, photos[row.ID])
 	}
 	return gen.ListMilestones200JSONResponse(out), nil
 }
@@ -78,7 +89,7 @@ func (d Deps) CreateMilestone(ctx context.Context, req gen.CreateMilestoneReques
 	if unknownBaby {
 		return gen.CreateMilestone404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
 	}
-	return gen.CreateMilestone201JSONResponse(serMilestone(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Title, row.Notes)), nil
+	return gen.CreateMilestone201JSONResponse(serMilestone(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Title, row.Notes, nil)), nil
 }
 
 // UpdateMilestone implements PATCH /api/milestones/{id}. REF: "partial
@@ -137,12 +148,22 @@ func (d Deps) UpdateMilestone(ctx context.Context, req gen.UpdateMilestoneReques
 	if !found {
 		return gen.UpdateMilestone404JSONResponse(notFound()), nil
 	}
-	return gen.UpdateMilestone200JSONResponse(serMilestone(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Title, row.Notes)), nil
+	photos, err := d.Q.ListMilestonePhotosForLog(ctx, dbgen.ListMilestonePhotosForLogParams{FamilyID: fam.FamilyID, MilestoneLogID: req.Id})
+	if err != nil {
+		return nil, err
+	}
+	return gen.UpdateMilestone200JSONResponse(serMilestone(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Title, row.Notes, photos)), nil
 }
 
 // DeleteMilestone implements DELETE /api/milestones/{id}. REF: "{ok:true} / 404".
 func (d Deps) DeleteMilestone(ctx context.Context, req gen.DeleteMilestoneRequestObject) (gen.DeleteMilestoneResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
+	// Keys before the delete: the photo rows cascade away with the log, the
+	// objects do not (the vaccine-document pattern).
+	keys, err := d.Q.MilestonePhotoKeysForLog(ctx, dbgen.MilestonePhotoKeysForLogParams{FamilyID: fam.FamilyID, MilestoneLogID: req.Id})
+	if err != nil {
+		return nil, err
+	}
 	ok, err := deleteLog(ctx, func(ctx context.Context) (int64, error) {
 		return d.Q.DeleteMilestone(ctx, dbgen.DeleteMilestoneParams{FamilyID: fam.FamilyID, ID: req.Id})
 	})
@@ -151,6 +172,11 @@ func (d Deps) DeleteMilestone(ctx context.Context, req gen.DeleteMilestoneReques
 	}
 	if !ok {
 		return gen.DeleteMilestone404JSONResponse(notFound()), nil
+	}
+	if len(keys) > 0 {
+		if err := d.Storage.Delete(ctx, keys...); err != nil {
+			return nil, err
+		}
 	}
 	return gen.DeleteMilestone200JSONResponse{Ok: gen.OkOkTrue}, nil
 }
