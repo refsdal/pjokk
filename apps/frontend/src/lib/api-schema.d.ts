@@ -954,19 +954,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/push/prefs": {
+    "/api/reminders": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** The caller's feed-reminder preference for the active family. Defaults to 0 (off) when no preference row exists yet. */
-        get: operations["getPushPrefs"];
-        /** Set the caller's feed-reminder preference. Resets the reminder cooldown (last_reminded_at set to NULL) so a new setting starts a fresh observation window instead of firing immediately off the old one's state. */
-        put: operations["updatePushPrefs"];
-        post?: never;
+        /** The caller's own reminders in the active family (issue #45). A reminder is a personal nag, not family state: another member never sees it, and an API key (no person behind it) cannot reach these endpoints at all. */
+        get: operations["listReminders"];
+        put?: never;
+        /** Add a reminder. `since_last` fires once the newest log of `kind` is older than `intervalMin` (once per gap; a newer log resets it); `at_time` fires once per day in `days` at `atMinute` of local time in `tz`. A `custom` reminder is always `at_time` and needs a `label`; a `medicine` reminder's `label` is the medicine name it keys on (omit for any dose). Quiet hours hold a due reminder without latching it. Delivery rides the *\/15 cron, so it can lag the moment by up to 15 minutes. */
+        post: operations["createReminder"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reminders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove one of the caller's reminders. */
+        delete: operations["deleteReminder"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2203,13 +2220,64 @@ export interface components {
         Unsubscribe: {
             endpoint: string;
         };
-        /** @description feedReminderHours is off (0) or a lead time in hours before a reminder fires; the enum matches the frontend's fixed picker (off/3/4/6). */
-        PushPrefs: {
+        Reminder: {
+            id: string;
+            /** @description null = any baby in the family. */
+            babyId: string | null;
+            /** @enum {string} */
+            kind: "feed" | "diaper" | "pump" | "medicine" | "custom";
+            /** @enum {string} */
+            mode: "since_last" | "at_time";
             /**
-             * @default 0
-             * @enum {integer}
+             * Format: int32
+             * @description since_last only.
              */
-            feedReminderHours: 0 | 3 | 4 | 6;
+            intervalMin: number | null;
+            /**
+             * Format: int32
+             * @description at_time only; minutes after local midnight in `tz`.
+             */
+            atMinute: number | null;
+            /**
+             * Format: int32
+             * @description Bit mask, bit 0 = Monday … bit 6 = Sunday; 127 = every day.
+             */
+            days: number;
+            /** @description IANA zone name the local clock is read in. */
+            tz: string;
+            /**
+             * Format: int32
+             * @description Local hour (0–23) quiet hours begin, or null.
+             */
+            quietStart: number | null;
+            /** Format: int32 */
+            quietEnd: number | null;
+            /** @description The medicine name a medicine reminder keys on, or a custom reminder's text. */
+            label: string | null;
+            /** Format: date-time */
+            lastFiredAt: string | null;
+        };
+        CreateReminder: {
+            babyId?: string;
+            /** @enum {string} */
+            kind: "feed" | "diaper" | "pump" | "medicine" | "custom";
+            /** @enum {string} */
+            mode: "since_last" | "at_time";
+            /** Format: int32 */
+            intervalMin?: number;
+            /** Format: int32 */
+            atMinute?: number;
+            /**
+             * Format: int32
+             * @default 127
+             */
+            days: number;
+            tz: string;
+            /** Format: int32 */
+            quietStart?: number;
+            /** Format: int32 */
+            quietEnd?: number;
+            label?: string;
         };
         PushTestResult: {
             sent: number;
@@ -5163,7 +5231,7 @@ export interface operations {
             };
         };
     };
-    getPushPrefs: {
+    listReminders: {
         parameters: {
             query?: never;
             header?: never;
@@ -5172,18 +5240,18 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Notification preferences. */
+            /** @description Reminders, oldest first. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PushPrefs"];
+                    "application/json": components["schemas"]["Reminder"][];
                 };
             };
         };
     };
-    updatePushPrefs: {
+    createReminder: {
         parameters: {
             query?: never;
             header?: never;
@@ -5192,17 +5260,67 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PushPrefs"];
+                "application/json": components["schemas"]["CreateReminder"];
             };
         };
         responses: {
-            /** @description Updated preferences. */
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Reminder"];
+                };
+            };
+            /** @description The mode's field is missing, a custom reminder is not at_time or has no label, the timezone is unknown, or quiet hours are half-set. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unknown baby. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteReminder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PushPrefs"];
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description No such reminder of the caller's. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };

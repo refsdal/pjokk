@@ -17,6 +17,7 @@ export * from "./logs";
 export * from "./other";
 export * from "./play";
 export * from "./profile";
+export * from "./reminders";
 export * from "./sleep-locations";
 export * from "./vaccines";
 

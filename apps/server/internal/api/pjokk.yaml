@@ -2180,41 +2180,84 @@ paths:
               schema:
                 $ref: "#/components/schemas/Ok"
 
-  /api/push/prefs:
+  /api/reminders:
     get:
-      operationId: getPushPrefs
+      operationId: listReminders
       summary: >-
-        The caller's feed-reminder preference for the active family.
-        Defaults to 0 (off) when no preference row exists yet.
+        The caller's own reminders in the active family (issue #45). A
+        reminder is a personal nag, not family state: another member never
+        sees it, and an API key (no person behind it) cannot reach these
+        endpoints at all.
       tags: [push]
       responses:
         "200":
-          description: Notification preferences.
+          description: Reminders, oldest first.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PushPrefs"
-    put:
-      operationId: updatePushPrefs
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reminder"
+    post:
+      operationId: createReminder
       summary: >-
-        Set the caller's feed-reminder preference. Resets the reminder
-        cooldown (last_reminded_at set to NULL) so a new setting starts a
-        fresh observation window instead of firing immediately off the old
-        one's state.
+        Add a reminder. `since_last` fires once the newest log of `kind` is
+        older than `intervalMin` (once per gap; a newer log resets it);
+        `at_time` fires once per day in `days` at `atMinute` of local time
+        in `tz`. A `custom` reminder is always `at_time` and needs a
+        `label`; a `medicine` reminder's `label` is the medicine name it
+        keys on (omit for any dose). Quiet hours hold a due reminder
+        without latching it. Delivery rides the */15 cron, so it can lag
+        the moment by up to 15 minutes.
       tags: [push]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/PushPrefs"
+              $ref: "#/components/schemas/CreateReminder"
       responses:
-        "200":
-          description: Updated preferences.
+        "201":
+          description: Created.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PushPrefs"
+                $ref: "#/components/schemas/Reminder"
+        "400":
+          description: >-
+            The mode's field is missing, a custom reminder is not at_time or
+            has no label, the timezone is unknown, or quiet hours are
+            half-set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/reminders/{id}:
+    delete:
+      operationId: deleteReminder
+      summary: Remove one of the caller's reminders.
+      tags: [push]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No such reminder of the caller's.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /api/push/test:
     post:
@@ -4906,18 +4949,112 @@ components:
         endpoint:
           type: string
           maxLength: 1000
-    PushPrefs:
+    Reminder:
       type: object
-      description: >-
-        feedReminderHours is off (0) or a lead time in hours before a
-        reminder fires; the enum matches the frontend's fixed picker
-        (off/3/4/6).
-      required: [feedReminderHours]
+      required:
+        - id
+        - babyId
+        - kind
+        - mode
+        - intervalMin
+        - atMinute
+        - days
+        - tz
+        - quietStart
+        - quietEnd
+        - label
+        - lastFiredAt
       properties:
-        feedReminderHours:
+        id:
+          type: string
+        babyId:
+          type: string
+          nullable: true
+          description: null = any baby in the family.
+        kind:
+          type: string
+          enum: [feed, diaper, pump, medicine, custom]
+        mode:
+          type: string
+          enum: [since_last, at_time]
+        intervalMin:
           type: integer
-          enum: [0, 3, 4, 6]
-          default: 0
+          format: int32
+          nullable: true
+          description: since_last only.
+        atMinute:
+          type: integer
+          format: int32
+          nullable: true
+          description: at_time only; minutes after local midnight in `tz`.
+        days:
+          type: integer
+          format: int32
+          description: Bit mask, bit 0 = Monday … bit 6 = Sunday; 127 = every day.
+        tz:
+          type: string
+          description: IANA zone name the local clock is read in.
+        quietStart:
+          type: integer
+          format: int32
+          nullable: true
+          description: Local hour (0–23) quiet hours begin, or null.
+        quietEnd:
+          type: integer
+          format: int32
+          nullable: true
+        label:
+          type: string
+          nullable: true
+          description: The medicine name a medicine reminder keys on, or a custom reminder's text.
+        lastFiredAt:
+          type: string
+          format: date-time
+          nullable: true
+    CreateReminder:
+      type: object
+      required: [kind, mode, tz]
+      properties:
+        babyId:
+          type: string
+        kind:
+          type: string
+          enum: [feed, diaper, pump, medicine, custom]
+        mode:
+          type: string
+          enum: [since_last, at_time]
+        intervalMin:
+          type: integer
+          format: int32
+          minimum: 15
+          maximum: 1440
+        atMinute:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1439
+        days:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 127
+          default: 127
+        tz:
+          type: string
+          maxLength: 64
+        quietStart:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 23
+        quietEnd:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 23
+        label:
+          type: string
+          maxLength: 100
     PushTestResult:
       type: object
       required: [sent]

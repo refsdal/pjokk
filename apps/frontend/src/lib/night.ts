@@ -46,6 +46,12 @@ function readMode(): NightMode {
   return "auto";
 }
 
+// The device's night window, for anything else that wants the hours a
+// parent already said they sleep in (reminder quiet hours default to it).
+export function nightSchedule(): NightSchedule {
+  return readSchedule();
+}
+
 // The default for a new sleep entry's nap/night type: "night" when the
 // moment falls inside the device's scheduled night window, else "nap". The
 // SCHEDULE alone decides — a manual "night on" at 14:00 is about the

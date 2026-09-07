@@ -223,79 +223,6 @@ func TestUnsubscribeScopedToOwnRows(t *testing.T) {
 	}
 }
 
-func TestPushPrefsRoundtripDefaultsToZero(t *testing.T) {
-	a := testrig.App(t)
-	_, cookie := a.NewFamily("Hansen", "parent@example.com")
-
-	initial := a.Do(http.MethodGet, "/api/push/prefs", cookie, nil)
-	if initial.Status != http.StatusOK {
-		t.Fatalf("initial GET status = %d, body %s", initial.Status, initial.Raw)
-	}
-	if hours, _ := initial.JSON["feedReminderHours"].(float64); hours != 0 {
-		t.Errorf("initial feedReminderHours = %v, want 0 (no row yet)", initial.JSON["feedReminderHours"])
-	}
-
-	updated := a.Do(http.MethodPut, "/api/push/prefs", cookie, map[string]any{"feedReminderHours": 4})
-	if updated.Status != http.StatusOK {
-		t.Fatalf("PUT status = %d, body %s", updated.Status, updated.Raw)
-	}
-	if hours, _ := updated.JSON["feedReminderHours"].(float64); hours != 4 {
-		t.Errorf("PUT response feedReminderHours = %v, want 4", updated.JSON["feedReminderHours"])
-	}
-
-	after := a.Do(http.MethodGet, "/api/push/prefs", cookie, nil)
-	if after.Status != http.StatusOK {
-		t.Fatalf("GET after PUT status = %d, body %s", after.Status, after.Raw)
-	}
-	if hours, _ := after.JSON["feedReminderHours"].(float64); hours != 4 {
-		t.Errorf("GET after PUT feedReminderHours = %v, want 4", after.JSON["feedReminderHours"])
-	}
-}
-
-func TestUpdatePushPrefsRejectsValuesOutsideTheEnum(t *testing.T) {
-	a := testrig.App(t)
-	_, cookie := a.NewFamily("Hansen", "parent@example.com")
-
-	res := a.Do(http.MethodPut, "/api/push/prefs", cookie, map[string]any{"feedReminderHours": 5})
-	if res.Status != http.StatusBadRequest {
-		t.Fatalf("status = %d, body %s, want 400", res.Status, res.Raw)
-	}
-	if res.JSON["code"] != "VALIDATION" {
-		t.Errorf("code = %v, want VALIDATION", res.JSON["code"])
-	}
-}
-
-// TestUpdatePushPrefsResetsLastRemindedAt proves a write always clears the
-// reminder cooldown: a new setting must start a fresh observation window
-// rather than inheriting the old one's "already reminded" state.
-func TestUpdatePushPrefsResetsLastRemindedAt(t *testing.T) {
-	a := testrig.App(t)
-	_, cookie := a.NewFamily("Hansen", "parent@example.com")
-
-	if res := a.Do(http.MethodPut, "/api/push/prefs", cookie, map[string]any{"feedReminderHours": 3}); res.Status != http.StatusOK {
-		t.Fatalf("first PUT status = %d, body %s", res.Status, res.Raw)
-	}
-	if _, err := a.Rig.Pool.Exec(context.Background(),
-		`UPDATE "push_pref" SET "last_reminded_at" = now()`,
-	); err != nil {
-		t.Fatalf("simulate a fired reminder: %v", err)
-	}
-
-	if res := a.Do(http.MethodPut, "/api/push/prefs", cookie, map[string]any{"feedReminderHours": 6}); res.Status != http.StatusOK {
-		t.Fatalf("second PUT status = %d, body %s", res.Status, res.Raw)
-	}
-
-	var lastRemindedAt *string
-	if err := a.Rig.Pool.QueryRow(context.Background(),
-		`SELECT "last_reminded_at"::text FROM "push_pref"`,
-	).Scan(&lastRemindedAt); err != nil {
-		t.Fatalf("read last_reminded_at: %v", err)
-	}
-	if lastRemindedAt != nil {
-		t.Errorf("last_reminded_at = %v, want NULL after a new PUT", *lastRemindedAt)
-	}
-}
-
 func TestTestPushCountsDeliveriesViaRecordingPush(t *testing.T) {
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
@@ -353,8 +280,9 @@ func TestPushRoutesForbidAPIKeyAuth(t *testing.T) {
 		{http.MethodGet, "/api/push/config", nil},
 		{http.MethodPost, "/api/push/subscribe", subscribeBody("https://fcm.googleapis.com/sub/key-auth")},
 		{http.MethodPost, "/api/push/unsubscribe", map[string]any{"endpoint": "https://fcm.googleapis.com/sub/key-auth"}},
-		{http.MethodGet, "/api/push/prefs", nil},
-		{http.MethodPut, "/api/push/prefs", map[string]any{"feedReminderHours": 3}},
+		{http.MethodGet, "/api/reminders", nil},
+		{http.MethodPost, "/api/reminders", map[string]any{"kind": "feed", "mode": "since_last", "intervalMin": 180, "tz": "UTC"}},
+		{http.MethodDelete, "/api/reminders/nope", nil},
 		{http.MethodPost, "/api/push/test", nil},
 	}
 	for _, c := range cases {

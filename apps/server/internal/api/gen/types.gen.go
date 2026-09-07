@@ -431,6 +431,51 @@ func (e CreatePumpSide) Valid() bool {
 	}
 }
 
+// Defines values for CreateReminderKind.
+const (
+	CreateReminderKindCustom   CreateReminderKind = "custom"
+	CreateReminderKindDiaper   CreateReminderKind = "diaper"
+	CreateReminderKindFeed     CreateReminderKind = "feed"
+	CreateReminderKindMedicine CreateReminderKind = "medicine"
+	CreateReminderKindPump     CreateReminderKind = "pump"
+)
+
+// Valid indicates whether the value is a known member of the CreateReminderKind enum.
+func (e CreateReminderKind) Valid() bool {
+	switch e {
+	case CreateReminderKindCustom:
+		return true
+	case CreateReminderKindDiaper:
+		return true
+	case CreateReminderKindFeed:
+		return true
+	case CreateReminderKindMedicine:
+		return true
+	case CreateReminderKindPump:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateReminderMode.
+const (
+	CreateReminderModeAtTime    CreateReminderMode = "at_time"
+	CreateReminderModeSinceLast CreateReminderMode = "since_last"
+)
+
+// Valid indicates whether the value is a known member of the CreateReminderMode enum.
+func (e CreateReminderMode) Valid() bool {
+	switch e {
+	case CreateReminderModeAtTime:
+		return true
+	case CreateReminderModeSinceLast:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateSleepType.
 const (
 	CreateSleepTypeNap   CreateSleepType = "nap"
@@ -809,30 +854,6 @@ func (e PumpLogSide) Valid() bool {
 	}
 }
 
-// Defines values for PushPrefsFeedReminderHours.
-const (
-	N0 PushPrefsFeedReminderHours = 0
-	N3 PushPrefsFeedReminderHours = 3
-	N4 PushPrefsFeedReminderHours = 4
-	N6 PushPrefsFeedReminderHours = 6
-)
-
-// Valid indicates whether the value is a known member of the PushPrefsFeedReminderHours enum.
-func (e PushPrefsFeedReminderHours) Valid() bool {
-	switch e {
-	case N0:
-		return true
-	case N3:
-		return true
-	case N4:
-		return true
-	case N6:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for RedeemResultRole.
 const (
 	RedeemResultRoleAdmin  RedeemResultRole = "admin"
@@ -845,6 +866,51 @@ func (e RedeemResultRole) Valid() bool {
 	case RedeemResultRoleAdmin:
 		return true
 	case RedeemResultRoleMember:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReminderKind.
+const (
+	ReminderKindCustom   ReminderKind = "custom"
+	ReminderKindDiaper   ReminderKind = "diaper"
+	ReminderKindFeed     ReminderKind = "feed"
+	ReminderKindMedicine ReminderKind = "medicine"
+	ReminderKindPump     ReminderKind = "pump"
+)
+
+// Valid indicates whether the value is a known member of the ReminderKind enum.
+func (e ReminderKind) Valid() bool {
+	switch e {
+	case ReminderKindCustom:
+		return true
+	case ReminderKindDiaper:
+		return true
+	case ReminderKindFeed:
+		return true
+	case ReminderKindMedicine:
+		return true
+	case ReminderKindPump:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReminderMode.
+const (
+	ReminderModeAtTime    ReminderMode = "at_time"
+	ReminderModeSinceLast ReminderMode = "since_last"
+)
+
+// Valid indicates whether the value is a known member of the ReminderMode enum.
+func (e ReminderMode) Valid() bool {
+	switch e {
+	case ReminderModeAtTime:
+		return true
+	case ReminderModeSinceLast:
 		return true
 	default:
 		return false
@@ -1766,6 +1832,26 @@ type CreatePump struct {
 // CreatePumpSide defines model for CreatePump.Side.
 type CreatePumpSide string
 
+// CreateReminder defines model for CreateReminder.
+type CreateReminder struct {
+	AtMinute    *int32             `json:"atMinute,omitempty"`
+	BabyId      *string            `json:"babyId,omitempty"`
+	Days        *int32             `json:"days,omitempty"`
+	IntervalMin *int32             `json:"intervalMin,omitempty"`
+	Kind        CreateReminderKind `json:"kind"`
+	Label       *string            `json:"label,omitempty"`
+	Mode        CreateReminderMode `json:"mode"`
+	QuietEnd    *int32             `json:"quietEnd,omitempty"`
+	QuietStart  *int32             `json:"quietStart,omitempty"`
+	Tz          string             `json:"tz"`
+}
+
+// CreateReminderKind defines model for CreateReminder.Kind.
+type CreateReminderKind string
+
+// CreateReminderMode defines model for CreateReminder.Mode.
+type CreateReminderMode string
+
 // CreateSleep defines model for CreateSleep.
 type CreateSleep struct {
 	BabyId string `json:"babyId"`
@@ -2119,14 +2205,6 @@ type PushConfig struct {
 	PublicKey string `json:"publicKey"`
 }
 
-// PushPrefs feedReminderHours is off (0) or a lead time in hours before a reminder fires; the enum matches the frontend's fixed picker (off/3/4/6).
-type PushPrefs struct {
-	FeedReminderHours PushPrefsFeedReminderHours `json:"feedReminderHours"`
-}
-
-// PushPrefsFeedReminderHours defines model for PushPrefs.FeedReminderHours.
-type PushPrefsFeedReminderHours int
-
 // PushTestResult defines model for PushTestResult.
 type PushTestResult struct {
 	Sent int `json:"sent"`
@@ -2147,6 +2225,41 @@ type RedeemResult struct {
 
 // RedeemResultRole defines model for RedeemResult.Role.
 type RedeemResultRole string
+
+// Reminder defines model for Reminder.
+type Reminder struct {
+	// AtMinute at_time only; minutes after local midnight in `tz`.
+	AtMinute *int32 `json:"atMinute"`
+
+	// BabyId null = any baby in the family.
+	BabyId *string `json:"babyId"`
+
+	// Days Bit mask, bit 0 = Monday … bit 6 = Sunday; 127 = every day.
+	Days int32  `json:"days"`
+	Id   string `json:"id"`
+
+	// IntervalMin since_last only.
+	IntervalMin *int32       `json:"intervalMin"`
+	Kind        ReminderKind `json:"kind"`
+
+	// Label The medicine name a medicine reminder keys on, or a custom reminder's text.
+	Label       *string      `json:"label"`
+	LastFiredAt *time.Time   `json:"lastFiredAt"`
+	Mode        ReminderMode `json:"mode"`
+	QuietEnd    *int32       `json:"quietEnd"`
+
+	// QuietStart Local hour (0–23) quiet hours begin, or null.
+	QuietStart *int32 `json:"quietStart"`
+
+	// Tz IANA zone name the local clock is read in.
+	Tz string `json:"tz"`
+}
+
+// ReminderKind defines model for Reminder.Kind.
+type ReminderKind string
+
+// ReminderMode defines model for Reminder.Mode.
+type ReminderMode string
 
 // SetFeedTimerSide defines model for SetFeedTimerSide.
 type SetFeedTimerSide struct {
@@ -2854,14 +2967,14 @@ type CreatePumpJSONRequestBody = CreatePump
 // UpdatePumpJSONRequestBody defines body for UpdatePump for application/json ContentType.
 type UpdatePumpJSONRequestBody = UpdatePump
 
-// UpdatePushPrefsJSONRequestBody defines body for UpdatePushPrefs for application/json ContentType.
-type UpdatePushPrefsJSONRequestBody = PushPrefs
-
 // SubscribePushJSONRequestBody defines body for SubscribePush for application/json ContentType.
 type SubscribePushJSONRequestBody = Subscribe
 
 // UnsubscribePushJSONRequestBody defines body for UnsubscribePush for application/json ContentType.
 type UnsubscribePushJSONRequestBody = Unsubscribe
+
+// CreateReminderJSONRequestBody defines body for CreateReminder for application/json ContentType.
+type CreateReminderJSONRequestBody = CreateReminder
 
 // CreateSleepJSONRequestBody defines body for CreateSleep for application/json ContentType.
 type CreateSleepJSONRequestBody = CreateSleep

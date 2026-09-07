@@ -79,31 +79,6 @@ func (q *Queries) DeletePushSubscriptionForUser(ctx context.Context, arg DeleteP
 	return result.RowsAffected(), nil
 }
 
-const getPushPref = `-- name: GetPushPref :one
-SELECT user_id, family_id, feed_reminder_hours, last_reminded_at FROM "push_pref"
-WHERE "user_id" = $1 AND "family_id" = $2
-`
-
-type GetPushPrefParams struct {
-	UserID   string
-	FamilyID string
-}
-
-// GET /api/push/prefs. No row means the caller has never set a preference —
-// internal/api/push.go treats pgx.ErrNoRows as feedReminderHours=0 (off),
-// the default apps/api/src/routes/push.ts's PushPrefsSchema applies.
-func (q *Queries) GetPushPref(ctx context.Context, arg GetPushPrefParams) (PushPref, error) {
-	row := q.db.QueryRow(ctx, getPushPref, arg.UserID, arg.FamilyID)
-	var i PushPref
-	err := row.Scan(
-		&i.UserID,
-		&i.FamilyID,
-		&i.FeedReminderHours,
-		&i.LastRemindedAt,
-	)
-	return i, err
-}
-
 const listPushSubscriptionsByUser = `-- name: ListPushSubscriptionsByUser :many
 
 SELECT id, family_id, user_id, endpoint, p256dh, auth, created_at FROM "push_subscription"
@@ -140,28 +115,6 @@ func (q *Queries) ListPushSubscriptionsByUser(ctx context.Context, userID string
 		return nil, err
 	}
 	return items, nil
-}
-
-const upsertPushPref = `-- name: UpsertPushPref :exec
-INSERT INTO "push_pref" ("user_id", "family_id", "feed_reminder_hours", "last_reminded_at")
-VALUES ($1, $2, $3, NULL)
-ON CONFLICT ("user_id", "family_id") DO UPDATE SET
-  "feed_reminder_hours" = EXCLUDED."feed_reminder_hours",
-  "last_reminded_at" = NULL
-`
-
-type UpsertPushPrefParams struct {
-	UserID            string
-	FamilyID          string
-	FeedReminderHours int32
-}
-
-// PUT /api/push/prefs. A write always resets last_reminded_at to NULL — a
-// new setting starts a fresh observation window rather than firing off the
-// old one's cooldown state (see the OpenAPI operation's summary).
-func (q *Queries) UpsertPushPref(ctx context.Context, arg UpsertPushPrefParams) error {
-	_, err := q.db.Exec(ctx, upsertPushPref, arg.UserID, arg.FamilyID, arg.FeedReminderHours)
-	return err
 }
 
 const upsertPushSubscription = `-- name: UpsertPushSubscription :exec

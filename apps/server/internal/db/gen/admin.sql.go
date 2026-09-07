@@ -409,7 +409,7 @@ type ReassignUserReferencesParams struct {
 //
 // Every foreign key to "users" in the schema is either ON DELETE CASCADE
 // (sessions, accounts, organization_members, organization_invitations,
-// push_subscription, push_pref, impersonation — all correctly taken with
+// push_subscription, reminder, impersonation — all correctly taken with
 // the account) or a non-cascading attribution that must survive the
 // delete. This statement covers every one of the latter, and
 // internal/api's TestUserDeleteCoversEveryNonCascadingUserReference asks

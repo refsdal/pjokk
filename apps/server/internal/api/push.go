@@ -2,11 +2,8 @@ package api
 
 import (
 	"context"
-	"errors"
 	"net/url"
 	"strings"
-
-	"github.com/jackc/pgx/v5"
 
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
@@ -108,44 +105,6 @@ func (d Deps) UnsubscribePush(ctx context.Context, req gen.UnsubscribePushReques
 		return nil, err
 	}
 	return gen.UnsubscribePush200JSONResponse{Ok: gen.OkOkTrue}, nil
-}
-
-// GetPushPrefs implements GET /api/push/prefs. REF: "{feedReminderHours:
-// 0|3|4|6} (default 0 when no row)". No row (a caller who has never set a
-// preference) is not an error — GetPushPref's pgx.ErrNoRows is the "off"
-// default apps/api/src/routes/push.ts's PushPrefsSchema applies.
-func (d Deps) GetPushPrefs(ctx context.Context, _ gen.GetPushPrefsRequestObject) (gen.GetPushPrefsResponseObject, error) {
-	fam := middleware.FamilyFromContext(ctx)
-	row, err := d.Q.GetPushPref(ctx, dbgen.GetPushPrefParams{UserID: fam.UserID, FamilyID: fam.FamilyID})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return gen.GetPushPrefs200JSONResponse{FeedReminderHours: 0}, nil
-		}
-		return nil, err
-	}
-	return gen.GetPushPrefs200JSONResponse{FeedReminderHours: gen.PushPrefsFeedReminderHours(row.FeedReminderHours)}, nil
-}
-
-// UpdatePushPrefs implements PUT /api/push/prefs. REF: "{feedReminderHours
-// ∈ {0,3,4,6}} → same shape; resets last_reminded_at=null; upsert on
-// (user_id, family_id) composite PK". The enum itself is enforced by spec
-// (request-shape) validation before this method ever runs — an out-of-set
-// value never reaches here (see push_test.go's
-// TestUpdatePushPrefsRejectsValuesOutsideTheEnum).
-func (d Deps) UpdatePushPrefs(ctx context.Context, req gen.UpdatePushPrefsRequestObject) (gen.UpdatePushPrefsResponseObject, error) {
-	fam := middleware.FamilyFromContext(ctx)
-	if req.Body == nil {
-		return nil, errNoRequestBody("UpdatePushPrefs")
-	}
-	hours := req.Body.FeedReminderHours
-	if err := d.Q.UpsertPushPref(ctx, dbgen.UpsertPushPrefParams{
-		UserID:            fam.UserID,
-		FamilyID:          fam.FamilyID,
-		FeedReminderHours: int32(hours),
-	}); err != nil {
-		return nil, err
-	}
-	return gen.UpdatePushPrefs200JSONResponse{FeedReminderHours: hours}, nil
 }
 
 // TestPush implements POST /api/push/test. REF: "{sent: n} via

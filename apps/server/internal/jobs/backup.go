@@ -65,7 +65,7 @@ var BackupTables = []string{
 	"calendar_event_baby",
 	"calendar_assignee",
 	"push_subscription",
-	"push_pref",
+	"reminder",
 	"api_key",
 	"admin_audit",
 	"help_request",
