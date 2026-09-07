@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/refsdal/pjokk/server/internal/auth"
 	"github.com/refsdal/pjokk/server/internal/testrig"
 )
 
@@ -267,5 +268,36 @@ func TestFeedTimerHonoursClientStartTime(t *testing.T) {
 	feed, _ := stop.JSON["feed"].(map[string]any)
 	if feed["leftMin"] != float64(3) {
 		t.Errorf("leftMin = %v, want 3 (counted from the client's start)", feed["leftMin"])
+	}
+}
+
+// Deleting an account must not fail on its running timer, and must not take
+// the family's clock with it: a co-parent may still be feeding. The timer
+// lands on the tombstone exactly as the feed it becomes would.
+func TestFeedTimerSurvivesCaretakerDeletion(t *testing.T) {
+	a, familyID, cookie, _ := sysadminRig(t, "Hansen")
+	babyID := a.NewBaby(familyID, "Ada")
+	victimID := a.SignUp("Leaving caretaker", "victim@example.com")
+	victimCookie := a.AddMember(familyID, victimID, auth.RoleMember, "victim@example.com")
+
+	start := a.Do(http.MethodPost, "/api/feeds/timer", victimCookie, map[string]any{"babyId": babyID, "kind": "breast"})
+	if start.Status != http.StatusCreated {
+		t.Fatalf("start = %d %s", start.Status, start.Raw)
+	}
+	id, _ := start.JSON["id"].(string)
+
+	del := a.Do(http.MethodPost, "/api/admin/users/"+victimID+"/delete", cookie, nil)
+	if del.Status != http.StatusOK {
+		t.Fatalf("delete = %d %s, want 200", del.Status, del.Raw)
+	}
+
+	lookup := a.Do(http.MethodGet, "/api/feeds/timer?babyId="+babyID, cookie, nil)
+	breast, _ := lookup.JSON["breast"].(map[string]any)
+	if breast["id"] != id || breast["caretakerName"] != "Deleted user" {
+		t.Fatalf("timer after deletion = %v, want the same timer attributed to the tombstone", lookup.JSON["breast"])
+	}
+	stop := a.Do(http.MethodPost, "/api/feeds/timer/"+id+"/stop", cookie, map[string]any{})
+	if stop.Status != http.StatusCreated {
+		t.Errorf("stop after deletion = %d %s, want 201", stop.Status, stop.Raw)
 	}
 }

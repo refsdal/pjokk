@@ -194,6 +194,11 @@ WITH
     measurement AS (UPDATE "measurement_log" SET "caretaker_id" = @tombstone_id WHERE "measurement_log"."caretaker_id" = @user_id),
     pump AS (UPDATE "pump_log" SET "caretaker_id" = @tombstone_id WHERE "pump_log"."caretaker_id" = @user_id),
     play AS (UPDATE "play_log" SET "caretaker_id" = @tombstone_id WHERE "play_log"."caretaker_id" = @user_id),
+    -- A running nursing/pump timer is an attribution ("started by"), not an
+    -- assignment: the clock belongs to the family and a co-parent may still
+    -- be feeding, so it survives the deletion and lands on the tombstone
+    -- exactly as the feed it becomes would.
+    feed_timer AS (UPDATE "feed_timer" SET "caretaker_id" = @tombstone_id WHERE "feed_timer"."caretaker_id" = @user_id),
     vaccine AS (UPDATE "vaccine_log" SET "caretaker_id" = @tombstone_id WHERE "vaccine_log"."caretaker_id" = @user_id),
     vaccine_doc AS (UPDATE "vaccine_document" SET "uploaded_by" = @tombstone_id WHERE "vaccine_document"."uploaded_by" = @user_id),
     vaccine_dismissal AS (UPDATE "vaccine_dismissal" SET "dismissed_by" = @tombstone_id WHERE "vaccine_dismissal"."dismissed_by" = @user_id),
