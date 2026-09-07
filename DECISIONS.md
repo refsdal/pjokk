@@ -1845,3 +1845,39 @@ second in the competitor comparison; every app in it shares the timer.
   does: the two-context flow is the only place a second phone's banner can
   be seen, so the spec that proves it is also the one that photographs it.
 
+## 2026-09-07 — reminders are a per-user list (#45)
+
+`push_pref` held one integer: "no feed for 3/4/6 h", family-wide. Third in
+the competitor comparison; every app there reminds about diapers, pumping
+and medicine, at intervals or fixed times, with a night-time switch.
+
+- **A `reminder` table replaces `push_pref`**, migrated in 00009 (each
+  non-zero preference becomes one `feed since_last` row, with its latch)
+  and the old table dropped. No compatibility endpoint: the SPA ships in
+  the same binary as the API, so there is no client to keep the old
+  `feedReminderHours` alive for. Personal, not family state — `user_id`
+  cascades, so account deletion needs no reassignment branch.
+- **Two modes, one latch.** `since_last` is the old rule per kind: fire once
+  the newest log of the kind is older than the interval, once per gap (a
+  newer log makes `last_fired_at` stale). `at_time` fires once per matching
+  local day; the same column latches the day slot. A `custom` reminder is
+  always `at_time` — there is nothing to be "since".
+- **The timezone lives on the row.** Users have no timezone column and a
+  phone can move; `at_minute`, `days_mask` and quiet hours are wall-clock
+  ideas and are read in the row's IANA zone, which the SPA sends from
+  `Intl`. The binary embeds tzdata (calendar reminders already depended on
+  it), so any zone name works in the scratch image.
+- **Quiet hours hold, they do not latch.** A gap that comes due at 03:00
+  fires at the first tick after 07:00 if still open. The sheet prefills the
+  window from the device's night-mode schedule — the hours a parent already
+  said they sleep in — and it is one chip to switch off.
+- **A missed fixed slot is latched silently after an hour**, as calendar
+  reminders are: after a cron outage a late nudge is worse than none. An
+  interval gap has no such cutoff; "no feed for 9 h" is worth saying however
+  late the cron wakes up.
+- **Medicine keys on a name by free text** (case- and space-insensitive),
+  or on any dose when no name is given. #49's catalogue can attach an id
+  later without changing the rule.
+- **GET / POST / DELETE only.** A reminder is cheap enough to recreate that
+  an edit endpoint would buy a PATCH tri-state for nothing.
+

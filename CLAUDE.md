@@ -329,6 +329,13 @@ Bun-era schema used. Domain tables kept their singular names:
   pump clock, UNIQUE (babyId, kind). Its own table, not a `feed_log` row
   with a NULL end, because a logged feed has one `time`; stopping turns it
   into a `feed_log` / `pump_log` row and deletes it in one transaction.
+- `reminder(id, familyId, userId, babyId?, kind feed|diaper|pump|medicine|
+  custom, mode since_last|at_time, intervalMin?, atMinute?, daysMask, tz,
+  quietStart?, quietEnd?, label?, lastFiredAt?)` — a caretaker's own
+  reminders, per family (replaced the one-integer `push_pref`). The */15
+  cron decides "due" on the row's own IANA zone; `since_last` is the old
+  one-nudge-per-gap rule per kind, `at_time` fires once per matching local
+  day, quiet hours hold rather than latch.
 - `family_invite(code, familyId, role, expiresAt, maxUses, usedCount)`
 - Organization/family metadata: `plan` (default `free`), units, night-mode
   schedule.
