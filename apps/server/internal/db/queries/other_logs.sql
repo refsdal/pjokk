@@ -14,7 +14,7 @@
 -- name: ListMedicine :many
 SELECT
     m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    m."time", m."name", m."amount", m."unit", m."notes"
+    m."time", m."name", m."amount", m."unit", m."medicine_id", m."notes"
 FROM "medicine_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
 WHERE m."family_id" = sqlc.arg(family_id)
@@ -25,15 +25,15 @@ LIMIT sqlc.arg(lim);
 -- name: GetMedicine :one
 SELECT
     m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    m."time", m."name", m."amount", m."unit", m."notes"
+    m."time", m."name", m."amount", m."unit", m."medicine_id", m."notes"
 FROM "medicine_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
 WHERE m."family_id" = $1 AND m."id" = $2;
 
 -- name: CreateMedicine :one
 INSERT INTO "medicine_log"
-    ("family_id", "baby_id", "caretaker_id", "time", "name", "amount", "unit", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    ("family_id", "baby_id", "caretaker_id", "time", "name", "amount", "unit", "medicine_id", "notes")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING "id";
 
 -- name: UpdateMedicine :execrows
@@ -43,6 +43,7 @@ SET
     "name" = CASE WHEN sqlc.arg(name_set)::bool THEN sqlc.narg(name_val)::text ELSE "name" END,
     "amount" = CASE WHEN sqlc.arg(amount_set)::bool THEN sqlc.narg(amount_val)::double precision ELSE "amount" END,
     "unit" = CASE WHEN sqlc.arg(unit_set)::bool THEN sqlc.narg(unit_val)::text ELSE "unit" END,
+    "medicine_id" = CASE WHEN sqlc.arg(medicine_id_set)::bool THEN sqlc.narg(medicine_id_val)::text ELSE "medicine_id" END,
     "notes" = CASE WHEN sqlc.arg(notes_set)::bool THEN sqlc.narg(notes_val)::text ELSE "notes" END
 WHERE "family_id" = sqlc.arg(family_id) AND "id" = sqlc.arg(id);
 

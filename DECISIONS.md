@@ -1979,3 +1979,36 @@ a photographed clinic card can carry a fødselsnummer) and avatars. A
 - **The privacy policy names attached photos** in both languages, under
   the health-information section, including the 30-day backup copy.
 
+
+## 2026-09-07 — the medicine catalogue is the family's, not the app's (#49)
+
+- **A `medicine` table per family, with `medicine_log.medicine_id`
+  pointing at it.** A dose used to be a free-text name typed every time,
+  and the app could not say at 02:00 whether the next paracetamol was
+  allowed yet. The catalogue holds what the family knows — the name, the
+  usual dose, and their own minimum interval — and the log sheet offers
+  it as chips that prefill the stepper. `/api/medicines` is a bespoke
+  family entity like contacts (no time, no caretaker); the dose log stays
+  at `/api/medicine` and gains a nullable `medicineId` that must name one
+  of the caller's family's entries (404 otherwise).
+- **No dosing data ships with the app, and nothing ever blocks a save.**
+  The interval is entered by the family from the leaflet or the doctor;
+  the app adds it to the newest linked dose and shows "Next dose OK from
+  HH:MM" in the caution colour on the sheet and on the timeline's newest
+  dose, while it is still ahead. Supplements (`is_supplement`) never get
+  the line: vitamin D twice in a morning is not what the caution is for.
+  A medical table the app owned would be a liability the app cannot
+  carry; a number the parent typed is a reminder of their own rule.
+- **`lastDoseAt` rides on the catalogue entry, per baby.** `GET
+  /api/medicines?babyId=` answers each entry's newest linked dose for
+  that baby, so the sheet needs no second query and no client-side scan
+  of a paginated log. The catalogue query key is invalidated with the
+  logs, which is what keeps the caution correct on the very next open.
+- **Deleting an entry keeps every dose.** `ON DELETE SET NULL`, and the
+  dose row carries its own `name` regardless — the catalogue is a
+  convenience over the log, never its source of truth. Archiving hides an
+  entry from the chips and keeps it in Settings, dimmed.
+- **The importer maps sprout's `Medicine` table** to catalogue rows
+  (`st-med-<id>`, dose where the unit fits, `doseMinTime` "HH:MM" as the
+  interval, inactive → archived) and links every imported dose, so the
+  chips and the caution work on imported history too.

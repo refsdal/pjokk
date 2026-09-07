@@ -366,6 +366,25 @@ const nb: Record<string, string> = {
   // Contacts
   Contacts: "Kontakter",
   "Add contact": "Legg til kontakt",
+  Medicines: "Medisiner",
+  "Add medicine": "Legg til medisin",
+  "Name (e.g. Paracetamol)": "Navn (f.eks. Paracet)",
+  "Usual dose": "Vanlig dose",
+  "At most every": "Høyst hver",
+  Supplement: "Kosttilskudd",
+  Archive: "Arkiver",
+  "Show in log sheet again": "Vis i loggarket igjen",
+  "Medicine removed": "Medisin fjernet",
+  "Your own rule from the leaflet or the doctor. The log sheet shows when the next dose is OK — it never stops you.":
+    "Deres egen regel fra pakningsvedlegget eller legen. Loggarket viser når neste dose er OK – det stopper deg aldri.",
+  "Paracetamol, vitamin D — the medicines you give, with the usual dose and how long you wait between doses.":
+    "Paracet, vitamin D – medisinene dere gir, med vanlig dose og hvor lenge dere venter mellom dosene.",
+  "Other…": "Annet…",
+  "Next dose OK from": "Neste dose OK fra",
+  next: "neste",
+  every: "hver",
+  supplement: "kosttilskudd",
+  archived: "arkivert",
   "Edit contact": "Rediger kontakt",
   "Contact removed": "Kontakt fjernet",
   "Doctor, helsestasjon, grandparents — the people you call.":

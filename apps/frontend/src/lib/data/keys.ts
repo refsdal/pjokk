@@ -9,6 +9,8 @@ export const invalidateLogs = (qc: QueryClient) => {
   void qc.invalidateQueries({ queryKey: ["sleep"] });
   void qc.invalidateQueries({ queryKey: ["timeline"] });
   void qc.invalidateQueries({ queryKey: ["other"] });
+  // The medicine catalogue carries each entry's newest dose (issue #49).
+  void qc.invalidateQueries({ queryKey: ["medicines"] });
   void qc.invalidateQueries({ queryKey: ["play"] });
   void qc.invalidateQueries({ queryKey: ["vaccines"] });
   void qc.invalidateQueries({ queryKey: ["vaccine-dismissals"] });

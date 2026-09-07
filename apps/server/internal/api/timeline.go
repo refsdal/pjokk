@@ -171,6 +171,7 @@ func timelineMedicineRow(r dbgen.ListMedicinePageRow) timelineEntryRow {
 	e.Set("name", r.Name)
 	e.Set("amount", r.Amount)
 	e.Set("unit", r.Unit)
+	e.Set("medicineId", r.MedicineID)
 	return timelineEntryRow{sortKey: r.Time.Time.UnixMilli(), entry: e}
 }
 

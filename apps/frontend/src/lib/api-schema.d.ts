@@ -458,6 +458,42 @@ export interface paths {
         patch: operations["updateMedicine"];
         trace?: never;
     };
+    "/api/medicines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The family's medicine catalogue (issue #49): name, usual dose and the family's own minimum interval. `lastDoseAt` is the newest dose linked to each entry — for the baby in `babyId` when given, else for the family — so the log sheet can say "next dose OK from" with no second query. Archived entries sort last. */
+        get: operations["listMedicineCatalogue"];
+        put?: never;
+        /** Add a medicine to the family's catalogue. */
+        post: operations["createMedicineCatalogueEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/medicines/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove an entry. Doses that pointed at it keep their name and lose the link. */
+        delete: operations["deleteMedicineCatalogueEntry"];
+        options?: never;
+        head?: never;
+        /** Partial update. `defaultAmount`, `unit` and `minIntervalMin` may be sent as `null` to clear; `archived: true` hides the entry from the log sheet's chips and keeps it for old doses. */
+        patch: operations["updateMedicineCatalogueEntry"];
+        trace?: never;
+    };
     "/api/baths": {
         parameters: {
             query?: never;
@@ -1918,6 +1954,44 @@ export interface components {
                 sleeps: number;
             };
         };
+        MedicineCatalogueEntry: {
+            id: string;
+            name: string;
+            /** Format: double */
+            defaultAmount: number | null;
+            /** @enum {string|null} */
+            unit: "ml" | "mg" | "drops" | "dose" | null;
+            /**
+             * Format: int32
+             * @description The family's own "at most every N minutes"; never shipped by the app.
+             */
+            minIntervalMin: number | null;
+            isSupplement: boolean;
+            archived: boolean;
+            /** Format: date-time */
+            lastDoseAt: string | null;
+        };
+        CreateMedicineCatalogueEntry: {
+            name: string;
+            /** Format: double */
+            defaultAmount?: number;
+            /** @enum {string} */
+            unit?: "ml" | "mg" | "drops" | "dose";
+            /** Format: int32 */
+            minIntervalMin?: number;
+            isSupplement?: boolean;
+        };
+        UpdateMedicineCatalogueEntry: {
+            name?: string;
+            /** Format: double */
+            defaultAmount?: number | null;
+            /** @enum {string|null} */
+            unit?: "ml" | "mg" | "drops" | "dose" | null;
+            /** Format: int32 */
+            minIntervalMin?: number | null;
+            isSupplement?: boolean;
+            archived?: boolean;
+        };
         MedicineLog: {
             id: string;
             babyId: string;
@@ -1931,6 +2005,8 @@ export interface components {
             amount: number | null;
             /** @enum {string|null} */
             unit: "ml" | "mg" | "drops" | "dose" | null;
+            /** @description The catalogue entry this dose was picked from, or null. */
+            medicineId: string | null;
         };
         CreateMedicine: {
             babyId: string;
@@ -1941,6 +2017,7 @@ export interface components {
             amount?: number;
             /** @enum {string} */
             unit?: "ml" | "mg" | "drops" | "dose";
+            medicineId?: string;
             notes?: string;
         };
         /** @description Every field is optional; an empty object is a no-op. `amount`, `unit` and `notes` may also be sent as `null` to CLEAR that column; `time`/`name` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs). */
@@ -1952,6 +2029,7 @@ export interface components {
             amount?: number | null;
             /** @enum {string|null} */
             unit?: "ml" | "mg" | "drops" | "dose" | null;
+            medicineId?: string | null;
             notes?: string | null;
         };
         BathLog: {
@@ -3715,6 +3793,139 @@ export interface operations {
                 };
             };
             /** @description No medicine log with this id in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listMedicineCatalogue: {
+        parameters: {
+            query?: {
+                /** @description Restrict the result to one baby in the caller's family. */
+                babyId?: components["parameters"]["babyIdQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Catalogue entries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MedicineCatalogueEntry"][];
+                };
+            };
+        };
+    };
+    createMedicineCatalogueEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMedicineCatalogueEntry"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MedicineCatalogueEntry"];
+                };
+            };
+            /** @description Blank name. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteMedicineCatalogueEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description No such entry in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateMedicineCatalogueEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMedicineCatalogueEntry"];
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MedicineCatalogueEntry"];
+                };
+            };
+            /** @description Blank name. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such entry in the caller's family. */
             404: {
                 headers: {
                     [name: string]: unknown;

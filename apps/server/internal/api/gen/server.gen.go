@@ -223,6 +223,18 @@ type ServerInterface interface {
 	// UpdateMedicine Partial update. `amount`, `unit` and `notes` may be sent as `null` to CLEAR that column; `time`/`name` are not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
 	// (PATCH /api/medicine/{id})
 	UpdateMedicine(w http.ResponseWriter, r *http.Request, id IdPath)
+	// ListMedicineCatalogue The family's medicine catalogue (issue #49): name, usual dose and the family's own minimum interval. `lastDoseAt` is the newest dose linked to each entry — for the baby in `babyId` when given, else for the family — so the log sheet can say "next dose OK from" with no second query. Archived entries sort last.
+	// (GET /api/medicines)
+	ListMedicineCatalogue(w http.ResponseWriter, r *http.Request, params ListMedicineCatalogueParams)
+	// CreateMedicineCatalogueEntry Add a medicine to the family's catalogue.
+	// (POST /api/medicines)
+	CreateMedicineCatalogueEntry(w http.ResponseWriter, r *http.Request)
+	// DeleteMedicineCatalogueEntry Remove an entry. Doses that pointed at it keep their name and lose the link.
+	// (DELETE /api/medicines/{id})
+	DeleteMedicineCatalogueEntry(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdateMedicineCatalogueEntry Partial update. `defaultAmount`, `unit` and `minIntervalMin` may be sent as `null` to clear; `archived: true` hides the entry from the log sheet's chips and keeps it for old doses.
+	// (PATCH /api/medicines/{id})
+	UpdateMedicineCatalogueEntry(w http.ResponseWriter, r *http.Request, id IdPath)
 	// ListMilestones Milestone logs in the caller's active family, newest first.
 	// (GET /api/milestones)
 	ListMilestones(w http.ResponseWriter, r *http.Request, params ListMilestonesParams)
@@ -1963,6 +1975,105 @@ func (siw *ServerInterfaceWrapper) UpdateMedicine(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// ListMedicineCatalogue operation middleware
+func (siw *ServerInterfaceWrapper) ListMedicineCatalogue(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMedicineCatalogueParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMedicineCatalogue(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateMedicineCatalogueEntry operation middleware
+func (siw *ServerInterfaceWrapper) CreateMedicineCatalogueEntry(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateMedicineCatalogueEntry(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteMedicineCatalogueEntry operation middleware
+func (siw *ServerInterfaceWrapper) DeleteMedicineCatalogueEntry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteMedicineCatalogueEntry(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateMedicineCatalogueEntry operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMedicineCatalogueEntry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMedicineCatalogueEntry(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListMilestones operation middleware
 func (siw *ServerInterfaceWrapper) ListMilestones(w http.ResponseWriter, r *http.Request) {
 
@@ -3353,6 +3464,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/medicine", wrapper.CreateMedicine)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/medicine/{id}", wrapper.DeleteMedicine)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/medicine/{id}", wrapper.UpdateMedicine)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/medicines", wrapper.ListMedicineCatalogue)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/medicines", wrapper.CreateMedicineCatalogueEntry)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/medicines/{id}", wrapper.DeleteMedicineCatalogueEntry)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/medicines/{id}", wrapper.UpdateMedicineCatalogueEntry)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/baths", wrapper.ListBaths)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/baths", wrapper.CreateBath)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/baths/{id}", wrapper.DeleteBath)
@@ -5829,6 +5944,151 @@ func (response UpdateMedicine404JSONResponse) VisitUpdateMedicineResponse(w http
 	return err
 }
 
+type ListMedicineCatalogueRequestObject struct {
+	Params ListMedicineCatalogueParams
+}
+
+type ListMedicineCatalogueResponseObject interface {
+	VisitListMedicineCatalogueResponse(w http.ResponseWriter) error
+}
+
+type ListMedicineCatalogue200JSONResponse []MedicineCatalogueEntry
+
+func (response ListMedicineCatalogue200JSONResponse) VisitListMedicineCatalogueResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateMedicineCatalogueEntryRequestObject struct {
+	Body *CreateMedicineCatalogueEntryJSONRequestBody
+}
+
+type CreateMedicineCatalogueEntryResponseObject interface {
+	VisitCreateMedicineCatalogueEntryResponse(w http.ResponseWriter) error
+}
+
+type CreateMedicineCatalogueEntry201JSONResponse MedicineCatalogueEntry
+
+func (response CreateMedicineCatalogueEntry201JSONResponse) VisitCreateMedicineCatalogueEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateMedicineCatalogueEntry400JSONResponse Error
+
+func (response CreateMedicineCatalogueEntry400JSONResponse) VisitCreateMedicineCatalogueEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteMedicineCatalogueEntryRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteMedicineCatalogueEntryResponseObject interface {
+	VisitDeleteMedicineCatalogueEntryResponse(w http.ResponseWriter) error
+}
+
+type DeleteMedicineCatalogueEntry200JSONResponse Ok
+
+func (response DeleteMedicineCatalogueEntry200JSONResponse) VisitDeleteMedicineCatalogueEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteMedicineCatalogueEntry404JSONResponse Error
+
+func (response DeleteMedicineCatalogueEntry404JSONResponse) VisitDeleteMedicineCatalogueEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMedicineCatalogueEntryRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdateMedicineCatalogueEntryJSONRequestBody
+}
+
+type UpdateMedicineCatalogueEntryResponseObject interface {
+	VisitUpdateMedicineCatalogueEntryResponse(w http.ResponseWriter) error
+}
+
+type UpdateMedicineCatalogueEntry200JSONResponse MedicineCatalogueEntry
+
+func (response UpdateMedicineCatalogueEntry200JSONResponse) VisitUpdateMedicineCatalogueEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMedicineCatalogueEntry400JSONResponse Error
+
+func (response UpdateMedicineCatalogueEntry400JSONResponse) VisitUpdateMedicineCatalogueEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMedicineCatalogueEntry404JSONResponse Error
+
+func (response UpdateMedicineCatalogueEntry404JSONResponse) VisitUpdateMedicineCatalogueEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListMilestonesRequestObject struct {
 	Params ListMilestonesParams
 }
@@ -7602,6 +7862,18 @@ type StrictServerInterface interface {
 	// UpdateMedicine Partial update. `amount`, `unit` and `notes` may be sent as `null` to CLEAR that column; `time`/`name` are not nullable — only settable or omitted. An empty body is a no-op. See internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs.
 	// (PATCH /api/medicine/{id})
 	UpdateMedicine(ctx context.Context, request UpdateMedicineRequestObject) (UpdateMedicineResponseObject, error)
+	// ListMedicineCatalogue The family's medicine catalogue (issue #49): name, usual dose and the family's own minimum interval. `lastDoseAt` is the newest dose linked to each entry — for the baby in `babyId` when given, else for the family — so the log sheet can say "next dose OK from" with no second query. Archived entries sort last.
+	// (GET /api/medicines)
+	ListMedicineCatalogue(ctx context.Context, request ListMedicineCatalogueRequestObject) (ListMedicineCatalogueResponseObject, error)
+	// CreateMedicineCatalogueEntry Add a medicine to the family's catalogue.
+	// (POST /api/medicines)
+	CreateMedicineCatalogueEntry(ctx context.Context, request CreateMedicineCatalogueEntryRequestObject) (CreateMedicineCatalogueEntryResponseObject, error)
+	// DeleteMedicineCatalogueEntry Remove an entry. Doses that pointed at it keep their name and lose the link.
+	// (DELETE /api/medicines/{id})
+	DeleteMedicineCatalogueEntry(ctx context.Context, request DeleteMedicineCatalogueEntryRequestObject) (DeleteMedicineCatalogueEntryResponseObject, error)
+	// UpdateMedicineCatalogueEntry Partial update. `defaultAmount`, `unit` and `minIntervalMin` may be sent as `null` to clear; `archived: true` hides the entry from the log sheet's chips and keeps it for old doses.
+	// (PATCH /api/medicines/{id})
+	UpdateMedicineCatalogueEntry(ctx context.Context, request UpdateMedicineCatalogueEntryRequestObject) (UpdateMedicineCatalogueEntryResponseObject, error)
 	// ListMilestones Milestone logs in the caller's active family, newest first.
 	// (GET /api/milestones)
 	ListMilestones(ctx context.Context, request ListMilestonesRequestObject) (ListMilestonesResponseObject, error)
@@ -9693,6 +9965,122 @@ func (sh *strictHandler) UpdateMedicine(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateMedicineResponseObject); ok {
 		if err := validResponse.VisitUpdateMedicineResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMedicineCatalogue operation middleware
+func (sh *strictHandler) ListMedicineCatalogue(w http.ResponseWriter, r *http.Request, params ListMedicineCatalogueParams) {
+	var request ListMedicineCatalogueRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMedicineCatalogue(ctx, request.(ListMedicineCatalogueRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMedicineCatalogue")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMedicineCatalogueResponseObject); ok {
+		if err := validResponse.VisitListMedicineCatalogueResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateMedicineCatalogueEntry operation middleware
+func (sh *strictHandler) CreateMedicineCatalogueEntry(w http.ResponseWriter, r *http.Request) {
+	var request CreateMedicineCatalogueEntryRequestObject
+
+	var body CreateMedicineCatalogueEntryJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateMedicineCatalogueEntry(ctx, request.(CreateMedicineCatalogueEntryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateMedicineCatalogueEntry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateMedicineCatalogueEntryResponseObject); ok {
+		if err := validResponse.VisitCreateMedicineCatalogueEntryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteMedicineCatalogueEntry operation middleware
+func (sh *strictHandler) DeleteMedicineCatalogueEntry(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteMedicineCatalogueEntryRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteMedicineCatalogueEntry(ctx, request.(DeleteMedicineCatalogueEntryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteMedicineCatalogueEntry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteMedicineCatalogueEntryResponseObject); ok {
+		if err := validResponse.VisitDeleteMedicineCatalogueEntryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateMedicineCatalogueEntry operation middleware
+func (sh *strictHandler) UpdateMedicineCatalogueEntry(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdateMedicineCatalogueEntryRequestObject
+
+	request.Id = id
+
+	var body UpdateMedicineCatalogueEntryJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateMedicineCatalogueEntry(ctx, request.(UpdateMedicineCatalogueEntryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateMedicineCatalogueEntry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateMedicineCatalogueEntryResponseObject); ok {
+		if err := validResponse.VisitUpdateMedicineCatalogueEntryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

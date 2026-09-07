@@ -329,7 +329,7 @@ func (q *Queries) ListMeasurementsPage(ctx context.Context, arg ListMeasurements
 const listMedicinePage = `-- name: ListMedicinePage :many
 SELECT
     m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    m."time", m."name", m."amount", m."unit", m."notes"
+    m."time", m."name", m."amount", m."unit", m."medicine_id", m."notes"
 FROM "medicine_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
 WHERE m."family_id" = $1
@@ -359,6 +359,7 @@ type ListMedicinePageRow struct {
 	Name          string
 	Amount        *float64
 	Unit          *string
+	MedicineID    *string
 	Notes         *string
 }
 
@@ -386,6 +387,7 @@ func (q *Queries) ListMedicinePage(ctx context.Context, arg ListMedicinePagePara
 			&i.Name,
 			&i.Amount,
 			&i.Unit,
+			&i.MedicineID,
 			&i.Notes,
 		); err != nil {
 			return nil, err

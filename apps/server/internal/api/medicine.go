@@ -27,7 +27,7 @@ func medicineUnitPtr(s *string) *gen.MedicineLogUnit {
 	return &v
 }
 
-func serMedicine(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, name string, amount *float64, unit *string, notes *string) gen.MedicineLog {
+func serMedicine(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, name string, amount *float64, unit *string, medicineID *string, notes *string) gen.MedicineLog {
 	return gen.MedicineLog{
 		Id:            id,
 		BabyId:        babyID,
@@ -37,6 +37,7 @@ func serMedicine(id, babyID, caretakerID, caretakerName string, t pgtype.Timesta
 		Name:          name,
 		Amount:        amount,
 		Unit:          medicineUnitPtr(unit),
+		MedicineId:    medicineID,
 		Notes:         notes,
 	}
 }
@@ -54,7 +55,7 @@ func (d Deps) ListMedicine(ctx context.Context, req gen.ListMedicineRequestObjec
 	}
 	out := make([]gen.MedicineLog, len(rows))
 	for i, row := range rows {
-		out[i] = serMedicine(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Name, row.Amount, row.Unit, row.Notes)
+		out[i] = serMedicine(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Name, row.Amount, row.Unit, row.MedicineID, row.Notes)
 	}
 	return gen.ListMedicine200JSONResponse(out), nil
 }
@@ -73,6 +74,12 @@ func (d Deps) CreateMedicine(ctx context.Context, req gen.CreateMedicineRequestO
 		v := string(*body.Unit)
 		unit = &v
 	}
+	// A dose may point at one of the family's catalogue entries (issue #49).
+	if ok, err := d.catalogueMedicineBelongs(ctx, fam.FamilyID, body.MedicineId); err != nil {
+		return nil, err
+	} else if !ok {
+		return gen.CreateMedicine404JSONResponse{Error: "Unknown medicine", Code: "NOT_FOUND"}, nil
+	}
 
 	row, unknownBaby, err := createLog(ctx, d, fam.FamilyID, body.BabyId,
 		func(ctx context.Context) (string, error) {
@@ -84,6 +91,7 @@ func (d Deps) CreateMedicine(ctx context.Context, req gen.CreateMedicineRequestO
 				Name:        body.Name,
 				Amount:      body.Amount,
 				Unit:        unit,
+				MedicineID:  body.MedicineId,
 				Notes:       body.Notes,
 			})
 		},
@@ -97,7 +105,7 @@ func (d Deps) CreateMedicine(ctx context.Context, req gen.CreateMedicineRequestO
 	if unknownBaby {
 		return gen.CreateMedicine404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
 	}
-	return gen.CreateMedicine201JSONResponse(serMedicine(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Name, row.Amount, row.Unit, row.Notes)), nil
+	return gen.CreateMedicine201JSONResponse(serMedicine(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Name, row.Amount, row.Unit, row.MedicineID, row.Notes)), nil
 }
 
 // UpdateMedicine implements PATCH /api/medicine/{id}. REF: "partial
@@ -132,11 +140,22 @@ func (d Deps) UpdateMedicine(ctx context.Context, req gen.UpdateMedicineRequestO
 	if err != nil {
 		return nil, err
 	}
+	medicineSet, medicineVal, err := patchField[string](fields, "medicineId")
+	if err != nil {
+		return nil, err
+	}
+	if medicineSet {
+		if ok, err := d.catalogueMedicineBelongs(ctx, fam.FamilyID, medicineVal); err != nil {
+			return nil, err
+		} else if !ok {
+			return gen.UpdateMedicine404JSONResponse{Error: "Unknown medicine", Code: "NOT_FOUND"}, nil
+		}
+	}
 	notesSet, notesVal, err := patchField[string](fields, "notes")
 	if err != nil {
 		return nil, err
 	}
-	anySet := timeSet || nameSet || amountSet || unitSet || notesSet
+	anySet := timeSet || nameSet || amountSet || unitSet || medicineSet || notesSet
 
 	row, found, err := updateLog(ctx,
 		func(ctx context.Context) (dbgen.GetMedicineRow, error) {
@@ -149,18 +168,20 @@ func (d Deps) UpdateMedicine(ctx context.Context, req gen.UpdateMedicineRequestO
 				timeParam = pgtype.Timestamptz{Time: *timeVal, Valid: true}
 			}
 			_, err := d.Q.UpdateMedicine(ctx, dbgen.UpdateMedicineParams{
-				FamilyID:  fam.FamilyID,
-				ID:        req.Id,
-				TimeSet:   timeSet,
-				TimeVal:   timeParam,
-				NameSet:   nameSet,
-				NameVal:   nameVal,
-				AmountSet: amountSet,
-				AmountVal: amountVal,
-				UnitSet:   unitSet,
-				UnitVal:   unitVal,
-				NotesSet:  notesSet,
-				NotesVal:  notesVal,
+				FamilyID:      fam.FamilyID,
+				ID:            req.Id,
+				TimeSet:       timeSet,
+				TimeVal:       timeParam,
+				NameSet:       nameSet,
+				NameVal:       nameVal,
+				AmountSet:     amountSet,
+				AmountVal:     amountVal,
+				UnitSet:       unitSet,
+				UnitVal:       unitVal,
+				MedicineIDSet: medicineSet,
+				MedicineIDVal: medicineVal,
+				NotesSet:      notesSet,
+				NotesVal:      notesVal,
 			})
 			return err
 		},
@@ -171,7 +192,7 @@ func (d Deps) UpdateMedicine(ctx context.Context, req gen.UpdateMedicineRequestO
 	if !found {
 		return gen.UpdateMedicine404JSONResponse(notFound()), nil
 	}
-	return gen.UpdateMedicine200JSONResponse(serMedicine(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Name, row.Amount, row.Unit, row.Notes)), nil
+	return gen.UpdateMedicine200JSONResponse(serMedicine(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Name, row.Amount, row.Unit, row.MedicineID, row.Notes)), nil
 }
 
 // DeleteMedicine implements DELETE /api/medicine/{id}. REF: "{ok:true} / 404".
