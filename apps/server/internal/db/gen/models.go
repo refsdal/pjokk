@@ -221,6 +221,17 @@ type MilestoneLog struct {
 	CreatedAt   pgtype.Timestamptz
 }
 
+type MilestonePhoto struct {
+	ID             string
+	FamilyID       string
+	MilestoneLogID string
+	ObjectKey      string
+	Width          int32
+	Height         int32
+	Size           int32
+	CreatedAt      pgtype.Timestamptz
+}
+
 type NoteLog struct {
 	ID          string
 	FamilyID    string

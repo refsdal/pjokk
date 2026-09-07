@@ -596,6 +596,7 @@ func buildDeps(ctx context.Context, cfg *config.Config) (api.Deps, func(), error
 		AppURL:           cfg.AppURL,
 		VAPIDPublicKey:   cfg.VAPIDPublicKey,
 		TrustedProxyHops: cfg.TrustedProxyHops,
+		PhotoQuotaBytes:  int64(cfg.PhotoQuotaMB) << 20,
 		Version:          buildinfo.Version,
 
 		OpenSignup:     cfg.OpenSignup,

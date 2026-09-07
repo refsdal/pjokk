@@ -177,6 +177,7 @@ func App(t *testing.T) *AppRig {
 		AppURL:           rigAppURL,
 		VAPIDPublicKey:   vapidPublic,
 		TrustedProxyHops: 0,
+		PhotoQuotaBytes:  500 << 20,
 		Version:          Version,
 	}
 
@@ -216,6 +217,15 @@ func (a *AppRig) handlerFor() http.Handler {
 		a.rebuildLocked()
 	}
 	return a.handler
+}
+
+// Rebuild rebuilds the handler from a.Deps, for a test that changes a Deps
+// value after App(t) (the photo quota, say) — api.NewHandler copies Deps by
+// value at build time, so a later field write alone changes nothing.
+func (a *AppRig) Rebuild() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.rebuildLocked()
 }
 
 // rebuildLocked builds a.handler from a.Deps plus any MountProtected routes.

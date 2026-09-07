@@ -41,6 +41,10 @@ type Config struct {
 	OpenSignup       bool
 	Port             int
 	TrustedProxyHops int
+
+	// PhotoQuotaMB caps the milestone photos a family may store (issue
+	// #48); 0 disables the quota. Default 500.
+	PhotoQuotaMB int
 }
 
 // problemCollector accumulates every validation failure instead of
@@ -209,6 +213,18 @@ func Load(env map[string]string) (*Config, error) {
 			p.add("TRUSTED_PROXY_HOPS", "must be at least 0")
 		} else {
 			cfg.TrustedProxyHops = n
+		}
+	}
+
+	cfg.PhotoQuotaMB = 500
+	if v, present := env["PHOTO_QUOTA_MB"]; present && v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			p.add("PHOTO_QUOTA_MB", "must be a valid integer")
+		} else if n < 0 {
+			p.add("PHOTO_QUOTA_MB", "must be at least 0 (0 disables the quota)")
+		} else {
+			cfg.PhotoQuotaMB = n
 		}
 	}
 

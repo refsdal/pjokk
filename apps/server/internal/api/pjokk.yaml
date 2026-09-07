@@ -4360,10 +4360,35 @@ components:
           type: string
           maxLength: 1000
           nullable: true
+    MilestonePhoto:
+      type: object
+      description: >-
+        One photo attached to a milestone (issue #48): a server re-encoded
+        JPEG, fetched through `/api/photos/{id}` — the object store is
+        never public. Uploaded as multipart to
+        `POST /api/milestones/{id}/photos` (hand-routed, see
+        internal/api/photos.go); at most three per milestone and a
+        per-family quota (PHOTO_QUOTA_MB).
+      required: [id, width, height, size, url]
+      properties:
+        id:
+          type: string
+        width:
+          type: integer
+          format: int32
+        height:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+          description: Stored bytes.
+        url:
+          type: string
     MilestoneLog:
       type: object
       required:
-        [id, babyId, caretakerId, caretakerName, notes, time, title]
+        [id, babyId, caretakerId, caretakerName, notes, time, title, photos]
       properties:
         id:
           type: string
@@ -4381,6 +4406,10 @@ components:
           format: date-time
         title:
           type: string
+        photos:
+          type: array
+          items:
+            $ref: "#/components/schemas/MilestonePhoto"
     CreateMilestone:
       type: object
       required: [babyId, time, title]

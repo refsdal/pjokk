@@ -110,6 +110,14 @@ func runNightly(ctx context.Context, d Deps) error {
 		log.Printf("cron: pruned %d expired backup(s)", len(pruned))
 	}
 
+	copied, moved, photoPruned, err := jobs.RunPhotoBackup(ctx, d.Deps, now)
+	if err != nil {
+		return err
+	}
+	if copied+moved+photoPruned > 0 {
+		log.Printf("cron: photo backup: %d copied, %d moved to deleted, %d pruned", copied, moved, photoPruned)
+	}
+
 	purged, err := jobs.PurgeOrphanUsers(ctx, d.Deps, now)
 	if err != nil {
 		return err
