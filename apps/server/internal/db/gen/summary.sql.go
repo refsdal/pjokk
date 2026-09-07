@@ -177,7 +177,7 @@ func (q *Queries) LastMeasurementOfType(ctx context.Context, arg LastMeasurement
 }
 
 const sleepsInRange = `-- name: SleepsInRange :many
-SELECT "start_time", "end_time"
+SELECT "start_time", "end_time", "type"
 FROM "sleep_log"
 WHERE "family_id" = $1 AND "baby_id" = $2
   AND "start_time" < $3::timestamptz
@@ -194,6 +194,7 @@ type SleepsInRangeParams struct {
 type SleepsInRangeRow struct {
 	StartTime pgtype.Timestamptz
 	EndTime   pgtype.Timestamptz
+	Type      *string
 }
 
 // Sessions OVERLAPPING [from, to) — they can span midnight and the range
@@ -214,7 +215,7 @@ func (q *Queries) SleepsInRange(ctx context.Context, arg SleepsInRangeParams) ([
 	var items []SleepsInRangeRow
 	for rows.Next() {
 		var i SleepsInRangeRow
-		if err := rows.Scan(&i.StartTime, &i.EndTime); err != nil {
+		if err := rows.Scan(&i.StartTime, &i.EndTime, &i.Type); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

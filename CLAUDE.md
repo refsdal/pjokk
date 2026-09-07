@@ -287,8 +287,12 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   badge for running sessions, "by <name>" attribution, day-summary line
   ("6 feeds · 3 naps · 5 diapers"), filter chips (All/Feeds/Sleep/Diapers).
   Tap row → edit sheet.
-- **Stats:** deliberately minimal at first — avg sleep/day, avg intake/day,
-  one bar chart (sleep per day, week/month toggle), weight row w/ percentile
+- **Stats:** deliberately minimal at first — avg sleep/day (split night /
+  day since #50), avg intake/day with feeds by type, a **Longest stretch**
+  row (last night's longest `night` session, its wakings, and a Δ against
+  the window's earlier nights; a night runs local noon to noon and belongs
+  to the day it began on), one bar chart (sleep per day stacked night /
+  day, week/month toggle), weight row w/ percentile
   teaser, and one growth chart with Weight / Length / Head chips against the
   WHO P3/P50/P97 curves. WHO growth reference data ships as bundled static
   JSON (`data/who-*-for-age-lms.json`, weight, length and head, 0–60 months,

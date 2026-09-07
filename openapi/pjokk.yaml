@@ -4034,7 +4034,7 @@ components:
       additionalProperties: true
     StatsDay:
       type: object
-      required: [date, sleepMin, intakeMl, feeds, diapers]
+      required: [date, sleepMin, nightSleepMin, intakeMl, feeds, feedsByType, diapers]
       properties:
         date:
           type: string
@@ -4042,6 +4042,12 @@ components:
         sleepMin:
           type: integer
           format: int32
+        nightSleepMin:
+          type: integer
+          format: int32
+          description: The part of sleepMin from sessions typed `night` (issue #50).
+        feedsByType:
+          $ref: "#/components/schemas/StatsFeedsByType"
         intakeMl:
           type: integer
           format: int32
@@ -4069,17 +4075,80 @@ components:
           type: string
           format: date-time
           nullable: true
+    StatsNight:
+      type: object
+      description: >-
+        One night of the window (issue #50). A `night` sleep session belongs
+        to the night it STARTED in, where night D runs from local noon on
+        day D to local noon on D+1 — so a 23:00 bedtime and a 02:00 resettle
+        land on the same night, and this morning's wake-up closes "last
+        night". Both values are null for a night with no night session.
+        Like the day buckets, the noon boundary is a fixed offset from the
+        caretaker's `tz` and does not follow a DST change inside the window.
+      required: [date, longestStretchMin, wakings]
+      properties:
+        date:
+          type: string
+          description: Local calendar date the night began on (YYYY-MM-DD).
+        longestStretchMin:
+          type: integer
+          format: int32
+          nullable: true
+          description: The longest single night session; a running one counts up to now.
+        wakings:
+          type: integer
+          format: int32
+          nullable: true
+          description: Night sessions minus one.
+    StatsFeedsByType:
+      type: object
+      required: [bottle, breast, solids]
+      properties:
+        bottle:
+          type: number
+          format: double
+        breast:
+          type: number
+          format: double
+        solids:
+          type: number
+          format: double
     Stats:
       type: object
-      required: [days, avgSleepMin, avgIntakeMl, avgFeeds, avgDiapers, weight]
+      required:
+        - days
+        - nights
+        - avgSleepMin
+        - avgNightSleepMin
+        - avgIntakeMl
+        - avgFeeds
+        - avgFeedsByType
+        - avgDiapers
+        - weight
       properties:
         days:
           type: array
           items:
             $ref: "#/components/schemas/StatsDay"
+        nights:
+          type: array
+          description: >-
+            One entry per local day of the window plus the day before it
+            (oldest first): the night that began on each. The extra night
+            is what lets a one-day window still answer "last night".
+          items:
+            $ref: "#/components/schemas/StatsNight"
         avgSleepMin:
           type: integer
           format: int32
+        avgNightSleepMin:
+          type: integer
+          format: int32
+          description: >-
+            Per day, minutes of sessions typed `night`; the rest of
+            avgSleepMin is day sleep (naps and untyped sessions).
+        avgFeedsByType:
+          $ref: "#/components/schemas/StatsFeedsByType"
         avgIntakeMl:
           type: integer
           format: int32

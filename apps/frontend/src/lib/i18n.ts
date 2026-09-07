@@ -74,6 +74,15 @@ const nb: Record<string, string> = {
   Nap: "Lur",
   Night: "Natt",
   "Night sleep": "Nattesøvn",
+  night: "natt",
+  bottle: "flaske",
+  breast: "bryst",
+  "Longest stretch": "Lengste strekk",
+  waking: "oppvåkning",
+  wakings: "oppvåkninger",
+  "night of": "natt til",
+  "Log a night sleep to see last night's longest stretch":
+    "Logg en nattesøvn for å se nattens lengste strekk",
 
   // Help requests
   "Too many requests — wait a few minutes":

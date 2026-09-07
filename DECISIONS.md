@@ -2012,3 +2012,31 @@ a photographed clinic card can carry a fødselsnummer) and avatars. A
   (`st-med-<id>`, dose where the unit fits, `doseMinTime` "HH:MM" as the
   interval, inactive → archived) and links every imported dose, so the
   chips and the caution work on imported history too.
+
+## 2026-09-07 — nights run noon to noon (#50)
+
+- **A `night` session belongs to the night it started in, and a night
+  is local noon to the next local noon.** Stats' day buckets split
+  sessions across midnight, which is right for "sleep per day" and wrong
+  for "how long was the longest stretch last night?" — a 23:00 bedtime
+  and a 02:00 resettle are the same night, not two days. The noon
+  boundary is the same fixed offset from the caretaker's `tz` as the day
+  buckets, so it inherits the same DST caveat (documented on the schema)
+  rather than adding a second kind of boundary. `GET /api/stats` returns
+  `nights[]`, one per day of the window **plus the night before it**, so
+  a one-day window can still answer "last night" — the night that ended
+  this morning began yesterday afternoon, outside the day range. The
+  sleep read starts at that noon; the day buckets still clip to the
+  window, so nothing leaks.
+- **Longest stretch = the longest single `night` session; wakings =
+  night sessions minus one.** No inference from gaps, no merging of
+  sessions separated by a short gap: the log is the truth, and a parent
+  who logged two sessions had a waking between them. Untyped sessions
+  count as day sleep, as does everything typed `nap`; the split is only
+  ever "night" vs "the rest" so the two tints on the chart stay honest.
+- **Not on Home.** The issue floated "Longest stretch last night" on the
+  summary card. It was left off: Home is the glance screen and already
+  carries the sleep state; the number lives one tab over with its trend.
+- **Feeds by type as averages, not a chart.** `avgFeedsByType` on the
+  intake card, only the types with any feeds; a stacked feeds chart would
+  be the third chart on a screen that is meant to stay minimal.

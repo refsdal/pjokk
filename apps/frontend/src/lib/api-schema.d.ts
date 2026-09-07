@@ -1855,6 +1855,12 @@ export interface components {
             date: string;
             /** Format: int32 */
             sleepMin: number;
+            /**
+             * Format: int32
+             * @description The part of sleepMin from sessions typed `night` (issue
+             */
+            nightSleepMin: number;
+            feedsByType: components["schemas"]["StatsFeedsByType"];
             /** Format: int32 */
             intakeMl: number;
             /** Format: int32 */
@@ -1872,10 +1878,41 @@ export interface components {
             /** Format: date-time */
             prevTime: string | null;
         };
+        /** @description One night of the window (issue #50). A `night` sleep session belongs to the night it STARTED in, where night D runs from local noon on day D to local noon on D+1 — so a 23:00 bedtime and a 02:00 resettle land on the same night, and this morning's wake-up closes "last night". Both values are null for a night with no night session. Like the day buckets, the noon boundary is a fixed offset from the caretaker's `tz` and does not follow a DST change inside the window. */
+        StatsNight: {
+            /** @description Local calendar date the night began on (YYYY-MM-DD). */
+            date: string;
+            /**
+             * Format: int32
+             * @description The longest single night session; a running one counts up to now.
+             */
+            longestStretchMin: number | null;
+            /**
+             * Format: int32
+             * @description Night sessions minus one.
+             */
+            wakings: number | null;
+        };
+        StatsFeedsByType: {
+            /** Format: double */
+            bottle: number;
+            /** Format: double */
+            breast: number;
+            /** Format: double */
+            solids: number;
+        };
         Stats: {
             days: components["schemas"]["StatsDay"][];
+            /** @description One entry per local day of the window plus the day before it (oldest first): the night that began on each. The extra night is what lets a one-day window still answer "last night". */
+            nights: components["schemas"]["StatsNight"][];
             /** Format: int32 */
             avgSleepMin: number;
+            /**
+             * Format: int32
+             * @description Per day, minutes of sessions typed `night`; the rest of avgSleepMin is day sleep (naps and untyped sessions).
+             */
+            avgNightSleepMin: number;
+            avgFeedsByType: components["schemas"]["StatsFeedsByType"];
             /** Format: int32 */
             avgIntakeMl: number;
             /** Format: double */

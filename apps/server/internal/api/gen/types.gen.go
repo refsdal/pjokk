@@ -2446,22 +2446,52 @@ type StartFeedTimerSide string
 
 // Stats defines model for Stats.
 type Stats struct {
-	AvgDiapers  float64      `json:"avgDiapers"`
-	AvgFeeds    float64      `json:"avgFeeds"`
-	AvgIntakeMl int32        `json:"avgIntakeMl"`
-	AvgSleepMin int32        `json:"avgSleepMin"`
-	Days        []StatsDay   `json:"days"`
-	Weight      *StatsWeight `json:"weight"`
+	AvgDiapers     float64          `json:"avgDiapers"`
+	AvgFeeds       float64          `json:"avgFeeds"`
+	AvgFeedsByType StatsFeedsByType `json:"avgFeedsByType"`
+	AvgIntakeMl    int32            `json:"avgIntakeMl"`
+
+	// AvgNightSleepMin Per day, minutes of sessions typed `night`; the rest of avgSleepMin is day sleep (naps and untyped sessions).
+	AvgNightSleepMin int32      `json:"avgNightSleepMin"`
+	AvgSleepMin      int32      `json:"avgSleepMin"`
+	Days             []StatsDay `json:"days"`
+
+	// Nights One entry per local day of the window plus the day before it (oldest first): the night that began on each. The extra night is what lets a one-day window still answer "last night".
+	Nights []StatsNight `json:"nights"`
+	Weight *StatsWeight `json:"weight"`
 }
 
 // StatsDay defines model for StatsDay.
 type StatsDay struct {
 	// Date YYYY-MM-DD in the requester's local time.
-	Date     string `json:"date"`
-	Diapers  int32  `json:"diapers"`
-	Feeds    int32  `json:"feeds"`
-	IntakeMl int32  `json:"intakeMl"`
-	SleepMin int32  `json:"sleepMin"`
+	Date        string           `json:"date"`
+	Diapers     int32            `json:"diapers"`
+	Feeds       int32            `json:"feeds"`
+	FeedsByType StatsFeedsByType `json:"feedsByType"`
+	IntakeMl    int32            `json:"intakeMl"`
+
+	// NightSleepMin The part of sleepMin from sessions typed `night` (issue
+	NightSleepMin int32 `json:"nightSleepMin"`
+	SleepMin      int32 `json:"sleepMin"`
+}
+
+// StatsFeedsByType defines model for StatsFeedsByType.
+type StatsFeedsByType struct {
+	Bottle float64 `json:"bottle"`
+	Breast float64 `json:"breast"`
+	Solids float64 `json:"solids"`
+}
+
+// StatsNight One night of the window (issue #50). A `night` sleep session belongs to the night it STARTED in, where night D runs from local noon on day D to local noon on D+1 — so a 23:00 bedtime and a 02:00 resettle land on the same night, and this morning's wake-up closes "last night". Both values are null for a night with no night session. Like the day buckets, the noon boundary is a fixed offset from the caretaker's `tz` and does not follow a DST change inside the window.
+type StatsNight struct {
+	// Date Local calendar date the night began on (YYYY-MM-DD).
+	Date string `json:"date"`
+
+	// LongestStretchMin The longest single night session; a running one counts up to now.
+	LongestStretchMin *int32 `json:"longestStretchMin"`
+
+	// Wakings Night sessions minus one.
+	Wakings *int32 `json:"wakings"`
 }
 
 // StatsWeight defines model for StatsWeight.

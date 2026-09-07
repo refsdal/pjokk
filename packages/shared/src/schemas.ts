@@ -532,19 +532,40 @@ export const SummarySchema = z.object({
 
 // --- Stats (Phase 4): deliberately minimal ---
 
+export const StatsFeedsByTypeSchema = z.object({
+  bottle: z.number(),
+  breast: z.number(),
+  solids: z.number(),
+});
+
 export const StatsDaySchema = z.object({
   date: z.string(), // YYYY-MM-DD in the requester's local time
   sleepMin: z.number(),
+  // The part of sleepMin from sessions typed `night` (issue #50).
+  nightSleepMin: z.number(),
   intakeMl: z.number(),
   feeds: z.number().int(),
+  feedsByType: StatsFeedsByTypeSchema,
   diapers: z.number().int(),
+});
+
+// One night per local day of the window: the night that began on it
+// (local noon to the next noon). Both values null when nothing typed
+// `night` started in it.
+export const StatsNightSchema = z.object({
+  date: z.string(),
+  longestStretchMin: z.number().int().nullable(),
+  wakings: z.number().int().nullable(),
 });
 
 export const StatsSchema = z.object({
   days: z.array(StatsDaySchema),
+  nights: z.array(StatsNightSchema),
   avgSleepMin: z.number(),
+  avgNightSleepMin: z.number(),
   avgIntakeMl: z.number(),
   avgFeeds: z.number(),
+  avgFeedsByType: StatsFeedsByTypeSchema,
   avgDiapers: z.number(),
   weight: z
     .object({
@@ -864,6 +885,7 @@ export type UpdateMedicineCatalogueEntry = z.infer<
 export type MeasurementType = (typeof measurementTypes)[number];
 export type Stats = z.infer<typeof StatsSchema>;
 export type StatsDay = z.infer<typeof StatsDaySchema>;
+export type StatsNight = z.infer<typeof StatsNightSchema>;
 export type BabySex = (typeof babySexes)[number];
 export type ApiKey = z.infer<typeof ApiKeySchema>;
 export type ApiKeyCreated = z.infer<typeof ApiKeyCreatedSchema>;
