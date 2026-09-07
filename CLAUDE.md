@@ -306,11 +306,19 @@ Bun-era schema used. Domain tables kept their singular names:
 
 - `baby(id, familyId, name, birthDate, …)`
 - `sleep_log(id, familyId, babyId, caretakerId, startTime, endTime NULL while
-  active, location?, notes?)`
+  active, location?, type nap|night?, notes?)`
 - `feed_log(id, familyId, babyId, caretakerId, time, type bottle|breast|solids,
-  amountMl?, side?, durationMin?, notes?)`
-- `diaper_log(id, familyId, babyId, caretakerId, time, type wet|dirty|both,
-  notes?)`
+  amountMl?, side?, durationMin?, contents formula|breast_milk|mixed?,
+  food?, reaction bool?, notes?)`
+- `diaper_log(id, familyId, babyId, caretakerId, time, type
+  wet|dirty|both|dry, color?, consistency normal|loose|firm?, notes?)`
+- The optional detail columns (bottle contents, solids food + reaction,
+  diaper colour/consistency, sleep nap-vs-night) are nullable and never
+  required on the wire: NULL means "not recorded", the two-tap happy path
+  never sends them, and the sleep `type` is defaulted by the SPA from the
+  device's night-mode schedule because the server has no timezone to guess
+  with. `dry` is its own diaper count in the summary so a dry check never
+  inflates the wet count.
 - `family_invite(code, familyId, role, expiresAt, maxUses, usedCount)`
 - Organization/family metadata: `plan` (default `free`), units, night-mode
   schedule.

@@ -54,10 +54,17 @@
 //   and VaccineDocument files (sprout stores them encrypted on its own
 //   disk, outside the SQLite file this script reads — re-attach by hand).
 //
+// Mapped to columns since #43 (they used to ride along in notes):
+//   feed bottleType -> contents (Formula / Breast Milk / Formula+Breast;
+//   Milk and Other stay a note), feed food + FoodLog food names -> food,
+//   hadReaction -> reaction, diaper DRY -> type 'dry', diaper condition ->
+//   consistency (OTHER stays a note), diaper color -> color, sleep
+//   NAP / NIGHT_SLEEP -> type.
+//
 // Lossy on purpose, preserved in `notes` rather than dropped:
-//   feed bottleType / reaction fields / breastMilkAmount, diaper
-//   condition / colour / blowout / cream, sleep NAP-vs-NIGHT and quality,
-//   milestone category, bath type. A DRY diaper becomes a note ("Dry nappy
+//   feed reaction description / cause / breastMilkAmount, diaper blowout /
+//   cream, sleep quality, milestone category, bath type. (A DRY diaper used
+//   to become a note ("Dry nappy
 //   check") rather than a wet one, so wet-nappy counts stay true.
 //   sprout's medicine units are singular (DROP, PILL)
 //   where Pjokk's enum is plural, so they are mapped by name rather than by
@@ -344,15 +351,18 @@ for (const r of rows(`SELECT * FROM FeedLog WHERE deletedAt IS NULL`)) {
       : r.startTime && r.endTime
         ? Math.round((ms(r.endTime) - ms(r.startTime)) / 60000)
         : null;
-  // bottleType (formula vs breast milk), reaction flags and breastMilkAmount
-  // have no Pjokk column; they are real clinical detail, so they ride along
-  // in notes rather than vanishing.
+  // bottleType maps onto feed_log.contents where Pjokk has a value for it;
+  // sprout's "Milk" and "Other" have no counterpart and stay a note. The
+  // reaction FLAG is a column, its description and cause are notes, and
+  // breastMilkAmount (a mixed bottle's split) has no column at all.
+  const contents = bottleContents(r.bottleType);
+  const food = type === "solids" ? trimFood(r.food) : null;
   const notes =
     [
-      r.food,
-      r.bottleType,
+      type === "solids" ? null : r.food,
+      contents ? null : r.bottleType,
       r.breastMilkAmount ? `${r.breastMilkAmount} breast milk` : null,
-      r.hadReaction
+      r.hadReaction && (r.reactionDescription || r.reactionCause)
         ? `reaction${r.reactionDescription ? `: ${r.reactionDescription}` : ""}${r.reactionCause ? ` (${r.reactionCause})` : ""}`
         : null,
       r.notes,
@@ -371,6 +381,9 @@ for (const r of rows(`SELECT * FROM FeedLog WHERE deletedAt IS NULL`)) {
       "amount_ml",
       "side",
       "duration_min",
+      "contents",
+      "food",
+      "reaction",
       "notes",
       "created_at",
     ],
@@ -380,10 +393,30 @@ for (const r of rows(`SELECT * FROM FeedLog WHERE deletedAt IS NULL`)) {
       type === "breast" ? "NULL" : (toMl(r.amount, r.unitAbbr) ?? "NULL"),
       r.side ? esc(r.side.toLowerCase()) : "NULL",
       type === "breast" ? (durationMin ?? "NULL") : "NULL",
+      type === "bottle" && contents ? esc(contents) : "NULL",
+      escOrNull(food),
+      type === "solids" && r.hadReaction ? "TRUE" : "NULL",
       escOrNull(notes),
       now,
     ],
   );
+}
+
+// sprout's bottleType is free-ish text with five known values; only three
+// have a Pjokk counterpart.
+function bottleContents(bottleType) {
+  const v = String(bottleType ?? "").trim().toLowerCase();
+  if (v === "formula") return "formula";
+  if (v === "breast milk") return "breast_milk";
+  if (v === "formula/breast" || v === "formula/breast milk") return "mixed";
+  return null;
+}
+
+// feed_log.food is capped at 100 characters on the wire (CreateFeed.food);
+// keep the column within the same bound so the row round-trips the sheet.
+function trimFood(name) {
+  const v = String(name ?? "").trim();
+  return v ? v.slice(0, 100) : null;
 }
 
 // FoodLog is sprout's solids tracker, a table apart from FeedLog. Pjokk has
@@ -411,12 +444,15 @@ for (const r of rows(`SELECT * FROM FoodLog WHERE deletedAt IS NULL`)) {
   if (r.amount != null && foodUnit && foodUnit !== "g")
     skip(`solids amount in ${r.unitAbbr} taken as grams`);
   const names = foodIds.map((i) => foodNames.get(i)).filter(Boolean);
+  // The food names are the `food` column; enjoyment and the reaction's
+  // description stay notes (Pjokk records THAT there was a reaction, not
+  // what it looked like).
+  const food = trimFood(names.join(", "));
   const notes =
     [
-      names.join(", ") || null,
       r.enjoyment ? String(r.enjoyment).toLowerCase() : null,
-      r.hadReaction
-        ? `reaction${r.reactionDescription ? `: ${r.reactionDescription}` : ""}`
+      r.hadReaction && r.reactionDescription
+        ? `reaction: ${r.reactionDescription}`
         : null,
       r.notes,
     ]
@@ -434,6 +470,9 @@ for (const r of rows(`SELECT * FROM FoodLog WHERE deletedAt IS NULL`)) {
       "amount_ml",
       "side",
       "duration_min",
+      "contents",
+      "food",
+      "reaction",
       "notes",
       "created_at",
     ],
@@ -448,6 +487,9 @@ for (const r of rows(`SELECT * FROM FoodLog WHERE deletedAt IS NULL`)) {
       r.amount != null ? Math.round(r.amount) : "NULL",
       "NULL",
       "NULL",
+      "NULL",
+      escOrNull(food),
+      r.hadReaction ? "TRUE" : "NULL",
       escOrNull(notes),
       now,
     ],
@@ -457,42 +499,39 @@ for (const r of rows(`SELECT * FROM FoodLog WHERE deletedAt IS NULL`)) {
 for (const r of rows(`SELECT * FROM DiaperLog WHERE deletedAt IS NULL`)) {
   const b = base(r, ms(r.time));
   if (!b) continue;
+  // DRY is its own Pjokk type since #43 (counted apart from wet, so a dry
+  // check never inflates the wet count); it used to be demoted to a note.
+  const type = { WET: "wet", DIRTY: "dirty", BOTH: "both", DRY: "dry" }[
+    r.type
+  ];
+  if (!type) {
+    skip(`diaper type ${r.type}`);
+    continue;
+  }
+  const consistency = { NORMAL: "normal", LOOSE: "loose", FIRM: "firm" }[
+    r.condition
+  ];
+  const color = {
+    YELLOW: "yellow",
+    GREEN: "green",
+    BROWN: "brown",
+    BLACK: "black",
+    RED: "red",
+    OTHER: "other",
+  }[r.color];
+  const hasStool = type === "dirty" || type === "both";
   const diaperNotes =
     [
-      r.condition,
-      r.color,
+      // An unmapped condition (sprout's OTHER) or a colour on a diaper with
+      // no stool keeps the original word rather than vanishing.
+      consistency && hasStool ? null : r.condition,
+      color && hasStool ? null : r.color,
       r.blowout ? "blowout" : null,
       r.creamApplied ? "cream applied" : null,
       r.notes,
     ]
       .filter(Boolean)
       .join(" · ") || null;
-  // Pjokk has no DRY type, and calling a dry check "wet" would inflate every
-  // wet-nappy count forever. Keep the record as a note instead: the event
-  // survives, the diaper statistics stay true.
-  if (r.type === "DRY") {
-    insert(
-      "note_log",
-      [
-        "id",
-        "family_id",
-        "baby_id",
-        "caretaker_id",
-        "time",
-        "content",
-        "notes",
-        "created_at",
-      ],
-      [...b, esc("Dry nappy check"), escOrNull(diaperNotes), now],
-    );
-    skip("DRY diaper imported as a note (no Pjokk diaper type fits)");
-    continue;
-  }
-  const type = { WET: "wet", DIRTY: "dirty", BOTH: "both" }[r.type];
-  if (!type) {
-    skip(`diaper type ${r.type}`);
-    continue;
-  }
   insert(
     "diaper_log",
     [
@@ -502,10 +541,19 @@ for (const r of rows(`SELECT * FROM DiaperLog WHERE deletedAt IS NULL`)) {
       "caretaker_id",
       "time",
       "type",
+      "color",
+      "consistency",
       "notes",
       "created_at",
     ],
-    [...b, esc(type), escOrNull(diaperNotes), now],
+    [
+      ...b,
+      esc(type),
+      hasStool && color ? esc(color) : "NULL",
+      hasStool && consistency ? esc(consistency) : "NULL",
+      escOrNull(diaperNotes),
+      now,
+    ],
   );
 }
 
@@ -513,11 +561,12 @@ for (const r of rows(`SELECT * FROM SleepLog WHERE deletedAt IS NULL`)) {
   const b = base(r, ms(r.startTime));
   if (!b) continue;
   const [id, fam, babyId, caretakerId, startMs] = b;
-  // Pjokk has no nap/night split and no sleep quality; both would otherwise
-  // be dropped silently, so they ride along in notes.
+  // NAP / NIGHT_SLEEP is sleep_log.type since #43; quality has no column
+  // and rides along in notes rather than being dropped silently.
+  const sleepType = { NAP: "nap", NIGHT_SLEEP: "night" }[r.type] ?? null;
   const sleepNotes =
     [
-      r.type === "NAP" ? "nap" : r.type === "NIGHT_SLEEP" ? "night sleep" : null,
+      sleepType ? null : r.type ? String(r.type).toLowerCase() : null,
       r.quality ? `quality: ${String(r.quality).toLowerCase()}` : null,
       r.notes,
     ]
@@ -533,6 +582,7 @@ for (const r of rows(`SELECT * FROM SleepLog WHERE deletedAt IS NULL`)) {
       "start_time",
       "end_time",
       "location",
+      "type",
       "notes",
       "created_at",
     ],
@@ -546,6 +596,7 @@ for (const r of rows(`SELECT * FROM SleepLog WHERE deletedAt IS NULL`)) {
       // Not lowercased: the value is shown as-is and sits beside the
       // family's own sleep-location chips, which are capitalized.
       escOrNull(r.location),
+      sleepType ? esc(sleepType) : "NULL",
       escOrNull(sleepNotes),
       now,
     ],

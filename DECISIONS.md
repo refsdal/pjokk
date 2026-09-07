@@ -1744,3 +1744,55 @@ the smoke test before it still runs the image at its defaults.
   the picked file through an object URL before uploading; `blob:` URLs are
   created by the page itself, so no third-party image load is enabled. The
   landing site's CSP is unchanged.
+
+## 2026-09-07 — detail on the core logs (#43)
+
+The September competitor comparison (issues #43–#54) put one gap first:
+every general-purpose tracker records what a bottle held, what the solids
+were and whether they caused a reaction, whether a diaper was dry and what
+a stool looked like, and whether a sleep was a nap or the night. Pjokk's
+sprout-track importer had been meeting all of that data and folding it into
+`notes` — which is exactly the shape you cannot count, filter or chart.
+
+- **Six nullable columns, no new tables, nothing required on the wire.**
+  `feed_log.contents` (formula | breast_milk | mixed), `feed_log.food`,
+  `feed_log.reaction` (boolean), `diaper_log.color`, `diaper_log.consistency`,
+  `sleep_log.type` (nap | night), plus `dry` as a fourth `diaper_log.type`.
+  NULL means "not recorded" everywhere and renders as nothing; the two-tap
+  happy path sends none of them. The PATCH tri-state (omitted = leave,
+  null = clear, value = set) applies to each, and switching a feed's type
+  from the sheet clears the detail that no longer applies with explicit
+  nulls, exactly as `amountMl` is cleared when switching to breast.
+- **`reaction` is a nullable boolean, not a severity enum.** The sprout
+  data has a flag plus a free-text description; inventing "mild"/"severe"
+  on import would have been a guess. The flag is the column, the
+  description stays in notes.
+- **The sleep field is `type`, not `kind`.** The first cut called it `kind`
+  and the timeline test caught it: `kind` is the timeline entry's
+  discriminator ("sleep"), and `Set("kind", …)` overwrote it. The feed and
+  diaper enums are already `type`, so sleep's is too.
+- **The server never defaults the sleep type.** It has no timezone to
+  decide "night" with. The SPA defaults it from the device's night-mode
+  schedule at the moment the sheet opens (`sleepTypeAt` in `lib/night.ts`,
+  schedule only — a manual "night on" at 14:00 is about the screen, not the
+  baby), and the chip is one tap away for the 19:00 bedtime the default
+  window does not cover. API-key writes that omit it stay NULL, and rows
+  from before the column exist as NULL, so the timeline title falls back to
+  plain "Sleep".
+- **`dry` is its own summary count.** The importer used to demote a DRY
+  check to a note precisely because calling it "wet" would inflate every
+  wet-nappy count forever; now it is a type with its own `today.dry`, shown
+  on the Home card only when non-zero.
+- **Colour and consistency are never prefilled**, unlike contents and food.
+  Last-value prefill is for things that repeat (the same formula, the same
+  puree twice a day); a silently repeated "green · loose" would be a false
+  record. They sit behind an "Add detail" disclosure that only appears for
+  dirty/both, so the diaper sheet's happy path is unchanged.
+- **The CSV keeps its header.** The new detail lands in the existing free
+  `detail` column (" · "-joined), so spreadsheets built on the old file keep
+  their column positions.
+- **The importer maps instead of folding.** bottleType → contents (Milk
+  and Other have no counterpart and stay a note), FeedLog.food and the
+  FoodLog names → food, hadReaction → reaction, DRY → dry, condition →
+  consistency (OTHER stays a note), color → color, NAP/NIGHT_SLEEP → type.
+  Quality, blowout, cream and reaction descriptions still ride in notes.
