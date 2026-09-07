@@ -368,6 +368,155 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/feeds/timer:
+    get:
+      operationId: getFeedTimer
+      summary: >-
+        The running nursing and pump timers for a baby, either null. One
+        call for both because Home Assistant and the SPA both want the
+        pair; /api/summary carries the same two objects as activeFeed /
+        activePump.
+      tags: [feeds]
+      parameters:
+        - name: babyId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Both timers, each null when not running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedTimers"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      operationId: startFeedTimer
+      summary: >-
+        Start a nursing or pump timer for a baby. One running timer per
+        (baby, kind) — enforced by a unique index, not just the pre-check —
+        so a second start for the same kind is 409 while a pump timer next
+        to a running nursing timer is fine. `startTime` lets an offline
+        client replay the moment it actually tapped Start.
+      tags: [feeds]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartFeedTimer"
+      responses:
+        "201":
+          description: Started.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedTimer"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: A timer of this kind is already running for the baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/feeds/timer/{id}/side:
+    post:
+      operationId: setFeedTimerSide
+      summary: >-
+        Switch the running side of a nursing timer, or pause it with `side:
+        null`. The stretch that was running is banked on the server's clock
+        first. A pump timer is one clock and cannot be paused (400).
+      tags: [feeds]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetFeedTimerSide"
+      responses:
+        "200":
+          description: The timer after the switch.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedTimer"
+        "400":
+          description: Pausing a pump timer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such running timer in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/feeds/timer/{id}/stop:
+    post:
+      operationId: stopFeedTimer
+      summary: >-
+        Stop a timer and log it: a nursing timer becomes a breast FeedLog
+        (time = the timer's start, per-side minutes from the banked
+        seconds, 20 s still counts as 1 min), a pump timer becomes a
+        PumpLog. Both happen in one transaction with the timer's deletion,
+        so a replayed stop is a 404 rather than a second row. The sheet's
+        steppers may override the clock through the body.
+      tags: [feeds]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StopFeedTimer"
+      responses:
+        "201":
+          description: Logged; the timer is gone.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedTimerStopped"
+        "404":
+          description: No such running timer in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/feeds/timer/{id}:
+    delete:
+      operationId: discardFeedTimer
+      summary: Throw a running timer away without logging anything.
+      tags: [feeds]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Discarded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No such running timer in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/diapers:
     get:
       operationId: listDiapers
@@ -3111,6 +3260,156 @@ components:
           type: string
           maxLength: 1000
           nullable: true
+    FeedTimer:
+      type: object
+      description: >-
+        A running nursing or pump timer, shared by the whole family (issue
+        #44). Elapsed time is computed by the reader: the banked
+        `leftSec`/`rightSec` plus, while `runningSide` is set, now minus
+        `sideStartedAt`. The server banks the running stretch on its own
+        clock at every switch, pause and stop.
+      required:
+        - id
+        - babyId
+        - caretakerId
+        - caretakerName
+        - kind
+        - startTime
+        - runningSide
+        - sideStartedAt
+        - leftSec
+        - rightSec
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        kind:
+          type: string
+          enum: [breast, pump]
+        startTime:
+          type: string
+          format: date-time
+        runningSide:
+          type: string
+          enum: [left, right, both]
+          nullable: true
+          description: >-
+            The side counting now; null = paused. A pump timer is never
+            paused and keeps the side chosen at start (usually `both`).
+        sideStartedAt:
+          type: string
+          format: date-time
+          nullable: true
+        leftSec:
+          type: integer
+          format: int32
+        rightSec:
+          type: integer
+          format: int32
+          description: For a pump timer everything banks into leftSec.
+    FeedTimers:
+      type: object
+      required: [breast, pump]
+      properties:
+        breast:
+          allOf:
+            - $ref: "#/components/schemas/FeedTimer"
+          nullable: true
+        pump:
+          allOf:
+            - $ref: "#/components/schemas/FeedTimer"
+          nullable: true
+    StartFeedTimer:
+      type: object
+      required: [babyId, kind]
+      properties:
+        babyId:
+          type: string
+        kind:
+          type: string
+          enum: [breast, pump]
+        side:
+          type: string
+          enum: [left, right, both]
+          description: Defaults to left for nursing, both for pumping.
+        startTime:
+          type: string
+          format: date-time
+          description: >-
+            When the parent tapped Start. Defaults to now on the server;
+            an offline client sends its own so a replayed start keeps the
+            real moment.
+    SetFeedTimerSide:
+      type: object
+      required: [side]
+      properties:
+        side:
+          type: string
+          enum: [left, right, both]
+          nullable: true
+          description: null pauses a nursing timer.
+    StopFeedTimer:
+      type: object
+      description: >-
+        Every field optional. Minutes override what the clock banked (the
+        sheet's steppers); `time` overrides the logged feed's time
+        (defaults to the timer's start); `amountMl` is for a pump.
+      properties:
+        time:
+          type: string
+          format: date-time
+        leftMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+        rightMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+        amountMl:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+        side:
+          type: string
+          enum: [left, right, both]
+          description: >-
+            Pump only: which side was pumped, when the sheet changes it
+            from what the timer was started with. A nursing feed's side is
+            derived from its minutes.
+        durationMin:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 600
+          description: Pump only; a nursing feed's duration is its minutes.
+        notes:
+          type: string
+          maxLength: 1000
+    FeedTimerStopped:
+      type: object
+      description: The row the timer became; exactly one of feed / pump is set.
+      required: [kind, feed, pump]
+      properties:
+        kind:
+          type: string
+          enum: [breast, pump]
+        feed:
+          allOf:
+            - $ref: "#/components/schemas/FeedLog"
+          nullable: true
+        pump:
+          allOf:
+            - $ref: "#/components/schemas/PumpLog"
+          nullable: true
     DiaperLog:
       type: object
       required:
@@ -3737,6 +4036,8 @@ components:
         - activeSleep
         - lastSleep
         - activePlay
+        - activeFeed
+        - activePump
         - lastTemperature
         - openHelp
         - today
@@ -3760,6 +4061,16 @@ components:
         activePlay:
           allOf:
             - $ref: "#/components/schemas/PlayLog"
+          nullable: true
+        activeFeed:
+          description: The running nursing timer, or null (issue #44).
+          allOf:
+            - $ref: "#/components/schemas/FeedTimer"
+          nullable: true
+        activePump:
+          description: The running pump timer, or null.
+          allOf:
+            - $ref: "#/components/schemas/FeedTimer"
           nullable: true
         lastTemperature:
           description: >-

@@ -587,6 +587,63 @@ func (e FeedLogType) Valid() bool {
 	}
 }
 
+// Defines values for FeedTimerKind.
+const (
+	FeedTimerKindBreast FeedTimerKind = "breast"
+	FeedTimerKindPump   FeedTimerKind = "pump"
+)
+
+// Valid indicates whether the value is a known member of the FeedTimerKind enum.
+func (e FeedTimerKind) Valid() bool {
+	switch e {
+	case FeedTimerKindBreast:
+		return true
+	case FeedTimerKindPump:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FeedTimerRunningSide.
+const (
+	FeedTimerRunningSideBoth  FeedTimerRunningSide = "both"
+	FeedTimerRunningSideLeft  FeedTimerRunningSide = "left"
+	FeedTimerRunningSideRight FeedTimerRunningSide = "right"
+)
+
+// Valid indicates whether the value is a known member of the FeedTimerRunningSide enum.
+func (e FeedTimerRunningSide) Valid() bool {
+	switch e {
+	case FeedTimerRunningSideBoth:
+		return true
+	case FeedTimerRunningSideLeft:
+		return true
+	case FeedTimerRunningSideRight:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FeedTimerStoppedKind.
+const (
+	FeedTimerStoppedKindBreast FeedTimerStoppedKind = "breast"
+	FeedTimerStoppedKindPump   FeedTimerStoppedKind = "pump"
+)
+
+// Valid indicates whether the value is a known member of the FeedTimerStoppedKind enum.
+func (e FeedTimerStoppedKind) Valid() bool {
+	switch e {
+	case FeedTimerStoppedKindBreast:
+		return true
+	case FeedTimerStoppedKindPump:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for InviteRole.
 const (
 	InviteRoleAdmin  InviteRole = "admin"
@@ -794,6 +851,27 @@ func (e RedeemResultRole) Valid() bool {
 	}
 }
 
+// Defines values for SetFeedTimerSideSide.
+const (
+	SetFeedTimerSideSideBoth  SetFeedTimerSideSide = "both"
+	SetFeedTimerSideSideLeft  SetFeedTimerSideSide = "left"
+	SetFeedTimerSideSideRight SetFeedTimerSideSide = "right"
+)
+
+// Valid indicates whether the value is a known member of the SetFeedTimerSideSide enum.
+func (e SetFeedTimerSideSide) Valid() bool {
+	switch e {
+	case SetFeedTimerSideSideBoth:
+		return true
+	case SetFeedTimerSideSideLeft:
+		return true
+	case SetFeedTimerSideSideRight:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SetMemberRoleRole.
 const (
 	SetMemberRoleRoleAdmin  SetMemberRoleRole = "admin"
@@ -824,6 +902,66 @@ func (e SleepLogType) Valid() bool {
 	case SleepLogTypeNap:
 		return true
 	case SleepLogTypeNight:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StartFeedTimerKind.
+const (
+	StartFeedTimerKindBreast StartFeedTimerKind = "breast"
+	StartFeedTimerKindPump   StartFeedTimerKind = "pump"
+)
+
+// Valid indicates whether the value is a known member of the StartFeedTimerKind enum.
+func (e StartFeedTimerKind) Valid() bool {
+	switch e {
+	case StartFeedTimerKindBreast:
+		return true
+	case StartFeedTimerKindPump:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StartFeedTimerSide.
+const (
+	StartFeedTimerSideBoth  StartFeedTimerSide = "both"
+	StartFeedTimerSideLeft  StartFeedTimerSide = "left"
+	StartFeedTimerSideRight StartFeedTimerSide = "right"
+)
+
+// Valid indicates whether the value is a known member of the StartFeedTimerSide enum.
+func (e StartFeedTimerSide) Valid() bool {
+	switch e {
+	case StartFeedTimerSideBoth:
+		return true
+	case StartFeedTimerSideLeft:
+		return true
+	case StartFeedTimerSideRight:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StopFeedTimerSide.
+const (
+	StopFeedTimerSideBoth  StopFeedTimerSide = "both"
+	StopFeedTimerSideLeft  StopFeedTimerSide = "left"
+	StopFeedTimerSideRight StopFeedTimerSide = "right"
+)
+
+// Valid indicates whether the value is a known member of the StopFeedTimerSide enum.
+func (e StopFeedTimerSide) Valid() bool {
+	switch e {
+	case StopFeedTimerSideBoth:
+		return true
+	case StopFeedTimerSideLeft:
+		return true
+	case StopFeedTimerSideRight:
 		return true
 	default:
 		return false
@@ -1746,6 +1884,46 @@ type FeedLogSide string
 // FeedLogType defines model for FeedLog.Type.
 type FeedLogType string
 
+// FeedTimer A running nursing or pump timer, shared by the whole family (issue #44). Elapsed time is computed by the reader: the banked `leftSec`/`rightSec` plus, while `runningSide` is set, now minus `sideStartedAt`. The server banks the running stretch on its own clock at every switch, pause and stop.
+type FeedTimer struct {
+	BabyId        string        `json:"babyId"`
+	CaretakerId   string        `json:"caretakerId"`
+	CaretakerName string        `json:"caretakerName"`
+	Id            string        `json:"id"`
+	Kind          FeedTimerKind `json:"kind"`
+	LeftSec       int32         `json:"leftSec"`
+
+	// RightSec For a pump timer everything banks into leftSec.
+	RightSec int32 `json:"rightSec"`
+
+	// RunningSide The side counting now; null = paused. A pump timer is never paused and keeps the side chosen at start (usually `both`).
+	RunningSide   *FeedTimerRunningSide `json:"runningSide"`
+	SideStartedAt *time.Time            `json:"sideStartedAt"`
+	StartTime     time.Time             `json:"startTime"`
+}
+
+// FeedTimerKind defines model for FeedTimer.Kind.
+type FeedTimerKind string
+
+// FeedTimerRunningSide The side counting now; null = paused. A pump timer is never paused and keeps the side chosen at start (usually `both`).
+type FeedTimerRunningSide string
+
+// FeedTimerStopped The row the timer became; exactly one of feed / pump is set.
+type FeedTimerStopped struct {
+	Feed *FeedLog             `json:"feed"`
+	Kind FeedTimerStoppedKind `json:"kind"`
+	Pump *PumpLog             `json:"pump"`
+}
+
+// FeedTimerStoppedKind defines model for FeedTimerStopped.Kind.
+type FeedTimerStoppedKind string
+
+// FeedTimers defines model for FeedTimers.
+type FeedTimers struct {
+	Breast *FeedTimer `json:"breast"`
+	Pump   *FeedTimer `json:"pump"`
+}
+
 // HelpRequest One caretaker asking a specific other member of the family for a hand. Family state, not a log: it is not on the timeline and has no baby. Open until someone acknowledges it; shown on Home (see Summary.openHelp) for two hours after creation whatever its state, then simply no longer returned. Names are denormalised so the card never needs a second lookup and still reads correctly after a member leaves.
 type HelpRequest struct {
 	// AcknowledgedAt null while open.
@@ -1970,6 +2148,15 @@ type RedeemResult struct {
 // RedeemResultRole defines model for RedeemResult.Role.
 type RedeemResultRole string
 
+// SetFeedTimerSide defines model for SetFeedTimerSide.
+type SetFeedTimerSide struct {
+	// Side null pauses a nursing timer.
+	Side *SetFeedTimerSideSide `json:"side"`
+}
+
+// SetFeedTimerSideSide null pauses a nursing timer.
+type SetFeedTimerSideSide string
+
 // SetMemberRole defines model for SetMemberRole.
 type SetMemberRole struct {
 	Role SetMemberRoleRole `json:"role"`
@@ -2009,6 +2196,24 @@ type SleepLog struct {
 // SleepLogType Nap or night sleep. The client defaults it from the device's night-mode schedule; the server never guesses (it has no timezone), so an omitted type stays null. (Named `type` like the feed and diaper enums; `kind` is the timeline's discriminator and must stay free.)
 type SleepLogType string
 
+// StartFeedTimer defines model for StartFeedTimer.
+type StartFeedTimer struct {
+	BabyId string             `json:"babyId"`
+	Kind   StartFeedTimerKind `json:"kind"`
+
+	// Side Defaults to left for nursing, both for pumping.
+	Side *StartFeedTimerSide `json:"side,omitempty"`
+
+	// StartTime When the parent tapped Start. Defaults to now on the server; an offline client sends its own so a replayed start keeps the real moment.
+	StartTime *time.Time `json:"startTime,omitempty"`
+}
+
+// StartFeedTimerKind defines model for StartFeedTimer.Kind.
+type StartFeedTimerKind string
+
+// StartFeedTimerSide Defaults to left for nursing, both for pumping.
+type StartFeedTimerSide string
+
 // Stats defines model for Stats.
 type Stats struct {
 	AvgDiapers  float64      `json:"avgDiapers"`
@@ -2037,6 +2242,24 @@ type StatsWeight struct {
 	Value     float64    `json:"value"`
 }
 
+// StopFeedTimer Every field optional. Minutes override what the clock banked (the sheet's steppers); `time` overrides the logged feed's time (defaults to the timer's start); `amountMl` is for a pump.
+type StopFeedTimer struct {
+	AmountMl *int32 `json:"amountMl,omitempty"`
+
+	// DurationMin Pump only; a nursing feed's duration is its minutes.
+	DurationMin *int32  `json:"durationMin,omitempty"`
+	LeftMin     *int32  `json:"leftMin,omitempty"`
+	Notes       *string `json:"notes,omitempty"`
+	RightMin    *int32  `json:"rightMin,omitempty"`
+
+	// Side Pump only: which side was pumped, when the sheet changes it from what the timer was started with. A nursing feed's side is derived from its minutes.
+	Side *StopFeedTimerSide `json:"side,omitempty"`
+	Time *time.Time         `json:"time,omitempty"`
+}
+
+// StopFeedTimerSide Pump only: which side was pumped, when the sheet changes it from what the timer was started with. A nursing feed's side is derived from its minutes.
+type StopFeedTimerSide string
+
 // StopPlay Defaults endTime to now on the server when omitted.
 type StopPlay struct {
 	EndTime *time.Time `json:"endTime,omitempty"`
@@ -2051,7 +2274,12 @@ type Subscribe struct {
 
 // Summary defines model for Summary.
 type Summary struct {
-	ActivePlay  *PlayLog   `json:"activePlay"`
+	// ActiveFeed The running nursing timer, or null (issue
+	ActiveFeed *FeedTimer `json:"activeFeed"`
+	ActivePlay *PlayLog   `json:"activePlay"`
+
+	// ActivePump The running pump timer, or null.
+	ActivePump  *FeedTimer `json:"activePump"`
 	ActiveSleep *SleepLog  `json:"activeSleep"`
 	LastDiaper  *DiaperLog `json:"lastDiaper"`
 	LastFeed    *FeedLog   `json:"lastFeed"`
@@ -2379,6 +2607,11 @@ type ListFeedsParams struct {
 	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// GetFeedTimerParams defines parameters for GetFeedTimer.
+type GetFeedTimerParams struct {
+	BabyId string `form:"babyId" json:"babyId"`
+}
+
 // ListMeasurementsParams defines parameters for ListMeasurements.
 type ListMeasurementsParams struct {
 	// BabyId Restrict the result to one baby in the caller's family.
@@ -2554,6 +2787,15 @@ type SetFamilyMemberRoleJSONRequestBody = SetMemberRole
 
 // CreateFeedJSONRequestBody defines body for CreateFeed for application/json ContentType.
 type CreateFeedJSONRequestBody = CreateFeed
+
+// StartFeedTimerJSONRequestBody defines body for StartFeedTimer for application/json ContentType.
+type StartFeedTimerJSONRequestBody = StartFeedTimer
+
+// SetFeedTimerSideJSONRequestBody defines body for SetFeedTimerSide for application/json ContentType.
+type SetFeedTimerSideJSONRequestBody = SetFeedTimerSide
+
+// StopFeedTimerJSONRequestBody defines body for StopFeedTimer for application/json ContentType.
+type StopFeedTimerJSONRequestBody = StopFeedTimer
 
 // UpdateFeedJSONRequestBody defines body for UpdateFeed for application/json ContentType.
 type UpdateFeedJSONRequestBody = UpdateFeed

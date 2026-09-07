@@ -195,6 +195,75 @@ export interface paths {
         patch: operations["updateFeed"];
         trace?: never;
     };
+    "/api/feeds/timer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The running nursing and pump timers for a baby, either null. One call for both because Home Assistant and the SPA both want the pair; /api/summary carries the same two objects as activeFeed / activePump. */
+        get: operations["getFeedTimer"];
+        put?: never;
+        /** Start a nursing or pump timer for a baby. One running timer per (baby, kind) — enforced by a unique index, not just the pre-check — so a second start for the same kind is 409 while a pump timer next to a running nursing timer is fine. `startTime` lets an offline client replay the moment it actually tapped Start. */
+        post: operations["startFeedTimer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/feeds/timer/{id}/side": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Switch the running side of a nursing timer, or pause it with `side: null`. The stretch that was running is banked on the server's clock first. A pump timer is one clock and cannot be paused (400). */
+        post: operations["setFeedTimerSide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/feeds/timer/{id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop a timer and log it: a nursing timer becomes a breast FeedLog (time = the timer's start, per-side minutes from the banked seconds, 20 s still counts as 1 min), a pump timer becomes a PumpLog. Both happen in one transaction with the timer's deletion, so a replayed stop is a 404 rather than a second row. The sheet's steppers may override the clock through the body. */
+        post: operations["stopFeedTimer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/feeds/timer/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Throw a running timer away without logging anything. */
+        delete: operations["discardFeedTimer"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/diapers": {
         parameters: {
             query?: never;
@@ -1435,6 +1504,86 @@ export interface components {
             reaction?: boolean | null;
             notes?: string | null;
         };
+        /** @description A running nursing or pump timer, shared by the whole family (issue #44). Elapsed time is computed by the reader: the banked `leftSec`/`rightSec` plus, while `runningSide` is set, now minus `sideStartedAt`. The server banks the running stretch on its own clock at every switch, pause and stop. */
+        FeedTimer: {
+            id: string;
+            babyId: string;
+            caretakerId: string;
+            caretakerName: string;
+            /** @enum {string} */
+            kind: "breast" | "pump";
+            /** Format: date-time */
+            startTime: string;
+            /**
+             * @description The side counting now; null = paused. A pump timer is never paused and keeps the side chosen at start (usually `both`).
+             * @enum {string|null}
+             */
+            runningSide: "left" | "right" | "both" | null;
+            /** Format: date-time */
+            sideStartedAt: string | null;
+            /** Format: int32 */
+            leftSec: number;
+            /**
+             * Format: int32
+             * @description For a pump timer everything banks into leftSec.
+             */
+            rightSec: number;
+        };
+        FeedTimers: {
+            breast: components["schemas"]["FeedTimer"] | null;
+            pump: components["schemas"]["FeedTimer"] | null;
+        };
+        StartFeedTimer: {
+            babyId: string;
+            /** @enum {string} */
+            kind: "breast" | "pump";
+            /**
+             * @description Defaults to left for nursing, both for pumping.
+             * @enum {string}
+             */
+            side?: "left" | "right" | "both";
+            /**
+             * Format: date-time
+             * @description When the parent tapped Start. Defaults to now on the server; an offline client sends its own so a replayed start keeps the real moment.
+             */
+            startTime?: string;
+        };
+        SetFeedTimerSide: {
+            /**
+             * @description null pauses a nursing timer.
+             * @enum {string|null}
+             */
+            side: "left" | "right" | "both" | null;
+        };
+        /** @description Every field optional. Minutes override what the clock banked (the sheet's steppers); `time` overrides the logged feed's time (defaults to the timer's start); `amountMl` is for a pump. */
+        StopFeedTimer: {
+            /** Format: date-time */
+            time?: string;
+            /** Format: int32 */
+            leftMin?: number;
+            /** Format: int32 */
+            rightMin?: number;
+            /** Format: int32 */
+            amountMl?: number;
+            /**
+             * @description Pump only: which side was pumped, when the sheet changes it from what the timer was started with. A nursing feed's side is derived from its minutes.
+             * @enum {string}
+             */
+            side?: "left" | "right" | "both";
+            /**
+             * Format: int32
+             * @description Pump only; a nursing feed's duration is its minutes.
+             */
+            durationMin?: number;
+            notes?: string;
+        };
+        /** @description The row the timer became; exactly one of feed / pump is set. */
+        FeedTimerStopped: {
+            /** @enum {string} */
+            kind: "breast" | "pump";
+            feed: components["schemas"]["FeedLog"] | null;
+            pump: components["schemas"]["PumpLog"] | null;
+        };
         DiaperLog: {
             id: string;
             babyId: string;
@@ -1720,6 +1869,10 @@ export interface components {
             activeSleep: components["schemas"]["SleepLog"] | null;
             lastSleep: components["schemas"]["SleepLog"] | null;
             activePlay: components["schemas"]["PlayLog"] | null;
+            /** @description The running nursing timer, or null (issue */
+            activeFeed: components["schemas"]["FeedTimer"] | null;
+            /** @description The running pump timer, or null. */
+            activePump: components["schemas"]["FeedTimer"] | null;
             /** @description The newest `temperature` measurement, or null. Specifically the newest of that TYPE, not the newest measurement — a weight taken after a temperature must not displace it. Backs the Home screen's temperature card. */
             lastTemperature: components["schemas"]["MeasurementLog"] | null;
             /** @description The family's newest help request created within the last two hours, open or acknowledged, or null. Family-level (not per baby) but carried here because Home already polls this query. */
@@ -2693,6 +2846,192 @@ export interface operations {
                 };
             };
             /** @description No feed with this id in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getFeedTimer: {
+        parameters: {
+            query: {
+                babyId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Both timers, each null when not running. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedTimers"];
+                };
+            };
+            /** @description Unknown baby. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    startFeedTimer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartFeedTimer"];
+            };
+        };
+        responses: {
+            /** @description Started. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedTimer"];
+                };
+            };
+            /** @description Unknown baby. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A timer of this kind is already running for the baby. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setFeedTimerSide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetFeedTimerSide"];
+            };
+        };
+        responses: {
+            /** @description The timer after the switch. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedTimer"];
+                };
+            };
+            /** @description Pausing a pump timer. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such running timer in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    stopFeedTimer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["StopFeedTimer"];
+            };
+        };
+        responses: {
+            /** @description Logged; the timer is gone. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedTimerStopped"];
+                };
+            };
+            /** @description No such running timer in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    discardFeedTimer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Discarded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description No such running timer in the caller's family. */
             404: {
                 headers: {
                     [name: string]: unknown;

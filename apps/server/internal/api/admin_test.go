@@ -1169,6 +1169,7 @@ var reassignedUserReferences = map[string]bool{
 	"measurement_log.caretaker_id":   true,
 	"pump_log.caretaker_id":          true,
 	"play_log.caretaker_id":          true,
+	"feed_timer.caretaker_id":        true,
 	"vaccine_log.caretaker_id":       true,
 	"vaccine_document.uploaded_by":   true,
 	"vaccine_dismissal.dismissed_by": true,

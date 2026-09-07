@@ -144,6 +144,17 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		return nil, err
 	}
 
+	// The shared nursing / pump timers (feed_timer.go), read the same way
+	// activeSleep / activePlay are: state, not screens.
+	activeFeed, err := d.activeFeedTimer(ctx, fam.FamilyID, babyID, "breast")
+	if err != nil {
+		return nil, err
+	}
+	activePump, err := d.activeFeedTimer(ctx, fam.FamilyID, babyID, "pump")
+	if err != nil {
+		return nil, err
+	}
+
 	// Family-level, not per baby, but Home polls this query and nothing
 	// else — see help.go for the window. Newest request in the window,
 	// whatever its state; the SPA derives open/acknowledged from the row.
@@ -236,6 +247,8 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		ActiveSleep:     activeSleep,
 		LastSleep:       lastSleep,
 		ActivePlay:      activePlay,
+		ActiveFeed:      activeFeed,
+		ActivePump:      activePump,
 		LastTemperature: lastTemperature,
 		OpenHelp:        openHelp,
 		Today: struct {

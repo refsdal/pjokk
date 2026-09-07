@@ -223,14 +223,22 @@ var operationAuthTiers = map[string]authTier{
 	"GetFamily":         tierFamily,
 	"ListFamilyMembers": tierFamily,
 
-	"ListFeeds":    tierFamily,
-	"CreateFeed":   tierFamily,
-	"UpdateFeed":   tierFamily,
-	"DeleteFeed":   tierFamily,
-	"ListDiapers":  tierFamily,
-	"CreateDiaper": tierFamily,
-	"UpdateDiaper": tierFamily,
-	"DeleteDiaper": tierFamily,
+	"ListFeeds":  tierFamily,
+	"CreateFeed": tierFamily,
+	// The shared nursing / pump timer (feed_timer.go): the same tier as the
+	// feeds it becomes, API keys included (a Home Assistant automation may
+	// start and stop it, and attribution already works for keys).
+	"GetFeedTimer":     tierFamily,
+	"StartFeedTimer":   tierFamily,
+	"SetFeedTimerSide": tierFamily,
+	"StopFeedTimer":    tierFamily,
+	"DiscardFeedTimer": tierFamily,
+	"UpdateFeed":       tierFamily,
+	"DeleteFeed":       tierFamily,
+	"ListDiapers":      tierFamily,
+	"CreateDiaper":     tierFamily,
+	"UpdateDiaper":     tierFamily,
+	"DeleteDiaper":     tierFamily,
 
 	"ListSleeps":     tierFamily,
 	"CreateSleep":    tierFamily,

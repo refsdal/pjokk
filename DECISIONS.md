@@ -1796,3 +1796,52 @@ sprout-track importer had been meeting all of that data and folding it into
   FoodLog names → food, hadReaction → reaction, DRY → dry, condition →
   consistency (OTHER stays a note), color → color, NAP/NIGHT_SLEEP → type.
   Quality, blowout, cream and reaction descriptions still ride in notes.
+
+## 2026-09-07 — the nursing timer is family state (#44)
+
+The nursing timer lived in one phone's localStorage (`lib/nursing-timer.ts`):
+a co-parent saw "last feed 2 h ago" while the baby was being fed, a phone
+swap lost the clock, and the API could start a sleep but not a feed. Ranked
+second in the competitor comparison; every app in it shares the timer.
+
+- **A `feed_timer` table, not a `feed_log` row with `end_time IS NULL`.**
+  The issue proposed the sleep/play shape. It does not fit: a logged feed
+  has one `time`, not a start and an end, so a NULL end could only have
+  meant "running" by adding an end column every finished feed would also
+  carry. The timer is a different thing from a feed — a running side and
+  banked seconds per side — and it BECOMES a feed on stop. One row per
+  (baby, kind) with `kind ∈ breast | pump`, so a parent can nurse one side
+  and pump the other.
+- **The clock is the server's.** The client never sends elapsed time. It
+  sends start / switch / pause / stop and the server banks the running
+  stretch on `d.Now()` before writing the new state, so two phones agree
+  without a clock sync and a Home Assistant automation drives the timer
+  with the same calls. The one exception is start: an offline SPA replays
+  the moment the parent tapped, via `startTime`.
+- **Stop is one transaction with the delete.** The DELETE's rows-affected
+  count is the replay guard: a second stop finds nothing to delete, the
+  transaction rolls back the feed it just inserted, and the caller gets a
+  404 rather than a duplicate — the same property WakeSleep gets from its
+  `end_time IS NULL` predicate.
+- **The logged feed's time is the timer's start**, not the moment of
+  Save, because that is what the duration is measured from and what
+  "when did she last eat" should count from. The sheet can still pick a
+  time.
+- **Minutes from seconds is the sheet's old rule**, now on both sides: a
+  side with any seconds is at least one minute, otherwise nearest minute;
+  the steppers override the clock through the stop body, because a parent
+  who forgot to stop the clock knows better than the clock.
+- **A pump timer is one clock.** No pause, no switch; the side is chosen at
+  start and can be corrected at stop. Everything it counts banks into
+  `leftSec`. Stop opens the pump sheet rather than logging directly: the
+  amount is the one thing the clock cannot know.
+- **Switch / stop / discard are disabled while the start is optimistic.**
+  They need the server-issued id. The start itself is offline-safe (the
+  optimistic banner counts from the client's `startTime`), which is the
+  case that matters at 03:00 with no signal.
+- **The localStorage timer is deleted, not kept as a fallback.** Two
+  sources of truth for a clock is the bug this fixes.
+- **Screenshots ride on the e2e spec** (`E2E_SHOT_DIR`), as help.spec.ts
+  does: the two-context flow is the only place a second phone's banner can
+  be seen, so the spec that proves it is also the one that photographs it.
+

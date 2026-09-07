@@ -15,7 +15,9 @@ import type {
 } from "@pjokk/shared";
 import { useNavigate } from "@tanstack/react-router";
 import {
+  ActiveFeedBanner,
   ActivePlayBanner,
+  ActivePumpBanner,
   ActiveSleepBanner,
 } from "@/components/ActiveSessionBanner";
 import { Avatar } from "@/components/Avatar";
@@ -123,6 +125,9 @@ export function HomeScreen() {
   const [measurementType, setMeasurementType] =
     useState<MeasurementType>("weight");
   const [playType, setPlayType] = useState<PlayType>("tummy");
+  // The pump banner's Stop opens the pump sheet in "stop the timer" mode;
+  // the More picker opens it in the ordinary log mode.
+  const [pumpStop, setPumpStop] = useState(false);
   // The running session as it was when tapped. A snapshot rather than the
   // live summary value so a Wake from another device mid-edit cannot turn
   // the open edit sheet into a "start sleep" sheet under the user's thumb.
@@ -164,6 +169,8 @@ export function HomeScreen() {
   const s = summary.data;
   const active = s?.activeSleep ?? null;
   const activePlay = s?.activePlay ?? null;
+  const activeFeed = s?.activeFeed ?? null;
+  const activePump = s?.activePump ?? null;
   const openHelp = s?.openHelp ?? null;
   const tempStatus = temperatureStatus(
     s?.lastTemperature?.value ?? 0,
@@ -186,6 +193,7 @@ export function HomeScreen() {
         setSheet={setSheet}
         activeSleepId={active?.id ?? null}
         recentFeeds={feeds.data ?? []}
+        activeFeed={activeFeed}
         lastDiaper={s?.lastDiaper ?? null}
         openHelp={openHelp}
       />
@@ -226,6 +234,22 @@ export function HomeScreen() {
           />
         )}
         {activePlay && <ActivePlayBanner session={activePlay} />}
+        {activeFeed && (
+          <ActiveFeedBanner
+            timer={activeFeed}
+            onOpen={() => setSheet("feed")}
+          />
+        )}
+        {activePump && (
+          <ActivePumpBanner
+            timer={activePump}
+            onStop={() => {
+              setOtherKind("pump");
+              setPumpStop(true);
+              setSheet("other");
+            }}
+          />
+        )}
 
         {/* Status before action: last feed / last diaper at a glance */}
         <div className="grid grid-cols-1 gap-3">
@@ -345,6 +369,7 @@ export function HomeScreen() {
         onOpenChange={(o) => setSheet(o ? "feed" : null)}
         babyId={baby.id}
         recentFeeds={feeds.data ?? []}
+        activeFeed={activeFeed}
       />
       <DiaperSheet
         open={sheet === "diaper"}
@@ -366,6 +391,7 @@ export function HomeScreen() {
         onOpenChange={(o) => setSheet(o ? "more" : null)}
         onPick={(kind) => {
           setOtherKind(kind);
+          setPumpStop(false);
           // Reset: the temperature card sets this, and without clearing it
           // here the More picker would keep opening on temperature ever after.
           setMeasurementType("weight");
@@ -383,6 +409,8 @@ export function HomeScreen() {
         babyId={baby.id}
         kind={otherKind}
         initialMeasurementType={measurementType}
+        activePump={activePump}
+        stopTimer={pumpStop}
       />
       <PlaySheet
         open={sheet === "play"}
@@ -413,6 +441,7 @@ function NightHome({
   setSheet,
   activeSleepId,
   recentFeeds,
+  activeFeed,
   lastDiaper,
   openHelp,
 }: {
@@ -421,6 +450,7 @@ function NightHome({
   setSheet: (s: OpenSheet) => void;
   activeSleepId: string | null;
   recentFeeds: Parameters<typeof FeedSheet>[0]["recentFeeds"];
+  activeFeed: Parameters<typeof FeedSheet>[0]["activeFeed"];
   lastDiaper: Parameters<typeof DiaperSheet>[0]["lastDiaper"];
   openHelp: HelpRequest | null;
 }) {
@@ -462,6 +492,7 @@ function NightHome({
         onOpenChange={(o) => setSheet(o ? "feed" : null)}
         babyId={babyId}
         recentFeeds={recentFeeds}
+        activeFeed={activeFeed}
       />
       <DiaperSheet
         open={sheet === "diaper"}
