@@ -19,6 +19,7 @@ import (
 
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
 	"github.com/refsdal/pjokk/server/internal/push"
+	"github.com/refsdal/pjokk/server/internal/recur"
 )
 
 // osloLocation is loaded once at package init. time/tzdata guarantees this
@@ -78,6 +79,34 @@ func RunCalendarReminders(ctx context.Context, d Deps, now time.Time) (int, erro
 
 	sent := 0
 	for _, event := range due {
+		// Which occurrence is this reminder for? A one-off's own start; for
+		// a series (issue #52) the next occurrence at or after the grace
+		// floor, due once its lead has elapsed and not yet latched —
+		// reminded_at holds the START of the last reminded occurrence, so
+		// "reminded_at < occurrence" is the per-occurrence latch, and an
+		// edit's re-arm (NULL) still means "not yet".
+		occurrence := event.StartTime.Time
+		if event.Recurrence != string(recur.None) {
+			var until *time.Time
+			if event.RecurrenceUntil.Valid {
+				u := event.RecurrenceUntil.Time
+				until = &u
+			}
+			series := recur.Series{Start: event.StartTime.Time, Rule: recur.Rule(event.Recurrence), Until: until}
+			next, ok := series.NextOnOrAfter(now.Add(-time.Hour))
+			if !ok {
+				continue
+			}
+			lead := time.Duration(*event.RemindMinutesBefore) * time.Minute
+			if next.Add(-lead).After(now) {
+				continue
+			}
+			if event.RemindedAt.Valid && !event.RemindedAt.Time.Before(next) {
+				continue
+			}
+			occurrence = next
+		}
+
 		assignees, err := d.Q.CalendarEventAssigneeUserIDs(ctx, event.ID)
 		if err != nil {
 			return sent, fmt.Errorf("jobs: assignees for event %s: %w", event.ID, err)
@@ -93,7 +122,7 @@ func RunCalendarReminders(ctx context.Context, d Deps, now time.Time) (int, erro
 
 		body := event.Title
 		if !event.AllDay {
-			body = fmt.Sprintf("%s · %s", event.Title, FormatOsloClock(event.StartTime.Time))
+			body = fmt.Sprintf("%s · %s", event.Title, FormatOsloClock(occurrence))
 		}
 
 		for _, userID := range targets {
@@ -109,9 +138,15 @@ func RunCalendarReminders(ctx context.Context, d Deps, now time.Time) (int, erro
 		}
 
 		// Latch even when every delivery failed — retrying each cron tick
-		// would hammer dead subscriptions for no benefit.
+		// would hammer dead subscriptions for no benefit. The latch value
+		// is the occurrence's start (never earlier than now for a one-off's
+		// purposes, and exactly what the series comparison above reads).
+		latch := nowTS
+		if event.Recurrence != string(recur.None) {
+			latch = pgtype.Timestamptz{Time: occurrence, Valid: true}
+		}
 		if err := d.Q.MarkCalendarEventReminded(ctx, dbgen.MarkCalendarEventRemindedParams{
-			RemindedAt: nowTS,
+			RemindedAt: latch,
 			ID:         event.ID,
 		}); err != nil {
 			return sent, fmt.Errorf("jobs: latch calendar event %s: %w", event.ID, err)

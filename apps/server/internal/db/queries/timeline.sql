@@ -15,6 +15,13 @@
 -- OR is true, and the row-comparison clause never runs — i.e. no extra
 -- filtering, exactly the brief's "no cursor: no row-comparison clause".
 --
+-- ?q (issue #52) is a case-insensitive substring match — an ILIKE against
+-- the free-text columns each kind has (notes everywhere; plus the medicine
+-- and vaccine name, the milestone title, the note body, the solids food,
+-- the sleep location). internal/api/timeline.go escapes % and _ in the
+-- term (backslash is ILIKE's default escape) and wraps it in %…% before
+-- it gets here; NULL means "no search".
+--
 -- Sleep and play sort by start_time (see sleep.sql's ActiveSleep /
 -- play.sql's ActivePlay for why — both are session tables where the natural
 -- timeline position is when the session STARTED, not the row's other
@@ -33,6 +40,7 @@ WHERE f."family_id" = sqlc.arg(family_id)
     sqlc.narg(cursor_time)::timestamptz IS NULL
     OR (f."time", f."id") < (sqlc.narg(cursor_time)::timestamptz, sqlc.narg(cursor_id)::text)
   )
+  AND (sqlc.narg(q)::text IS NULL OR f."notes" ILIKE sqlc.narg(q)::text OR f."food" ILIKE sqlc.narg(q)::text)
 ORDER BY f."time" DESC, f."id" DESC
 LIMIT sqlc.arg(lim);
 
@@ -48,6 +56,7 @@ WHERE d."family_id" = sqlc.arg(family_id)
     sqlc.narg(cursor_time)::timestamptz IS NULL
     OR (d."time", d."id") < (sqlc.narg(cursor_time)::timestamptz, sqlc.narg(cursor_id)::text)
   )
+  AND (sqlc.narg(q)::text IS NULL OR d."notes" ILIKE sqlc.narg(q)::text)
 ORDER BY d."time" DESC, d."id" DESC
 LIMIT sqlc.arg(lim);
 
@@ -63,6 +72,7 @@ WHERE s."family_id" = sqlc.arg(family_id)
     sqlc.narg(cursor_time)::timestamptz IS NULL
     OR (s."start_time", s."id") < (sqlc.narg(cursor_time)::timestamptz, sqlc.narg(cursor_id)::text)
   )
+  AND (sqlc.narg(q)::text IS NULL OR s."notes" ILIKE sqlc.narg(q)::text OR s."location" ILIKE sqlc.narg(q)::text)
 ORDER BY s."start_time" DESC, s."id" DESC
 LIMIT sqlc.arg(lim);
 
@@ -78,6 +88,7 @@ WHERE m."family_id" = sqlc.arg(family_id)
     sqlc.narg(cursor_time)::timestamptz IS NULL
     OR (m."time", m."id") < (sqlc.narg(cursor_time)::timestamptz, sqlc.narg(cursor_id)::text)
   )
+  AND (sqlc.narg(q)::text IS NULL OR m."name" ILIKE sqlc.narg(q)::text OR m."notes" ILIKE sqlc.narg(q)::text)
 ORDER BY m."time" DESC, m."id" DESC
 LIMIT sqlc.arg(lim);
 
@@ -93,6 +104,7 @@ WHERE b."family_id" = sqlc.arg(family_id)
     sqlc.narg(cursor_time)::timestamptz IS NULL
     OR (b."time", b."id") < (sqlc.narg(cursor_time)::timestamptz, sqlc.narg(cursor_id)::text)
   )
+  AND (sqlc.narg(q)::text IS NULL OR b."notes" ILIKE sqlc.narg(q)::text)
 ORDER BY b."time" DESC, b."id" DESC
 LIMIT sqlc.arg(lim);
 
@@ -108,6 +120,7 @@ WHERE n."family_id" = sqlc.arg(family_id)
     sqlc.narg(cursor_time)::timestamptz IS NULL
     OR (n."time", n."id") < (sqlc.narg(cursor_time)::timestamptz, sqlc.narg(cursor_id)::text)
   )
+  AND (sqlc.narg(q)::text IS NULL OR n."content" ILIKE sqlc.narg(q)::text OR n."notes" ILIKE sqlc.narg(q)::text)
 ORDER BY n."time" DESC, n."id" DESC
 LIMIT sqlc.arg(lim);
 
@@ -123,6 +136,7 @@ WHERE m."family_id" = sqlc.arg(family_id)
     sqlc.narg(cursor_time)::timestamptz IS NULL
     OR (m."time", m."id") < (sqlc.narg(cursor_time)::timestamptz, sqlc.narg(cursor_id)::text)
   )
+  AND (sqlc.narg(q)::text IS NULL OR m."title" ILIKE sqlc.narg(q)::text OR m."notes" ILIKE sqlc.narg(q)::text)
 ORDER BY m."time" DESC, m."id" DESC
 LIMIT sqlc.arg(lim);
 
@@ -138,6 +152,7 @@ WHERE m."family_id" = sqlc.arg(family_id)
     sqlc.narg(cursor_time)::timestamptz IS NULL
     OR (m."time", m."id") < (sqlc.narg(cursor_time)::timestamptz, sqlc.narg(cursor_id)::text)
   )
+  AND (sqlc.narg(q)::text IS NULL OR m."notes" ILIKE sqlc.narg(q)::text)
 ORDER BY m."time" DESC, m."id" DESC
 LIMIT sqlc.arg(lim);
 
@@ -153,6 +168,7 @@ WHERE p."family_id" = sqlc.arg(family_id)
     sqlc.narg(cursor_time)::timestamptz IS NULL
     OR (p."time", p."id") < (sqlc.narg(cursor_time)::timestamptz, sqlc.narg(cursor_id)::text)
   )
+  AND (sqlc.narg(q)::text IS NULL OR p."notes" ILIKE sqlc.narg(q)::text)
 ORDER BY p."time" DESC, p."id" DESC
 LIMIT sqlc.arg(lim);
 
@@ -168,6 +184,7 @@ WHERE p."family_id" = sqlc.arg(family_id)
     sqlc.narg(cursor_time)::timestamptz IS NULL
     OR (p."start_time", p."id") < (sqlc.narg(cursor_time)::timestamptz, sqlc.narg(cursor_id)::text)
   )
+  AND (sqlc.narg(q)::text IS NULL OR p."notes" ILIKE sqlc.narg(q)::text)
 ORDER BY p."start_time" DESC, p."id" DESC
 LIMIT sqlc.arg(lim);
 
@@ -183,5 +200,6 @@ WHERE v."family_id" = sqlc.arg(family_id)
     sqlc.narg(cursor_time)::timestamptz IS NULL
     OR (v."time", v."id") < (sqlc.narg(cursor_time)::timestamptz, sqlc.narg(cursor_id)::text)
   )
+  AND (sqlc.narg(q)::text IS NULL OR v."name" ILIKE sqlc.narg(q)::text OR v."notes" ILIKE sqlc.narg(q)::text)
 ORDER BY v."time" DESC, v."id" DESC
 LIMIT sqlc.arg(lim);

@@ -8,10 +8,11 @@ import {
   IconDiaper,
   IconMoon,
   IconNote,
+  IconSearch,
   IconVaccine,
   type Icon as TablerIcon,
 } from "@tabler/icons-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { TimelineEntry, TimelineFilter } from "@pjokk/shared";
 import { DiaperSheet } from "@/components/sheets/DiaperSheet";
 import { FeedSheet } from "@/components/sheets/FeedSheet";
@@ -25,6 +26,7 @@ import { SleepSheet } from "@/components/sheets/SleepSheet";
 import { VaccineSheet } from "@/components/sheets/VaccineSheet";
 import { Avatar } from "@/components/Avatar";
 import { ChipGroup } from "@/components/Chips";
+import { Input } from "@/components/ui/input";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { Button } from "@/components/ui/button";
 import { BabySwitcher } from "@/components/BabySwitcher";
@@ -269,7 +271,18 @@ function Row({
 export function TimelineScreen() {
   const { baby } = useSelectedBaby();
   const [filter, setFilter] = useState<TimelineFilter | null>(null);
-  const timeline = useTimeline(baby?.id, filter);
+  // Search (issue #52): the field shows on demand so the default screen
+  // stays dense; the term is debounced so a query is not fired per key.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [q, setQ] = useState("");
+  useEffect(() => {
+    const term = search.trim();
+    if (term === q) return;
+    const id = setTimeout(() => setQ(term), 300);
+    return () => clearTimeout(id);
+  }, [search, q]);
+  const timeline = useTimeline(baby?.id, filter, q);
   const feeds = useFeeds(baby?.id);
   const avatars = useMemberAvatars();
   const [editEntry, setEditEntry] = useState<TimelineEntry | null>(null);
@@ -299,10 +312,41 @@ export function TimelineScreen() {
 
   return (
     <div className="mx-auto max-w-md px-4 pt-safe">
-      <div className="flex items-center justify-between py-4">
+      <div className="flex items-center justify-between gap-2 py-4">
         <h1 className="text-2xl font-extrabold text-ink">{t("Timeline")}</h1>
-        <BabySwitcher compact />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label={t("Search")}
+            aria-pressed={searchOpen}
+            onClick={() => {
+              if (searchOpen) {
+                setSearch("");
+                setQ("");
+              }
+              setSearchOpen((o) => !o);
+            }}
+            className={cn(
+              "flex h-11 w-11 items-center justify-center rounded-full border border-line bg-surface text-ink-soft active:bg-surface-2",
+              searchOpen && "border-accent text-accent",
+            )}
+          >
+            <IconSearch className="h-5 w-5" />
+          </button>
+          <BabySwitcher compact />
+        </div>
       </div>
+      {searchOpen && (
+        <Input
+          // biome-ignore lint/a11y/noAutofocus: the field appears on the user's own tap.
+          autoFocus
+          type="search"
+          placeholder={t("Search notes, medicines, milestones…")}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="mb-3"
+        />
+      )}
 
       <ChipGroup
         className="flex-nowrap overflow-x-auto pb-3"
@@ -324,7 +368,9 @@ export function TimelineScreen() {
         )}
         {timeline.isSuccess && entries.length === 0 && (
           <p className="py-16 text-center text-sm text-muted">
-            {t("Nothing here yet — log something from Home.")}
+            {q
+              ? t("No entries match your search.")
+              : t("Nothing here yet — log something from Home.")}
           </p>
         )}
 

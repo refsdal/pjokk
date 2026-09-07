@@ -657,6 +657,8 @@ func skipSpecValidation(r *http.Request) bool {
 		return true
 	case r.URL.Path == "/api/export.csv":
 		return true
+	case r.URL.Path == "/api/calendar.ics":
+		return true
 	case vaccineDocumentsPattern.MatchString(r.URL.Path):
 		return true
 	case r.URL.Path == "/api/me/avatar":
@@ -804,6 +806,7 @@ func NewHandler(d Deps) http.Handler {
 	// identical familyChain (no admin check, no plan gate, API keys
 	// allowed), matching apps/api/src/app.ts's exportApp mount.
 	d.mountExportRoutes(mux, familyChain(d))
+	d.mountICSRoutes(mux, familyChain(d))
 
 	if d.ExtraRoutes != nil {
 		mwDeps := middleware.Deps{Auth: d.Auth, Q: d.Q, RateLimit: d.RateLimit, Now: d.Now}

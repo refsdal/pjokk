@@ -7,9 +7,11 @@ import { client, unwrap } from "../api";
 export function useTimeline(
   babyId: string | undefined,
   filter: TimelineFilter | null,
+  // A search term (issue #52); "" is the plain feed.
+  q = "",
 ) {
   return useInfiniteQuery({
-    queryKey: ["timeline", babyId, filter ?? "all"],
+    queryKey: ["timeline", babyId, filter ?? "all", q],
     enabled: !!babyId,
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) =>
@@ -21,6 +23,7 @@ export function useTimeline(
               limit: 50,
               ...(pageParam ? { before: pageParam } : {}),
               ...(filter ? { filter } : {}),
+              ...(q ? { q } : {}),
             },
           },
         }),

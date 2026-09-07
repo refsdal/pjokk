@@ -1,5 +1,9 @@
 import { useState } from "react";
-import type { CalendarCategory, CalendarEvent } from "@pjokk/shared";
+import type {
+  CalendarCategory,
+  CalendarEvent,
+  CalendarRecurrence,
+} from "@pjokk/shared";
 import { Avatar } from "@/components/Avatar";
 import { ChipGroup, MultiChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
@@ -63,12 +67,20 @@ export function EventSheet({
   const [babyIds, setBabyIds] = useState<string[]>([]);
   const [assignees, setAssignees] = useState<string[]>([]);
   const [reminder, setReminder] = useState<ReminderChoice>("off");
+  // Recurrence (issue #52). Editing any occurrence edits the SERIES, so
+  // the date shown is the series start, never the tapped occurrence.
+  const [recurrence, setRecurrence] = useState<CalendarRecurrence>("none");
+  const [until, setUntil] = useState("");
   const [wasOpen, setWasOpen] = useState(false);
 
   if (open && !wasOpen) {
     setWasOpen(true);
     if (edit) {
-      const start = new Date(edit.startTime);
+      const start = new Date(edit.seriesStart);
+      setRecurrence(edit.recurrence);
+      setUntil(
+        edit.recurrenceUntil ? toDateInput(new Date(edit.recurrenceUntil)) : "",
+      );
       setTitle(edit.title);
       setCategory(edit.category);
       setAllDay(edit.allDay);
@@ -102,6 +114,8 @@ export function EventSheet({
       setBabyIds((babies.data ?? []).length === 1 ? [babies.data![0]!.id] : []);
       setAssignees([]);
       setReminder("off");
+      setRecurrence("none");
+      setUntil("");
     }
   }
   if (!open && wasOpen) setWasOpen(false);
@@ -125,8 +139,16 @@ export function EventSheet({
     const soleBaby =
       (babies.data ?? []).length === 1 ? [babies.data![0]!.id] : null;
     const effectiveBabyIds = !edit && soleBaby ? soleBaby : babyIds;
+    // "Until" is a day: the last occurrence may start any time that day.
+    const untilIso = (() => {
+      if (recurrence === "none" || !until) return undefined;
+      const [uy, um, ud] = until.split("-").map(Number);
+      return new Date(uy!, um! - 1, ud!, 23, 59, 59, 0).toISOString();
+    })();
     const payload = {
       title: title.trim(),
+      recurrence,
+      recurrenceUntil: untilIso,
       description: description.trim() || undefined,
       location: location.trim() || undefined,
       category,
@@ -146,6 +168,7 @@ export function EventSheet({
           location: payload.location ?? null,
           durationMin: payload.durationMin ?? null,
           remindMinutesBefore: payload.remindMinutesBefore ?? null,
+          recurrenceUntil: payload.recurrenceUntil ?? null,
         },
       });
     } else {
@@ -285,6 +308,41 @@ export function EventSheet({
             value={reminder}
             onChange={setReminder}
           />
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs font-semibold tracking-wide text-muted uppercase">
+            {t("Repeat")}
+          </p>
+          <ChipGroup
+            options={[
+              { value: "none", label: t("Never") },
+              { value: "daily", label: t("Daily") },
+              { value: "weekly", label: t("Weekly") },
+              { value: "biweekly", label: t("Every 2 weeks") },
+              { value: "monthly", label: t("Monthly") },
+              { value: "yearly", label: t("Yearly") },
+            ]}
+            value={recurrence}
+            onChange={setRecurrence}
+          />
+          {recurrence !== "none" && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted">{t("Until")}</span>
+              <input
+                type="date"
+                aria-label={t("Until")}
+                value={until}
+                min={date}
+                onChange={(e) => setUntil(e.target.value)}
+                className="h-12 w-full rounded-xl2 border border-line bg-surface px-4 text-base text-ink"
+              />
+            </div>
+          )}
+          {edit && edit.recurrence !== "none" && (
+            <p className="text-xs text-muted">
+              {t("Changes apply to every occurrence in the series.")}
+            </p>
+          )}
         </div>
         <Input
           placeholder={t("Location (optional)")}

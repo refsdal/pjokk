@@ -792,6 +792,18 @@ export const calendarCategories = [
   "other",
 ] as const;
 
+// Recurrence (issue #52): a series is one row; the API returns one entry
+// per occurrence in the window, all sharing the id, with startTime the
+// occurrence and seriesStart the stored start.
+export const calendarRecurrences = [
+  "none",
+  "daily",
+  "weekly",
+  "biweekly",
+  "monthly",
+  "yearly",
+] as const;
+
 export const CalendarEventSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -799,6 +811,9 @@ export const CalendarEventSchema = z.object({
   location: z.string().nullable(),
   category: z.enum(calendarCategories),
   startTime: isoTime(),
+  recurrence: z.enum(calendarRecurrences),
+  recurrenceUntil: isoTime().nullable(),
+  seriesStart: isoTime(),
   allDay: z.boolean(),
   durationMin: z.number().int().nullable(),
   remindMinutesBefore: z.number().int().nullable(),
@@ -821,6 +836,8 @@ export const CreateCalendarEventSchema = z.object({
   remindMinutesBefore: z.number().int().min(15).max(10080).optional(),
   babyIds: z.array(z.string()).max(10).default([]),
   assigneeUserIds: z.array(z.string()).max(20).default([]),
+  recurrence: z.enum(calendarRecurrences).optional(),
+  recurrenceUntil: isoTime().optional(),
 });
 
 export const UpdateCalendarEventSchema = z.object({
@@ -838,6 +855,8 @@ export const UpdateCalendarEventSchema = z.object({
     .max(10080)
     .nullable()
     .optional(),
+  recurrence: z.enum(calendarRecurrences).optional(),
+  recurrenceUntil: isoTime().nullable().optional(),
   // Present = replace the link set; omitted = untouched.
   babyIds: z.array(z.string()).max(10).optional(),
   assigneeUserIds: z.array(z.string()).max(20).optional(),
@@ -893,6 +912,7 @@ export type CalendarEvent = z.infer<typeof CalendarEventSchema>;
 export type CreateCalendarEvent = z.infer<typeof CreateCalendarEventSchema>;
 export type UpdateCalendarEvent = z.infer<typeof UpdateCalendarEventSchema>;
 export type CalendarCategory = (typeof calendarCategories)[number];
+export type CalendarRecurrence = (typeof calendarRecurrences)[number];
 export type Contact = z.infer<typeof ContactSchema>;
 export type CreateContact = z.infer<typeof CreateContactSchema>;
 export type UpdateContact = z.infer<typeof UpdateContactSchema>;

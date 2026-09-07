@@ -15,6 +15,7 @@
 UPDATE "calendar_event"
 SET "reminded_at" = $1
 WHERE "remind_minutes_before" IS NOT NULL
+  AND "recurrence" = 'none'
   AND "reminded_at" IS NULL
   AND "start_time" < $2;
 
@@ -24,12 +25,23 @@ WHERE "remind_minutes_before" IS NOT NULL
 -- be "long past"), $2 = now (twice: once for the plain floor comparison,
 -- once inside the interval arithmetic — timestamptz minus an integer is
 -- not a Postgres operator, so the lead time has to be a real interval).
-SELECT "id", "family_id", "title", "start_time", "all_day"
+--
+-- A SERIES (recurrence <> 'none') is a candidate whenever it has not ended
+-- before the floor; which occurrence is due, and whether it was already
+-- reminded (reminded_at holds the START of the last reminded occurrence),
+-- is decided in Go — internal/recur does the stepping, SQL cannot.
+SELECT "id", "family_id", "title", "start_time", "all_day",
+       "remind_minutes_before", "reminded_at", "recurrence", "recurrence_until"
 FROM "calendar_event"
 WHERE "remind_minutes_before" IS NOT NULL
-  AND "reminded_at" IS NULL
-  AND "start_time" >= $1
-  AND "start_time" - ("remind_minutes_before" * interval '1 minute') <= $2
+  AND (
+    ("recurrence" = 'none'
+      AND "reminded_at" IS NULL
+      AND "start_time" >= $1
+      AND "start_time" - ("remind_minutes_before" * interval '1 minute') <= $2)
+    OR ("recurrence" <> 'none'
+      AND ("recurrence_until" IS NULL OR "recurrence_until" >= $1))
+  )
 ORDER BY "start_time" ASC;
 
 -- name: CalendarEventAssigneeUserIDs :many

@@ -11,6 +11,7 @@ import { legalUrl } from "@/lib/site";
 import { ApiKeysSection } from "./ApiKeysSection";
 import { AppearanceSection } from "./AppearanceSection";
 import { BabiesSection } from "./BabiesSection";
+import { CalendarFeedCard } from "./CalendarFeedCard";
 import { ContactsSection } from "./ContactsSection";
 import { FamilySection } from "./FamilySection";
 import { InstallSection } from "./InstallSection";
@@ -78,6 +79,9 @@ export function SettingsScreen() {
           </Button>
           <PhotoUsageLine />
         </Card>
+
+        <SectionTitle>{t("Calendar subscription")}</SectionTitle>
+        <CalendarFeedCard />
 
         <SectionTitle>{t("About")}</SectionTitle>
         <Card className="divide-y divide-line p-0">

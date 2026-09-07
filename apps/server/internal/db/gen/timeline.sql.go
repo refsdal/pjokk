@@ -23,8 +23,9 @@ WHERE b."family_id" = $1
     $3::timestamptz IS NULL
     OR (b."time", b."id") < ($3::timestamptz, $4::text)
   )
+  AND ($5::text IS NULL OR b."notes" ILIKE $5::text)
 ORDER BY b."time" DESC, b."id" DESC
-LIMIT $5
+LIMIT $6
 `
 
 type ListBathsPageParams struct {
@@ -32,6 +33,7 @@ type ListBathsPageParams struct {
 	BabyID     string
 	CursorTime pgtype.Timestamptz
 	CursorID   *string
+	Q          *string
 	Lim        int32
 }
 
@@ -50,6 +52,7 @@ func (q *Queries) ListBathsPage(ctx context.Context, arg ListBathsPageParams) ([
 		arg.BabyID,
 		arg.CursorTime,
 		arg.CursorID,
+		arg.Q,
 		arg.Lim,
 	)
 	if err != nil {
@@ -89,8 +92,9 @@ WHERE d."family_id" = $1
     $3::timestamptz IS NULL
     OR (d."time", d."id") < ($3::timestamptz, $4::text)
   )
+  AND ($5::text IS NULL OR d."notes" ILIKE $5::text)
 ORDER BY d."time" DESC, d."id" DESC
-LIMIT $5
+LIMIT $6
 `
 
 type ListDiapersPageParams struct {
@@ -98,6 +102,7 @@ type ListDiapersPageParams struct {
 	BabyID     string
 	CursorTime pgtype.Timestamptz
 	CursorID   *string
+	Q          *string
 	Lim        int32
 }
 
@@ -119,6 +124,7 @@ func (q *Queries) ListDiapersPage(ctx context.Context, arg ListDiapersPageParams
 		arg.BabyID,
 		arg.CursorTime,
 		arg.CursorID,
+		arg.Q,
 		arg.Lim,
 	)
 	if err != nil {
@@ -163,8 +169,9 @@ WHERE f."family_id" = $1
     $3::timestamptz IS NULL
     OR (f."time", f."id") < ($3::timestamptz, $4::text)
   )
+  AND ($5::text IS NULL OR f."notes" ILIKE $5::text OR f."food" ILIKE $5::text)
 ORDER BY f."time" DESC, f."id" DESC
-LIMIT $5
+LIMIT $6
 `
 
 type ListFeedsPageParams struct {
@@ -172,6 +179,7 @@ type ListFeedsPageParams struct {
 	BabyID     string
 	CursorTime pgtype.Timestamptz
 	CursorID   *string
+	Q          *string
 	Lim        int32
 }
 
@@ -210,6 +218,13 @@ type ListFeedsPageRow struct {
 // OR is true, and the row-comparison clause never runs — i.e. no extra
 // filtering, exactly the brief's "no cursor: no row-comparison clause".
 //
+// ?q (issue #52) is a case-insensitive substring match — an ILIKE against
+// the free-text columns each kind has (notes everywhere; plus the medicine
+// and vaccine name, the milestone title, the note body, the solids food,
+// the sleep location). internal/api/timeline.go escapes % and _ in the
+// term (backslash is ILIKE's default escape) and wraps it in %…% before
+// it gets here; NULL means "no search".
+//
 // Sleep and play sort by start_time (see sleep.sql's ActiveSleep /
 // play.sql's ActivePlay for why — both are session tables where the natural
 // timeline position is when the session STARTED, not the row's other
@@ -220,6 +235,7 @@ func (q *Queries) ListFeedsPage(ctx context.Context, arg ListFeedsPageParams) ([
 		arg.BabyID,
 		arg.CursorTime,
 		arg.CursorID,
+		arg.Q,
 		arg.Lim,
 	)
 	if err != nil {
@@ -268,8 +284,9 @@ WHERE m."family_id" = $1
     $3::timestamptz IS NULL
     OR (m."time", m."id") < ($3::timestamptz, $4::text)
   )
+  AND ($5::text IS NULL OR m."notes" ILIKE $5::text)
 ORDER BY m."time" DESC, m."id" DESC
-LIMIT $5
+LIMIT $6
 `
 
 type ListMeasurementsPageParams struct {
@@ -277,6 +294,7 @@ type ListMeasurementsPageParams struct {
 	BabyID     string
 	CursorTime pgtype.Timestamptz
 	CursorID   *string
+	Q          *string
 	Lim        int32
 }
 
@@ -297,6 +315,7 @@ func (q *Queries) ListMeasurementsPage(ctx context.Context, arg ListMeasurements
 		arg.BabyID,
 		arg.CursorTime,
 		arg.CursorID,
+		arg.Q,
 		arg.Lim,
 	)
 	if err != nil {
@@ -338,8 +357,9 @@ WHERE m."family_id" = $1
     $3::timestamptz IS NULL
     OR (m."time", m."id") < ($3::timestamptz, $4::text)
   )
+  AND ($5::text IS NULL OR m."name" ILIKE $5::text OR m."notes" ILIKE $5::text)
 ORDER BY m."time" DESC, m."id" DESC
-LIMIT $5
+LIMIT $6
 `
 
 type ListMedicinePageParams struct {
@@ -347,6 +367,7 @@ type ListMedicinePageParams struct {
 	BabyID     string
 	CursorTime pgtype.Timestamptz
 	CursorID   *string
+	Q          *string
 	Lim        int32
 }
 
@@ -369,6 +390,7 @@ func (q *Queries) ListMedicinePage(ctx context.Context, arg ListMedicinePagePara
 		arg.BabyID,
 		arg.CursorTime,
 		arg.CursorID,
+		arg.Q,
 		arg.Lim,
 	)
 	if err != nil {
@@ -412,8 +434,9 @@ WHERE m."family_id" = $1
     $3::timestamptz IS NULL
     OR (m."time", m."id") < ($3::timestamptz, $4::text)
   )
+  AND ($5::text IS NULL OR m."title" ILIKE $5::text OR m."notes" ILIKE $5::text)
 ORDER BY m."time" DESC, m."id" DESC
-LIMIT $5
+LIMIT $6
 `
 
 type ListMilestonesPageParams struct {
@@ -421,6 +444,7 @@ type ListMilestonesPageParams struct {
 	BabyID     string
 	CursorTime pgtype.Timestamptz
 	CursorID   *string
+	Q          *string
 	Lim        int32
 }
 
@@ -440,6 +464,7 @@ func (q *Queries) ListMilestonesPage(ctx context.Context, arg ListMilestonesPage
 		arg.BabyID,
 		arg.CursorTime,
 		arg.CursorID,
+		arg.Q,
 		arg.Lim,
 	)
 	if err != nil {
@@ -480,8 +505,9 @@ WHERE n."family_id" = $1
     $3::timestamptz IS NULL
     OR (n."time", n."id") < ($3::timestamptz, $4::text)
   )
+  AND ($5::text IS NULL OR n."content" ILIKE $5::text OR n."notes" ILIKE $5::text)
 ORDER BY n."time" DESC, n."id" DESC
-LIMIT $5
+LIMIT $6
 `
 
 type ListNotesPageParams struct {
@@ -489,6 +515,7 @@ type ListNotesPageParams struct {
 	BabyID     string
 	CursorTime pgtype.Timestamptz
 	CursorID   *string
+	Q          *string
 	Lim        int32
 }
 
@@ -508,6 +535,7 @@ func (q *Queries) ListNotesPage(ctx context.Context, arg ListNotesPageParams) ([
 		arg.BabyID,
 		arg.CursorTime,
 		arg.CursorID,
+		arg.Q,
 		arg.Lim,
 	)
 	if err != nil {
@@ -548,8 +576,9 @@ WHERE p."family_id" = $1
     $3::timestamptz IS NULL
     OR (p."start_time", p."id") < ($3::timestamptz, $4::text)
   )
+  AND ($5::text IS NULL OR p."notes" ILIKE $5::text)
 ORDER BY p."start_time" DESC, p."id" DESC
-LIMIT $5
+LIMIT $6
 `
 
 type ListPlaysPageParams struct {
@@ -557,6 +586,7 @@ type ListPlaysPageParams struct {
 	BabyID     string
 	CursorTime pgtype.Timestamptz
 	CursorID   *string
+	Q          *string
 	Lim        int32
 }
 
@@ -577,6 +607,7 @@ func (q *Queries) ListPlaysPage(ctx context.Context, arg ListPlaysPageParams) ([
 		arg.BabyID,
 		arg.CursorTime,
 		arg.CursorID,
+		arg.Q,
 		arg.Lim,
 	)
 	if err != nil {
@@ -618,8 +649,9 @@ WHERE p."family_id" = $1
     $3::timestamptz IS NULL
     OR (p."time", p."id") < ($3::timestamptz, $4::text)
   )
+  AND ($5::text IS NULL OR p."notes" ILIKE $5::text)
 ORDER BY p."time" DESC, p."id" DESC
-LIMIT $5
+LIMIT $6
 `
 
 type ListPumpsPageParams struct {
@@ -627,6 +659,7 @@ type ListPumpsPageParams struct {
 	BabyID     string
 	CursorTime pgtype.Timestamptz
 	CursorID   *string
+	Q          *string
 	Lim        int32
 }
 
@@ -648,6 +681,7 @@ func (q *Queries) ListPumpsPage(ctx context.Context, arg ListPumpsPageParams) ([
 		arg.BabyID,
 		arg.CursorTime,
 		arg.CursorID,
+		arg.Q,
 		arg.Lim,
 	)
 	if err != nil {
@@ -690,8 +724,9 @@ WHERE s."family_id" = $1
     $3::timestamptz IS NULL
     OR (s."start_time", s."id") < ($3::timestamptz, $4::text)
   )
+  AND ($5::text IS NULL OR s."notes" ILIKE $5::text OR s."location" ILIKE $5::text)
 ORDER BY s."start_time" DESC, s."id" DESC
-LIMIT $5
+LIMIT $6
 `
 
 type ListSleepsPageParams struct {
@@ -699,6 +734,7 @@ type ListSleepsPageParams struct {
 	BabyID     string
 	CursorTime pgtype.Timestamptz
 	CursorID   *string
+	Q          *string
 	Lim        int32
 }
 
@@ -720,6 +756,7 @@ func (q *Queries) ListSleepsPage(ctx context.Context, arg ListSleepsPageParams) 
 		arg.BabyID,
 		arg.CursorTime,
 		arg.CursorID,
+		arg.Q,
 		arg.Lim,
 	)
 	if err != nil {
@@ -762,8 +799,9 @@ WHERE v."family_id" = $1
     $3::timestamptz IS NULL
     OR (v."time", v."id") < ($3::timestamptz, $4::text)
   )
+  AND ($5::text IS NULL OR v."name" ILIKE $5::text OR v."notes" ILIKE $5::text)
 ORDER BY v."time" DESC, v."id" DESC
-LIMIT $5
+LIMIT $6
 `
 
 type ListVaccinesPageParams struct {
@@ -771,6 +809,7 @@ type ListVaccinesPageParams struct {
 	BabyID     string
 	CursorTime pgtype.Timestamptz
 	CursorID   *string
+	Q          *string
 	Lim        int32
 }
 
@@ -792,6 +831,7 @@ func (q *Queries) ListVaccinesPage(ctx context.Context, arg ListVaccinesPagePara
 		arg.BabyID,
 		arg.CursorTime,
 		arg.CursorID,
+		arg.Q,
 		arg.Lim,
 	)
 	if err != nil {

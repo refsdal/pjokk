@@ -294,7 +294,10 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   cards), per-category icon + tint, sleep rows show spans + duration, "active"
   badge for running sessions, "by <name>" attribution, day-summary line
   ("6 feeds · 3 naps · 5 diapers"), filter chips (All/Feeds/Sleep/Diapers).
-  Tap row → edit sheet.
+  Tap row → edit sheet. A search button (#52) reveals a field; `?q=` on
+  `/api/timeline` is an ILIKE over each kind's free text (notes, medicine
+  and vaccine names, milestone titles, note bodies, food, sleep location),
+  combined with the filter chips.
 - **Stats:** deliberately minimal at first — avg sleep/day (split night /
   day since #50), avg intake/day with feeds by type, a **Longest stretch**
   row (last night's longest `night` session, its wakings, and a Δ against
@@ -307,7 +310,19 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   each cited in the file; no API).
 - **Settings:** iOS-style grouped rows. Family (Babies, Caretakers, Invite
   link w/ QR), Preferences (Notifications, Units, Night mode schedule), Data
-  (Export CSV, API access).
+  (Export CSV, API access, and a **Calendar subscription** link — #52 —
+  which mints a read-only `pjk_` key into `/api/calendar.ics?key=…`; the
+  route lifts the query key into the Authorization header and then runs
+  the ordinary key middleware, so the URL is a credential like any key).
+- **Calendar recurrence (#52):** `calendar_event.recurrence`
+  (none|daily|weekly|biweekly|monthly|yearly) + `recurrence_until`. A
+  series is ONE row; `internal/recur` expands it at read time (stepping on
+  the Europe/Oslo calendar so a daily 08:00 stays 08:00 across DST,
+  clamping the day for monthly/yearly), the list returns one entry per
+  occurrence sharing the id with `seriesStart`, the reminder job reminds
+  per occurrence (`reminded_at` = the occurrence start for a series), and
+  the ICS feed emits an RRULE instead of expanding. Editing an occurrence
+  edits the series; no per-occurrence exceptions in v1.
 - **Profile (`/profile`):** the person, not the family — full name,
   nickname (shown instead of the name everywhere, via the users
   `display_name` generated column), phone (private), photo. Reached from the

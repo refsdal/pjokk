@@ -57,6 +57,7 @@ const latchStaleCalendarReminders = `-- name: LatchStaleCalendarReminders :execr
 UPDATE "calendar_event"
 SET "reminded_at" = $1
 WHERE "remind_minutes_before" IS NOT NULL
+  AND "recurrence" = 'none'
   AND "reminded_at" IS NULL
   AND "start_time" < $2
 `
@@ -86,12 +87,18 @@ func (q *Queries) LatchStaleCalendarReminders(ctx context.Context, arg LatchStal
 }
 
 const listDueCalendarReminders = `-- name: ListDueCalendarReminders :many
-SELECT "id", "family_id", "title", "start_time", "all_day"
+SELECT "id", "family_id", "title", "start_time", "all_day",
+       "remind_minutes_before", "reminded_at", "recurrence", "recurrence_until"
 FROM "calendar_event"
 WHERE "remind_minutes_before" IS NOT NULL
-  AND "reminded_at" IS NULL
-  AND "start_time" >= $1
-  AND "start_time" - ("remind_minutes_before" * interval '1 minute') <= $2
+  AND (
+    ("recurrence" = 'none'
+      AND "reminded_at" IS NULL
+      AND "start_time" >= $1
+      AND "start_time" - ("remind_minutes_before" * interval '1 minute') <= $2)
+    OR ("recurrence" <> 'none'
+      AND ("recurrence_until" IS NULL OR "recurrence_until" >= $1))
+  )
 ORDER BY "start_time" ASC
 `
 
@@ -101,11 +108,15 @@ type ListDueCalendarRemindersParams struct {
 }
 
 type ListDueCalendarRemindersRow struct {
-	ID        string
-	FamilyID  string
-	Title     string
-	StartTime pgtype.Timestamptz
-	AllDay    bool
+	ID                  string
+	FamilyID            string
+	Title               string
+	StartTime           pgtype.Timestamptz
+	AllDay              bool
+	RemindMinutesBefore *int32
+	RemindedAt          pgtype.Timestamptz
+	Recurrence          string
+	RecurrenceUntil     pgtype.Timestamptz
 }
 
 // Pending events whose lead time has elapsed. $1 = now - 1h (the same
@@ -113,6 +124,11 @@ type ListDueCalendarRemindersRow struct {
 // be "long past"), $2 = now (twice: once for the plain floor comparison,
 // once inside the interval arithmetic — timestamptz minus an integer is
 // not a Postgres operator, so the lead time has to be a real interval).
+//
+// A SERIES (recurrence <> 'none') is a candidate whenever it has not ended
+// before the floor; which occurrence is due, and whether it was already
+// reminded (reminded_at holds the START of the last reminded occurrence),
+// is decided in Go — internal/recur does the stepping, SQL cannot.
 func (q *Queries) ListDueCalendarReminders(ctx context.Context, arg ListDueCalendarRemindersParams) ([]ListDueCalendarRemindersRow, error) {
 	rows, err := q.db.Query(ctx, listDueCalendarReminders, arg.StartTime, arg.StartTime_2)
 	if err != nil {
@@ -128,6 +144,10 @@ func (q *Queries) ListDueCalendarReminders(ctx context.Context, arg ListDueCalen
 			&i.Title,
 			&i.StartTime,
 			&i.AllDay,
+			&i.RemindMinutesBefore,
+			&i.RemindedAt,
+			&i.Recurrence,
+			&i.RecurrenceUntil,
 		); err != nil {
 			return nil, err
 		}

@@ -3,6 +3,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconPlus,
+  IconRepeat,
 } from "@tabler/icons-react";
 import type { CalendarEvent } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
@@ -69,6 +70,12 @@ function EventRow({
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold text-ink">
           {event.title}
+          {event.recurrence !== "none" && (
+            <IconRepeat
+              aria-label={t("Repeats")}
+              className="ml-1.5 inline h-3.5 w-3.5 text-muted"
+            />
+          )}
           {event.babies.length > 0 && (
             <span className="ml-1.5 font-medium text-muted">
               · {event.babies.map((b) => b.name).join(", ")}
@@ -254,7 +261,7 @@ export function CalendarScreen() {
                   <span className="flex h-1.5 gap-0.5">
                     {events.slice(0, 3).map((e) => (
                       <span
-                        key={e.id}
+                        key={`${e.id}-${e.startTime}`}
                         className="h-1.5 w-1.5 rounded-full"
                         style={{
                           background: calendarCategoryMeta[e.category].colorVar,
@@ -301,7 +308,8 @@ export function CalendarScreen() {
             )}
             {group.events.map((event) => (
               <EventRow
-                key={event.id}
+                // A series shares one id across its occurrences.
+                key={`${event.id}-${event.startTime}`}
                 event={event}
                 onTap={(e) => setSheet({ open: true, edit: e })}
               />
