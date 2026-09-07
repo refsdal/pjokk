@@ -970,6 +970,106 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/medicines:
+    get:
+      operationId: listMedicineCatalogue
+      summary: >-
+        The family's medicine catalogue (issue #49): name, usual dose and
+        the family's own minimum interval. `lastDoseAt` is the newest dose
+        linked to each entry — for the baby in `babyId` when given, else
+        for the family — so the log sheet can say "next dose OK from" with
+        no second query. Archived entries sort last.
+      tags: [medicine]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+      responses:
+        "200":
+          description: Catalogue entries.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MedicineCatalogueEntry"
+    post:
+      operationId: createMedicineCatalogueEntry
+      summary: Add a medicine to the family's catalogue.
+      tags: [medicine]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMedicineCatalogueEntry"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicineCatalogueEntry"
+        "400":
+          description: Blank name.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/medicines/{id}:
+    patch:
+      operationId: updateMedicineCatalogueEntry
+      summary: >-
+        Partial update. `defaultAmount`, `unit` and `minIntervalMin` may be
+        sent as `null` to clear; `archived: true` hides the entry from the
+        log sheet's chips and keeps it for old doses.
+      tags: [medicine]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMedicineCatalogueEntry"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicineCatalogueEntry"
+        "400":
+          description: Blank name.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such entry in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteMedicineCatalogueEntry
+      summary: >-
+        Remove an entry. Doses that pointed at it keep their name and lose
+        the link.
+      tags: [medicine]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No such entry in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/baths:
     get:
       operationId: listBaths
@@ -4167,6 +4267,85 @@ components:
                 Sleep sessions with any part inside today's window, on the
                 same rule sleepMin uses for minutes — an overnight sleep that
                 ended this morning counts, a running one counts already.
+    MedicineCatalogueEntry:
+      type: object
+      required: [id, name, defaultAmount, unit, minIntervalMin, isSupplement, archived, lastDoseAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        defaultAmount:
+          type: number
+          format: double
+          nullable: true
+        unit:
+          type: string
+          enum: [ml, mg, drops, dose]
+          nullable: true
+        minIntervalMin:
+          type: integer
+          format: int32
+          nullable: true
+          description: The family's own "at most every N minutes"; never shipped by the app.
+        isSupplement:
+          type: boolean
+        archived:
+          type: boolean
+        lastDoseAt:
+          type: string
+          format: date-time
+          nullable: true
+    CreateMedicineCatalogueEntry:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        defaultAmount:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1000
+        unit:
+          type: string
+          enum: [ml, mg, drops, dose]
+        minIntervalMin:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 10080
+        isSupplement:
+          type: boolean
+    UpdateMedicineCatalogueEntry:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        defaultAmount:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1000
+          nullable: true
+        unit:
+          type: string
+          enum: [ml, mg, drops, dose]
+          nullable: true
+        minIntervalMin:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 10080
+          nullable: true
+        isSupplement:
+          type: boolean
+        archived:
+          type: boolean
     MedicineLog:
       type: object
       required:
@@ -4179,6 +4358,7 @@ components:
         - name
         - amount
         - unit
+        - medicineId
       properties:
         id:
           type: string
@@ -4204,6 +4384,10 @@ components:
           type: string
           enum: [ml, mg, drops, dose]
           nullable: true
+        medicineId:
+          type: string
+          nullable: true
+          description: The catalogue entry this dose was picked from, or null.
     CreateMedicine:
       type: object
       required: [babyId, time, name]
@@ -4225,6 +4409,8 @@ components:
         unit:
           type: string
           enum: [ml, mg, drops, dose]
+        medicineId:
+          type: string
         notes:
           type: string
           maxLength: 1000
@@ -4253,6 +4439,9 @@ components:
         unit:
           type: string
           enum: [ml, mg, drops, dose]
+          nullable: true
+        medicineId:
+          type: string
           nullable: true
         notes:
           type: string

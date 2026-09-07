@@ -71,8 +71,8 @@ func (q *Queries) CreateMeasurement(ctx context.Context, arg CreateMeasurementPa
 
 const createMedicine = `-- name: CreateMedicine :one
 INSERT INTO "medicine_log"
-    ("family_id", "baby_id", "caretaker_id", "time", "name", "amount", "unit", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    ("family_id", "baby_id", "caretaker_id", "time", "name", "amount", "unit", "medicine_id", "notes")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING "id"
 `
 
@@ -84,6 +84,7 @@ type CreateMedicineParams struct {
 	Name        string
 	Amount      *float64
 	Unit        *string
+	MedicineID  *string
 	Notes       *string
 }
 
@@ -96,6 +97,7 @@ func (q *Queries) CreateMedicine(ctx context.Context, arg CreateMedicineParams) 
 		arg.Name,
 		arg.Amount,
 		arg.Unit,
+		arg.MedicineID,
 		arg.Notes,
 	)
 	var id string
@@ -384,7 +386,7 @@ func (q *Queries) GetMeasurement(ctx context.Context, arg GetMeasurementParams) 
 const getMedicine = `-- name: GetMedicine :one
 SELECT
     m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    m."time", m."name", m."amount", m."unit", m."notes"
+    m."time", m."name", m."amount", m."unit", m."medicine_id", m."notes"
 FROM "medicine_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
 WHERE m."family_id" = $1 AND m."id" = $2
@@ -404,6 +406,7 @@ type GetMedicineRow struct {
 	Name          string
 	Amount        *float64
 	Unit          *string
+	MedicineID    *string
 	Notes         *string
 }
 
@@ -419,6 +422,7 @@ func (q *Queries) GetMedicine(ctx context.Context, arg GetMedicineParams) (GetMe
 		&i.Name,
 		&i.Amount,
 		&i.Unit,
+		&i.MedicineID,
 		&i.Notes,
 	)
 	return i, err
@@ -666,7 +670,7 @@ const listMedicine = `-- name: ListMedicine :many
 
 SELECT
     m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    m."time", m."name", m."amount", m."unit", m."notes"
+    m."time", m."name", m."amount", m."unit", m."medicine_id", m."notes"
 FROM "medicine_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
 WHERE m."family_id" = $1
@@ -690,6 +694,7 @@ type ListMedicineRow struct {
 	Name          string
 	Amount        *float64
 	Unit          *string
+	MedicineID    *string
 	Notes         *string
 }
 
@@ -722,6 +727,7 @@ func (q *Queries) ListMedicine(ctx context.Context, arg ListMedicineParams) ([]L
 			&i.Name,
 			&i.Amount,
 			&i.Unit,
+			&i.MedicineID,
 			&i.Notes,
 		); err != nil {
 			return nil, err
@@ -993,23 +999,26 @@ SET
     "name" = CASE WHEN $3::bool THEN $4::text ELSE "name" END,
     "amount" = CASE WHEN $5::bool THEN $6::double precision ELSE "amount" END,
     "unit" = CASE WHEN $7::bool THEN $8::text ELSE "unit" END,
-    "notes" = CASE WHEN $9::bool THEN $10::text ELSE "notes" END
-WHERE "family_id" = $11 AND "id" = $12
+    "medicine_id" = CASE WHEN $9::bool THEN $10::text ELSE "medicine_id" END,
+    "notes" = CASE WHEN $11::bool THEN $12::text ELSE "notes" END
+WHERE "family_id" = $13 AND "id" = $14
 `
 
 type UpdateMedicineParams struct {
-	TimeSet   bool
-	TimeVal   pgtype.Timestamptz
-	NameSet   bool
-	NameVal   *string
-	AmountSet bool
-	AmountVal *float64
-	UnitSet   bool
-	UnitVal   *string
-	NotesSet  bool
-	NotesVal  *string
-	FamilyID  string
-	ID        string
+	TimeSet       bool
+	TimeVal       pgtype.Timestamptz
+	NameSet       bool
+	NameVal       *string
+	AmountSet     bool
+	AmountVal     *float64
+	UnitSet       bool
+	UnitVal       *string
+	MedicineIDSet bool
+	MedicineIDVal *string
+	NotesSet      bool
+	NotesVal      *string
+	FamilyID      string
+	ID            string
 }
 
 func (q *Queries) UpdateMedicine(ctx context.Context, arg UpdateMedicineParams) (int64, error) {
@@ -1022,6 +1031,8 @@ func (q *Queries) UpdateMedicine(ctx context.Context, arg UpdateMedicineParams) 
 		arg.AmountVal,
 		arg.UnitSet,
 		arg.UnitVal,
+		arg.MedicineIDSet,
+		arg.MedicineIDVal,
 		arg.NotesSet,
 		arg.NotesVal,
 		arg.FamilyID,

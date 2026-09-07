@@ -202,6 +202,9 @@ export const MedicineLogSchema = z.object({
   name: z.string(),
   amount: z.number().nullable(),
   unit: z.enum(medicineUnits).nullable(),
+  // The catalogue entry the dose was picked from (issue #49); null for a
+  // free-text or imported dose.
+  medicineId: z.string().nullable(),
 });
 
 export const CreateMedicineSchema = z.object({
@@ -209,6 +212,7 @@ export const CreateMedicineSchema = z.object({
   name: z.string().min(1).max(100),
   amount: z.number().min(0).max(1000).optional(),
   unit: z.enum(medicineUnits).optional(),
+  medicineId: z.string().optional(),
 });
 
 export const UpdateMedicineSchema = z.object({
@@ -216,6 +220,40 @@ export const UpdateMedicineSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   amount: z.number().min(0).max(1000).nullable().optional(),
   unit: z.enum(medicineUnits).nullable().optional(),
+  medicineId: z.string().nullable().optional(),
+});
+
+// The family's medicine catalogue (issue #49): what THEY know about the
+// medicines they give — usual dose, and their own minimum interval. The
+// app ships no dosing data; `lastDoseAt` is the newest linked dose (for
+// the baby the list was asked for) so the sheet can say "next dose OK
+// from" without a second query.
+export const MedicineCatalogueEntrySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  defaultAmount: z.number().nullable(),
+  unit: z.enum(medicineUnits).nullable(),
+  minIntervalMin: z.number().int().nullable(),
+  isSupplement: z.boolean(),
+  archived: z.boolean(),
+  lastDoseAt: isoTime().nullable(),
+});
+
+export const CreateMedicineCatalogueEntrySchema = z.object({
+  name: z.string().min(1).max(100),
+  defaultAmount: z.number().min(0).max(1000).optional(),
+  unit: z.enum(medicineUnits).optional(),
+  minIntervalMin: z.number().int().min(1).max(10080).optional(),
+  isSupplement: z.boolean().optional(),
+});
+
+export const UpdateMedicineCatalogueEntrySchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  defaultAmount: z.number().min(0).max(1000).nullable().optional(),
+  unit: z.enum(medicineUnits).nullable().optional(),
+  minIntervalMin: z.number().int().min(1).max(10080).nullable().optional(),
+  isSupplement: z.boolean().optional(),
+  archived: z.boolean().optional(),
 });
 
 export const BathLogSchema = z.object({ ...logBase, time: isoTime() });
@@ -814,6 +852,15 @@ export type MilestonePhoto = z.infer<typeof MilestonePhotoSchema>;
 export type MeasurementLog = z.infer<typeof MeasurementLogSchema>;
 export type PumpLog = z.infer<typeof PumpLogSchema>;
 export type MedicineUnit = (typeof medicineUnits)[number];
+export type MedicineCatalogueEntry = z.infer<
+  typeof MedicineCatalogueEntrySchema
+>;
+export type CreateMedicineCatalogueEntry = z.infer<
+  typeof CreateMedicineCatalogueEntrySchema
+>;
+export type UpdateMedicineCatalogueEntry = z.infer<
+  typeof UpdateMedicineCatalogueEntrySchema
+>;
 export type MeasurementType = (typeof measurementTypes)[number];
 export type Stats = z.infer<typeof StatsSchema>;
 export type StatsDay = z.infer<typeof StatsDaySchema>;

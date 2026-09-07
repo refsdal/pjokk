@@ -251,8 +251,14 @@ const TIMESTAMP_COLS = new Set([
   "last_used_at",
   "revoked_at",
   "last_reminded_at",
+  "archived_at",
 ]);
-const BOOLEAN_COLS = new Set(["all_day", "read_only", "email_verified"]);
+const BOOLEAN_COLS = new Set([
+  "all_day",
+  "read_only",
+  "email_verified",
+  "is_supplement",
+]);
 
 const at = (msValue) => `'${new Date(msValue).toISOString()}'`;
 
@@ -735,9 +741,6 @@ for (const r of rows(`SELECT * FROM Measurement WHERE deletedAt IS NULL`)) {
   );
 }
 
-const medicineNames = new Map(
-  rows(`SELECT id, name FROM Medicine`).map((m) => [m.id, m.name]),
-);
 // sprout's unit vocabulary is singular (DROP, PILL); Pjokk's enum is
 // ("ml","mg","drops","dose"). Matching them by identity silently dropped the
 // unit off every Vitamin D dose, so map explicitly and keep what will not fit
@@ -749,6 +752,48 @@ const MEDICINE_UNIT = {
   ml: "ml",
   mg: "mg",
 };
+// sprout's Medicine table becomes the family's catalogue (issue #49):
+// name, typical dose where its unit fits, and doseMinTime ("HH:MM") as
+// the minimum interval. Each dose below links to its entry, so the log
+// sheet's chips and "next dose OK from" work on imported history too.
+const medicineNames = new Map();
+const medicineIds = new Map();
+for (const m of rows(`SELECT * FROM Medicine`)) {
+  medicineNames.set(m.id, m.name);
+  const id = `st-med-${m.id}`;
+  medicineIds.set(m.id, id);
+  const unit = String(m.unitAbbr ?? "").toLowerCase();
+  const mappedUnit = MEDICINE_UNIT[unit] ?? null;
+  const minTime = /^(\d{1,2}):(\d{2})$/.exec(String(m.doseMinTime ?? ""));
+  const minInterval = minTime
+    ? Number(minTime[1]) * 60 + Number(minTime[2])
+    : null;
+  insert(
+    "medicine",
+    [
+      "id",
+      "family_id",
+      "name",
+      "default_amount",
+      "unit",
+      "min_interval_min",
+      "is_supplement",
+      "archived_at",
+      "created_at",
+    ],
+    [
+      esc(id),
+      familyExpr(),
+      esc(m.name ?? "Medicine"),
+      mappedUnit && m.typicalDoseSize != null ? m.typicalDoseSize : "NULL",
+      mappedUnit ? esc(mappedUnit) : "NULL",
+      minInterval && minInterval > 0 ? minInterval : "NULL",
+      false,
+      m.active === 0 || m.active === false ? now : "NULL",
+      now,
+    ],
+  );
+}
 for (const r of rows(`SELECT * FROM MedicineLog WHERE deletedAt IS NULL`)) {
   const b = base(r, ms(r.time));
   if (!b) continue;
@@ -776,6 +821,7 @@ for (const r of rows(`SELECT * FROM MedicineLog WHERE deletedAt IS NULL`)) {
       "name",
       "amount",
       "unit",
+      "medicine_id",
       "notes",
       "created_at",
     ],
@@ -784,6 +830,7 @@ for (const r of rows(`SELECT * FROM MedicineLog WHERE deletedAt IS NULL`)) {
       esc(medicineNames.get(r.medicineId) ?? "Medicine"),
       r.doseAmount ?? "NULL",
       mappedUnit ? esc(mappedUnit) : "NULL",
+      medicineIds.has(r.medicineId) ? esc(medicineIds.get(r.medicineId)) : "NULL",
       escOrNull(medicineNotes),
       now,
     ],

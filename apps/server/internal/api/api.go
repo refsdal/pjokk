@@ -332,10 +332,16 @@ var operationAuthTiers = map[string]authTier{
 	"CreateCalendarEvent": tierFamily,
 	"UpdateCalendarEvent": tierFamily,
 	"DeleteCalendarEvent": tierFamily,
-	"ListContacts":        tierFamily,
-	"CreateContact":       tierFamily,
-	"UpdateContact":       tierFamily,
-	"DeleteContact":       tierFamily,
+	// The medicine catalogue (medicine_catalogue.go), family reference data
+	// like contacts.
+	"ListMedicineCatalogue":        tierFamily,
+	"CreateMedicineCatalogueEntry": tierFamily,
+	"UpdateMedicineCatalogueEntry": tierFamily,
+	"DeleteMedicineCatalogueEntry": tierFamily,
+	"ListContacts":                 tierFamily,
+	"CreateContact":                tierFamily,
+	"UpdateContact":                tierFamily,
+	"DeleteContact":                tierFamily,
 
 	// Stats (Task 17; REF §A1 stats.ts). The TS predecessor's statsMonth
 	// premium gate (402 when days>7) is removed — every window up to the

@@ -389,6 +389,30 @@ func (e CreateMedicineUnit) Valid() bool {
 	}
 }
 
+// Defines values for CreateMedicineCatalogueEntryUnit.
+const (
+	CreateMedicineCatalogueEntryUnitDose  CreateMedicineCatalogueEntryUnit = "dose"
+	CreateMedicineCatalogueEntryUnitDrops CreateMedicineCatalogueEntryUnit = "drops"
+	CreateMedicineCatalogueEntryUnitMg    CreateMedicineCatalogueEntryUnit = "mg"
+	CreateMedicineCatalogueEntryUnitMl    CreateMedicineCatalogueEntryUnit = "ml"
+)
+
+// Valid indicates whether the value is a known member of the CreateMedicineCatalogueEntryUnit enum.
+func (e CreateMedicineCatalogueEntryUnit) Valid() bool {
+	switch e {
+	case CreateMedicineCatalogueEntryUnitDose:
+		return true
+	case CreateMedicineCatalogueEntryUnitDrops:
+		return true
+	case CreateMedicineCatalogueEntryUnitMg:
+		return true
+	case CreateMedicineCatalogueEntryUnitMl:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreatePlayType.
 const (
 	CreatePlayTypePlay  CreatePlayType = "play"
@@ -767,6 +791,30 @@ func (e MeasurementLogType) Valid() bool {
 	case MeasurementLogTypeTemperature:
 		return true
 	case MeasurementLogTypeWeight:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MedicineCatalogueEntryUnit.
+const (
+	MedicineCatalogueEntryUnitDose  MedicineCatalogueEntryUnit = "dose"
+	MedicineCatalogueEntryUnitDrops MedicineCatalogueEntryUnit = "drops"
+	MedicineCatalogueEntryUnitMg    MedicineCatalogueEntryUnit = "mg"
+	MedicineCatalogueEntryUnitMl    MedicineCatalogueEntryUnit = "ml"
+)
+
+// Valid indicates whether the value is a known member of the MedicineCatalogueEntryUnit enum.
+func (e MedicineCatalogueEntryUnit) Valid() bool {
+	switch e {
+	case MedicineCatalogueEntryUnitDose:
+		return true
+	case MedicineCatalogueEntryUnitDrops:
+		return true
+	case MedicineCatalogueEntryUnitMg:
+		return true
+	case MedicineCatalogueEntryUnitMl:
 		return true
 	default:
 		return false
@@ -1352,6 +1400,30 @@ func (e UpdateMedicineUnit) Valid() bool {
 	}
 }
 
+// Defines values for UpdateMedicineCatalogueEntryUnit.
+const (
+	UpdateMedicineCatalogueEntryUnitDose  UpdateMedicineCatalogueEntryUnit = "dose"
+	UpdateMedicineCatalogueEntryUnitDrops UpdateMedicineCatalogueEntryUnit = "drops"
+	UpdateMedicineCatalogueEntryUnitMg    UpdateMedicineCatalogueEntryUnit = "mg"
+	UpdateMedicineCatalogueEntryUnitMl    UpdateMedicineCatalogueEntryUnit = "ml"
+)
+
+// Valid indicates whether the value is a known member of the UpdateMedicineCatalogueEntryUnit enum.
+func (e UpdateMedicineCatalogueEntryUnit) Valid() bool {
+	switch e {
+	case UpdateMedicineCatalogueEntryUnitDose:
+		return true
+	case UpdateMedicineCatalogueEntryUnitDrops:
+		return true
+	case UpdateMedicineCatalogueEntryUnitMg:
+		return true
+	case UpdateMedicineCatalogueEntryUnitMl:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UpdatePlayType.
 const (
 	UpdatePlayTypePlay  UpdatePlayType = "play"
@@ -1778,16 +1850,29 @@ type CreateMeasurementType string
 
 // CreateMedicine defines model for CreateMedicine.
 type CreateMedicine struct {
-	Amount *float64            `json:"amount,omitempty"`
-	BabyId string              `json:"babyId"`
-	Name   string              `json:"name"`
-	Notes  *string             `json:"notes,omitempty"`
-	Time   time.Time           `json:"time"`
-	Unit   *CreateMedicineUnit `json:"unit,omitempty"`
+	Amount     *float64            `json:"amount,omitempty"`
+	BabyId     string              `json:"babyId"`
+	MedicineId *string             `json:"medicineId,omitempty"`
+	Name       string              `json:"name"`
+	Notes      *string             `json:"notes,omitempty"`
+	Time       time.Time           `json:"time"`
+	Unit       *CreateMedicineUnit `json:"unit,omitempty"`
 }
 
 // CreateMedicineUnit defines model for CreateMedicine.Unit.
 type CreateMedicineUnit string
+
+// CreateMedicineCatalogueEntry defines model for CreateMedicineCatalogueEntry.
+type CreateMedicineCatalogueEntry struct {
+	DefaultAmount  *float64                          `json:"defaultAmount,omitempty"`
+	IsSupplement   *bool                             `json:"isSupplement,omitempty"`
+	MinIntervalMin *int32                            `json:"minIntervalMin,omitempty"`
+	Name           string                            `json:"name"`
+	Unit           *CreateMedicineCatalogueEntryUnit `json:"unit,omitempty"`
+}
+
+// CreateMedicineCatalogueEntryUnit defines model for CreateMedicineCatalogueEntry.Unit.
+type CreateMedicineCatalogueEntryUnit string
 
 // CreateMilestone defines model for CreateMilestone.
 type CreateMilestone struct {
@@ -2105,17 +2190,37 @@ type MeasurementLog struct {
 // MeasurementLogType defines model for MeasurementLog.Type.
 type MeasurementLogType string
 
+// MedicineCatalogueEntry defines model for MedicineCatalogueEntry.
+type MedicineCatalogueEntry struct {
+	Archived      bool       `json:"archived"`
+	DefaultAmount *float64   `json:"defaultAmount"`
+	Id            string     `json:"id"`
+	IsSupplement  bool       `json:"isSupplement"`
+	LastDoseAt    *time.Time `json:"lastDoseAt"`
+
+	// MinIntervalMin The family's own "at most every N minutes"; never shipped by the app.
+	MinIntervalMin *int32                      `json:"minIntervalMin"`
+	Name           string                      `json:"name"`
+	Unit           *MedicineCatalogueEntryUnit `json:"unit"`
+}
+
+// MedicineCatalogueEntryUnit defines model for MedicineCatalogueEntry.Unit.
+type MedicineCatalogueEntryUnit string
+
 // MedicineLog defines model for MedicineLog.
 type MedicineLog struct {
-	Amount        *float64         `json:"amount"`
-	BabyId        string           `json:"babyId"`
-	CaretakerId   string           `json:"caretakerId"`
-	CaretakerName string           `json:"caretakerName"`
-	Id            string           `json:"id"`
-	Name          string           `json:"name"`
-	Notes         *string          `json:"notes"`
-	Time          time.Time        `json:"time"`
-	Unit          *MedicineLogUnit `json:"unit"`
+	Amount        *float64 `json:"amount"`
+	BabyId        string   `json:"babyId"`
+	CaretakerId   string   `json:"caretakerId"`
+	CaretakerName string   `json:"caretakerName"`
+	Id            string   `json:"id"`
+
+	// MedicineId The catalogue entry this dose was picked from, or null.
+	MedicineId *string          `json:"medicineId"`
+	Name       string           `json:"name"`
+	Notes      *string          `json:"notes"`
+	Time       time.Time        `json:"time"`
+	Unit       *MedicineLogUnit `json:"unit"`
 }
 
 // MedicineLogUnit defines model for MedicineLog.Unit.
@@ -2567,15 +2672,29 @@ type UpdateMeasurementType string
 
 // UpdateMedicine Every field is optional; an empty object is a no-op. `amount`, `unit` and `notes` may also be sent as `null` to CLEAR that column; `time`/`name` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
 type UpdateMedicine struct {
-	Amount *float64            `json:"amount,omitempty"`
-	Name   *string             `json:"name,omitempty"`
-	Notes  *string             `json:"notes,omitempty"`
-	Time   *time.Time          `json:"time,omitempty"`
-	Unit   *UpdateMedicineUnit `json:"unit,omitempty"`
+	Amount     *float64            `json:"amount,omitempty"`
+	MedicineId *string             `json:"medicineId,omitempty"`
+	Name       *string             `json:"name,omitempty"`
+	Notes      *string             `json:"notes,omitempty"`
+	Time       *time.Time          `json:"time,omitempty"`
+	Unit       *UpdateMedicineUnit `json:"unit,omitempty"`
 }
 
 // UpdateMedicineUnit defines model for UpdateMedicine.Unit.
 type UpdateMedicineUnit string
+
+// UpdateMedicineCatalogueEntry defines model for UpdateMedicineCatalogueEntry.
+type UpdateMedicineCatalogueEntry struct {
+	Archived       *bool                             `json:"archived,omitempty"`
+	DefaultAmount  *float64                          `json:"defaultAmount,omitempty"`
+	IsSupplement   *bool                             `json:"isSupplement,omitempty"`
+	MinIntervalMin *int32                            `json:"minIntervalMin,omitempty"`
+	Name           *string                           `json:"name,omitempty"`
+	Unit           *UpdateMedicineCatalogueEntryUnit `json:"unit,omitempty"`
+}
+
+// UpdateMedicineCatalogueEntryUnit defines model for UpdateMedicineCatalogueEntry.Unit.
+type UpdateMedicineCatalogueEntryUnit string
 
 // UpdateMilestone Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time`/`title` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
 type UpdateMilestone struct {
@@ -2753,6 +2872,12 @@ type ListMedicineParams struct {
 
 	// Limit Maximum number of rows to return.
 	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListMedicineCatalogueParams defines parameters for ListMedicineCatalogue.
+type ListMedicineCatalogueParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
 }
 
 // ListMilestonesParams defines parameters for ListMilestones.
@@ -2951,6 +3076,12 @@ type CreateMedicineJSONRequestBody = CreateMedicine
 
 // UpdateMedicineJSONRequestBody defines body for UpdateMedicine for application/json ContentType.
 type UpdateMedicineJSONRequestBody = UpdateMedicine
+
+// CreateMedicineCatalogueEntryJSONRequestBody defines body for CreateMedicineCatalogueEntry for application/json ContentType.
+type CreateMedicineCatalogueEntryJSONRequestBody = CreateMedicineCatalogueEntry
+
+// UpdateMedicineCatalogueEntryJSONRequestBody defines body for UpdateMedicineCatalogueEntry for application/json ContentType.
+type UpdateMedicineCatalogueEntryJSONRequestBody = UpdateMedicineCatalogueEntry
 
 // CreateMilestoneJSONRequestBody defines body for CreateMilestone for application/json ContentType.
 type CreateMilestoneJSONRequestBody = CreateMilestone

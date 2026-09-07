@@ -14,6 +14,7 @@ export * from "./help";
 export * from "./insights";
 export * from "./keys";
 export * from "./logs";
+export * from "./medicines";
 export * from "./other";
 export * from "./photos";
 export * from "./play";

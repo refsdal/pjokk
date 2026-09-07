@@ -14,6 +14,7 @@ import { BabiesSection } from "./BabiesSection";
 import { ContactsSection } from "./ContactsSection";
 import { FamilySection } from "./FamilySection";
 import { InstallSection } from "./InstallSection";
+import { MedicinesSection } from "./MedicinesSection";
 import { NapGuideSection } from "./NapGuideSection";
 import { PhotoUsageLine } from "./PhotoUsageLine";
 import { SectionTitle } from "./lib";
@@ -36,6 +37,7 @@ export function SettingsScreen() {
         <FamilySection isAdmin={isAdmin} />
         <BabiesSection isAdmin={isAdmin} />
         <ContactsSection />
+        <MedicinesSection />
 
         {isAdmin && (
           <>

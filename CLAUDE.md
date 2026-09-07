@@ -350,6 +350,12 @@ Bun-era schema used. Domain tables kept their singular names:
   cron decides "due" on the row's own IANA zone; `since_last` is the old
   one-nudge-per-gap rule per kind, `at_time` fires once per matching local
   day, quiet hours hold rather than latch.
+- `medicine(id, familyId, name, defaultAmount?, unit?, minIntervalMin?,
+  isSupplement, archivedAt?)` — the family's own medicine catalogue (#49).
+  `medicine_log.medicineId` links a dose to its entry (NULL for free text
+  and imports, `ON DELETE SET NULL`). The interval is the FAMILY's number:
+  the app ships no dosing data and never blocks a save — the sheet and the
+  newest timeline dose say "next dose OK from HH:MM", nothing more.
 - `family_invite(code, familyId, role, expiresAt, maxUses, usedCount)`
 - Organization/family metadata: `plan` (default `free`), units, night-mode
   schedule.

@@ -1,5 +1,6 @@
 import { measurementMeta } from "@/lib/measurements";
 import {
+  IconAlertTriangle,
   IconBath,
   IconHandStop,
   IconMilk,
@@ -17,6 +18,7 @@ import { useEffect, useState } from "react";
 import type {
   FeedTimer,
   MeasurementType,
+  MedicineCatalogueEntry,
   MilestonePhoto,
   MedicineUnit,
   PlayType,
@@ -35,6 +37,7 @@ import {
   useCreateOther,
   useDeleteMilestonePhoto,
   useDeleteOther,
+  useMedicineCatalogue,
   useOtherList,
   useUploadMilestonePhoto,
   useStartFeedTimer,
@@ -45,7 +48,9 @@ import {
 } from "@/lib/data";
 import { minutesFromSeconds, totalSeconds } from "@/lib/feed-timer-ui";
 import { t } from "@/lib/i18n";
+import { nextDoseFrom } from "@/lib/medicine-ui";
 import { playKindMeta, playTypeOrder } from "@/lib/play-ui";
+import { formatClock } from "@/lib/time";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
@@ -184,7 +189,9 @@ export function OtherLogSheet({
   const pumpTimer = kind === "pump" && !edit && stopTimer ? activePump : null;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (!open || !pumpTimer) return;
+    if (!open) return;
+    setNow(Date.now());
+    if (!pumpTimer) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [open, pumpTimer]);
@@ -194,6 +201,22 @@ export function OtherLogSheet({
   const [name, setName] = useState("");
   const [amount, setAmount] = useState(2.5);
   const [unit, setUnit] = useState<MedicineUnit>("ml");
+  // The catalogue entry picked from the chips (issue #49), or null for a
+  // typed name. The catalogue is asked for THIS baby so lastDoseAt, and
+  // the "next dose OK from" line built from it, is hers.
+  const [medicineId, setMedicineId] = useState<string | null>(null);
+  const catalogue = useMedicineCatalogue(babyId, open && kind === "medicine");
+  const medicines = (catalogue.data ?? []).filter((m) => !m.archived);
+  const pickMedicine = (entry: MedicineCatalogueEntry | null) => {
+    setMedicineId(entry?.id ?? null);
+    if (!entry) {
+      setName("");
+      return;
+    }
+    setName(entry.name);
+    if (entry.defaultAmount != null) setAmount(entry.defaultAmount);
+    if (entry.unit) setUnit(entry.unit);
+  };
   const [content, setContent] = useState("");
   const [title, setTitle] = useState("");
   const [mtype, setMtype] = useState<MeasurementType>(initialMeasurementType);
@@ -243,6 +266,7 @@ export function OtherLogSheet({
         setName(edit.name);
         setAmount(edit.amount ?? 2.5);
         setUnit(edit.unit ?? "ml");
+        setMedicineId(edit.medicineId);
       } else if (edit.kind === "note") {
         setContent(edit.content);
       } else if (edit.kind === "milestone") {
@@ -268,6 +292,13 @@ export function OtherLogSheet({
           last?.unit === "mg" || last?.unit === "drops" || last?.unit === "dose"
             ? last.unit
             : "ml",
+        );
+        // Last-value prefill keeps the chip too, as long as the entry is
+        // still in the catalogue and not archived.
+        const lastId =
+          typeof last?.medicineId === "string" ? last.medicineId : null;
+        setMedicineId(
+          lastId && medicines.some((m) => m.id === lastId) ? lastId : null,
         );
       }
       if (kind === "note") setContent("");
@@ -354,7 +385,14 @@ export function OtherLogSheet({
     }
     const fields: Record<string, unknown> =
       kind === "medicine"
-        ? { name: name.trim(), amount, unit }
+        ? {
+            name: name.trim(),
+            amount,
+            unit,
+            // Create omits the link when there is none; PATCH must send
+            // null to drop one the row already had.
+            ...(medicineId ? { medicineId } : edit ? { medicineId: null } : {}),
+          }
         : kind === "note"
           ? { content: content.trim() }
           : kind === "milestone"
@@ -422,6 +460,12 @@ export function OtherLogSheet({
 
   const meta = otherKindMeta[kind];
   const mcfg = measurementMeta[mtype];
+  // A caution, never a block (CLAUDE.md: the parent is the authority): the
+  // family's own interval added to the last dose, shown only while it is
+  // still ahead. Editing an old dose has no "next" to speak of.
+  const selectedMedicine = medicines.find((m) => m.id === medicineId) ?? null;
+  const nextDose =
+    !edit && selectedMedicine ? nextDoseFrom(selectedMedicine, now) : null;
   const saveDisabled =
     (kind === "medicine" && name.trim().length === 0) ||
     (kind === "note" && content.trim().length === 0) ||
@@ -436,11 +480,38 @@ export function OtherLogSheet({
       <div className="space-y-5 pb-4">
         {kind === "medicine" && (
           <>
-            <Input
-              placeholder={t("Medicine name")}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
+            {medicines.length > 0 && (
+              <ChipGroup
+                options={[
+                  ...medicines.map((m) => ({ value: m.id, label: m.name })),
+                  { value: "__other", label: t("Other…") },
+                ]}
+                value={medicineId ?? "__other"}
+                onChange={(v) =>
+                  pickMedicine(
+                    v === "__other"
+                      ? null
+                      : (medicines.find((m) => m.id === v) ?? null),
+                  )
+                }
+              />
+            )}
+            {nextDose && (
+              <p
+                role="status"
+                className="flex items-center gap-2 px-1 text-sm font-semibold text-caution"
+              >
+                <IconAlertTriangle className="h-4 w-4 shrink-0" />
+                {t("Next dose OK from")} {formatClock(nextDose)}
+              </p>
+            )}
+            {(!medicineId || medicines.length === 0) && (
+              <Input
+                placeholder={t("Medicine name")}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            )}
             <ChipGroup
               options={[
                 { value: "ml", label: "ml" },

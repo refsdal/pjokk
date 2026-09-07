@@ -28,12 +28,18 @@ import { ChipGroup } from "@/components/Chips";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { Button } from "@/components/ui/button";
 import { BabySwitcher } from "@/components/BabySwitcher";
-import { useFeeds, useMemberAvatars, useTimeline } from "@/lib/data";
+import {
+  useFeeds,
+  useMedicineCatalogue,
+  useMemberAvatars,
+  useTimeline,
+} from "@/lib/data";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import { t } from "@/lib/i18n";
 import { diaperDetail, feedDetail, sleepTitle } from "@/lib/log-detail";
 import { photoSrc } from "@/lib/data/photos";
 import { playKindMeta } from "@/lib/play-ui";
+import { nextDoseFrom } from "@/lib/medicine-ui";
 import { formatClock, formatDay, formatDuration } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
@@ -181,10 +187,14 @@ const kindStyle: Record<
 function Row({
   entry,
   avatarUrl,
+  nextDose = null,
   onClick,
 }: {
   entry: TimelineEntry;
   avatarUrl: string | null | undefined;
+  // The medicine catalogue's "next dose OK from" (issue #49), only on the
+  // newest dose of an entry with an interval, while it is still ahead.
+  nextDose?: Date | null;
   onClick: () => void;
 }) {
   const { icon: Icon, tint: baseTint } = kindStyle[entry.kind];
@@ -214,6 +224,17 @@ function Row({
       <span className="min-w-0 flex-1 truncate text-[15px] text-ink">
         <span className="font-semibold">{title}</span>
         {detail && <span className="text-ink-soft"> · {detail}</span>}
+        {nextDose && (
+          // Short on purpose: the row is one line, and the sheet says it
+          // in full.
+          <span
+            className="font-semibold text-caution"
+            title={`${t("Next dose OK from")} ${formatClock(nextDose)}`}
+          >
+            {" "}
+            · {t("next")} {formatClock(nextDose)}
+          </span>
+        )}
         {entry.notes && (
           <IconNote className="ml-1.5 inline h-3.5 w-3.5 text-muted" />
         )}
@@ -252,6 +273,17 @@ export function TimelineScreen() {
   const feeds = useFeeds(baby?.id);
   const avatars = useMemberAvatars();
   const [editEntry, setEditEntry] = useState<TimelineEntry | null>(null);
+  // The catalogue for THIS baby carries each entry's newest linked dose;
+  // the row that IS that dose gets the "next dose OK from" note.
+  const catalogue = useMedicineCatalogue(baby?.id, !!baby);
+  const nextDoseFor = (entry: TimelineEntry): Date | null => {
+    if (entry.kind !== "medicine" || !entry.medicineId) return null;
+    const m = (catalogue.data ?? []).find((c) => c.id === entry.medicineId);
+    if (!m || !m.lastDoseAt) return null;
+    if (new Date(m.lastDoseAt).getTime() !== new Date(entry.time).getTime())
+      return null;
+    return nextDoseFrom(m);
+  };
 
   const entries = timeline.data?.pages.flatMap((p) => p.entries) ?? [];
 
@@ -310,6 +342,7 @@ export function TimelineScreen() {
                   key={`${entry.kind}-${entry.id}`}
                   entry={entry}
                   avatarUrl={avatars[entry.caretakerId]}
+                  nextDose={nextDoseFor(entry)}
                   onClick={() => setEditEntry(entry)}
                 />
               ))}

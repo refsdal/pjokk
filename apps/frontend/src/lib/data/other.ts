@@ -77,6 +77,7 @@ export type CreateOtherVars =
         name: string;
         amount?: number;
         unit?: MedicineUnit;
+        medicineId?: string;
       })
   | ({ kind: "bath" } & OtherBase)
   | ({ kind: "note" } & OtherBase & { content: string })

@@ -197,6 +197,18 @@ type MeasurementLog struct {
 	CreatedAt   pgtype.Timestamptz
 }
 
+type Medicine struct {
+	ID             string
+	FamilyID       string
+	Name           string
+	DefaultAmount  *float64
+	Unit           *string
+	MinIntervalMin *int32
+	IsSupplement   bool
+	ArchivedAt     pgtype.Timestamptz
+	CreatedAt      pgtype.Timestamptz
+}
+
 type MedicineLog struct {
 	ID          string
 	FamilyID    string
@@ -208,6 +220,7 @@ type MedicineLog struct {
 	Unit        *string
 	Notes       *string
 	CreatedAt   pgtype.Timestamptz
+	MedicineID  *string
 }
 
 type MilestoneLog struct {

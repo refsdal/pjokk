@@ -44,6 +44,7 @@ var BackupTables = []string{
 	"feed_log",
 	"diaper_log",
 	"sleep_log",
+	"medicine",
 	"medicine_log",
 	"bath_log",
 	"note_log",
