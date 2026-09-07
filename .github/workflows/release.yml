@@ -193,6 +193,11 @@ jobs:
       # with nothing pushed, tagged or signed.
       - name: GoReleaser (snapshot)
         if: needs.version.outputs.dry == 'true'
+        env:
+          # The SPA is built in GoReleaser's before hook; this is the same
+          # string GoReleaser stamps into the binary, and what the SPA
+          # keys its persisted query cache on (apps/frontend/vite.config.ts).
+          PJOKK_VERSION: ${{ needs.version.outputs.version }}
         run: |
           trap 'bash scripts/restore-embed-overlay.sh' EXIT
           goreleaser release --snapshot --clean --skip=sign
@@ -227,6 +232,7 @@ jobs:
         if: needs.version.outputs.publish == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PJOKK_VERSION: ${{ needs.version.outputs.version }}
         run: |
           trap 'bash scripts/restore-embed-overlay.sh' EXIT
           goreleaser release --clean

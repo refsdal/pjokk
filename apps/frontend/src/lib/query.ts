@@ -36,10 +36,20 @@ export const persister = createAsyncStoragePersister({
 // render; "which family am I in" does not.
 const NEVER_PERSIST = new Set(["me", "family", "members", "my-families"]);
 
+// The persisted cache is keyed on the BUILD, not a hand-bumped string: a
+// snapshot written by one build is dropped by the next. Stats gained
+// required fields in PR #62 and the old snapshot, restored before the
+// network answered, crashed the screen on `nights.length` — a shape change
+// nobody thought to bump "v2" for. Offline data survives reloads within a
+// build, which is the case that matters; after an update the next open is
+// online anyway (that is how the update arrived).
+const buildVersion =
+  typeof __PJOKK_VERSION__ === "string" ? __PJOKK_VERSION__ : "dev";
+
 export const persistOptions = {
   persister,
   maxAge: 14 * DAY,
-  buster: "v2",
+  buster: `v3-${buildVersion}`,
   dehydrateOptions: {
     shouldDehydrateQuery: (query: { queryKey: readonly unknown[] }) =>
       !NEVER_PERSIST.has(String(query.queryKey[0])),
