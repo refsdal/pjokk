@@ -1,0 +1,3 @@
+id,child_id,child_first_name,child_last_name,name,dosage,dosage_unit,time,next_dose_interval,notes,tags
+70,1,Nora,Hansen,Paracetamol,2.5,ml,2026-09-01 22:10:00,06:00:00,,
+71,1,Nora,Hansen,Vitamin D,1,tablets,2026-09-01 08:30:00,,,

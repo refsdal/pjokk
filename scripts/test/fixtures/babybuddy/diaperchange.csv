@@ -1,0 +1,4 @@
+id,child_id,child_first_name,child_last_name,time,wet,solid,color,amount,notes,tags
+20,1,Nora,Hansen,2026-09-01 09:00:00,True,True,yellow,,,
+21,1,Nora,Hansen,2026-09-01 14:00:00,False,False,,,"just checked",
+22,1,Nora,Hansen,2026-09-01 16:00:00,True,False,,2,,
