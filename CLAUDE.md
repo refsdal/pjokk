@@ -272,7 +272,13 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
 - **Home:** baby header w/ age + caretaker chip (the user's avatar → account
   sheet: profile, family switcher, sign out), active-session banner (live
   counter + Wake button when sleeping), last-feed / last-diaper status cards,
-  2×2 grid of big log buttons (Feed, Diaper, Sleep, More), tab bar.
+  2×2 grid of big log buttons (Feed, Diaper, Sleep, More), tab bar. The
+  Awake card carries the nap-window guide: a typical wake window for the
+  baby's age (`data/wake-windows.json`, Cleveland Clinic 2024, cited in the
+  file) added to the last wake, shown as a window ("Nap window 13:10–14:25",
+  then "In the nap window", then "Past the usual nap window"). A guide,
+  never a prediction; it shows nothing without a birth date, past 12 months,
+  or when the last wake is over 12 h old; per-device switch in Settings.
 - **Log sheets (vaul):** type chips → prefilled stepper/fields → time chips
   (Now / 15 m ago / Pick time) → full-width Save at the very bottom. The SAME
   component handles create and edit.
