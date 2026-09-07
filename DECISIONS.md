@@ -1735,7 +1735,9 @@ the smoke test before it still runs the image at its defaults.
   family-level caches, replayed offline writes, a second tab — are handled
   by the switch flow (refuse with paused mutations, then `resetCache`) and
   the family fence in the shell (`localStorage` family id vs `/api/me`,
-  reset + reload on mismatch).
+  reset + reload on mismatch). If the fence fires while offline writes are
+  queued, they are discarded — the server has already switched and they can
+  never be replayed — and the shell says so once after the reload.
 - **Nothing else moved out of Settings.** Notifications are per user but
   configured per device; Appearance is per device.
 - **The SPA CSP allows `blob:` images.** The on-device avatar crop decodes

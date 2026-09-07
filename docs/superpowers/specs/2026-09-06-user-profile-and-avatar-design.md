@@ -145,8 +145,8 @@ ALTER TABLE "users"
   themself and for anyone who shares at least one organization membership
   with the target user (one EXISTS query on `organization_members`).
   Everyone else, and any user without a photo, gets **404, not 403** — the
-  route must not confirm that a user id exists. Streams the object with
-  its stored content type, `ETag` = avatar key, and
+  route must not confirm that a user id exists. Streams as image/jpeg
+  (everything stored is re-encoded), `ETag` = avatar key, and
   `Cache-Control: private, max-age=86400` (safe because the URL is keyed
   by version). Sysadmins are not special-cased; the admin console keeps
   its initials.
