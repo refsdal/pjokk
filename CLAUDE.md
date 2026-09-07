@@ -289,7 +289,10 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   Tap row → edit sheet.
 - **Stats:** deliberately minimal at first — avg sleep/day, avg intake/day,
   one bar chart (sleep per day, week/month toggle), weight row w/ percentile
-  teaser. WHO growth reference data ships as bundled static JSON (no API).
+  teaser, and one growth chart with Weight / Length / Head chips against the
+  WHO P3/P50/P97 curves. WHO growth reference data ships as bundled static
+  JSON (`data/who-*-for-age-lms.json`, weight, length and head, 0–60 months,
+  each cited in the file; no API).
 - **Settings:** iOS-style grouped rows. Family (Babies, Caretakers, Invite
   link w/ QR), Preferences (Notifications, Units, Night mode schedule), Data
   (Export CSV, API access).

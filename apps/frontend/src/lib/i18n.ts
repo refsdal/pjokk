@@ -310,6 +310,8 @@ const nb: Record<string, string> = {
   h: "t",
   m: "m",
   "Growth (WHO weight-for-age)": "Vekst (WHO vekt-for-alder)",
+  "Growth (WHO length-for-age)": "Vekst (WHO lengde for alder)",
+  "Growth (WHO head-for-age)": "Vekst (WHO hodeomkrets for alder)",
   "Reference lines: WHO P3 / P50 / P97 · months on the x-axis":
     "Referanselinjer: WHO P3 / P50 / P97 · måneder på x-aksen",
   ". percentile (WHO)": ". persentil (WHO)",
