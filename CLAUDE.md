@@ -293,7 +293,12 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   account sheet and Settings → Account. Global across families.
 - **Night mode:** scheduled + manual override; deliberate exit gesture.
 - **Active sessions are state, not screens:** one `activeSession` query,
-  rendered everywhere (home banner, timeline badge, tab tint).
+  rendered everywhere (home banner, timeline badge, tab tint). The nursing
+  and pump timers are the same kind of state (`feed_timer`, one row per
+  baby and kind, on `/api/summary` as `activeFeed` / `activePump`): every
+  caretaker sees the running clock, and the server banks the seconds — the
+  client only ever says start / switch / pause / stop. There is no
+  device-local timer any more.
 
 ## Data model (Phase 1 core)
 
@@ -319,6 +324,11 @@ Bun-era schema used. Domain tables kept their singular names:
   device's night-mode schedule because the server has no timezone to guess
   with. `dry` is its own diaper count in the summary so a dry check never
   inflates the wet count.
+- `feed_timer(id, familyId, babyId, caretakerId, kind breast|pump, startTime,
+  runningSide?, sideStartedAt?, leftSec, rightSec)` — the running nursing /
+  pump clock, UNIQUE (babyId, kind). Its own table, not a `feed_log` row
+  with a NULL end, because a logged feed has one `time`; stopping turns it
+  into a `feed_log` / `pump_log` row and deletes it in one transaction.
 - `family_invite(code, familyId, role, expiresAt, maxUses, usedCount)`
 - Organization/family metadata: `plan` (default `free`), units, night-mode
   schedule.
