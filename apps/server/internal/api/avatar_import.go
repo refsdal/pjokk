@@ -110,7 +110,17 @@ func (d Deps) importGoogleAvatar(ctx context.Context, userID string) {
 	}
 	res, err := c.Do(req)
 	if err != nil {
-		log.Printf("api: avatar import for %s: %v", userID, err)
+		// http.Client.Do wraps every transport failure — and CheckRedirect's
+		// own errRedirectOffAllowlist above — in a *url.Error whose Error()
+		// embeds the full request URL, so logging err directly would print a
+		// stable pseudonymous Google identifier into logs this project
+		// cannot later erase (see purge.go's comment on logging personal
+		// data). Unwrap to the underlying error and log the host instead.
+		var ue *url.Error
+		if errors.As(err, &ue) {
+			err = ue.Err
+		}
+		log.Printf("api: avatar import for %s from %s: %v", userID, u.Hostname(), err)
 		return
 	}
 	defer res.Body.Close()

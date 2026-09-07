@@ -616,14 +616,19 @@ func familyChain(d Deps) func(http.Handler) http.Handler {
 // beneath it, one of the spec-validation exclusions below.
 var vaccineDocumentsPattern = regexp.MustCompile(`^/api/vaccines/[^/]+/documents(/|$)`)
 
+// avatarPattern matches exactly /api/users/{id}/avatar — the one streaming
+// route under /api/users/; a prefix match would silently exempt any future
+// JSON route mounted there from request validation.
+var avatarPattern = regexp.MustCompile(`^/api/users/[^/]+/avatar$`)
+
 // skipSpecValidation reports whether r's path is one of the routes that
 // never go through kin-openapi request validation: the auth handler (Limen
 // owns its own request shapes), raw file streaming, the CSV export stream,
 // vaccine document uploads (multipart, not JSON), and the avatar upload
-// (multipart) and avatar streaming routes. /api/auth/ is also structurally
-// unreachable here (see NewHandler's mount order) — it is listed anyway so
-// this function documents the full exclusion set on its own, independent of
-// how the mux happens to be wired today.
+// (multipart) and the avatar streaming route. /api/auth/ is also
+// structurally unreachable here (see NewHandler's mount order) — it is
+// listed anyway so this function documents the full exclusion set on its
+// own, independent of how the mux happens to be wired today.
 func skipSpecValidation(r *http.Request) bool {
 	switch {
 	case strings.HasPrefix(r.URL.Path, auth.BasePath+"/"):
@@ -636,7 +641,7 @@ func skipSpecValidation(r *http.Request) bool {
 		return true
 	case r.URL.Path == "/api/me/avatar":
 		return true
-	case strings.HasPrefix(r.URL.Path, "/api/users/"):
+	case avatarPattern.MatchString(r.URL.Path):
 		return true
 	default:
 		return false

@@ -129,4 +129,16 @@ func TestAttributionUsesDisplayName(t *testing.T) {
 	if m := members.JSON[0].(map[string]any); m["name"] != "Mamma" {
 		t.Errorf("member name = %v, want the nickname", m["name"])
 	}
+
+	timeline := a.Do(http.MethodGet, "/api/timeline?babyId="+babyID, cookie, nil)
+	if timeline.Status != http.StatusOK {
+		t.Fatalf("list timeline: %d %s", timeline.Status, timeline.Raw)
+	}
+	entries, _ := timeline.JSON["entries"].([]any)
+	if len(entries) != 1 {
+		t.Fatalf("timeline entries = %v, want 1", entries)
+	}
+	if first := entries[0].(map[string]any); first["caretakerName"] != "Mamma" {
+		t.Errorf("timeline caretakerName = %v, want the nickname", first["caretakerName"])
+	}
 }

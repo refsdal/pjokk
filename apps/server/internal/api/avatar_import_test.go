@@ -1,9 +1,12 @@
 package api_test
 
 import (
+	"bytes"
 	"context"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -146,6 +149,46 @@ func TestGoogleAvatarImportRefusesRedirectsOffTheAllowlist(t *testing.T) {
 	}
 	if n := atomic.LoadInt32(&hits); n != 1 {
 		t.Errorf("redirecting server hit %d times, want 1", n)
+	}
+}
+
+// TestGoogleAvatarImportFailureLogDoesNotLeakURL pins the fix for a
+// *url.Error's Error() embedding the full request URL: http.Client.Do
+// returns one on a transport failure, and logging it unwrapped would print
+// a stable pseudonymous Google identifier (the picture URL, host:port and
+// path included) into logs this project cannot later erase.
+func TestGoogleAvatarImportFailureLogDoesNotLeakURL(t *testing.T) {
+	a := testrig.App(t)
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		panic(http.ErrAbortHandler)
+	}))
+	t.Cleanup(srv.Close)
+
+	a.Configure(func(d *api.Deps) {
+		d.AvatarImport = &api.AvatarImporter{Client: srv.Client(), AllowedHost: allowAll}
+	})
+	id := a.SignUp("Google Person", "leak@example.com")
+	setGoogleImage(t, a, id, srv.URL+"/photo=s96-c")
+	cookie := a.SignIn("leak@example.com")
+
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stderr)
+
+	res := a.Do(http.MethodGet, "/api/me", cookie, nil)
+	if res.Status != http.StatusOK {
+		t.Fatalf("GET /api/me must not fail because the import did: %d %s", res.Status, res.Raw)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "avatar import for") {
+		t.Errorf("log output = %q, want it to contain the avatar import line", out)
+	}
+	if host := strings.TrimPrefix(srv.URL, "https://"); strings.Contains(out, host) {
+		t.Errorf("log output leaked the server's host:port %q: %s", host, out)
+	}
+	if strings.Contains(out, "/photo") {
+		t.Errorf("log output leaked the request path: %s", out)
 	}
 }
 

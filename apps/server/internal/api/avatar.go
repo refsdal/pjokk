@@ -234,7 +234,8 @@ func (d Deps) getUserAvatar(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(w, body)
 }
 
-// sessionChain is the hand-routed twin of authChain's tierSession, plus
+// sessionChain is the hand-routed twin of authChain's tierSession — WITHOUT
+// captureHTTP (no avatar route writes a session-refresh cookie) and WITH
 // RejectAPIKey: apiKey → session → requireSession → rejectAPIKey.
 func sessionChain(d Deps) func(http.Handler) http.Handler {
 	mwDeps := middleware.Deps{Auth: d.Auth, Q: d.Q, RateLimit: d.RateLimit, Now: d.Now}
