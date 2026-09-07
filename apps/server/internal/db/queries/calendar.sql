@@ -13,21 +13,43 @@
 -- sweep's idempotency latch (see 00001_init.sql's reminded_at column).
 
 -- name: ListCalendarEvents :many
+-- One-offs starting in [from, to), plus every SERIES that could have an
+-- occurrence there (started before `to`, not ended before `from`) — the
+-- occurrences themselves are expanded in Go (internal/recur), so a series
+-- row comes back once and internal/api/calendar.go fans it out.
 SELECT
     e."id", e."title", e."description", e."location", e."category",
     e."start_time", e."all_day", e."duration_min", e."remind_minutes_before",
+    e."recurrence", e."recurrence_until",
     e."created_by", COALESCE(u."display_name", '') AS created_by_name
 FROM "calendar_event" e
 JOIN "users" u ON u."id" = e."created_by"
 WHERE e."family_id" = sqlc.arg(family_id)
-  AND e."start_time" >= sqlc.arg(from_time)
-  AND e."start_time" < sqlc.arg(to_time)
+  AND (
+    (e."recurrence" = 'none' AND e."start_time" >= sqlc.arg(from_time) AND e."start_time" < sqlc.arg(to_time))
+    OR (e."recurrence" <> 'none' AND e."start_time" < sqlc.arg(to_time)
+        AND (e."recurrence_until" IS NULL OR e."recurrence_until" >= sqlc.arg(from_time)))
+  )
+ORDER BY e."start_time" ASC, e."id" ASC;
+
+-- name: ListAllCalendarEvents :many
+-- Every event of the family, for the ICS feed (internal/api/ics.go), which
+-- hands series to the calendar client as RRULEs rather than expanding.
+SELECT
+    e."id", e."title", e."description", e."location", e."category",
+    e."start_time", e."all_day", e."duration_min", e."remind_minutes_before",
+    e."recurrence", e."recurrence_until", e."created_at",
+    e."created_by", COALESCE(u."display_name", '') AS created_by_name
+FROM "calendar_event" e
+JOIN "users" u ON u."id" = e."created_by"
+WHERE e."family_id" = sqlc.arg(family_id)
 ORDER BY e."start_time" ASC, e."id" ASC;
 
 -- name: GetCalendarEvent :one
 SELECT
     e."id", e."title", e."description", e."location", e."category",
     e."start_time", e."all_day", e."duration_min", e."remind_minutes_before",
+    e."recurrence", e."recurrence_until",
     e."created_by", COALESCE(u."display_name", '') AS created_by_name
 FROM "calendar_event" e
 JOIN "users" u ON u."id" = e."created_by"
@@ -36,8 +58,9 @@ WHERE e."family_id" = $1 AND e."id" = $2;
 -- name: CreateCalendarEvent :one
 INSERT INTO "calendar_event"
     ("family_id", "created_by", "title", "description", "location",
-     "category", "start_time", "all_day", "duration_min", "remind_minutes_before")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     "category", "start_time", "all_day", "duration_min", "remind_minutes_before",
+     "recurrence", "recurrence_until")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 RETURNING "id";
 
 -- name: UpdateCalendarEvent :execrows
@@ -51,6 +74,8 @@ SET
     "all_day" = CASE WHEN sqlc.arg(all_day_set)::bool THEN sqlc.narg(all_day_val)::bool ELSE "all_day" END,
     "duration_min" = CASE WHEN sqlc.arg(duration_min_set)::bool THEN sqlc.narg(duration_min_val)::integer ELSE "duration_min" END,
     "remind_minutes_before" = CASE WHEN sqlc.arg(remind_minutes_before_set)::bool THEN sqlc.narg(remind_minutes_before_val)::integer ELSE "remind_minutes_before" END,
+    "recurrence" = CASE WHEN sqlc.arg(recurrence_set)::bool THEN sqlc.arg(recurrence_val)::text ELSE "recurrence" END,
+    "recurrence_until" = CASE WHEN sqlc.arg(recurrence_until_set)::bool THEN sqlc.narg(recurrence_until_val)::timestamptz ELSE "recurrence_until" END,
     "reminded_at" = CASE WHEN sqlc.arg(clear_reminded_at)::bool THEN NULL ELSE "reminded_at" END
 WHERE "family_id" = sqlc.arg(family_id) AND "id" = sqlc.arg(id);
 

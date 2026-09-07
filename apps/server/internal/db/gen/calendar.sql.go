@@ -166,8 +166,9 @@ func (q *Queries) CreateCalendarAssignee(ctx context.Context, arg CreateCalendar
 const createCalendarEvent = `-- name: CreateCalendarEvent :one
 INSERT INTO "calendar_event"
     ("family_id", "created_by", "title", "description", "location",
-     "category", "start_time", "all_day", "duration_min", "remind_minutes_before")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     "category", "start_time", "all_day", "duration_min", "remind_minutes_before",
+     "recurrence", "recurrence_until")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 RETURNING "id"
 `
 
@@ -182,6 +183,8 @@ type CreateCalendarEventParams struct {
 	AllDay              bool
 	DurationMin         *int32
 	RemindMinutesBefore *int32
+	Recurrence          string
+	RecurrenceUntil     pgtype.Timestamptz
 }
 
 func (q *Queries) CreateCalendarEvent(ctx context.Context, arg CreateCalendarEventParams) (string, error) {
@@ -196,6 +199,8 @@ func (q *Queries) CreateCalendarEvent(ctx context.Context, arg CreateCalendarEve
 		arg.AllDay,
 		arg.DurationMin,
 		arg.RemindMinutesBefore,
+		arg.Recurrence,
+		arg.RecurrenceUntil,
 	)
 	var id string
 	err := row.Scan(&id)
@@ -256,6 +261,7 @@ const getCalendarEvent = `-- name: GetCalendarEvent :one
 SELECT
     e."id", e."title", e."description", e."location", e."category",
     e."start_time", e."all_day", e."duration_min", e."remind_minutes_before",
+    e."recurrence", e."recurrence_until",
     e."created_by", COALESCE(u."display_name", '') AS created_by_name
 FROM "calendar_event" e
 JOIN "users" u ON u."id" = e."created_by"
@@ -277,6 +283,8 @@ type GetCalendarEventRow struct {
 	AllDay              bool
 	DurationMin         *int32
 	RemindMinutesBefore *int32
+	Recurrence          string
+	RecurrenceUntil     pgtype.Timestamptz
 	CreatedBy           string
 	CreatedByName       string
 }
@@ -294,10 +302,78 @@ func (q *Queries) GetCalendarEvent(ctx context.Context, arg GetCalendarEventPara
 		&i.AllDay,
 		&i.DurationMin,
 		&i.RemindMinutesBefore,
+		&i.Recurrence,
+		&i.RecurrenceUntil,
 		&i.CreatedBy,
 		&i.CreatedByName,
 	)
 	return i, err
+}
+
+const listAllCalendarEvents = `-- name: ListAllCalendarEvents :many
+SELECT
+    e."id", e."title", e."description", e."location", e."category",
+    e."start_time", e."all_day", e."duration_min", e."remind_minutes_before",
+    e."recurrence", e."recurrence_until", e."created_at",
+    e."created_by", COALESCE(u."display_name", '') AS created_by_name
+FROM "calendar_event" e
+JOIN "users" u ON u."id" = e."created_by"
+WHERE e."family_id" = $1
+ORDER BY e."start_time" ASC, e."id" ASC
+`
+
+type ListAllCalendarEventsRow struct {
+	ID                  string
+	Title               string
+	Description         *string
+	Location            *string
+	Category            string
+	StartTime           pgtype.Timestamptz
+	AllDay              bool
+	DurationMin         *int32
+	RemindMinutesBefore *int32
+	Recurrence          string
+	RecurrenceUntil     pgtype.Timestamptz
+	CreatedAt           pgtype.Timestamptz
+	CreatedBy           string
+	CreatedByName       string
+}
+
+// Every event of the family, for the ICS feed (internal/api/ics.go), which
+// hands series to the calendar client as RRULEs rather than expanding.
+func (q *Queries) ListAllCalendarEvents(ctx context.Context, familyID string) ([]ListAllCalendarEventsRow, error) {
+	rows, err := q.db.Query(ctx, listAllCalendarEvents, familyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAllCalendarEventsRow
+	for rows.Next() {
+		var i ListAllCalendarEventsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Description,
+			&i.Location,
+			&i.Category,
+			&i.StartTime,
+			&i.AllDay,
+			&i.DurationMin,
+			&i.RemindMinutesBefore,
+			&i.Recurrence,
+			&i.RecurrenceUntil,
+			&i.CreatedAt,
+			&i.CreatedBy,
+			&i.CreatedByName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listCalendarEvents = `-- name: ListCalendarEvents :many
@@ -305,12 +381,16 @@ const listCalendarEvents = `-- name: ListCalendarEvents :many
 SELECT
     e."id", e."title", e."description", e."location", e."category",
     e."start_time", e."all_day", e."duration_min", e."remind_minutes_before",
+    e."recurrence", e."recurrence_until",
     e."created_by", COALESCE(u."display_name", '') AS created_by_name
 FROM "calendar_event" e
 JOIN "users" u ON u."id" = e."created_by"
 WHERE e."family_id" = $1
-  AND e."start_time" >= $2
-  AND e."start_time" < $3
+  AND (
+    (e."recurrence" = 'none' AND e."start_time" >= $2 AND e."start_time" < $3)
+    OR (e."recurrence" <> 'none' AND e."start_time" < $3
+        AND (e."recurrence_until" IS NULL OR e."recurrence_until" >= $2))
+  )
 ORDER BY e."start_time" ASC, e."id" ASC
 `
 
@@ -330,6 +410,8 @@ type ListCalendarEventsRow struct {
 	AllDay              bool
 	DurationMin         *int32
 	RemindMinutesBefore *int32
+	Recurrence          string
+	RecurrenceUntil     pgtype.Timestamptz
 	CreatedBy           string
 	CreatedByName       string
 }
@@ -347,6 +429,10 @@ type ListCalendarEventsRow struct {
 // clear_reminded_at, which internal/api/calendar.go sets whenever the
 // patch touches startTime or remindMinutesBefore — re-arming the reminder
 // sweep's idempotency latch (see 00001_init.sql's reminded_at column).
+// One-offs starting in [from, to), plus every SERIES that could have an
+// occurrence there (started before `to`, not ended before `from`) — the
+// occurrences themselves are expanded in Go (internal/recur), so a series
+// row comes back once and internal/api/calendar.go fans it out.
 func (q *Queries) ListCalendarEvents(ctx context.Context, arg ListCalendarEventsParams) ([]ListCalendarEventsRow, error) {
 	rows, err := q.db.Query(ctx, listCalendarEvents, arg.FamilyID, arg.FromTime, arg.ToTime)
 	if err != nil {
@@ -366,6 +452,8 @@ func (q *Queries) ListCalendarEvents(ctx context.Context, arg ListCalendarEvents
 			&i.AllDay,
 			&i.DurationMin,
 			&i.RemindMinutesBefore,
+			&i.Recurrence,
+			&i.RecurrenceUntil,
 			&i.CreatedBy,
 			&i.CreatedByName,
 		); err != nil {
@@ -390,8 +478,10 @@ SET
     "all_day" = CASE WHEN $11::bool THEN $12::bool ELSE "all_day" END,
     "duration_min" = CASE WHEN $13::bool THEN $14::integer ELSE "duration_min" END,
     "remind_minutes_before" = CASE WHEN $15::bool THEN $16::integer ELSE "remind_minutes_before" END,
-    "reminded_at" = CASE WHEN $17::bool THEN NULL ELSE "reminded_at" END
-WHERE "family_id" = $18 AND "id" = $19
+    "recurrence" = CASE WHEN $17::bool THEN $18::text ELSE "recurrence" END,
+    "recurrence_until" = CASE WHEN $19::bool THEN $20::timestamptz ELSE "recurrence_until" END,
+    "reminded_at" = CASE WHEN $21::bool THEN NULL ELSE "reminded_at" END
+WHERE "family_id" = $22 AND "id" = $23
 `
 
 type UpdateCalendarEventParams struct {
@@ -411,6 +501,10 @@ type UpdateCalendarEventParams struct {
 	DurationMinVal         *int32
 	RemindMinutesBeforeSet bool
 	RemindMinutesBeforeVal *int32
+	RecurrenceSet          bool
+	RecurrenceVal          string
+	RecurrenceUntilSet     bool
+	RecurrenceUntilVal     pgtype.Timestamptz
 	ClearRemindedAt        bool
 	FamilyID               string
 	ID                     string
@@ -434,6 +528,10 @@ func (q *Queries) UpdateCalendarEvent(ctx context.Context, arg UpdateCalendarEve
 		arg.DurationMinVal,
 		arg.RemindMinutesBeforeSet,
 		arg.RemindMinutesBeforeVal,
+		arg.RecurrenceSet,
+		arg.RecurrenceVal,
+		arg.RecurrenceUntilSet,
+		arg.RecurrenceUntilVal,
 		arg.ClearRemindedAt,
 		arg.FamilyID,
 		arg.ID,

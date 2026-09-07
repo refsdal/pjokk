@@ -56,6 +56,36 @@ func (e CalendarEventCategory) Valid() bool {
 	}
 }
 
+// Defines values for CalendarEventRecurrence.
+const (
+	CalendarEventRecurrenceBiweekly CalendarEventRecurrence = "biweekly"
+	CalendarEventRecurrenceDaily    CalendarEventRecurrence = "daily"
+	CalendarEventRecurrenceMonthly  CalendarEventRecurrence = "monthly"
+	CalendarEventRecurrenceNone     CalendarEventRecurrence = "none"
+	CalendarEventRecurrenceWeekly   CalendarEventRecurrence = "weekly"
+	CalendarEventRecurrenceYearly   CalendarEventRecurrence = "yearly"
+)
+
+// Valid indicates whether the value is a known member of the CalendarEventRecurrence enum.
+func (e CalendarEventRecurrence) Valid() bool {
+	switch e {
+	case CalendarEventRecurrenceBiweekly:
+		return true
+	case CalendarEventRecurrenceDaily:
+		return true
+	case CalendarEventRecurrenceMonthly:
+		return true
+	case CalendarEventRecurrenceNone:
+		return true
+	case CalendarEventRecurrenceWeekly:
+		return true
+	case CalendarEventRecurrenceYearly:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ContactIcon.
 const (
 	ContactIconDaycare     ContactIcon = "daycare"
@@ -137,6 +167,36 @@ func (e CreateCalendarEventCategory) Valid() bool {
 	case CreateCalendarEventCategoryOther:
 		return true
 	case CreateCalendarEventCategoryVaccination:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateCalendarEventRecurrence.
+const (
+	CreateCalendarEventRecurrenceBiweekly CreateCalendarEventRecurrence = "biweekly"
+	CreateCalendarEventRecurrenceDaily    CreateCalendarEventRecurrence = "daily"
+	CreateCalendarEventRecurrenceMonthly  CreateCalendarEventRecurrence = "monthly"
+	CreateCalendarEventRecurrenceNone     CreateCalendarEventRecurrence = "none"
+	CreateCalendarEventRecurrenceWeekly   CreateCalendarEventRecurrence = "weekly"
+	CreateCalendarEventRecurrenceYearly   CreateCalendarEventRecurrence = "yearly"
+)
+
+// Valid indicates whether the value is a known member of the CreateCalendarEventRecurrence enum.
+func (e CreateCalendarEventRecurrence) Valid() bool {
+	switch e {
+	case CreateCalendarEventRecurrenceBiweekly:
+		return true
+	case CreateCalendarEventRecurrenceDaily:
+		return true
+	case CreateCalendarEventRecurrenceMonthly:
+		return true
+	case CreateCalendarEventRecurrenceNone:
+		return true
+	case CreateCalendarEventRecurrenceWeekly:
+		return true
+	case CreateCalendarEventRecurrenceYearly:
 		return true
 	default:
 		return false
@@ -1172,6 +1232,36 @@ func (e UpdateCalendarEventCategory) Valid() bool {
 	}
 }
 
+// Defines values for UpdateCalendarEventRecurrence.
+const (
+	UpdateCalendarEventRecurrenceBiweekly UpdateCalendarEventRecurrence = "biweekly"
+	UpdateCalendarEventRecurrenceDaily    UpdateCalendarEventRecurrence = "daily"
+	UpdateCalendarEventRecurrenceMonthly  UpdateCalendarEventRecurrence = "monthly"
+	UpdateCalendarEventRecurrenceNone     UpdateCalendarEventRecurrence = "none"
+	UpdateCalendarEventRecurrenceWeekly   UpdateCalendarEventRecurrence = "weekly"
+	UpdateCalendarEventRecurrenceYearly   UpdateCalendarEventRecurrence = "yearly"
+)
+
+// Valid indicates whether the value is a known member of the UpdateCalendarEventRecurrence enum.
+func (e UpdateCalendarEventRecurrence) Valid() bool {
+	switch e {
+	case UpdateCalendarEventRecurrenceBiweekly:
+		return true
+	case UpdateCalendarEventRecurrenceDaily:
+		return true
+	case UpdateCalendarEventRecurrenceMonthly:
+		return true
+	case UpdateCalendarEventRecurrenceNone:
+		return true
+	case UpdateCalendarEventRecurrenceWeekly:
+		return true
+	case UpdateCalendarEventRecurrenceYearly:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UpdateContactIcon.
 const (
 	UpdateContactIconDaycare     UpdateContactIcon = "daycare"
@@ -1680,20 +1770,34 @@ type CalendarEvent struct {
 		Id   string `json:"id"`
 		Name string `json:"name"`
 	} `json:"babies"`
-	Category            CalendarEventCategory `json:"category"`
-	CreatedBy           string                `json:"createdBy"`
-	CreatedByName       string                `json:"createdByName"`
-	Description         *string               `json:"description"`
-	DurationMin         *int32                `json:"durationMin"`
-	Id                  string                `json:"id"`
-	Location            *string               `json:"location"`
-	RemindMinutesBefore *int32                `json:"remindMinutesBefore"`
-	StartTime           time.Time             `json:"startTime"`
-	Title               string                `json:"title"`
+	Category      CalendarEventCategory `json:"category"`
+	CreatedBy     string                `json:"createdBy"`
+	CreatedByName string                `json:"createdByName"`
+	Description   *string               `json:"description"`
+	DurationMin   *int32                `json:"durationMin"`
+	Id            string                `json:"id"`
+	Location      *string               `json:"location"`
+
+	// Recurrence Steps on the local calendar (Europe/Oslo), so a daily 08:00 stays 08:00 across DST; monthly/yearly clamp the day.
+	Recurrence CalendarEventRecurrence `json:"recurrence"`
+
+	// RecurrenceUntil Last allowed occurrence start (inclusive); null = forever.
+	RecurrenceUntil     *time.Time `json:"recurrenceUntil"`
+	RemindMinutesBefore *int32     `json:"remindMinutesBefore"`
+
+	// SeriesStart The stored start of the series (equals startTime for a one-off).
+	SeriesStart time.Time `json:"seriesStart"`
+
+	// StartTime This occurrence's start. A series is returned once per occurrence in the window, all sharing the id (issue #52).
+	StartTime time.Time `json:"startTime"`
+	Title     string    `json:"title"`
 }
 
 // CalendarEventCategory defines model for CalendarEvent.Category.
 type CalendarEventCategory string
+
+// CalendarEventRecurrence Steps on the local calendar (Europe/Oslo), so a daily 08:00 stays 08:00 across DST; monthly/yearly clamp the day.
+type CalendarEventRecurrence string
 
 // Contact One entry in the family's address book. Zero linked babies means the contact belongs to the whole family. Free (no plan gate — see internal/api/contacts.go).
 type Contact struct {
@@ -1743,20 +1847,29 @@ type CreateBath struct {
 // CreateCalendarEvent defines model for CreateCalendarEvent.
 type CreateCalendarEvent struct {
 	// AllDay All-day events are single-day; the server nulls durationMin when set.
-	AllDay              *bool                        `json:"allDay,omitempty"`
-	AssigneeUserIds     *[]string                    `json:"assigneeUserIds,omitempty"`
-	BabyIds             *[]string                    `json:"babyIds,omitempty"`
-	Category            *CreateCalendarEventCategory `json:"category,omitempty"`
-	Description         *string                      `json:"description,omitempty"`
-	DurationMin         *int32                       `json:"durationMin,omitempty"`
-	Location            *string                      `json:"location,omitempty"`
-	RemindMinutesBefore *int32                       `json:"remindMinutesBefore,omitempty"`
-	StartTime           time.Time                    `json:"startTime"`
-	Title               string                       `json:"title"`
+	AllDay          *bool                        `json:"allDay,omitempty"`
+	AssigneeUserIds *[]string                    `json:"assigneeUserIds,omitempty"`
+	BabyIds         *[]string                    `json:"babyIds,omitempty"`
+	Category        *CreateCalendarEventCategory `json:"category,omitempty"`
+	Description     *string                      `json:"description,omitempty"`
+	DurationMin     *int32                       `json:"durationMin,omitempty"`
+	Location        *string                      `json:"location,omitempty"`
+
+	// Recurrence Omitted means none.
+	Recurrence *CreateCalendarEventRecurrence `json:"recurrence,omitempty"`
+
+	// RecurrenceUntil Inclusive on the occurrence start; ignored when recurrence is none.
+	RecurrenceUntil     *time.Time `json:"recurrenceUntil,omitempty"`
+	RemindMinutesBefore *int32     `json:"remindMinutesBefore,omitempty"`
+	StartTime           time.Time  `json:"startTime"`
+	Title               string     `json:"title"`
 }
 
 // CreateCalendarEventCategory defines model for CreateCalendarEvent.Category.
 type CreateCalendarEventCategory string
+
+// CreateCalendarEventRecurrence Omitted means none.
+type CreateCalendarEventRecurrence string
 
 // CreateContact defines model for CreateContact.
 type CreateContact struct {
@@ -2610,20 +2723,25 @@ type UpdateBath struct {
 
 // UpdateCalendarEvent Every field is optional; an empty object is a no-op. `description`/`location`/`durationMin`/`remindMinutesBefore` may also be sent as `null` to CLEAR that column; `title`/`category`/ `startTime`/`allDay` are not nullable — only settable or omitted. `babyIds`/`assigneeUserIds`, when present, REPLACE the link set; omitted leaves it untouched (see internal/api/calendar.go).
 type UpdateCalendarEvent struct {
-	AllDay              *bool                        `json:"allDay,omitempty"`
-	AssigneeUserIds     *[]string                    `json:"assigneeUserIds,omitempty"`
-	BabyIds             *[]string                    `json:"babyIds,omitempty"`
-	Category            *UpdateCalendarEventCategory `json:"category,omitempty"`
-	Description         *string                      `json:"description,omitempty"`
-	DurationMin         *int32                       `json:"durationMin,omitempty"`
-	Location            *string                      `json:"location,omitempty"`
-	RemindMinutesBefore *int32                       `json:"remindMinutesBefore,omitempty"`
-	StartTime           *time.Time                   `json:"startTime,omitempty"`
-	Title               *string                      `json:"title,omitempty"`
+	AllDay              *bool                          `json:"allDay,omitempty"`
+	AssigneeUserIds     *[]string                      `json:"assigneeUserIds,omitempty"`
+	BabyIds             *[]string                      `json:"babyIds,omitempty"`
+	Category            *UpdateCalendarEventCategory   `json:"category,omitempty"`
+	Description         *string                        `json:"description,omitempty"`
+	DurationMin         *int32                         `json:"durationMin,omitempty"`
+	Location            *string                        `json:"location,omitempty"`
+	Recurrence          *UpdateCalendarEventRecurrence `json:"recurrence,omitempty"`
+	RecurrenceUntil     *time.Time                     `json:"recurrenceUntil,omitempty"`
+	RemindMinutesBefore *int32                         `json:"remindMinutesBefore,omitempty"`
+	StartTime           *time.Time                     `json:"startTime,omitempty"`
+	Title               *string                        `json:"title,omitempty"`
 }
 
 // UpdateCalendarEventCategory defines model for UpdateCalendarEvent.Category.
 type UpdateCalendarEventCategory string
+
+// UpdateCalendarEventRecurrence defines model for UpdateCalendarEvent.Recurrence.
+type UpdateCalendarEventRecurrence string
 
 // UpdateContact Every field is optional; an empty object is a no-op. `role`/`icon`/`phone`/`email`/`website`/`notes` may also be sent as `null` to CLEAR that column; `name` is not nullable — only settable or omitted. `babyIds`, when present, REPLACES the link set; omitted leaves it untouched.
 type UpdateContact struct {
@@ -2994,6 +3112,9 @@ type ListTimelineParams struct {
 	Before *string                   `form:"before,omitempty" json:"before,omitempty"`
 	Limit  *int                      `form:"limit,omitempty" json:"limit,omitempty"`
 	Filter *ListTimelineParamsFilter `form:"filter,omitempty" json:"filter,omitempty"`
+
+	// Q Case-insensitive substring search (issue #52) over each kind's free text — notes everywhere, plus medicine and vaccine names, milestone titles, note bodies, solids food and sleep location. Combines with `filter`.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
 }
 
 // ListTimelineParamsFilter defines parameters for ListTimeline.

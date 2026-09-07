@@ -291,12 +291,13 @@ func (d Deps) ListTimeline(ctx context.Context, req gen.ListTimelineRequestObjec
 	// other = !q.filter || q.filter === "other"` exactly.
 	core := filter == ""
 	other := filter == "" || filter == "other"
+	q := timelineSearchPattern(req.Params.Q)
 
 	feedRows, err := fetchTimelinePage(ctx, core || filter == "feeds",
 		func(ctx context.Context) ([]dbgen.ListFeedsPageRow, error) {
 			return d.Q.ListFeedsPage(ctx, dbgen.ListFeedsPageParams{
 				FamilyID: fam.FamilyID, BabyID: babyID,
-				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit,
+				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit, Q: q,
 			})
 		}, timelineFeedRow)
 	if err != nil {
@@ -307,7 +308,7 @@ func (d Deps) ListTimeline(ctx context.Context, req gen.ListTimelineRequestObjec
 		func(ctx context.Context) ([]dbgen.ListDiapersPageRow, error) {
 			return d.Q.ListDiapersPage(ctx, dbgen.ListDiapersPageParams{
 				FamilyID: fam.FamilyID, BabyID: babyID,
-				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit,
+				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit, Q: q,
 			})
 		}, timelineDiaperRow)
 	if err != nil {
@@ -318,7 +319,7 @@ func (d Deps) ListTimeline(ctx context.Context, req gen.ListTimelineRequestObjec
 		func(ctx context.Context) ([]dbgen.ListSleepsPageRow, error) {
 			return d.Q.ListSleepsPage(ctx, dbgen.ListSleepsPageParams{
 				FamilyID: fam.FamilyID, BabyID: babyID,
-				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit,
+				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit, Q: q,
 			})
 		}, timelineSleepRow)
 	if err != nil {
@@ -329,7 +330,7 @@ func (d Deps) ListTimeline(ctx context.Context, req gen.ListTimelineRequestObjec
 		func(ctx context.Context) ([]dbgen.ListMedicinePageRow, error) {
 			return d.Q.ListMedicinePage(ctx, dbgen.ListMedicinePageParams{
 				FamilyID: fam.FamilyID, BabyID: babyID,
-				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit,
+				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit, Q: q,
 			})
 		}, timelineMedicineRow)
 	if err != nil {
@@ -340,7 +341,7 @@ func (d Deps) ListTimeline(ctx context.Context, req gen.ListTimelineRequestObjec
 		func(ctx context.Context) ([]dbgen.ListBathsPageRow, error) {
 			return d.Q.ListBathsPage(ctx, dbgen.ListBathsPageParams{
 				FamilyID: fam.FamilyID, BabyID: babyID,
-				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit,
+				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit, Q: q,
 			})
 		}, timelineBathRow)
 	if err != nil {
@@ -351,7 +352,7 @@ func (d Deps) ListTimeline(ctx context.Context, req gen.ListTimelineRequestObjec
 		func(ctx context.Context) ([]dbgen.ListNotesPageRow, error) {
 			return d.Q.ListNotesPage(ctx, dbgen.ListNotesPageParams{
 				FamilyID: fam.FamilyID, BabyID: babyID,
-				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit,
+				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit, Q: q,
 			})
 		}, timelineNoteRow)
 	if err != nil {
@@ -364,7 +365,7 @@ func (d Deps) ListTimeline(ctx context.Context, req gen.ListTimelineRequestObjec
 	if other {
 		mRows, err := d.Q.ListMilestonesPage(ctx, dbgen.ListMilestonesPageParams{
 			FamilyID: fam.FamilyID, BabyID: babyID,
-			CursorTime: cursor.time, CursorID: cursor.id, Lim: limit,
+			CursorTime: cursor.time, CursorID: cursor.id, Lim: limit, Q: q,
 		})
 		if err != nil {
 			return nil, err
@@ -387,7 +388,7 @@ func (d Deps) ListTimeline(ctx context.Context, req gen.ListTimelineRequestObjec
 		func(ctx context.Context) ([]dbgen.ListMeasurementsPageRow, error) {
 			return d.Q.ListMeasurementsPage(ctx, dbgen.ListMeasurementsPageParams{
 				FamilyID: fam.FamilyID, BabyID: babyID,
-				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit,
+				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit, Q: q,
 			})
 		}, timelineMeasurementRow)
 	if err != nil {
@@ -398,7 +399,7 @@ func (d Deps) ListTimeline(ctx context.Context, req gen.ListTimelineRequestObjec
 		func(ctx context.Context) ([]dbgen.ListPumpsPageRow, error) {
 			return d.Q.ListPumpsPage(ctx, dbgen.ListPumpsPageParams{
 				FamilyID: fam.FamilyID, BabyID: babyID,
-				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit,
+				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit, Q: q,
 			})
 		}, timelinePumpRow)
 	if err != nil {
@@ -409,7 +410,7 @@ func (d Deps) ListTimeline(ctx context.Context, req gen.ListTimelineRequestObjec
 		func(ctx context.Context) ([]dbgen.ListPlaysPageRow, error) {
 			return d.Q.ListPlaysPage(ctx, dbgen.ListPlaysPageParams{
 				FamilyID: fam.FamilyID, BabyID: babyID,
-				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit,
+				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit, Q: q,
 			})
 		}, timelinePlayRow)
 	if err != nil {
@@ -423,7 +424,7 @@ func (d Deps) ListTimeline(ctx context.Context, req gen.ListTimelineRequestObjec
 	if other {
 		vRows, err := d.Q.ListVaccinesPage(ctx, dbgen.ListVaccinesPageParams{
 			FamilyID: fam.FamilyID, BabyID: babyID,
-			CursorTime: cursor.time, CursorID: cursor.id, Lim: limit,
+			CursorTime: cursor.time, CursorID: cursor.id, Lim: limit, Q: q,
 		})
 		if err != nil {
 			return nil, err
@@ -501,4 +502,21 @@ func (d Deps) ListTimeline(ctx context.Context, req gen.ListTimelineRequestObjec
 	}
 
 	return gen.ListTimeline200JSONResponse{Entries: entries, NextCursor: nextCursor}, nil
+}
+
+// timelineSearchPattern turns ?q into the ILIKE pattern the page queries
+// take (issue #52): trimmed, with % and _ escaped so a literal underscore
+// in a medicine name matches only itself, wrapped in %…%. nil for no
+// search or a blank term.
+func timelineSearchPattern(q *string) *string {
+	if q == nil {
+		return nil
+	}
+	term := strings.TrimSpace(*q)
+	if term == "" {
+		return nil
+	}
+	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	p := "%" + r.Replace(term) + "%"
+	return &p
 }

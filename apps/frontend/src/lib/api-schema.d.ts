@@ -2233,8 +2233,26 @@ export interface components {
             location: string | null;
             /** @enum {string} */
             category: "doctor" | "vaccination" | "babysitting" | "family" | "other";
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description This occurrence's start. A series is returned once per occurrence in the window, all sharing the id (issue #52).
+             */
             startTime: string;
+            /**
+             * @description Steps on the local calendar (Europe/Oslo), so a daily 08:00 stays 08:00 across DST; monthly/yearly clamp the day.
+             * @enum {string}
+             */
+            recurrence: "none" | "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
+            /**
+             * Format: date-time
+             * @description Last allowed occurrence start (inclusive); null = forever.
+             */
+            recurrenceUntil: string | null;
+            /**
+             * Format: date-time
+             * @description The stored start of the series (equals startTime for a one-off).
+             */
+            seriesStart: string;
             allDay: boolean;
             /** Format: int32 */
             durationMin: number | null;
@@ -2276,6 +2294,16 @@ export interface components {
             babyIds: string[];
             /** @default [] */
             assigneeUserIds: string[];
+            /**
+             * @description Omitted means none.
+             * @enum {string}
+             */
+            recurrence?: "none" | "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
+            /**
+             * Format: date-time
+             * @description Inclusive on the occurrence start; ignored when recurrence is none.
+             */
+            recurrenceUntil?: string;
         };
         /** @description Every field is optional; an empty object is a no-op. `description`/`location`/`durationMin`/`remindMinutesBefore` may also be sent as `null` to CLEAR that column; `title`/`category`/ `startTime`/`allDay` are not nullable — only settable or omitted. `babyIds`/`assigneeUserIds`, when present, REPLACE the link set; omitted leaves it untouched (see internal/api/calendar.go). */
         UpdateCalendarEvent: {
@@ -2293,6 +2321,10 @@ export interface components {
             remindMinutesBefore?: number | null;
             babyIds?: string[];
             assigneeUserIds?: string[];
+            /** @enum {string} */
+            recurrence?: "none" | "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
+            /** Format: date-time */
+            recurrenceUntil?: string | null;
         };
         /** @description One entry in the family's address book. Zero linked babies means the contact belongs to the whole family. Free (no plan gate — see internal/api/contacts.go). */
         Contact: {
@@ -5302,6 +5334,8 @@ export interface operations {
                 before?: string;
                 limit?: number;
                 filter?: "feeds" | "diapers" | "sleep" | "other";
+                /** @description Case-insensitive substring search (issue #52) over each kind's free text — notes everywhere, plus medicine and vaccine names, milestone titles, note bodies, solids food and sleep location. Combines with `filter`. */
+                q?: string;
             };
             header?: never;
             path?: never;

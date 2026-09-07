@@ -375,6 +375,28 @@ const nb: Record<string, string> = {
   // Contacts
   Contacts: "Kontakter",
   "Add contact": "Legg til kontakt",
+  Search: "Søk",
+  "Search notes, medicines, milestones…":
+    "Søk i notater, medisiner, milepæler…",
+  "No entries match your search.": "Ingen oppføringer passer til søket.",
+  Repeat: "Gjenta",
+  Never: "Aldri",
+  Daily: "Daglig",
+  Weekly: "Ukentlig",
+  "Every 2 weeks": "Annenhver uke",
+  Monthly: "Månedlig",
+  Yearly: "Årlig",
+  Repeats: "Gjentas",
+  "Changes apply to every occurrence in the series.":
+    "Endringer gjelder alle gjentakelsene i serien.",
+  "Calendar subscription": "Kalenderabonnement",
+  "See the family's events in your phone's calendar or Google Calendar. Repeating events come along as rules.":
+    "Se familiens hendelser i telefonens kalender eller Google Kalender. Gjentakende hendelser blir med som regler.",
+  "This link is a password: anyone who has it can read the family's calendar. It is shown once — copy it now, and revoke it under API keys if it leaks.":
+    "Denne lenken er et passord: alle som har den kan lese familiens kalender. Den vises én gang – kopier den nå, og trekk den tilbake under API-nøkler hvis den lekker.",
+  "Link copied": "Lenke kopiert",
+  "Could not copy": "Kunne ikke kopiere",
+  "Create calendar link": "Lag kalenderlenke",
   Medicines: "Medisiner",
   "Add medicine": "Legg til medisin",
   "Name (e.g. Paracetamol)": "Navn (f.eks. Paracet)",

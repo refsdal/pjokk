@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"sort"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -11,7 +12,17 @@ import (
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
+	"github.com/refsdal/pjokk/server/internal/recur"
 )
+
+// # Recurrence (issue #52)
+//
+// A series is ONE row (recurrence + recurrence_until, 00012). List expands
+// it at read time through internal/recur into one CalendarEvent per
+// occurrence in [from, to), all sharing the id; startTime is the
+// occurrence, seriesStart the stored start. Editing any occurrence edits
+// the series ("this occurrence only" is not v1). Changing the rule or its
+// end re-arms the reminder latch like a start-time change does.
 
 // This file ports apps/api/src/routes/calendar.ts (REF §A1's calendar.ts
 // route table): GET/POST /api/calendar/events, PATCH/DELETE
@@ -63,6 +74,7 @@ import (
 
 func serCalendarEvent(id, title string, description, location *string, category string,
 	startTime pgtype.Timestamptz, allDay bool, durationMin, remindMinutesBefore *int32,
+	recurrence string, recurrenceUntil pgtype.Timestamptz,
 	createdBy, createdByName string,
 	babies []dbgen.CalendarEventBabiesForEventRow, assignees []dbgen.CalendarAssigneesForEventRow,
 ) gen.CalendarEvent {
@@ -73,6 +85,9 @@ func serCalendarEvent(id, title string, description, location *string, category 
 		Location:            location,
 		Category:            gen.CalendarEventCategory(category),
 		StartTime:           startTime.Time,
+		SeriesStart:         startTime.Time,
+		Recurrence:          gen.CalendarEventRecurrence(recurrence),
+		RecurrenceUntil:     tsPtr(recurrenceUntil),
 		AllDay:              allDay,
 		DurationMin:         durationMin,
 		RemindMinutesBefore: remindMinutesBefore,
@@ -105,13 +120,25 @@ func serCalendarEvent(id, title string, description, location *string, category 
 func serCalendarEventRow(row dbgen.GetCalendarEventRow, babies []dbgen.CalendarEventBabiesForEventRow, assignees []dbgen.CalendarAssigneesForEventRow) gen.CalendarEvent {
 	return serCalendarEvent(row.ID, row.Title, row.Description, row.Location, row.Category,
 		row.StartTime, row.AllDay, row.DurationMin, row.RemindMinutesBefore,
+		row.Recurrence, row.RecurrenceUntil,
 		row.CreatedBy, row.CreatedByName, babies, assignees)
 }
 
 func serCalendarEventListRow(row dbgen.ListCalendarEventsRow, babies []dbgen.CalendarEventBabiesForEventRow, assignees []dbgen.CalendarAssigneesForEventRow) gen.CalendarEvent {
 	return serCalendarEvent(row.ID, row.Title, row.Description, row.Location, row.Category,
 		row.StartTime, row.AllDay, row.DurationMin, row.RemindMinutesBefore,
+		row.Recurrence, row.RecurrenceUntil,
 		row.CreatedBy, row.CreatedByName, babies, assignees)
+}
+
+// seriesOf is the recur view of a stored row.
+func seriesOf(start pgtype.Timestamptz, recurrence string, until pgtype.Timestamptz) recur.Series {
+	s := recur.Series{Start: start.Time, Rule: recur.Rule(recurrence)}
+	if until.Valid {
+		u := until.Time
+		s.Until = &u
+	}
+	return s
 }
 
 // getCalendarEventHydrated re-reads one event plus both hydrated link
@@ -178,10 +205,25 @@ func (d Deps) ListCalendarEvents(ctx context.Context, req gen.ListCalendarEvents
 		assigneesByEvent[ar.EventID] = append(assigneesByEvent[ar.EventID], dbgen.CalendarAssigneesForEventRow{UserID: ar.UserID, Name: ar.Name})
 	}
 
-	out := make([]gen.CalendarEvent, len(rows))
-	for i, row := range rows {
-		out[i] = serCalendarEventListRow(row, babiesByEvent[row.ID], assigneesByEvent[row.ID])
+	// One entry per occurrence in the window: a one-off is its own single
+	// occurrence, a series fans out, and the merged list is re-sorted
+	// because a series row sorts by its stored start, not its occurrences.
+	out := make([]gen.CalendarEvent, 0, len(rows))
+	for _, row := range rows {
+		base := serCalendarEventListRow(row, babiesByEvent[row.ID], assigneesByEvent[row.ID])
+		for _, occ := range seriesOf(row.StartTime, row.Recurrence, row.RecurrenceUntil).Between(from, to) {
+			e := base
+			// recur steps in Oslo; the wire is UTC like every other timestamp.
+			e.StartTime = occ.UTC()
+			out = append(out, e)
+		}
 	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if !out[i].StartTime.Equal(out[j].StartTime) {
+			return out[i].StartTime.Before(out[j].StartTime)
+		}
+		return out[i].Id < out[j].Id
+	})
 	return gen.ListCalendarEvents200JSONResponse(out), nil
 }
 
@@ -220,6 +262,14 @@ func (d Deps) CreateCalendarEvent(ctx context.Context, req gen.CreateCalendarEve
 	if allDay {
 		durationMin = nil
 	}
+	recurrence := string(gen.CreateCalendarEventRecurrenceNone)
+	if body.Recurrence != nil {
+		recurrence = string(*body.Recurrence)
+	}
+	var until pgtype.Timestamptz
+	if recurrence != string(recur.None) && body.RecurrenceUntil != nil {
+		until = pgtype.Timestamptz{Time: *body.RecurrenceUntil, Valid: true}
+	}
 
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
@@ -239,6 +289,8 @@ func (d Deps) CreateCalendarEvent(ctx context.Context, req gen.CreateCalendarEve
 		AllDay:              allDay,
 		DurationMin:         durationMin,
 		RemindMinutesBefore: body.RemindMinutesBefore,
+		Recurrence:          recurrence,
+		RecurrenceUntil:     until,
 	})
 	if err != nil {
 		return nil, err
@@ -326,6 +378,28 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 	if err != nil {
 		return nil, err
 	}
+	recurrenceSet, recurrenceVal, err := patchField[string](fields, "recurrence")
+	if err != nil {
+		return nil, err
+	}
+	untilSet, untilVal, err := patchField[time.Time](fields, "recurrenceUntil")
+	if err != nil {
+		return nil, err
+	}
+	// The spec forbids a null recurrence; treat one as "none" rather than
+	// writing NULL into a NOT NULL column.
+	recurrenceStr := string(recur.None)
+	if recurrenceVal != nil {
+		recurrenceStr = *recurrenceVal
+	}
+	// Turning a series back into a one-off drops its end date too.
+	if recurrenceSet && recurrenceStr == string(recur.None) {
+		untilSet, untilVal = true, nil
+	}
+	var untilParam pgtype.Timestamptz
+	if untilVal != nil {
+		untilParam = pgtype.Timestamptz{Time: *untilVal, Valid: true}
+	}
 
 	var babyIDs, assigneeIDs []string
 	if babyIdsSet {
@@ -359,10 +433,11 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 		durationSet, durationVal = true, nil
 	}
 
-	// Moving the event (or its reminder) re-arms the sweep latch.
-	rearm := startSet || remindSet
+	// Moving the event (or its reminder, or its recurrence) re-arms the
+	// sweep latch.
+	rearm := startSet || remindSet || recurrenceSet || untilSet
 
-	anySet := titleSet || descSet || locSet || categorySet || startSet || allDaySet || durationSet || remindSet
+	anySet := titleSet || descSet || locSet || categorySet || startSet || allDaySet || durationSet || remindSet || recurrenceSet || untilSet
 
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
@@ -395,6 +470,10 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 			DurationMinVal:         durationVal,
 			RemindMinutesBeforeSet: remindSet,
 			RemindMinutesBeforeVal: remindVal,
+			RecurrenceSet:          recurrenceSet,
+			RecurrenceVal:          recurrenceStr,
+			RecurrenceUntilSet:     untilSet,
+			RecurrenceUntilVal:     untilParam,
 			ClearRemindedAt:        rearm,
 		})
 		if err != nil {

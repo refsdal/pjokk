@@ -2070,3 +2070,46 @@ a photographed clinic card can carry a fødselsnummer) and avatars. A
   authed fetch from the service worker; the issue's other three items
   were free and this one was not. Filed as follow-up material rather than
   shipped as a half.
+
+## 2026-09-07 — search, recurrence and an ICS feed (#52)
+
+- **Timeline search is an ILIKE, not an index.** `?q=` adds one
+  `col ILIKE '%term%'` clause per kind to the existing page queries — the
+  family scope and the keyset cursor stay exactly where they were — with
+  `%`, `_` and `\` escaped so a literal wildcard in a medicine name
+  matches only itself. A trigram index can come when a family's log is
+  large enough to make this slow; none is yet. The field appears on a tap
+  so the default screen keeps its density.
+- **A recurring event is one row, expanded on read.** No materialised
+  occurrences: editing the series is one write, deleting it is one row,
+  and the ICS feed hands the rule to the calendar client as an RRULE
+  instead of hundreds of VEVENTs. Occurrences share the id and carry
+  `seriesStart`, which is what the edit sheet shows — editing any
+  occurrence edits the series, and "this occurrence only" (an exception
+  table) is deliberately not v1. `recurrence_until` is inclusive on the
+  occurrence's start; the sheet sends the end of the chosen day.
+- **The series steps on Europe/Oslo's calendar.** Adding 24 h to a daily
+  08:00 event lands it at 07:00 or 09:00 after a DST change; stepping the
+  local wall clock does not. Oslo is the product's stated locale and the
+  zone the reminder clock already renders in, so `internal/recur` uses it
+  for everyone rather than growing a per-family timezone the calendar
+  has never needed. Monthly/yearly clamp the day (the 31st recurs on the
+  30th, Feb 29 on Feb 28) instead of rolling into the next month.
+- **The reminder latch is per occurrence.** For a series `reminded_at`
+  holds the START of the last reminded occurrence and the job fires when
+  the next occurrence's lead has elapsed and `reminded_at < occurrence`;
+  a re-arm (NULL) still means "not yet", and a week of downtime skips the
+  missed occurrences rather than firing them late — the same grace rule
+  one-offs have. One-offs keep `reminded_at = now` and the SQL-side
+  stale-latch as before.
+- **The ICS key rides in the query string, through the same middleware.**
+  A subscription URL cannot send a header. Rather than a second
+  authentication path, the route lifts `?key=` into the Authorization
+  header when none was sent and then runs the ordinary key chain — the
+  key is checked, expired, touched and read-only-gated exactly as a
+  bearer would be. Settings mints a read-only key named "Calendar
+  subscription" for it, shows the URL once, and points at API keys for
+  revocation; the copy says outright that the link is a password.
+- **DTSTART carries a TZID with a static Oslo VTIMEZONE**, so the client
+  steps the RRULE on the same local calendar `internal/recur` does; a UTC
+  DTSTART would drift the rule an hour at each DST change.

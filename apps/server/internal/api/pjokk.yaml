@@ -2101,6 +2101,18 @@ paths:
           schema:
             type: string
             enum: [feeds, diapers, sleep, other]
+        - name: q
+          in: query
+          required: false
+          description: >-
+            Case-insensitive substring search (issue #52) over each kind's
+            free text — notes everywhere, plus medicine and vaccine names,
+            milestone titles, note bodies, solids food and sleep location.
+            Combines with `filter`.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
       responses:
         "200":
           description: Timeline page.
@@ -4889,6 +4901,9 @@ components:
         - createdByName
         - babies
         - assignees
+        - recurrence
+        - recurrenceUntil
+        - seriesStart
       properties:
         id:
           type: string
@@ -4906,6 +4921,24 @@ components:
         startTime:
           type: string
           format: date-time
+          description: >-
+            This occurrence's start. A series is returned once per
+            occurrence in the window, all sharing the id (issue #52).
+        recurrence:
+          type: string
+          enum: [none, daily, weekly, biweekly, monthly, yearly]
+          description: >-
+            Steps on the local calendar (Europe/Oslo), so a daily 08:00
+            stays 08:00 across DST; monthly/yearly clamp the day.
+        recurrenceUntil:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last allowed occurrence start (inclusive); null = forever.
+        seriesStart:
+          type: string
+          format: date-time
+          description: The stored start of the series (equals startTime for a one-off).
         allDay:
           type: boolean
         durationMin:
@@ -4988,6 +5021,14 @@ components:
           default: []
           items:
             type: string
+        recurrence:
+          type: string
+          enum: [none, daily, weekly, biweekly, monthly, yearly]
+          description: Omitted means none.
+        recurrenceUntil:
+          type: string
+          format: date-time
+          description: Inclusive on the occurrence start; ignored when recurrence is none.
     UpdateCalendarEvent:
       type: object
       description: >-
@@ -5040,6 +5081,13 @@ components:
           maxItems: 20
           items:
             type: string
+        recurrence:
+          type: string
+          enum: [none, daily, weekly, biweekly, monthly, yearly]
+        recurrenceUntil:
+          type: string
+          format: date-time
+          nullable: true
     Contact:
       type: object
       description: >-

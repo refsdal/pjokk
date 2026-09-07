@@ -84,6 +84,8 @@ type CalendarEvent struct {
 	RemindMinutesBefore *int32
 	RemindedAt          pgtype.Timestamptz
 	CreatedAt           pgtype.Timestamptz
+	Recurrence          string
+	RecurrenceUntil     pgtype.Timestamptz
 }
 
 type CalendarEventBaby struct {
