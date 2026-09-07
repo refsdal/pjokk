@@ -28,7 +28,6 @@ import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { LogButton } from "@/components/LogButton";
 import { StatusCard } from "@/components/StatusCard";
 import {
-  formatMeasurement,
   showsTemperatureCard,
   temperatureStatus,
   temperatureTrend,
@@ -58,6 +57,12 @@ import { describeNapWindow, napWindow, useNapGuide } from "@/lib/nap-window";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import { formatDuration, formatElapsed } from "@/lib/time";
 import { useAppearance } from "@/lib/appearance";
+import {
+  formatMeasurementIn,
+  formatVolume,
+  type Units,
+  useUnits,
+} from "@/lib/units";
 
 const otherKinds: OtherKind[] = [
   "medicine",
@@ -82,13 +87,17 @@ type OpenSheet =
   | "account"
   | null;
 
-function feedDetail(feed: {
-  type: string;
-  amountMl: number | null;
-  side: string | null;
-  durationMin: number | null;
-}): string {
-  if (feed.type === "bottle") return `${feed.amountMl ?? "?"} ml`;
+function feedDetail(
+  feed: {
+    type: string;
+    amountMl: number | null;
+    side: string | null;
+    durationMin: number | null;
+  },
+  units: Units,
+): string {
+  if (feed.type === "bottle")
+    return feed.amountMl == null ? "?" : formatVolume(feed.amountMl, units);
   if (feed.type === "breast")
     return [feed.side, feed.durationMin ? `${feed.durationMin} min` : null]
       .filter(Boolean)
@@ -121,6 +130,7 @@ const TREND_LABEL: Record<TemperatureTrend, string> = {
 
 export function HomeScreen() {
   const me = useMe();
+  const units = useUnits();
   const { babies, baby } = useSelectedBaby();
   const summary = useSummary(baby?.id);
   const feeds = useFeeds(baby?.id);
@@ -295,10 +305,10 @@ export function HomeScreen() {
             icon={IconBabyBottle}
             label={t("Last feed")}
             time={s?.lastFeed ? new Date(s.lastFeed.time) : null}
-            detail={s?.lastFeed ? feedDetail(s.lastFeed) : undefined}
+            detail={s?.lastFeed ? feedDetail(s.lastFeed, units) : undefined}
             sub={
               s
-                ? `${s.today.feeds} ${t("feeds")} · ${s.today.intakeMl} ml${
+                ? `${s.today.feeds} ${t("feeds")} · ${formatVolume(s.today.intakeMl, units)}${
                     s.today.solidsG > 0 ? ` · ${s.today.solidsG} g` : ""
                   } ${t("today")}`
                 : undefined
@@ -348,9 +358,10 @@ export function HomeScreen() {
                 icon={IconTemperature}
                 label={t("Last temperature")}
                 time={new Date(s.lastTemperature.time)}
-                detail={`${formatMeasurement(
+                detail={`${formatMeasurementIn(
                   s.lastTemperature.type,
                   s.lastTemperature.value,
+                  units,
                 )} ${TREND_ARROW[tempTrend]}`}
                 sub={
                   tempStatus === "ok" ? undefined : t(TREND_LABEL[tempTrend])

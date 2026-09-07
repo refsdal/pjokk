@@ -47,6 +47,7 @@ import {
   type OtherKind,
 } from "@/lib/data";
 import { minutesFromSeconds, totalSeconds } from "@/lib/feed-timer-ui";
+import { measurementScale, useUnits } from "@/lib/units";
 import { t } from "@/lib/i18n";
 import { nextDoseFrom } from "@/lib/medicine-ui";
 import { playKindMeta, playTypeOrder } from "@/lib/play-ui";
@@ -184,6 +185,7 @@ export function OtherLogSheet({
   stopTimer?: boolean;
 }) {
   const recent = useOtherList(kind, babyId, open && !edit);
+  const units = useUnits();
   const startFeedTimer = useStartFeedTimer();
   const stopFeedTimer = useStopFeedTimer();
   const pumpTimer = kind === "pump" && !edit && stopTimer ? activePump : null;
@@ -459,7 +461,7 @@ export function OtherLogSheet({
   };
 
   const meta = otherKindMeta[kind];
-  const mcfg = measurementMeta[mtype];
+  const mcfg = measurementScale(mtype, units);
   // A caution, never a block (CLAUDE.md: the parent is the authority): the
   // family's own interval added to the last dose, shown only while it is
   // still ahead. Editing an old dose has no "next" to speak of.
@@ -629,10 +631,10 @@ export function OtherLogSheet({
               onChange={changeMtype}
             />
             <Stepper
-              value={value}
-              onChange={setValue}
+              value={mcfg.toDisplay(value)}
+              onChange={(v) => setValue(mcfg.toCanonical(v))}
               step={mcfg.step}
-              decimals={1}
+              decimals={mcfg.decimals}
               min={mcfg.min}
               max={mcfg.max}
               unit={mcfg.unit}

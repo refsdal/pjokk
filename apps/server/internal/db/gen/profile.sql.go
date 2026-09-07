@@ -51,6 +51,7 @@ SELECT
     "nickname",
     "phone",
     COALESCE("display_name", '') AS display_name,
+    "units",
     "avatar_key",
     "avatar_imported_at",
     "image"
@@ -64,6 +65,7 @@ type GetUserProfileRow struct {
 	Nickname         *string
 	Phone            *string
 	DisplayName      string
+	Units            string
 	AvatarKey        *string
 	AvatarImportedAt pgtype.Timestamptz
 	Image            *string
@@ -83,6 +85,7 @@ func (q *Queries) GetUserProfile(ctx context.Context, id string) (GetUserProfile
 		&i.Nickname,
 		&i.Phone,
 		&i.DisplayName,
+		&i.Units,
 		&i.AvatarKey,
 		&i.AvatarImportedAt,
 		&i.Image,
@@ -133,7 +136,7 @@ func (q *Queries) SetUserAvatar(ctx context.Context, arg SetUserAvatarParams) er
 
 const updateUserProfile = `-- name: UpdateUserProfile :exec
 UPDATE "users"
-SET "name" = $2, "nickname" = $3, "phone" = $4, "updated_at" = now()
+SET "name" = $2, "nickname" = $3, "phone" = $4, "units" = $5, "updated_at" = now()
 WHERE "id" = $1
 `
 
@@ -142,6 +145,7 @@ type UpdateUserProfileParams struct {
 	Name     *string
 	Nickname *string
 	Phone    *string
+	Units    string
 }
 
 // Full-row write of the three editable fields; the handler resolves the
@@ -152,6 +156,7 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		arg.Name,
 		arg.Nickname,
 		arg.Phone,
+		arg.Units,
 	)
 	return err
 }

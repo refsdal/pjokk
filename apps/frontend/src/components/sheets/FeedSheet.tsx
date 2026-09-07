@@ -19,6 +19,7 @@ import {
 } from "@/lib/data";
 import { clock, minutesFromSeconds, sideSeconds } from "@/lib/feed-timer-ui";
 import { t } from "@/lib/i18n";
+import { useUnits, volumeScale } from "@/lib/units";
 import { type FeedContents, feedContentsOptions } from "@/lib/log-detail";
 import { toast } from "@/lib/toast";
 
@@ -93,6 +94,8 @@ export function FeedSheet({
 
   const [type, setType] = useState<FeedType>("bottle");
   const [amountMl, setAmountMl] = useState(120);
+  const units = useUnits();
+  const volume = volumeScale(units);
   // Optional detail (issue #43): what a bottle held; what the solids were
   // and whether they caused a reaction. Contents and food prefill from the
   // last feed of the same type (the same formula, the same puree twice a
@@ -347,18 +350,31 @@ export function FeedSheet({
           onChange={changeType}
         />
 
-        {(type === "bottle" || type === "solids") && (
+        {type === "bottle" && (
+          // State stays in ml; the stepper shows the person's units and only
+          // a stepped value is converted back (lib/units.ts).
+          <Stepper
+            value={volume.toDisplay(amountMl)}
+            onChange={(v) => setAmountMl(volume.toCanonical(v))}
+            step={
+              units === "metric"
+                ? (v, dir) => ((dir > 0 ? v < 50 : v <= 50) ? 5 : 10)
+                : volume.step
+            }
+            min={volume.min}
+            max={volume.max}
+            decimals={volume.decimals}
+            unit={volume.unit}
+          />
+        )}
+        {type === "solids" && (
           <Stepper
             value={amountMl}
             onChange={setAmountMl}
-            step={
-              type === "bottle"
-                ? (v, dir) => ((dir > 0 ? v < 50 : v <= 50) ? 5 : 10)
-                : 5
-            }
+            step={5}
             min={5}
             max={500}
-            unit={type === "solids" ? "g" : "ml"}
+            unit="g"
           />
         )}
 

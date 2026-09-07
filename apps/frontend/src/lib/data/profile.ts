@@ -12,6 +12,7 @@ export interface UpdateMeVars {
   name?: string;
   nickname?: string | null;
   phone?: string | null;
+  units?: "metric" | "imperial";
 }
 
 // Every mutation replaces the cached `me` and refreshes `members` (both show

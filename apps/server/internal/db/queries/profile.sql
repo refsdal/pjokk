@@ -11,6 +11,7 @@ SELECT
     "nickname",
     "phone",
     COALESCE("display_name", '') AS display_name,
+    "units",
     "avatar_key",
     "avatar_imported_at",
     "image"
@@ -21,7 +22,7 @@ WHERE "id" = $1;
 -- Full-row write of the three editable fields; the handler resolves the
 -- PATCH tri-state (absent / null / value) before calling this.
 UPDATE "users"
-SET "name" = $2, "nickname" = $3, "phone" = $4, "updated_at" = now()
+SET "name" = $2, "nickname" = $3, "phone" = $4, "units" = $5, "updated_at" = now()
 WHERE "id" = $1;
 
 -- name: SetUserAvatar :exec

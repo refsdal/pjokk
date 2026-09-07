@@ -47,6 +47,9 @@ jobs:
       # file are compiled from source and CI never runs `go generate`.
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
+          # mise itself, pinned like every other tool: the action otherwise
+          # resolves "latest", which once pointed at a tag with no assets.
+          version: 2026.9.1
           install_args: "go bun aqua:goreleaser/goreleaser"
 
       # mise does not cache Go modules; do it directly, keyed on the module

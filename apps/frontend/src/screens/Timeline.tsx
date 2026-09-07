@@ -1,8 +1,4 @@
-import {
-  formatMeasurement,
-  isFever,
-  measurementMeta,
-} from "@/lib/measurements";
+import { isFever, measurementMeta } from "@/lib/measurements";
 import {
   IconBabyBottle,
   IconDiaper,
@@ -40,6 +36,12 @@ import { useSelectedBaby } from "@/lib/selected-baby";
 import { t } from "@/lib/i18n";
 import { diaperDetail, feedDetail, sleepTitle } from "@/lib/log-detail";
 import { photoSrc } from "@/lib/data/photos";
+import {
+  formatMeasurementIn,
+  formatVolume,
+  type Units,
+  useUnits,
+} from "@/lib/units";
 import { playKindMeta } from "@/lib/play-ui";
 import { nextDoseFrom } from "@/lib/medicine-ui";
 import { formatClock, formatDay, formatDuration } from "@/lib/time";
@@ -80,12 +82,18 @@ const diaperLabel: Record<string, string> = {
   dry: "Dry diaper",
 };
 
-function entryMain(e: TimelineEntry): { title: string; detail: string | null } {
+function entryMain(
+  e: TimelineEntry,
+  units: Units,
+): { title: string; detail: string | null } {
   if (e.kind === "feed") {
     if (e.type === "bottle")
       return {
         title: t("Bottle"),
-        detail: feedDetail(`${e.amountMl ?? "?"} ml`, e),
+        detail: feedDetail(
+          e.amountMl == null ? "?" : formatVolume(e.amountMl, units),
+          e,
+        ),
       };
     if (e.type === "breast")
       return {
@@ -139,7 +147,7 @@ function entryMain(e: TimelineEntry): { title: string; detail: string | null } {
     // here as `weight ? kg : cm` is what made temperatures render as lengths.
     return {
       title: t(measurementMeta[e.type].label),
-      detail: formatMeasurement(e.type, e.value),
+      detail: formatMeasurementIn(e.type, e.value, units),
     };
   }
   if (e.kind === "play") {
@@ -162,7 +170,10 @@ function entryMain(e: TimelineEntry): { title: string; detail: string | null } {
   }
   return {
     title: t("Pump"),
-    detail: [e.side, e.amountMl != null ? `${e.amountMl} ml` : null]
+    detail: [
+      e.side,
+      e.amountMl != null ? formatVolume(e.amountMl, units) : null,
+    ]
       .filter(Boolean)
       .join(" · "),
   };
@@ -200,7 +211,8 @@ function Row({
   onClick: () => void;
 }) {
   const { icon: Icon, tint: baseTint } = kindStyle[entry.kind];
-  const { title, detail } = entryMain(entry);
+  const units = useUnits();
+  const { title, detail } = entryMain(entry, units);
   // A fever is the one measurement worth spotting while scrolling back
   // through a sick week, so it takes the danger token instead of the usual
   // growth tint. Everything else stays calm.

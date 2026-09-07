@@ -1439,6 +1439,8 @@ export interface components {
             name?: string;
             nickname?: string | null;
             phone?: string | null;
+            /** @enum {string} */
+            units?: "metric" | "imperial";
         };
         Member: {
             /** @description The family-membership row id (NOT the user id). */
@@ -1466,6 +1468,11 @@ export interface components {
         Me: {
             userId: string;
             name: string;
+            /**
+             * @description Display units (issue #53). Stored values are always metric; the SPA converts at the edge. Follows the person across families and devices.
+             * @enum {string}
+             */
+            units: "metric" | "imperial";
             /** @description Nickname when set, else name — what every other member sees (users.display_name, a generated column). */
             displayName: string;
             nickname: string | null;

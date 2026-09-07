@@ -3121,6 +3121,9 @@ components:
           type: string
           maxLength: 32
           nullable: true
+        units:
+          type: string
+          enum: [metric, imperial]
     Member:
       type: object
       required: [memberId, userId, name, email, role, avatarUrl, hasPush]
@@ -3184,12 +3187,20 @@ components:
           plan,
           impersonatedBy,
           version,
+          units,
         ]
       properties:
         userId:
           type: string
         name:
           type: string
+        units:
+          type: string
+          enum: [metric, imperial]
+          description: >-
+            Display units (issue #53). Stored values are always metric;
+            the SPA converts at the edge. Follows the person across
+            families and devices.
         displayName:
           type: string
           description: >-

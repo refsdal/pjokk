@@ -272,7 +272,11 @@ separate test deploy).
 
 **Locale (Norwegian defaults, quietly)**
 - Units: ml, grams/kg. 24-hour clock. Monday week start. `nb-NO` formatting via
-  `Intl` from the first commit.
+  `Intl` from the first commit. Stored values are ALWAYS metric; `users.units`
+  (`metric | imperial`, #53) is a per-person display preference and
+  `lib/units.ts` is the only place oz / lb / in / °F are derived — sheets
+  keep canonical state and convert only what the user stepped, so an
+  untouched prefill is saved unchanged. The CSV export stays metric.
 - Pipe every user-facing string through a `t()` helper now; actual translation
   (English/Norwegian) comes later. Default UI language: English for now.
 
@@ -331,8 +335,15 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   edits the series; no per-occurrence exceptions in v1.
 - **Profile (`/profile`):** the person, not the family — full name,
   nickname (shown instead of the name everywhere, via the users
-  `display_name` generated column), phone (private), photo. Reached from the
-  account sheet and Settings → Account. Global across families.
+  `display_name` generated column), phone (private), photo, display
+  units. Reached from the account sheet and Settings → Account. Global
+  across families.
+- **PDF report (Settings → Data, #53):** the last 7 or 30 days for the
+  selected baby — averages, day by day, latest growth with WHO
+  percentiles, temperatures with the fever flag, medicines, the vaccine
+  schedule — built in the browser with jsPDF (lazy-loaded; `lib/report.ts`)
+  from the same API reads the screens use. Never server-side. Tables, no
+  charts. File name `pjokk-<baby>-<from>-<to>.pdf`.
 - **Night mode:** scheduled + manual override; deliberate exit gesture.
 - **Active sessions are state, not screens:** one `activeSession` query,
   rendered everywhere (home banner, timeline badge, tab tint). The nursing

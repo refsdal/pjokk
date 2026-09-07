@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
+import { ChipGroup } from "@/components/Chips";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -31,11 +32,13 @@ export function ProfileScreen() {
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
   const [phone, setPhone] = useState("");
+  const [units, setUnits] = useState<"metric" | "imperial">("metric");
   if (me.data && !seeded) {
     setSeeded(true);
     setName(me.data.name);
     setNickname(me.data.nickname ?? "");
     setPhone(me.data.phone ?? "");
+    setUnits(me.data.units === "imperial" ? "imperial" : "metric");
   }
 
   if (me.isPending) return <LoadingState />;
@@ -54,6 +57,7 @@ export function ProfileScreen() {
         name: name.trim(),
         nickname: nickname.trim() || null,
         phone: phone.trim() || null,
+        units,
       },
       {
         onSuccess: () => toast(t("Profile saved")),
@@ -187,6 +191,24 @@ export function ProfileScreen() {
               maxLength={32}
               onChange={(e) => setPhone(e.target.value)}
             />
+          </div>
+          <div className="space-y-2">
+            <span className="text-xs font-semibold text-muted">
+              {t("Units")}
+            </span>
+            <ChipGroup
+              options={[
+                { value: "metric", label: t("Metric (ml, kg, cm, °C)") },
+                { value: "imperial", label: t("Imperial (oz, lb, in, °F)") },
+              ]}
+              value={units}
+              onChange={setUnits}
+            />
+            <span className="block text-xs text-muted">
+              {t(
+                "Only how numbers are shown to you — everyone's entries are stored the same way.",
+              )}
+            </span>
           </div>
           <div className="space-y-1">
             <span className="text-xs font-semibold text-muted">

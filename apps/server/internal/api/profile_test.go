@@ -31,7 +31,8 @@ func TestDisplayNameFallsBackToFullName(t *testing.T) {
 	}
 
 	if err := a.Deps.Q.UpdateUserProfile(ctx, dbgen.UpdateUserProfileParams{
-		ID: id, Name: strp("Anders Olsen"), Nickname: strp("Pappa"), Phone: nil,
+		Units: "metric",
+		ID:    id, Name: strp("Anders Olsen"), Nickname: strp("Pappa"), Phone: nil,
 	}); err != nil {
 		t.Fatalf("UpdateUserProfile: %v", err)
 	}
@@ -42,7 +43,8 @@ func TestDisplayNameFallsBackToFullName(t *testing.T) {
 
 	// A blank nickname is no nickname.
 	if err := a.Deps.Q.UpdateUserProfile(ctx, dbgen.UpdateUserProfileParams{
-		ID: id, Name: strp("Anders Olsen"), Nickname: strp("   "), Phone: nil,
+		Units: "metric",
+		ID:    id, Name: strp("Anders Olsen"), Nickname: strp("   "), Phone: nil,
 	}); err != nil {
 		t.Fatalf("UpdateUserProfile: %v", err)
 	}
@@ -108,7 +110,8 @@ func TestAttributionUsesDisplayName(t *testing.T) {
 		t.Fatalf("user id: %v", err)
 	}
 	if err := a.Deps.Q.UpdateUserProfile(ctx, dbgen.UpdateUserProfileParams{
-		ID: userID, Name: strp("Rig admin"), Nickname: strp("Mamma"), Phone: nil,
+		Units: "metric",
+		ID:    userID, Name: strp("Rig admin"), Nickname: strp("Mamma"), Phone: nil,
 	}); err != nil {
 		t.Fatalf("UpdateUserProfile: %v", err)
 	}

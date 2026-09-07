@@ -81,6 +81,10 @@ func (d Deps) UpdateMe(ctx context.Context, _ gen.UpdateMeRequestObject) (gen.Up
 	if err != nil {
 		return nil, err
 	}
+	unitsSet, unitsVal, err := patchField[string](fields, "units")
+	if err != nil {
+		return nil, err
+	}
 
 	current, err := d.Q.GetUserProfile(ctx, session.UserID)
 	if err != nil {
@@ -108,11 +112,22 @@ func (d Deps) UpdateMe(ctx context.Context, _ gen.UpdateMeRequestObject) (gen.Up
 		}
 	}
 
+	units := current.Units
+	if unitsSet {
+		// The spec's enum already refused anything but the two values and
+		// null; guard the nil anyway.
+		if unitsVal == nil {
+			return gen.UpdateMe400JSONResponse(gen.Error{Error: "Units must be metric or imperial", Code: "VALIDATION"}), nil
+		}
+		units = *unitsVal
+	}
+
 	if err := d.Q.UpdateUserProfile(ctx, dbgen.UpdateUserProfileParams{
 		ID:       session.UserID,
 		Name:     &name,
 		Nickname: nickname,
 		Phone:    phone,
+		Units:    units,
 	}); err != nil {
 		return nil, err
 	}
@@ -166,6 +181,7 @@ func (d Deps) buildMe(ctx context.Context, session *auth.Session) (gen.Me, error
 		AvatarUrl:   avatarURL(session.UserID, profile.AvatarKey),
 		Email:       session.Email,
 		Version:     d.Version,
+		Units:       gen.MeUnits(profile.Units),
 	}
 	if session.Role != "" {
 		role := session.Role
