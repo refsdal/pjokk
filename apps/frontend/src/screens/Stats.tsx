@@ -22,10 +22,12 @@ import { useSelectedBaby } from "@/lib/selected-baby";
 import {
   ageInMonths,
   formatPercentile,
+  type GrowthType,
   referenceCurves,
-  referenceWeight,
+  referenceValue,
   weightPercentile,
 } from "@/lib/growth";
+import { measurementMeta } from "@/lib/measurements";
 import { t } from "@/lib/i18n";
 import { formatRelative } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -71,45 +73,72 @@ function StatCard({
   );
 }
 
-// WHO growth chart: the baby's weights against the P3/P50/P97 reference
-// curves for their sex. Rendered only when sex is set and there's data.
+const growthTitle: Record<GrowthType, string> = {
+  weight: "Growth (WHO weight-for-age)",
+  length: "Growth (WHO length-for-age)",
+  head: "Growth (WHO head-for-age)",
+};
+
+// WHO growth chart: the baby's measurements of one type against the
+// P3/P50/P97 reference curves for their sex (issue #47 added length and
+// head next to weight; the chips only show the types with data). Rendered
+// only when sex is set and there's data.
 function GrowthChart({ baby }: { baby: Baby }) {
   const measurements = useMeasurements(baby.id);
+  const [type, setType] = useState<GrowthType>("weight");
   const sex = baby.sex;
   if (!sex) return null;
 
-  const weights = (measurements.data ?? [])
-    .filter((m) => m.type === "weight")
+  const rows = (measurements.data ?? [])
     .map((m) => ({
+      type: m.type,
       age: ageInMonths(new Date(baby.birthDate), new Date(m.time)),
-      kg: m.value,
+      value: m.value,
     }))
-    .filter((m) => m.age >= 0 && m.age <= 60)
+    .filter((m) => m.age >= 0 && m.age <= 60);
+  const available = (["weight", "length", "head"] as GrowthType[]).filter((g) =>
+    rows.some((r) => r.type === g),
+  );
+  if (available.length === 0) return null;
+  // The first type with data, when the chosen one has none yet.
+  const shown = available.includes(type) ? type : available[0]!;
+  const points = rows
+    .filter((r) => r.type === shown)
     .sort((a, b) => a.age - b.age);
-  if (weights.length === 0) return null;
 
   const maxAge = Math.min(
     60,
-    Math.max(12, Math.ceil(weights[weights.length - 1]!.age) + 2),
+    Math.max(12, Math.ceil(points[points.length - 1]!.age) + 2),
   );
   const chartData: Record<string, number | null>[] = [];
   for (let m = 0; m <= maxAge; m++) {
     const row: Record<string, number | null> = { age: m };
     for (const curve of referenceCurves) {
-      row[curve.label] = referenceWeight(sex, m, curve.z);
+      row[curve.label] = referenceValue(shown, sex, m, curve.z);
     }
     chartData.push(row);
   }
-  for (const w of weights) {
-    chartData.push({ age: w.age, baby: w.kg });
+  for (const p of points) {
+    chartData.push({ age: p.age, baby: p.value });
   }
   chartData.sort((a, b) => (a.age ?? 0) - (b.age ?? 0));
 
   return (
     <Card>
       <p className="pb-3 text-xs font-semibold tracking-wide text-muted uppercase">
-        {t("Growth (WHO weight-for-age)")}
+        {t(growthTitle[shown])}
       </p>
+      {available.length > 1 && (
+        <ChipGroup
+          className="pb-3"
+          options={available.map((g) => ({
+            value: g,
+            label: `${t(measurementMeta[g].label)} (${measurementMeta[g].unit})`,
+          }))}
+          value={shown}
+          onChange={setType}
+        />
+      )}
       <div className="h-52">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
