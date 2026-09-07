@@ -347,9 +347,11 @@ var operationAuthTiers = map[string]authTier{
 	"GetPushConfig":   tierFamilyNoAPIKey,
 	"SubscribePush":   tierFamilyNoAPIKey,
 	"UnsubscribePush": tierFamilyNoAPIKey,
-	"GetPushPrefs":    tierFamilyNoAPIKey,
-	"UpdatePushPrefs": tierFamilyNoAPIKey,
-	"TestPush":        tierFamilyNoAPIKey,
+	// Reminders (reminders.go) are personal: bound to a session, never a key.
+	"ListReminders":  tierFamilyNoAPIKey,
+	"CreateReminder": tierFamilyNoAPIKey,
+	"DeleteReminder": tierFamilyNoAPIKey,
+	"TestPush":       tierFamilyNoAPIKey,
 
 	// Help requests (docs/superpowers/specs/2026-09-06-help-request-design.md).
 	// Session-bound like push: the notification names the caller, and a pjk_

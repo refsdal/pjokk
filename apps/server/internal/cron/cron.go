@@ -11,7 +11,7 @@
 // to carry in wrangler.jsonc:
 //
 //	nightly  — 15 3 * * *    backup → prune → purge orphans → purge help requests → sweep counters
-//	frequent — */15 * * * *  feed reminders → calendar reminders
+//	frequent — */15 * * * *  reminders → calendar reminders
 //
 // Cloudflare guaranteed exactly one invocation per schedule no matter how
 // many isolates were warm. NOTHING guarantees that here: with several
@@ -143,7 +143,7 @@ func runNightly(ctx context.Context, d Deps) error {
 func runFrequent(ctx context.Context, d Deps) error {
 	now := d.Now()
 
-	sent, err := jobs.RunFeedReminders(ctx, d.Deps, now)
+	sent, err := jobs.RunReminders(ctx, d.Deps, now)
 	if err != nil {
 		return err
 	}

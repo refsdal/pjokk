@@ -52,6 +52,8 @@ func (q *Queries) DeleteOrphanUser(ctx context.Context, id string) (int64, error
 }
 
 const latchStaleCalendarReminders = `-- name: LatchStaleCalendarReminders :execrows
+
+
 UPDATE "calendar_event"
 SET "reminded_at" = $1
 WHERE "remind_minutes_before" IS NOT NULL
@@ -64,6 +66,14 @@ type LatchStaleCalendarRemindersParams struct {
 	StartTime  pgtype.Timestamptz
 }
 
+// Queries backing internal/jobs (Task 23; REF §A7): feed reminders,
+// calendar reminders, and the purge-orphan-users sweep.
+//
+// The nightly backup itself (jobs/backup.go) is NOT here: it reads every
+// table via a raw `SELECT * FROM "<table>"` straight against the pool,
+// because the table name is a hard-coded Go slice element, not something
+// sqlc's static query analysis can parametrize.
+// Reminder queries live in queries/reminders.sql (issue #45).
 // Grace window: latch (without sending) any pending event whose start_time
 // is more than an hour in the past, so a long cron outage never fires a
 // stale push. $1 = now, $2 = the cutoff (now - 1h).
@@ -154,47 +164,6 @@ func (q *Queries) ListFamilyMemberUserIDs(ctx context.Context, organizationID st
 	return items, nil
 }
 
-const listFeedReminderPrefs = `-- name: ListFeedReminderPrefs :many
-
-SELECT user_id, family_id, feed_reminder_hours, last_reminded_at FROM "push_pref"
-WHERE "feed_reminder_hours" > 0
-`
-
-// Queries backing internal/jobs (Task 23; REF §A7): feed reminders,
-// calendar reminders, and the purge-orphan-users sweep.
-//
-// The nightly backup itself (jobs/backup.go) is NOT here: it reads every
-// table via a raw `SELECT * FROM "<table>"` straight against the pool,
-// because the table name is a hard-coded Go slice element, not something
-// sqlc's static query analysis can parametrize.
-// Every push_pref row with a non-zero threshold — feed_reminder_hours=0 is
-// "off", the default apps/api/src/routes/push.ts's PushPrefsSchema (and its
-// Go port's UpsertPushPref) leaves untouched.
-func (q *Queries) ListFeedReminderPrefs(ctx context.Context) ([]PushPref, error) {
-	rows, err := q.db.Query(ctx, listFeedReminderPrefs)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []PushPref
-	for rows.Next() {
-		var i PushPref
-		if err := rows.Scan(
-			&i.UserID,
-			&i.FamilyID,
-			&i.FeedReminderHours,
-			&i.LastRemindedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listOrphanUsers = `-- name: ListOrphanUsers :many
 SELECT u."id" FROM "users" u
 WHERE (u."role" IS NULL OR u."role" != 'admin')
@@ -247,41 +216,5 @@ type MarkCalendarEventRemindedParams struct {
 // retrying every cron tick would only hammer dead subscriptions.
 func (q *Queries) MarkCalendarEventReminded(ctx context.Context, arg MarkCalendarEventRemindedParams) error {
 	_, err := q.db.Exec(ctx, markCalendarEventReminded, arg.RemindedAt, arg.ID)
-	return err
-}
-
-const maxFeedTimeForFamily = `-- name: MaxFeedTimeForFamily :one
-SELECT MAX("time")::timestamptz AS max_time FROM "feed_log" WHERE "family_id" = $1
-`
-
-// The family's most recent feed, family-wide (not per baby) — matches
-// apps/api/src/jobs/reminders.ts's single max(feedLog.time) query. NULL
-// (an aggregate NULL, not zero rows) when the family has never logged a
-// feed; the ::timestamptz cast is load-bearing for codegen the same way
-// ListAdminFamilies' last_feed_at needs it (queries/admin.sql).
-func (q *Queries) MaxFeedTimeForFamily(ctx context.Context, familyID string) (pgtype.Timestamptz, error) {
-	row := q.db.QueryRow(ctx, maxFeedTimeForFamily, familyID)
-	var max_time pgtype.Timestamptz
-	err := row.Scan(&max_time)
-	return max_time, err
-}
-
-const setPushPrefLastReminded = `-- name: SetPushPrefLastReminded :exec
-UPDATE "push_pref"
-SET "last_reminded_at" = $1
-WHERE "user_id" = $2 AND "family_id" = $3
-`
-
-type SetPushPrefLastRemindedParams struct {
-	LastRemindedAt pgtype.Timestamptz
-	UserID         string
-	FamilyID       string
-}
-
-// Stamps the idempotency latch after a reminder fires. Unlike
-// UpsertPushPref (a caller's own preference write), this never touches
-// feed_reminder_hours.
-func (q *Queries) SetPushPrefLastReminded(ctx context.Context, arg SetPushPrefLastRemindedParams) error {
-	_, err := q.db.Exec(ctx, setPushPrefLastReminded, arg.LastRemindedAt, arg.UserID, arg.FamilyID)
 	return err
 }

@@ -136,7 +136,7 @@ func TestRunJobFrequentSendsDueReminders(t *testing.T) {
 	}); res.Status != http.StatusOK {
 		t.Fatalf("subscribe status = %d, body %s", res.Status, res.Raw)
 	}
-	if res := a.Do(http.MethodPut, "/api/push/prefs", cookie, map[string]any{"feedReminderHours": 3}); res.Status != http.StatusOK {
+	if res := a.Do(http.MethodPost, "/api/reminders", cookie, map[string]any{"kind": "feed", "mode": "since_last", "intervalMin": 180, "tz": "UTC"}); res.Status != http.StatusCreated {
 		t.Fatalf("set prefs status = %d, body %s", res.Status, res.Raw)
 	}
 

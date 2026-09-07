@@ -280,12 +280,6 @@ type ServerInterface interface {
 	// GetPushConfig The VAPID public key the frontend needs to create a browser push subscription. Never available to API keys (device/session-bound — see internal/api/middleware's RejectAPIKey).
 	// (GET /api/push/config)
 	GetPushConfig(w http.ResponseWriter, r *http.Request)
-	// GetPushPrefs The caller's feed-reminder preference for the active family. Defaults to 0 (off) when no preference row exists yet.
-	// (GET /api/push/prefs)
-	GetPushPrefs(w http.ResponseWriter, r *http.Request)
-	// UpdatePushPrefs Set the caller's feed-reminder preference. Resets the reminder cooldown (last_reminded_at set to NULL) so a new setting starts a fresh observation window instead of firing immediately off the old one's state.
-	// (PUT /api/push/prefs)
-	UpdatePushPrefs(w http.ResponseWriter, r *http.Request)
 	// SubscribePush Register this browser's push subscription for the signed-in caretaker. Upserts by endpoint: re-subscribing the SAME endpoint rebinds it to the calling user/family and refreshes its keys rather than failing a uniqueness check. Rejects an endpoint whose host isn't one of the recognized push services, or that isn't https — see internal/api/push.go's isAllowedPushEndpoint (SSRF guard: the scheduler later POSTs to stored endpoints unattended).
 	// (POST /api/push/subscribe)
 	SubscribePush(w http.ResponseWriter, r *http.Request)
@@ -295,6 +289,15 @@ type ServerInterface interface {
 	// UnsubscribePush Remove a subscription. Scoped to the caller's OWN rows — deleting by endpoint alone would let one caretaker remove another's subscription just by knowing the endpoint URL. Removing an endpoint that isn't the caller's (or doesn't exist) is still a 200: this is a set-membership operation, not a lookup.
 	// (POST /api/push/unsubscribe)
 	UnsubscribePush(w http.ResponseWriter, r *http.Request)
+	// ListReminders The caller's own reminders in the active family (issue #45). A reminder is a personal nag, not family state: another member never sees it, and an API key (no person behind it) cannot reach these endpoints at all.
+	// (GET /api/reminders)
+	ListReminders(w http.ResponseWriter, r *http.Request)
+	// CreateReminder Add a reminder. `since_last` fires once the newest log of `kind` is older than `intervalMin` (once per gap; a newer log resets it); `at_time` fires once per day in `days` at `atMinute` of local time in `tz`. A `custom` reminder is always `at_time` and needs a `label`; a `medicine` reminder's `label` is the medicine name it keys on (omit for any dose). Quiet hours hold a due reminder without latching it. Delivery rides the */15 cron, so it can lag the moment by up to 15 minutes.
+	// (POST /api/reminders)
+	CreateReminder(w http.ResponseWriter, r *http.Request)
+	// DeleteReminder Remove one of the caller's reminders.
+	// (DELETE /api/reminders/{id})
+	DeleteReminder(w http.ResponseWriter, r *http.Request, id IdPath)
 	// ListSleeps Sleep logs in the caller's active family, newest first (by startTime).
 	// (GET /api/sleep)
 	ListSleeps(w http.ResponseWriter, r *http.Request, params ListSleepsParams)
@@ -2481,34 +2484,6 @@ func (siw *ServerInterfaceWrapper) GetPushConfig(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
-// GetPushPrefs operation middleware
-func (siw *ServerInterfaceWrapper) GetPushPrefs(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetPushPrefs(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// UpdatePushPrefs operation middleware
-func (siw *ServerInterfaceWrapper) UpdatePushPrefs(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdatePushPrefs(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 // SubscribePush operation middleware
 func (siw *ServerInterfaceWrapper) SubscribePush(w http.ResponseWriter, r *http.Request) {
 
@@ -2542,6 +2517,60 @@ func (siw *ServerInterfaceWrapper) UnsubscribePush(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UnsubscribePush(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListReminders operation middleware
+func (siw *ServerInterfaceWrapper) ListReminders(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListReminders(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateReminder operation middleware
+func (siw *ServerInterfaceWrapper) CreateReminder(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateReminder(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteReminder operation middleware
+func (siw *ServerInterfaceWrapper) DeleteReminder(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteReminder(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3372,8 +3401,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/push/config", wrapper.GetPushConfig)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/push/subscribe", wrapper.SubscribePush)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/push/unsubscribe", wrapper.UnsubscribePush)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/push/prefs", wrapper.GetPushPrefs)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/push/prefs", wrapper.UpdatePushPrefs)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/reminders", wrapper.ListReminders)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/reminders", wrapper.CreateReminder)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/reminders/{id}", wrapper.DeleteReminder)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/push/test", wrapper.TestPush)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/help", wrapper.CreateHelpRequest)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/help/{id}/acknowledge", wrapper.AcknowledgeHelpRequest)
@@ -6431,49 +6461,6 @@ func (response GetPushConfig200JSONResponse) VisitGetPushConfigResponse(w http.R
 	return err
 }
 
-type GetPushPrefsRequestObject struct {
-}
-
-type GetPushPrefsResponseObject interface {
-	VisitGetPushPrefsResponse(w http.ResponseWriter) error
-}
-
-type GetPushPrefs200JSONResponse PushPrefs
-
-func (response GetPushPrefs200JSONResponse) VisitGetPushPrefsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type UpdatePushPrefsRequestObject struct {
-	Body *UpdatePushPrefsJSONRequestBody
-}
-
-type UpdatePushPrefsResponseObject interface {
-	VisitUpdatePushPrefsResponse(w http.ResponseWriter) error
-}
-
-type UpdatePushPrefs200JSONResponse PushPrefs
-
-func (response UpdatePushPrefs200JSONResponse) VisitUpdatePushPrefsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
 type SubscribePushRequestObject struct {
 	Body *SubscribePushJSONRequestBody
 }
@@ -6549,6 +6536,113 @@ func (response UnsubscribePush200JSONResponse) VisitUnsubscribePushResponse(w ht
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRemindersRequestObject struct {
+}
+
+type ListRemindersResponseObject interface {
+	VisitListRemindersResponse(w http.ResponseWriter) error
+}
+
+type ListReminders200JSONResponse []Reminder
+
+func (response ListReminders200JSONResponse) VisitListRemindersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateReminderRequestObject struct {
+	Body *CreateReminderJSONRequestBody
+}
+
+type CreateReminderResponseObject interface {
+	VisitCreateReminderResponse(w http.ResponseWriter) error
+}
+
+type CreateReminder201JSONResponse Reminder
+
+func (response CreateReminder201JSONResponse) VisitCreateReminderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateReminder400JSONResponse Error
+
+func (response CreateReminder400JSONResponse) VisitCreateReminderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateReminder404JSONResponse Error
+
+func (response CreateReminder404JSONResponse) VisitCreateReminderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteReminderRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteReminderResponseObject interface {
+	VisitDeleteReminderResponse(w http.ResponseWriter) error
+}
+
+type DeleteReminder200JSONResponse Ok
+
+func (response DeleteReminder200JSONResponse) VisitDeleteReminderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteReminder404JSONResponse Error
+
+func (response DeleteReminder404JSONResponse) VisitDeleteReminderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -7565,12 +7659,6 @@ type StrictServerInterface interface {
 	// GetPushConfig The VAPID public key the frontend needs to create a browser push subscription. Never available to API keys (device/session-bound — see internal/api/middleware's RejectAPIKey).
 	// (GET /api/push/config)
 	GetPushConfig(ctx context.Context, request GetPushConfigRequestObject) (GetPushConfigResponseObject, error)
-	// GetPushPrefs The caller's feed-reminder preference for the active family. Defaults to 0 (off) when no preference row exists yet.
-	// (GET /api/push/prefs)
-	GetPushPrefs(ctx context.Context, request GetPushPrefsRequestObject) (GetPushPrefsResponseObject, error)
-	// UpdatePushPrefs Set the caller's feed-reminder preference. Resets the reminder cooldown (last_reminded_at set to NULL) so a new setting starts a fresh observation window instead of firing immediately off the old one's state.
-	// (PUT /api/push/prefs)
-	UpdatePushPrefs(ctx context.Context, request UpdatePushPrefsRequestObject) (UpdatePushPrefsResponseObject, error)
 	// SubscribePush Register this browser's push subscription for the signed-in caretaker. Upserts by endpoint: re-subscribing the SAME endpoint rebinds it to the calling user/family and refreshes its keys rather than failing a uniqueness check. Rejects an endpoint whose host isn't one of the recognized push services, or that isn't https — see internal/api/push.go's isAllowedPushEndpoint (SSRF guard: the scheduler later POSTs to stored endpoints unattended).
 	// (POST /api/push/subscribe)
 	SubscribePush(ctx context.Context, request SubscribePushRequestObject) (SubscribePushResponseObject, error)
@@ -7580,6 +7668,15 @@ type StrictServerInterface interface {
 	// UnsubscribePush Remove a subscription. Scoped to the caller's OWN rows — deleting by endpoint alone would let one caretaker remove another's subscription just by knowing the endpoint URL. Removing an endpoint that isn't the caller's (or doesn't exist) is still a 200: this is a set-membership operation, not a lookup.
 	// (POST /api/push/unsubscribe)
 	UnsubscribePush(ctx context.Context, request UnsubscribePushRequestObject) (UnsubscribePushResponseObject, error)
+	// ListReminders The caller's own reminders in the active family (issue #45). A reminder is a personal nag, not family state: another member never sees it, and an API key (no person behind it) cannot reach these endpoints at all.
+	// (GET /api/reminders)
+	ListReminders(ctx context.Context, request ListRemindersRequestObject) (ListRemindersResponseObject, error)
+	// CreateReminder Add a reminder. `since_last` fires once the newest log of `kind` is older than `intervalMin` (once per gap; a newer log resets it); `at_time` fires once per day in `days` at `atMinute` of local time in `tz`. A `custom` reminder is always `at_time` and needs a `label`; a `medicine` reminder's `label` is the medicine name it keys on (omit for any dose). Quiet hours hold a due reminder without latching it. Delivery rides the */15 cron, so it can lag the moment by up to 15 minutes.
+	// (POST /api/reminders)
+	CreateReminder(ctx context.Context, request CreateReminderRequestObject) (CreateReminderResponseObject, error)
+	// DeleteReminder Remove one of the caller's reminders.
+	// (DELETE /api/reminders/{id})
+	DeleteReminder(ctx context.Context, request DeleteReminderRequestObject) (DeleteReminderResponseObject, error)
 	// ListSleeps Sleep logs in the caller's active family, newest first (by startTime).
 	// (GET /api/sleep)
 	ListSleeps(ctx context.Context, request ListSleepsRequestObject) (ListSleepsResponseObject, error)
@@ -10153,61 +10250,6 @@ func (sh *strictHandler) GetPushConfig(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GetPushPrefs operation middleware
-func (sh *strictHandler) GetPushPrefs(w http.ResponseWriter, r *http.Request) {
-	var request GetPushPrefsRequestObject
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetPushPrefs(ctx, request.(GetPushPrefsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetPushPrefs")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetPushPrefsResponseObject); ok {
-		if err := validResponse.VisitGetPushPrefsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// UpdatePushPrefs operation middleware
-func (sh *strictHandler) UpdatePushPrefs(w http.ResponseWriter, r *http.Request) {
-	var request UpdatePushPrefsRequestObject
-
-	var body UpdatePushPrefsJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
-	}
-	request.Body = &body
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.UpdatePushPrefs(ctx, request.(UpdatePushPrefsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "UpdatePushPrefs")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(UpdatePushPrefsResponseObject); ok {
-		if err := validResponse.VisitUpdatePushPrefsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
 // SubscribePush operation middleware
 func (sh *strictHandler) SubscribePush(w http.ResponseWriter, r *http.Request) {
 	var request SubscribePushRequestObject
@@ -10287,6 +10329,87 @@ func (sh *strictHandler) UnsubscribePush(w http.ResponseWriter, r *http.Request)
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UnsubscribePushResponseObject); ok {
 		if err := validResponse.VisitUnsubscribePushResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListReminders operation middleware
+func (sh *strictHandler) ListReminders(w http.ResponseWriter, r *http.Request) {
+	var request ListRemindersRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListReminders(ctx, request.(ListRemindersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListReminders")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListRemindersResponseObject); ok {
+		if err := validResponse.VisitListRemindersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateReminder operation middleware
+func (sh *strictHandler) CreateReminder(w http.ResponseWriter, r *http.Request) {
+	var request CreateReminderRequestObject
+
+	var body CreateReminderJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateReminder(ctx, request.(CreateReminderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateReminder")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateReminderResponseObject); ok {
+		if err := validResponse.VisitCreateReminderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteReminder operation middleware
+func (sh *strictHandler) DeleteReminder(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteReminderRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteReminder(ctx, request.(DeleteReminderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteReminder")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteReminderResponseObject); ok {
+		if err := validResponse.VisitDeleteReminderResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

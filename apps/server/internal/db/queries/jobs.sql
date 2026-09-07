@@ -6,28 +6,7 @@
 -- because the table name is a hard-coded Go slice element, not something
 -- sqlc's static query analysis can parametrize.
 
--- name: ListFeedReminderPrefs :many
--- Every push_pref row with a non-zero threshold — feed_reminder_hours=0 is
--- "off", the default apps/api/src/routes/push.ts's PushPrefsSchema (and its
--- Go port's UpsertPushPref) leaves untouched.
-SELECT * FROM "push_pref"
-WHERE "feed_reminder_hours" > 0;
-
--- name: MaxFeedTimeForFamily :one
--- The family's most recent feed, family-wide (not per baby) — matches
--- apps/api/src/jobs/reminders.ts's single max(feedLog.time) query. NULL
--- (an aggregate NULL, not zero rows) when the family has never logged a
--- feed; the ::timestamptz cast is load-bearing for codegen the same way
--- ListAdminFamilies' last_feed_at needs it (queries/admin.sql).
-SELECT MAX("time")::timestamptz AS max_time FROM "feed_log" WHERE "family_id" = $1;
-
--- name: SetPushPrefLastReminded :exec
--- Stamps the idempotency latch after a reminder fires. Unlike
--- UpsertPushPref (a caller's own preference write), this never touches
--- feed_reminder_hours.
-UPDATE "push_pref"
-SET "last_reminded_at" = $1
-WHERE "user_id" = $2 AND "family_id" = $3;
+-- Reminder queries live in queries/reminders.sql (issue #45).
 
 -- name: LatchStaleCalendarReminders :execrows
 -- Grace window: latch (without sending) any pending event whose start_time

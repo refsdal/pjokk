@@ -297,13 +297,6 @@ type PumpLog struct {
 	CreatedAt   pgtype.Timestamptz
 }
 
-type PushPref struct {
-	UserID            string
-	FamilyID          string
-	FeedReminderHours int32
-	LastRemindedAt    pgtype.Timestamptz
-}
-
 type PushSubscription struct {
 	ID        string
 	FamilyID  string
@@ -325,6 +318,24 @@ type RateLimits struct {
 	Key           string
 	Count         int32
 	LastRequestAt int64
+}
+
+type Reminder struct {
+	ID          string
+	FamilyID    string
+	UserID      string
+	BabyID      *string
+	Kind        string
+	Mode        string
+	IntervalMin *int32
+	AtMinute    *int32
+	DaysMask    int32
+	Tz          string
+	QuietStart  *int32
+	QuietEnd    *int32
+	Label       *string
+	LastFiredAt pgtype.Timestamptz
+	CreatedAt   pgtype.Timestamptz
 }
 
 type Sessions struct {

@@ -42,20 +42,3 @@ ON CONFLICT ("endpoint") DO UPDATE SET
 -- by knowing (or guessing) the endpoint URL.
 DELETE FROM "push_subscription"
 WHERE "endpoint" = $1 AND "user_id" = $2;
-
--- name: GetPushPref :one
--- GET /api/push/prefs. No row means the caller has never set a preference —
--- internal/api/push.go treats pgx.ErrNoRows as feedReminderHours=0 (off),
--- the default apps/api/src/routes/push.ts's PushPrefsSchema applies.
-SELECT * FROM "push_pref"
-WHERE "user_id" = $1 AND "family_id" = $2;
-
--- name: UpsertPushPref :exec
--- PUT /api/push/prefs. A write always resets last_reminded_at to NULL — a
--- new setting starts a fresh observation window rather than firing off the
--- old one's cooldown state (see the OpenAPI operation's summary).
-INSERT INTO "push_pref" ("user_id", "family_id", "feed_reminder_hours", "last_reminded_at")
-VALUES ($1, $2, $3, NULL)
-ON CONFLICT ("user_id", "family_id") DO UPDATE SET
-  "feed_reminder_hours" = EXCLUDED."feed_reminder_hours",
-  "last_reminded_at" = NULL;
