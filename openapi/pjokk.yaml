@@ -2944,6 +2944,9 @@ components:
         - durationMin
         - leftMin
         - rightMin
+        - contents
+        - food
+        - reaction
       properties:
         id:
           type: string
@@ -2982,6 +2985,25 @@ components:
           type: integer
           format: int32
           nullable: true
+        contents:
+          type: string
+          enum: [formula, breast_milk, mixed]
+          nullable: true
+          description: >-
+            What a bottle held. Only meaningful for `type: bottle`; null =
+            not recorded.
+        food:
+          type: string
+          nullable: true
+          description: >-
+            What a solids feed was, free text ("Banana"). Only meaningful
+            for `type: solids`; null = not recorded.
+        reaction:
+          type: boolean
+          nullable: true
+          description: >-
+            Whether a solids feed produced a reaction (details go in
+            `notes`). null = not recorded, which is not the same as false.
     CreateFeed:
       type: object
       required: [babyId, time, type]
@@ -3019,6 +3041,14 @@ components:
           minimum: 0
           maximum: 600
           nullable: true
+        contents:
+          type: string
+          enum: [formula, breast_milk, mixed]
+        food:
+          type: string
+          maxLength: 100
+        reaction:
+          type: boolean
         notes:
           type: string
           maxLength: 1000
@@ -3066,13 +3096,33 @@ components:
           minimum: 0
           maximum: 600
           nullable: true
+        contents:
+          type: string
+          enum: [formula, breast_milk, mixed]
+          nullable: true
+        food:
+          type: string
+          maxLength: 100
+          nullable: true
+        reaction:
+          type: boolean
+          nullable: true
         notes:
           type: string
           maxLength: 1000
           nullable: true
     DiaperLog:
       type: object
-      required: [id, babyId, caretakerId, caretakerName, notes, time, type]
+      required:
+        - id
+        - babyId
+        - caretakerId
+        - caretakerName
+        - notes
+        - time
+        - type
+        - color
+        - consistency
       properties:
         id:
           type: string
@@ -3090,7 +3140,20 @@ components:
           format: date-time
         type:
           type: string
-          enum: [wet, dirty, both]
+          enum: [wet, dirty, both, dry]
+          description: >-
+            `dry` is a checked-and-clean diaper; it is counted separately so
+            a dry check never inflates the wet count.
+        color:
+          type: string
+          enum: [yellow, green, brown, black, red, other]
+          nullable: true
+          description: Stool colour. Only meaningful for dirty/both.
+        consistency:
+          type: string
+          enum: [normal, loose, firm]
+          nullable: true
+          description: Stool consistency. Only meaningful for dirty/both.
     CreateDiaper:
       type: object
       required: [babyId, time, type]
@@ -3102,24 +3165,39 @@ components:
           format: date-time
         type:
           type: string
-          enum: [wet, dirty, both]
+          enum: [wet, dirty, both, dry]
+        color:
+          type: string
+          enum: [yellow, green, brown, black, red, other]
+        consistency:
+          type: string
+          enum: [normal, loose, firm]
         notes:
           type: string
           maxLength: 1000
     UpdateDiaper:
       type: object
       description: >-
-        Every field is optional; an empty object is a no-op. `notes` may
-        also be sent as `null` to CLEAR it; `time`/`type` are not nullable —
-        only settable or omitted (see internal/api/feeds.go for the
-        presence-detection pattern this endpoint shares with UpdateFeed).
+        Every field is optional; an empty object is a no-op. `color`,
+        `consistency` and `notes` may also be sent as `null` to CLEAR them;
+        `time`/`type` are not nullable — only settable or omitted (see
+        internal/api/feeds.go for the presence-detection pattern this
+        endpoint shares with UpdateFeed).
       properties:
         time:
           type: string
           format: date-time
         type:
           type: string
-          enum: [wet, dirty, both]
+          enum: [wet, dirty, both, dry]
+        color:
+          type: string
+          enum: [yellow, green, brown, black, red, other]
+          nullable: true
+        consistency:
+          type: string
+          enum: [normal, loose, firm]
+          nullable: true
         notes:
           type: string
           maxLength: 1000
@@ -3135,6 +3213,7 @@ components:
         - startTime
         - endTime
         - location
+        - type
       properties:
         id:
           type: string
@@ -3158,6 +3237,16 @@ components:
         location:
           type: string
           nullable: true
+        type:
+          type: string
+          enum: [nap, night]
+          nullable: true
+          description: >-
+            Nap or night sleep. The client defaults it from the device's
+            night-mode schedule; the server never guesses (it has no
+            timezone), so an omitted type stays null. (Named `type` like
+            the feed and diaper enums; `kind` is the timeline's
+            discriminator and must stay free.)
     CreateSleep:
       type: object
       required: [babyId, startTime]
@@ -3174,6 +3263,9 @@ components:
         location:
           type: string
           maxLength: 100
+        type:
+          type: string
+          enum: [nap, night]
         notes:
           type: string
           maxLength: 1000
@@ -3197,6 +3289,10 @@ components:
         location:
           type: string
           maxLength: 100
+          nullable: true
+        type:
+          type: string
+          enum: [nap, night]
           nullable: true
         notes:
           type: string
@@ -3684,7 +3780,7 @@ components:
           nullable: true
         today:
           type: object
-          required: [feeds, intakeMl, solidsG, wet, dirty, both, sleepMin, sleeps]
+          required: [feeds, intakeMl, solidsG, wet, dirty, both, dry, sleepMin, sleeps]
           properties:
             feeds:
               type: integer
@@ -3702,6 +3798,9 @@ components:
               type: integer
               format: int32
             both:
+              type: integer
+              format: int32
+            dry:
               type: integer
               format: int32
             sleepMin:

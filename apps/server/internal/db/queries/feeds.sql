@@ -17,7 +17,7 @@
 SELECT
     f."id", f."baby_id", f."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
-    f."left_min", f."right_min", f."notes"
+    f."left_min", f."right_min", f."contents", f."food", f."reaction", f."notes"
 FROM "feed_log" f
 JOIN "users" u ON u."id" = f."caretaker_id"
 WHERE f."family_id" = sqlc.arg(family_id)
@@ -29,7 +29,7 @@ LIMIT sqlc.arg(lim);
 SELECT
     f."id", f."baby_id", f."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
-    f."left_min", f."right_min", f."notes"
+    f."left_min", f."right_min", f."contents", f."food", f."reaction", f."notes"
 FROM "feed_log" f
 JOIN "users" u ON u."id" = f."caretaker_id"
 WHERE f."family_id" = $1 AND f."id" = $2;
@@ -37,8 +37,8 @@ WHERE f."family_id" = $1 AND f."id" = $2;
 -- name: CreateFeed :one
 INSERT INTO "feed_log"
     ("family_id", "baby_id", "caretaker_id", "time", "type", "amount_ml",
-     "side", "duration_min", "left_min", "right_min", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     "side", "duration_min", "left_min", "right_min", "contents", "food", "reaction", "notes")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 RETURNING "id";
 
 -- name: UpdateFeed :execrows
@@ -51,6 +51,9 @@ SET
     "duration_min" = CASE WHEN sqlc.arg(duration_min_set)::bool THEN sqlc.narg(duration_min_val)::integer ELSE "duration_min" END,
     "left_min" = CASE WHEN sqlc.arg(left_min_set)::bool THEN sqlc.narg(left_min_val)::integer ELSE "left_min" END,
     "right_min" = CASE WHEN sqlc.arg(right_min_set)::bool THEN sqlc.narg(right_min_val)::integer ELSE "right_min" END,
+    "contents" = CASE WHEN sqlc.arg(contents_set)::bool THEN sqlc.narg(contents_val)::text ELSE "contents" END,
+    "food" = CASE WHEN sqlc.arg(food_set)::bool THEN sqlc.narg(food_val)::text ELSE "food" END,
+    "reaction" = CASE WHEN sqlc.arg(reaction_set)::bool THEN sqlc.narg(reaction_val)::boolean ELSE "reaction" END,
     "notes" = CASE WHEN sqlc.arg(notes_set)::bool THEN sqlc.narg(notes_val)::text ELSE "notes" END
 WHERE "family_id" = sqlc.arg(family_id) AND "id" = sqlc.arg(id);
 

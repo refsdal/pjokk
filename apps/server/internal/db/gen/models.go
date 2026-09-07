@@ -118,6 +118,8 @@ type DiaperLog struct {
 	Type        string
 	Notes       *string
 	CreatedAt   pgtype.Timestamptz
+	Color       *string
+	Consistency *string
 }
 
 type FamilyInvite struct {
@@ -146,6 +148,9 @@ type FeedLog struct {
 	RightMin    *int32
 	Notes       *string
 	CreatedAt   pgtype.Timestamptz
+	Contents    *string
+	Food        *string
+	Reaction    *bool
 }
 
 type HelpRequest struct {
@@ -336,6 +341,7 @@ type SleepLog struct {
 	Location    *string
 	Notes       *string
 	CreatedAt   pgtype.Timestamptz
+	Type        *string
 }
 
 type Users struct {

@@ -141,6 +141,9 @@ func timelineFeedRow(r dbgen.ListFeedsPageRow) timelineEntryRow {
 	e.Set("durationMin", r.DurationMin)
 	e.Set("leftMin", r.LeftMin)
 	e.Set("rightMin", r.RightMin)
+	e.Set("contents", r.Contents)
+	e.Set("food", r.Food)
+	e.Set("reaction", r.Reaction)
 	return timelineEntryRow{sortKey: r.Time.Time.UnixMilli(), entry: e}
 }
 
@@ -148,6 +151,8 @@ func timelineDiaperRow(r dbgen.ListDiapersPageRow) timelineEntryRow {
 	e := timelineBase(gen.TimelineEntryKindDiaper, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.Notes)
 	e.Set("time", r.Time.Time)
 	e.Set("type", r.Type)
+	e.Set("color", r.Color)
+	e.Set("consistency", r.Consistency)
 	return timelineEntryRow{sortKey: r.Time.Time.UnixMilli(), entry: e}
 }
 
@@ -156,6 +161,7 @@ func timelineSleepRow(r dbgen.ListSleepsPageRow) timelineEntryRow {
 	e.Set("startTime", r.StartTime.Time)
 	e.Set("endTime", tsPtr(r.EndTime))
 	e.Set("location", r.Location)
+	e.Set("type", r.Type)
 	return timelineEntryRow{sortKey: r.StartTime.Time.UnixMilli(), entry: e}
 }
 

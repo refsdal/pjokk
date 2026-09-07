@@ -185,10 +185,62 @@ func (e CreateContactIcon) Valid() bool {
 	}
 }
 
+// Defines values for CreateDiaperColor.
+const (
+	CreateDiaperColorBlack  CreateDiaperColor = "black"
+	CreateDiaperColorBrown  CreateDiaperColor = "brown"
+	CreateDiaperColorGreen  CreateDiaperColor = "green"
+	CreateDiaperColorOther  CreateDiaperColor = "other"
+	CreateDiaperColorRed    CreateDiaperColor = "red"
+	CreateDiaperColorYellow CreateDiaperColor = "yellow"
+)
+
+// Valid indicates whether the value is a known member of the CreateDiaperColor enum.
+func (e CreateDiaperColor) Valid() bool {
+	switch e {
+	case CreateDiaperColorBlack:
+		return true
+	case CreateDiaperColorBrown:
+		return true
+	case CreateDiaperColorGreen:
+		return true
+	case CreateDiaperColorOther:
+		return true
+	case CreateDiaperColorRed:
+		return true
+	case CreateDiaperColorYellow:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateDiaperConsistency.
+const (
+	CreateDiaperConsistencyFirm   CreateDiaperConsistency = "firm"
+	CreateDiaperConsistencyLoose  CreateDiaperConsistency = "loose"
+	CreateDiaperConsistencyNormal CreateDiaperConsistency = "normal"
+)
+
+// Valid indicates whether the value is a known member of the CreateDiaperConsistency enum.
+func (e CreateDiaperConsistency) Valid() bool {
+	switch e {
+	case CreateDiaperConsistencyFirm:
+		return true
+	case CreateDiaperConsistencyLoose:
+		return true
+	case CreateDiaperConsistencyNormal:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateDiaperType.
 const (
 	CreateDiaperTypeBoth  CreateDiaperType = "both"
 	CreateDiaperTypeDirty CreateDiaperType = "dirty"
+	CreateDiaperTypeDry   CreateDiaperType = "dry"
 	CreateDiaperTypeWet   CreateDiaperType = "wet"
 )
 
@@ -199,7 +251,30 @@ func (e CreateDiaperType) Valid() bool {
 		return true
 	case CreateDiaperTypeDirty:
 		return true
+	case CreateDiaperTypeDry:
+		return true
 	case CreateDiaperTypeWet:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateFeedContents.
+const (
+	CreateFeedContentsBreastMilk CreateFeedContents = "breast_milk"
+	CreateFeedContentsFormula    CreateFeedContents = "formula"
+	CreateFeedContentsMixed      CreateFeedContents = "mixed"
+)
+
+// Valid indicates whether the value is a known member of the CreateFeedContents enum.
+func (e CreateFeedContents) Valid() bool {
+	switch e {
+	case CreateFeedContentsBreastMilk:
+		return true
+	case CreateFeedContentsFormula:
+		return true
+	case CreateFeedContentsMixed:
 		return true
 	default:
 		return false
@@ -356,10 +431,80 @@ func (e CreatePumpSide) Valid() bool {
 	}
 }
 
+// Defines values for CreateSleepType.
+const (
+	CreateSleepTypeNap   CreateSleepType = "nap"
+	CreateSleepTypeNight CreateSleepType = "night"
+)
+
+// Valid indicates whether the value is a known member of the CreateSleepType enum.
+func (e CreateSleepType) Valid() bool {
+	switch e {
+	case CreateSleepTypeNap:
+		return true
+	case CreateSleepTypeNight:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DiaperLogColor.
+const (
+	DiaperLogColorBlack  DiaperLogColor = "black"
+	DiaperLogColorBrown  DiaperLogColor = "brown"
+	DiaperLogColorGreen  DiaperLogColor = "green"
+	DiaperLogColorOther  DiaperLogColor = "other"
+	DiaperLogColorRed    DiaperLogColor = "red"
+	DiaperLogColorYellow DiaperLogColor = "yellow"
+)
+
+// Valid indicates whether the value is a known member of the DiaperLogColor enum.
+func (e DiaperLogColor) Valid() bool {
+	switch e {
+	case DiaperLogColorBlack:
+		return true
+	case DiaperLogColorBrown:
+		return true
+	case DiaperLogColorGreen:
+		return true
+	case DiaperLogColorOther:
+		return true
+	case DiaperLogColorRed:
+		return true
+	case DiaperLogColorYellow:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DiaperLogConsistency.
+const (
+	DiaperLogConsistencyFirm   DiaperLogConsistency = "firm"
+	DiaperLogConsistencyLoose  DiaperLogConsistency = "loose"
+	DiaperLogConsistencyNormal DiaperLogConsistency = "normal"
+)
+
+// Valid indicates whether the value is a known member of the DiaperLogConsistency enum.
+func (e DiaperLogConsistency) Valid() bool {
+	switch e {
+	case DiaperLogConsistencyFirm:
+		return true
+	case DiaperLogConsistencyLoose:
+		return true
+	case DiaperLogConsistencyNormal:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DiaperLogType.
 const (
 	DiaperLogTypeBoth  DiaperLogType = "both"
 	DiaperLogTypeDirty DiaperLogType = "dirty"
+	DiaperLogTypeDry   DiaperLogType = "dry"
 	DiaperLogTypeWet   DiaperLogType = "wet"
 )
 
@@ -370,7 +515,30 @@ func (e DiaperLogType) Valid() bool {
 		return true
 	case DiaperLogTypeDirty:
 		return true
+	case DiaperLogTypeDry:
+		return true
 	case DiaperLogTypeWet:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FeedLogContents.
+const (
+	FeedLogContentsBreastMilk FeedLogContents = "breast_milk"
+	FeedLogContentsFormula    FeedLogContents = "formula"
+	FeedLogContentsMixed      FeedLogContents = "mixed"
+)
+
+// Valid indicates whether the value is a known member of the FeedLogContents enum.
+func (e FeedLogContents) Valid() bool {
+	switch e {
+	case FeedLogContentsBreastMilk:
+		return true
+	case FeedLogContentsFormula:
+		return true
+	case FeedLogContentsMixed:
 		return true
 	default:
 		return false
@@ -644,6 +812,24 @@ func (e SetMemberRoleRole) Valid() bool {
 	}
 }
 
+// Defines values for SleepLogType.
+const (
+	SleepLogTypeNap   SleepLogType = "nap"
+	SleepLogTypeNight SleepLogType = "night"
+)
+
+// Valid indicates whether the value is a known member of the SleepLogType enum.
+func (e SleepLogType) Valid() bool {
+	switch e {
+	case SleepLogTypeNap:
+		return true
+	case SleepLogTypeNight:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TimelineEntryKind.
 const (
 	TimelineEntryKindBath        TimelineEntryKind = "bath"
@@ -776,10 +962,62 @@ func (e UpdateContactIcon) Valid() bool {
 	}
 }
 
+// Defines values for UpdateDiaperColor.
+const (
+	UpdateDiaperColorBlack  UpdateDiaperColor = "black"
+	UpdateDiaperColorBrown  UpdateDiaperColor = "brown"
+	UpdateDiaperColorGreen  UpdateDiaperColor = "green"
+	UpdateDiaperColorOther  UpdateDiaperColor = "other"
+	UpdateDiaperColorRed    UpdateDiaperColor = "red"
+	UpdateDiaperColorYellow UpdateDiaperColor = "yellow"
+)
+
+// Valid indicates whether the value is a known member of the UpdateDiaperColor enum.
+func (e UpdateDiaperColor) Valid() bool {
+	switch e {
+	case UpdateDiaperColorBlack:
+		return true
+	case UpdateDiaperColorBrown:
+		return true
+	case UpdateDiaperColorGreen:
+		return true
+	case UpdateDiaperColorOther:
+		return true
+	case UpdateDiaperColorRed:
+		return true
+	case UpdateDiaperColorYellow:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateDiaperConsistency.
+const (
+	UpdateDiaperConsistencyFirm   UpdateDiaperConsistency = "firm"
+	UpdateDiaperConsistencyLoose  UpdateDiaperConsistency = "loose"
+	UpdateDiaperConsistencyNormal UpdateDiaperConsistency = "normal"
+)
+
+// Valid indicates whether the value is a known member of the UpdateDiaperConsistency enum.
+func (e UpdateDiaperConsistency) Valid() bool {
+	switch e {
+	case UpdateDiaperConsistencyFirm:
+		return true
+	case UpdateDiaperConsistencyLoose:
+		return true
+	case UpdateDiaperConsistencyNormal:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UpdateDiaperType.
 const (
 	UpdateDiaperTypeBoth  UpdateDiaperType = "both"
 	UpdateDiaperTypeDirty UpdateDiaperType = "dirty"
+	UpdateDiaperTypeDry   UpdateDiaperType = "dry"
 	UpdateDiaperTypeWet   UpdateDiaperType = "wet"
 )
 
@@ -790,7 +1028,30 @@ func (e UpdateDiaperType) Valid() bool {
 		return true
 	case UpdateDiaperTypeDirty:
 		return true
+	case UpdateDiaperTypeDry:
+		return true
 	case UpdateDiaperTypeWet:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateFeedContents.
+const (
+	UpdateFeedContentsBreastMilk UpdateFeedContents = "breast_milk"
+	UpdateFeedContentsFormula    UpdateFeedContents = "formula"
+	UpdateFeedContentsMixed      UpdateFeedContents = "mixed"
+)
+
+// Valid indicates whether the value is a known member of the UpdateFeedContents enum.
+func (e UpdateFeedContents) Valid() bool {
+	switch e {
+	case UpdateFeedContentsBreastMilk:
+		return true
+	case UpdateFeedContentsFormula:
+		return true
+	case UpdateFeedContentsMixed:
 		return true
 	default:
 		return false
@@ -923,6 +1184,24 @@ func (e UpdatePumpSide) Valid() bool {
 	case UpdatePumpSideLeft:
 		return true
 	case UpdatePumpSideRight:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateSleepType.
+const (
+	UpdateSleepTypeNap   UpdateSleepType = "nap"
+	UpdateSleepTypeNight UpdateSleepType = "night"
+)
+
+// Valid indicates whether the value is a known member of the UpdateSleepType enum.
+func (e UpdateSleepType) Valid() bool {
+	switch e {
+	case UpdateSleepTypeNap:
+		return true
+	case UpdateSleepTypeNight:
 		return true
 	default:
 		return false
@@ -1222,27 +1501,41 @@ type CreateContactIcon string
 
 // CreateDiaper defines model for CreateDiaper.
 type CreateDiaper struct {
-	BabyId string           `json:"babyId"`
-	Notes  *string          `json:"notes,omitempty"`
-	Time   time.Time        `json:"time"`
-	Type   CreateDiaperType `json:"type"`
+	BabyId      string                   `json:"babyId"`
+	Color       *CreateDiaperColor       `json:"color,omitempty"`
+	Consistency *CreateDiaperConsistency `json:"consistency,omitempty"`
+	Notes       *string                  `json:"notes,omitempty"`
+	Time        time.Time                `json:"time"`
+	Type        CreateDiaperType         `json:"type"`
 }
+
+// CreateDiaperColor defines model for CreateDiaper.Color.
+type CreateDiaperColor string
+
+// CreateDiaperConsistency defines model for CreateDiaper.Consistency.
+type CreateDiaperConsistency string
 
 // CreateDiaperType defines model for CreateDiaper.Type.
 type CreateDiaperType string
 
 // CreateFeed defines model for CreateFeed.
 type CreateFeed struct {
-	AmountMl    *int32          `json:"amountMl,omitempty"`
-	BabyId      string          `json:"babyId"`
-	DurationMin *int32          `json:"durationMin,omitempty"`
-	LeftMin     *int32          `json:"leftMin,omitempty"`
-	Notes       *string         `json:"notes,omitempty"`
-	RightMin    *int32          `json:"rightMin,omitempty"`
-	Side        *CreateFeedSide `json:"side,omitempty"`
-	Time        time.Time       `json:"time"`
-	Type        CreateFeedType  `json:"type"`
+	AmountMl    *int32              `json:"amountMl,omitempty"`
+	BabyId      string              `json:"babyId"`
+	Contents    *CreateFeedContents `json:"contents,omitempty"`
+	DurationMin *int32              `json:"durationMin,omitempty"`
+	Food        *string             `json:"food,omitempty"`
+	LeftMin     *int32              `json:"leftMin,omitempty"`
+	Notes       *string             `json:"notes,omitempty"`
+	Reaction    *bool               `json:"reaction,omitempty"`
+	RightMin    *int32              `json:"rightMin,omitempty"`
+	Side        *CreateFeedSide     `json:"side,omitempty"`
+	Time        time.Time           `json:"time"`
+	Type        CreateFeedType      `json:"type"`
 }
+
+// CreateFeedContents defines model for CreateFeed.Contents.
+type CreateFeedContents string
 
 // CreateFeedSide defines model for CreateFeed.Side.
 type CreateFeedSide string
@@ -1340,11 +1633,15 @@ type CreateSleep struct {
 	BabyId string `json:"babyId"`
 
 	// EndTime Omit to start an active sleep session.
-	EndTime   *time.Time `json:"endTime,omitempty"`
-	Location  *string    `json:"location,omitempty"`
-	Notes     *string    `json:"notes,omitempty"`
-	StartTime time.Time  `json:"startTime"`
+	EndTime   *time.Time       `json:"endTime,omitempty"`
+	Location  *string          `json:"location,omitempty"`
+	Notes     *string          `json:"notes,omitempty"`
+	StartTime time.Time        `json:"startTime"`
+	Type      *CreateSleepType `json:"type,omitempty"`
 }
+
+// CreateSleepType defines model for CreateSleep.Type.
+type CreateSleepType string
 
 // CreateSleepLocation defines model for CreateSleepLocation.
 type CreateSleepLocation struct {
@@ -1369,16 +1666,30 @@ type CreateVaccineDismissal struct {
 
 // DiaperLog defines model for DiaperLog.
 type DiaperLog struct {
-	BabyId        string        `json:"babyId"`
-	CaretakerId   string        `json:"caretakerId"`
-	CaretakerName string        `json:"caretakerName"`
-	Id            string        `json:"id"`
-	Notes         *string       `json:"notes"`
-	Time          time.Time     `json:"time"`
-	Type          DiaperLogType `json:"type"`
+	BabyId        string `json:"babyId"`
+	CaretakerId   string `json:"caretakerId"`
+	CaretakerName string `json:"caretakerName"`
+
+	// Color Stool colour. Only meaningful for dirty/both.
+	Color *DiaperLogColor `json:"color"`
+
+	// Consistency Stool consistency. Only meaningful for dirty/both.
+	Consistency *DiaperLogConsistency `json:"consistency"`
+	Id          string                `json:"id"`
+	Notes       *string               `json:"notes"`
+	Time        time.Time             `json:"time"`
+
+	// Type `dry` is a checked-and-clean diaper; it is counted separately so a dry check never inflates the wet count.
+	Type DiaperLogType `json:"type"`
 }
 
-// DiaperLogType defines model for DiaperLog.Type.
+// DiaperLogColor Stool colour. Only meaningful for dirty/both.
+type DiaperLogColor string
+
+// DiaperLogConsistency Stool consistency. Only meaningful for dirty/both.
+type DiaperLogConsistency string
+
+// DiaperLogType `dry` is a checked-and-clean diaper; it is counted separately so a dry check never inflates the wet count.
 type DiaperLogType string
 
 // Error The error envelope used by every non-2xx JSON response in the API (CLAUDE.md: "{error: string, code: string}" everywhere).
@@ -1403,19 +1714,31 @@ type Family struct {
 
 // FeedLog defines model for FeedLog.
 type FeedLog struct {
-	AmountMl      *int32       `json:"amountMl"`
-	BabyId        string       `json:"babyId"`
-	CaretakerId   string       `json:"caretakerId"`
-	CaretakerName string       `json:"caretakerName"`
-	DurationMin   *int32       `json:"durationMin"`
-	Id            string       `json:"id"`
-	LeftMin       *int32       `json:"leftMin"`
-	Notes         *string      `json:"notes"`
-	RightMin      *int32       `json:"rightMin"`
-	Side          *FeedLogSide `json:"side"`
-	Time          time.Time    `json:"time"`
-	Type          FeedLogType  `json:"type"`
+	AmountMl      *int32 `json:"amountMl"`
+	BabyId        string `json:"babyId"`
+	CaretakerId   string `json:"caretakerId"`
+	CaretakerName string `json:"caretakerName"`
+
+	// Contents What a bottle held. Only meaningful for `type: bottle`; null = not recorded.
+	Contents    *FeedLogContents `json:"contents"`
+	DurationMin *int32           `json:"durationMin"`
+
+	// Food What a solids feed was, free text ("Banana"). Only meaningful for `type: solids`; null = not recorded.
+	Food    *string `json:"food"`
+	Id      string  `json:"id"`
+	LeftMin *int32  `json:"leftMin"`
+	Notes   *string `json:"notes"`
+
+	// Reaction Whether a solids feed produced a reaction (details go in `notes`). null = not recorded, which is not the same as false.
+	Reaction *bool        `json:"reaction"`
+	RightMin *int32       `json:"rightMin"`
+	Side     *FeedLogSide `json:"side"`
+	Time     time.Time    `json:"time"`
+	Type     FeedLogType  `json:"type"`
 }
+
+// FeedLogContents What a bottle held. Only meaningful for `type: bottle`; null = not recorded.
+type FeedLogContents string
 
 // FeedLogSide defines model for FeedLog.Side.
 type FeedLogSide string
@@ -1678,7 +2001,13 @@ type SleepLog struct {
 	Location  *string    `json:"location"`
 	Notes     *string    `json:"notes"`
 	StartTime time.Time  `json:"startTime"`
+
+	// Type Nap or night sleep. The client defaults it from the device's night-mode schedule; the server never guesses (it has no timezone), so an omitted type stays null. (Named `type` like the feed and diaper enums; `kind` is the timeline's discriminator and must stay free.)
+	Type *SleepLogType `json:"type"`
 }
+
+// SleepLogType Nap or night sleep. The client defaults it from the device's night-mode schedule; the server never guesses (it has no timezone), so an omitted type stays null. (Named `type` like the feed and diaper enums; `kind` is the timeline's discriminator and must stay free.)
+type SleepLogType string
 
 // Stats defines model for Stats.
 type Stats struct {
@@ -1736,6 +2065,7 @@ type Summary struct {
 	Today    struct {
 		Both     int32 `json:"both"`
 		Dirty    int32 `json:"dirty"`
+		Dry      int32 `json:"dry"`
 		Feeds    int32 `json:"feeds"`
 		IntakeMl int32 `json:"intakeMl"`
 		SleepMin int32 `json:"sleepMin"`
@@ -1822,27 +2152,41 @@ type UpdateContact struct {
 // UpdateContactIcon defines model for UpdateContact.Icon.
 type UpdateContactIcon string
 
-// UpdateDiaper Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time`/`type` are not nullable — only settable or omitted (see internal/api/feeds.go for the presence-detection pattern this endpoint shares with UpdateFeed).
+// UpdateDiaper Every field is optional; an empty object is a no-op. `color`, `consistency` and `notes` may also be sent as `null` to CLEAR them; `time`/`type` are not nullable — only settable or omitted (see internal/api/feeds.go for the presence-detection pattern this endpoint shares with UpdateFeed).
 type UpdateDiaper struct {
-	Notes *string           `json:"notes,omitempty"`
-	Time  *time.Time        `json:"time,omitempty"`
-	Type  *UpdateDiaperType `json:"type,omitempty"`
+	Color       *UpdateDiaperColor       `json:"color,omitempty"`
+	Consistency *UpdateDiaperConsistency `json:"consistency,omitempty"`
+	Notes       *string                  `json:"notes,omitempty"`
+	Time        *time.Time               `json:"time,omitempty"`
+	Type        *UpdateDiaperType        `json:"type,omitempty"`
 }
+
+// UpdateDiaperColor defines model for UpdateDiaper.Color.
+type UpdateDiaperColor string
+
+// UpdateDiaperConsistency defines model for UpdateDiaper.Consistency.
+type UpdateDiaperConsistency string
 
 // UpdateDiaperType defines model for UpdateDiaper.Type.
 type UpdateDiaperType string
 
 // UpdateFeed Every field is optional; an empty object is a no-op. `amountMl`, `side`, `durationMin`, `leftMin`, `rightMin` and `notes` may also be sent as `null` to CLEAR that column; `time`/`type` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs, which the generated request type alone cannot provide).
 type UpdateFeed struct {
-	AmountMl    *int32          `json:"amountMl,omitempty"`
-	DurationMin *int32          `json:"durationMin,omitempty"`
-	LeftMin     *int32          `json:"leftMin,omitempty"`
-	Notes       *string         `json:"notes,omitempty"`
-	RightMin    *int32          `json:"rightMin,omitempty"`
-	Side        *UpdateFeedSide `json:"side,omitempty"`
-	Time        *time.Time      `json:"time,omitempty"`
-	Type        *UpdateFeedType `json:"type,omitempty"`
+	AmountMl    *int32              `json:"amountMl,omitempty"`
+	Contents    *UpdateFeedContents `json:"contents,omitempty"`
+	DurationMin *int32              `json:"durationMin,omitempty"`
+	Food        *string             `json:"food,omitempty"`
+	LeftMin     *int32              `json:"leftMin,omitempty"`
+	Notes       *string             `json:"notes,omitempty"`
+	Reaction    *bool               `json:"reaction,omitempty"`
+	RightMin    *int32              `json:"rightMin,omitempty"`
+	Side        *UpdateFeedSide     `json:"side,omitempty"`
+	Time        *time.Time          `json:"time,omitempty"`
+	Type        *UpdateFeedType     `json:"type,omitempty"`
 }
+
+// UpdateFeedContents defines model for UpdateFeed.Contents.
+type UpdateFeedContents string
 
 // UpdateFeedSide defines model for UpdateFeed.Side.
 type UpdateFeedSide string
@@ -1919,11 +2263,15 @@ type UpdatePumpSide string
 
 // UpdateSleep Every field is optional; an empty object is a no-op. `endTime`, `location` and `notes` may also be sent as `null` to CLEAR that column — clearing `endTime` reopens the session and can 409 if another session for the same baby is already active (see internal/api/sleep.go). `startTime` is not nullable — only settable or omitted.
 type UpdateSleep struct {
-	EndTime   *time.Time `json:"endTime,omitempty"`
-	Location  *string    `json:"location,omitempty"`
-	Notes     *string    `json:"notes,omitempty"`
-	StartTime *time.Time `json:"startTime,omitempty"`
+	EndTime   *time.Time       `json:"endTime,omitempty"`
+	Location  *string          `json:"location,omitempty"`
+	Notes     *string          `json:"notes,omitempty"`
+	StartTime *time.Time       `json:"startTime,omitempty"`
+	Type      *UpdateSleepType `json:"type,omitempty"`
 }
+
+// UpdateSleepType defines model for UpdateSleep.Type.
+type UpdateSleepType string
 
 // UpdateVaccine Every field is optional; an empty object is a no-op. `doseNumber`, `scheduleSlot` and `notes` may also be sent as `null` to CLEAR that column; `time`/`name` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
 type UpdateVaccine struct {

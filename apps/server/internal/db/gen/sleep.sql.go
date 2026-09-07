@@ -14,7 +14,7 @@ import (
 const activeSleep = `-- name: ActiveSleep :one
 SELECT
     s."id", s."baby_id", s."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    s."start_time", s."end_time", s."location", s."notes"
+    s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
 WHERE s."family_id" = $1
@@ -37,6 +37,7 @@ type ActiveSleepRow struct {
 	StartTime     pgtype.Timestamptz
 	EndTime       pgtype.Timestamptz
 	Location      *string
+	Type          *string
 	Notes         *string
 }
 
@@ -56,14 +57,15 @@ func (q *Queries) ActiveSleep(ctx context.Context, arg ActiveSleepParams) (Activ
 		&i.StartTime,
 		&i.EndTime,
 		&i.Location,
+		&i.Type,
 		&i.Notes,
 	)
 	return i, err
 }
 
 const createSleep = `-- name: CreateSleep :one
-INSERT INTO "sleep_log" ("family_id", "baby_id", "caretaker_id", "start_time", "end_time", "location", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO "sleep_log" ("family_id", "baby_id", "caretaker_id", "start_time", "end_time", "location", "type", "notes")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING "id"
 `
 
@@ -74,6 +76,7 @@ type CreateSleepParams struct {
 	StartTime   pgtype.Timestamptz
 	EndTime     pgtype.Timestamptz
 	Location    *string
+	Type        *string
 	Notes       *string
 }
 
@@ -85,6 +88,7 @@ func (q *Queries) CreateSleep(ctx context.Context, arg CreateSleepParams) (strin
 		arg.StartTime,
 		arg.EndTime,
 		arg.Location,
+		arg.Type,
 		arg.Notes,
 	)
 	var id string
@@ -113,7 +117,7 @@ func (q *Queries) DeleteSleep(ctx context.Context, arg DeleteSleepParams) (int64
 const getSleep = `-- name: GetSleep :one
 SELECT
     s."id", s."baby_id", s."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    s."start_time", s."end_time", s."location", s."notes"
+    s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
 WHERE s."family_id" = $1 AND s."id" = $2
@@ -132,6 +136,7 @@ type GetSleepRow struct {
 	StartTime     pgtype.Timestamptz
 	EndTime       pgtype.Timestamptz
 	Location      *string
+	Type          *string
 	Notes         *string
 }
 
@@ -146,6 +151,7 @@ func (q *Queries) GetSleep(ctx context.Context, arg GetSleepParams) (GetSleepRow
 		&i.StartTime,
 		&i.EndTime,
 		&i.Location,
+		&i.Type,
 		&i.Notes,
 	)
 	return i, err
@@ -155,7 +161,7 @@ const listSleeps = `-- name: ListSleeps :many
 
 SELECT
     s."id", s."baby_id", s."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    s."start_time", s."end_time", s."location", s."notes"
+    s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
 WHERE s."family_id" = $1
@@ -178,6 +184,7 @@ type ListSleepsRow struct {
 	StartTime     pgtype.Timestamptz
 	EndTime       pgtype.Timestamptz
 	Location      *string
+	Type          *string
 	Notes         *string
 }
 
@@ -209,6 +216,7 @@ func (q *Queries) ListSleeps(ctx context.Context, arg ListSleepsParams) ([]ListS
 			&i.StartTime,
 			&i.EndTime,
 			&i.Location,
+			&i.Type,
 			&i.Notes,
 		); err != nil {
 			return nil, err
@@ -227,8 +235,9 @@ SET
     "start_time" = CASE WHEN $1::bool THEN $2::timestamptz ELSE "start_time" END,
     "end_time" = CASE WHEN $3::bool THEN $4::timestamptz ELSE "end_time" END,
     "location" = CASE WHEN $5::bool THEN $6::text ELSE "location" END,
-    "notes" = CASE WHEN $7::bool THEN $8::text ELSE "notes" END
-WHERE "family_id" = $9 AND "id" = $10
+    "type" = CASE WHEN $7::bool THEN $8::text ELSE "type" END,
+    "notes" = CASE WHEN $9::bool THEN $10::text ELSE "notes" END
+WHERE "family_id" = $11 AND "id" = $12
 `
 
 type UpdateSleepParams struct {
@@ -238,6 +247,8 @@ type UpdateSleepParams struct {
 	EndTimeVal   pgtype.Timestamptz
 	LocationSet  bool
 	LocationVal  *string
+	TypeSet      bool
+	TypeVal      *string
 	NotesSet     bool
 	NotesVal     *string
 	FamilyID     string
@@ -252,6 +263,8 @@ func (q *Queries) UpdateSleep(ctx context.Context, arg UpdateSleepParams) (int64
 		arg.EndTimeVal,
 		arg.LocationSet,
 		arg.LocationVal,
+		arg.TypeSet,
+		arg.TypeVal,
 		arg.NotesSet,
 		arg.NotesVal,
 		arg.FamilyID,

@@ -83,7 +83,7 @@ import (
 // sqlc queries (GetFeed, ListFeeds) produce structurally-identical row
 // types under different generated names, hence the two thin wrappers below
 // rather than one function taking a row type directly.
-func serFeedRow(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, typ string, amountMl *int32, side *string, durationMin, leftMin, rightMin *int32, notes *string) gen.FeedLog {
+func serFeedRow(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, typ string, amountMl *int32, side *string, durationMin, leftMin, rightMin *int32, contents, food *string, reaction *bool, notes *string) gen.FeedLog {
 	return gen.FeedLog{
 		Id:            id,
 		BabyId:        babyID,
@@ -97,17 +97,20 @@ func serFeedRow(id, babyID, caretakerID, caretakerName string, t pgtype.Timestam
 		DurationMin:   durationMin,
 		LeftMin:       leftMin,
 		RightMin:      rightMin,
+		Contents:      feedContentsPtr(contents),
+		Food:          food,
+		Reaction:      reaction,
 	}
 }
 
 func serFeed(row dbgen.GetFeedRow) gen.FeedLog {
 	return serFeedRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Type,
-		row.AmountMl, row.Side, row.DurationMin, row.LeftMin, row.RightMin, row.Notes)
+		row.AmountMl, row.Side, row.DurationMin, row.LeftMin, row.RightMin, row.Contents, row.Food, row.Reaction, row.Notes)
 }
 
 func serFeedListRow(row dbgen.ListFeedsRow) gen.FeedLog {
 	return serFeedRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Type,
-		row.AmountMl, row.Side, row.DurationMin, row.LeftMin, row.RightMin, row.Notes)
+		row.AmountMl, row.Side, row.DurationMin, row.LeftMin, row.RightMin, row.Contents, row.Food, row.Reaction, row.Notes)
 }
 
 func feedLogSidePtr(s *string) *gen.FeedLogSide {
@@ -116,6 +119,24 @@ func feedLogSidePtr(s *string) *gen.FeedLogSide {
 	}
 	v := gen.FeedLogSide(*s)
 	return &v
+}
+
+func feedContentsPtr(s *string) *gen.FeedLogContents {
+	if s == nil {
+		return nil
+	}
+	v := gen.FeedLogContents(*s)
+	return &v
+}
+
+// enumStr flattens an optional generated enum pointer (CreateFeedContents,
+// CreateDiaperColor, …) to the plain *string the sqlc params take.
+func enumStr[T ~string](v *T) *string {
+	if v == nil {
+		return nil
+	}
+	s := string(*v)
+	return &s
 }
 
 // listFeedsDefaultLimit mirrors apps/api/src/db/scoped.ts's `opts.limit ??
@@ -181,6 +202,9 @@ func (d Deps) CreateFeed(ctx context.Context, req gen.CreateFeedRequestObject) (
 		DurationMin: body.DurationMin,
 		LeftMin:     body.LeftMin,
 		RightMin:    body.RightMin,
+		Contents:    enumStr(body.Contents),
+		Food:        body.Food,
+		Reaction:    body.Reaction,
 		Notes:       body.Notes,
 	})
 	if err != nil {
@@ -247,12 +271,24 @@ func (d Deps) UpdateFeed(ctx context.Context, req gen.UpdateFeedRequestObject) (
 	if err != nil {
 		return nil, err
 	}
+	contentsSet, contentsVal, err := patchField[string](fields, "contents")
+	if err != nil {
+		return nil, err
+	}
+	foodSet, foodVal, err := patchField[string](fields, "food")
+	if err != nil {
+		return nil, err
+	}
+	reactionSet, reactionVal, err := patchField[bool](fields, "reaction")
+	if err != nil {
+		return nil, err
+	}
 	notesSet, notesVal, err := patchField[string](fields, "notes")
 	if err != nil {
 		return nil, err
 	}
 
-	if !timeSet && !typeSet && !amountSet && !sideSet && !durationSet && !leftSet && !rightSet && !notesSet {
+	if !timeSet && !typeSet && !amountSet && !sideSet && !durationSet && !leftSet && !rightSet && !contentsSet && !foodSet && !reactionSet && !notesSet {
 		return gen.UpdateFeed200JSONResponse(serFeed(existing)), nil
 	}
 
@@ -278,6 +314,12 @@ func (d Deps) UpdateFeed(ctx context.Context, req gen.UpdateFeedRequestObject) (
 		LeftMinVal:     leftVal,
 		RightMinSet:    rightSet,
 		RightMinVal:    rightVal,
+		ContentsSet:    contentsSet,
+		ContentsVal:    contentsVal,
+		FoodSet:        foodSet,
+		FoodVal:        foodVal,
+		ReactionSet:    reactionSet,
+		ReactionVal:    reactionVal,
 		NotesSet:       notesSet,
 		NotesVal:       notesVal,
 	}); err != nil {

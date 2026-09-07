@@ -12,8 +12,8 @@ import (
 )
 
 const createDiaper = `-- name: CreateDiaper :one
-INSERT INTO "diaper_log" ("family_id", "baby_id", "caretaker_id", "time", "type", "notes")
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO "diaper_log" ("family_id", "baby_id", "caretaker_id", "time", "type", "color", "consistency", "notes")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING "id"
 `
 
@@ -23,6 +23,8 @@ type CreateDiaperParams struct {
 	CaretakerID string
 	Time        pgtype.Timestamptz
 	Type        string
+	Color       *string
+	Consistency *string
 	Notes       *string
 }
 
@@ -33,6 +35,8 @@ func (q *Queries) CreateDiaper(ctx context.Context, arg CreateDiaperParams) (str
 		arg.CaretakerID,
 		arg.Time,
 		arg.Type,
+		arg.Color,
+		arg.Consistency,
 		arg.Notes,
 	)
 	var id string
@@ -61,7 +65,7 @@ func (q *Queries) DeleteDiaper(ctx context.Context, arg DeleteDiaperParams) (int
 const getDiaper = `-- name: GetDiaper :one
 SELECT
     d."id", d."baby_id", d."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    d."time", d."type", d."notes"
+    d."time", d."type", d."color", d."consistency", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
 WHERE d."family_id" = $1 AND d."id" = $2
@@ -79,6 +83,8 @@ type GetDiaperRow struct {
 	CaretakerName string
 	Time          pgtype.Timestamptz
 	Type          string
+	Color         *string
+	Consistency   *string
 	Notes         *string
 }
 
@@ -92,6 +98,8 @@ func (q *Queries) GetDiaper(ctx context.Context, arg GetDiaperParams) (GetDiaper
 		&i.CaretakerName,
 		&i.Time,
 		&i.Type,
+		&i.Color,
+		&i.Consistency,
 		&i.Notes,
 	)
 	return i, err
@@ -101,7 +109,7 @@ const listDiapers = `-- name: ListDiapers :many
 
 SELECT
     d."id", d."baby_id", d."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
-    d."time", d."type", d."notes"
+    d."time", d."type", d."color", d."consistency", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
 WHERE d."family_id" = $1
@@ -123,6 +131,8 @@ type ListDiapersRow struct {
 	CaretakerName string
 	Time          pgtype.Timestamptz
 	Type          string
+	Color         *string
+	Consistency   *string
 	Notes         *string
 }
 
@@ -148,6 +158,8 @@ func (q *Queries) ListDiapers(ctx context.Context, arg ListDiapersParams) ([]Lis
 			&i.CaretakerName,
 			&i.Time,
 			&i.Type,
+			&i.Color,
+			&i.Consistency,
 			&i.Notes,
 		); err != nil {
 			return nil, err
@@ -165,19 +177,25 @@ UPDATE "diaper_log"
 SET
     "time" = CASE WHEN $1::bool THEN $2::timestamptz ELSE "time" END,
     "type" = CASE WHEN $3::bool THEN $4::text ELSE "type" END,
-    "notes" = CASE WHEN $5::bool THEN $6::text ELSE "notes" END
-WHERE "family_id" = $7 AND "id" = $8
+    "color" = CASE WHEN $5::bool THEN $6::text ELSE "color" END,
+    "consistency" = CASE WHEN $7::bool THEN $8::text ELSE "consistency" END,
+    "notes" = CASE WHEN $9::bool THEN $10::text ELSE "notes" END
+WHERE "family_id" = $11 AND "id" = $12
 `
 
 type UpdateDiaperParams struct {
-	TimeSet  bool
-	TimeVal  pgtype.Timestamptz
-	TypeSet  bool
-	TypeVal  *string
-	NotesSet bool
-	NotesVal *string
-	FamilyID string
-	ID       string
+	TimeSet        bool
+	TimeVal        pgtype.Timestamptz
+	TypeSet        bool
+	TypeVal        *string
+	ColorSet       bool
+	ColorVal       *string
+	ConsistencySet bool
+	ConsistencyVal *string
+	NotesSet       bool
+	NotesVal       *string
+	FamilyID       string
+	ID             string
 }
 
 func (q *Queries) UpdateDiaper(ctx context.Context, arg UpdateDiaperParams) (int64, error) {
@@ -186,6 +204,10 @@ func (q *Queries) UpdateDiaper(ctx context.Context, arg UpdateDiaperParams) (int
 		arg.TimeVal,
 		arg.TypeSet,
 		arg.TypeVal,
+		arg.ColorSet,
+		arg.ColorVal,
+		arg.ConsistencySet,
+		arg.ConsistencyVal,
 		arg.NotesSet,
 		arg.NotesVal,
 		arg.FamilyID,

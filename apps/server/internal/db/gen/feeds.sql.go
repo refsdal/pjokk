@@ -14,8 +14,8 @@ import (
 const createFeed = `-- name: CreateFeed :one
 INSERT INTO "feed_log"
     ("family_id", "baby_id", "caretaker_id", "time", "type", "amount_ml",
-     "side", "duration_min", "left_min", "right_min", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     "side", "duration_min", "left_min", "right_min", "contents", "food", "reaction", "notes")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 RETURNING "id"
 `
 
@@ -30,6 +30,9 @@ type CreateFeedParams struct {
 	DurationMin *int32
 	LeftMin     *int32
 	RightMin    *int32
+	Contents    *string
+	Food        *string
+	Reaction    *bool
 	Notes       *string
 }
 
@@ -45,6 +48,9 @@ func (q *Queries) CreateFeed(ctx context.Context, arg CreateFeedParams) (string,
 		arg.DurationMin,
 		arg.LeftMin,
 		arg.RightMin,
+		arg.Contents,
+		arg.Food,
+		arg.Reaction,
 		arg.Notes,
 	)
 	var id string
@@ -74,7 +80,7 @@ const getFeed = `-- name: GetFeed :one
 SELECT
     f."id", f."baby_id", f."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
-    f."left_min", f."right_min", f."notes"
+    f."left_min", f."right_min", f."contents", f."food", f."reaction", f."notes"
 FROM "feed_log" f
 JOIN "users" u ON u."id" = f."caretaker_id"
 WHERE f."family_id" = $1 AND f."id" = $2
@@ -97,6 +103,9 @@ type GetFeedRow struct {
 	DurationMin   *int32
 	LeftMin       *int32
 	RightMin      *int32
+	Contents      *string
+	Food          *string
+	Reaction      *bool
 	Notes         *string
 }
 
@@ -115,6 +124,9 @@ func (q *Queries) GetFeed(ctx context.Context, arg GetFeedParams) (GetFeedRow, e
 		&i.DurationMin,
 		&i.LeftMin,
 		&i.RightMin,
+		&i.Contents,
+		&i.Food,
+		&i.Reaction,
 		&i.Notes,
 	)
 	return i, err
@@ -125,7 +137,7 @@ const listFeeds = `-- name: ListFeeds :many
 SELECT
     f."id", f."baby_id", f."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
-    f."left_min", f."right_min", f."notes"
+    f."left_min", f."right_min", f."contents", f."food", f."reaction", f."notes"
 FROM "feed_log" f
 JOIN "users" u ON u."id" = f."caretaker_id"
 WHERE f."family_id" = $1
@@ -152,6 +164,9 @@ type ListFeedsRow struct {
 	DurationMin   *int32
 	LeftMin       *int32
 	RightMin      *int32
+	Contents      *string
+	Food          *string
+	Reaction      *bool
 	Notes         *string
 }
 
@@ -165,10 +180,10 @@ type ListFeedsRow struct {
 // sets/clears/leaves without a query per combination. `_set = false` means
 // "leave alone" regardless of what `_val` carries; `_set = true` with a NULL
 // `_val` means "clear"; `_set = true` with a non-NULL `_val` means "set".
-// COALESCE(u.name, ”) rather than a bare u."display_name": sqlc's static analysis
-// can't prove an inner-joined column NOT NULL, so a bare alias would come
-// back as a *string; the family.sql ListFamilyMembers query uses the same
-// trick for the same reason.
+// COALESCE(u."display_name", ”) rather than a bare u."display_name": sqlc's
+// static analysis can't prove an inner-joined column NOT NULL, so a bare
+// alias would come back as a *string; the family.sql ListFamilyMembers query
+// uses the same trick for the same reason.
 func (q *Queries) ListFeeds(ctx context.Context, arg ListFeedsParams) ([]ListFeedsRow, error) {
 	rows, err := q.db.Query(ctx, listFeeds, arg.FamilyID, arg.BabyID, arg.Lim)
 	if err != nil {
@@ -190,6 +205,9 @@ func (q *Queries) ListFeeds(ctx context.Context, arg ListFeedsParams) ([]ListFee
 			&i.DurationMin,
 			&i.LeftMin,
 			&i.RightMin,
+			&i.Contents,
+			&i.Food,
+			&i.Reaction,
 			&i.Notes,
 		); err != nil {
 			return nil, err
@@ -212,8 +230,11 @@ SET
     "duration_min" = CASE WHEN $9::bool THEN $10::integer ELSE "duration_min" END,
     "left_min" = CASE WHEN $11::bool THEN $12::integer ELSE "left_min" END,
     "right_min" = CASE WHEN $13::bool THEN $14::integer ELSE "right_min" END,
-    "notes" = CASE WHEN $15::bool THEN $16::text ELSE "notes" END
-WHERE "family_id" = $17 AND "id" = $18
+    "contents" = CASE WHEN $15::bool THEN $16::text ELSE "contents" END,
+    "food" = CASE WHEN $17::bool THEN $18::text ELSE "food" END,
+    "reaction" = CASE WHEN $19::bool THEN $20::boolean ELSE "reaction" END,
+    "notes" = CASE WHEN $21::bool THEN $22::text ELSE "notes" END
+WHERE "family_id" = $23 AND "id" = $24
 `
 
 type UpdateFeedParams struct {
@@ -231,6 +252,12 @@ type UpdateFeedParams struct {
 	LeftMinVal     *int32
 	RightMinSet    bool
 	RightMinVal    *int32
+	ContentsSet    bool
+	ContentsVal    *string
+	FoodSet        bool
+	FoodVal        *string
+	ReactionSet    bool
+	ReactionVal    *bool
 	NotesSet       bool
 	NotesVal       *string
 	FamilyID       string
@@ -253,6 +280,12 @@ func (q *Queries) UpdateFeed(ctx context.Context, arg UpdateFeedParams) (int64, 
 		arg.LeftMinVal,
 		arg.RightMinSet,
 		arg.RightMinVal,
+		arg.ContentsSet,
+		arg.ContentsVal,
+		arg.FoodSet,
+		arg.FoodVal,
+		arg.ReactionSet,
+		arg.ReactionVal,
 		arg.NotesSet,
 		arg.NotesVal,
 		arg.FamilyID,

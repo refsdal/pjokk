@@ -76,7 +76,7 @@ func tsPtr(t pgtype.Timestamptz) *time.Time {
 // the thin per-type wrappers below rather than one function taking a row
 // type directly — the same shape feeds.go's serFeedRow/serFeed/
 // serFeedListRow trio uses.
-func serSleepRow(id, babyID, caretakerID, caretakerName string, start, end pgtype.Timestamptz, location, notes *string) gen.SleepLog {
+func serSleepRow(id, babyID, caretakerID, caretakerName string, start, end pgtype.Timestamptz, location, typ, notes *string) gen.SleepLog {
 	return gen.SleepLog{
 		Id:            id,
 		BabyId:        babyID,
@@ -86,19 +86,20 @@ func serSleepRow(id, babyID, caretakerID, caretakerName string, start, end pgtyp
 		StartTime:     start.Time,
 		EndTime:       tsPtr(end),
 		Location:      location,
+		Type:          enumPtr[gen.SleepLogType](typ),
 	}
 }
 
 func serSleep(row dbgen.GetSleepRow) gen.SleepLog {
-	return serSleepRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.StartTime, row.EndTime, row.Location, row.Notes)
+	return serSleepRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.StartTime, row.EndTime, row.Location, row.Type, row.Notes)
 }
 
 func serSleepListRow(row dbgen.ListSleepsRow) gen.SleepLog {
-	return serSleepRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.StartTime, row.EndTime, row.Location, row.Notes)
+	return serSleepRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.StartTime, row.EndTime, row.Location, row.Type, row.Notes)
 }
 
 func serActiveSleepRow(row dbgen.ActiveSleepRow) gen.SleepLog {
-	return serSleepRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.StartTime, row.EndTime, row.Location, row.Notes)
+	return serSleepRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.StartTime, row.EndTime, row.Location, row.Type, row.Notes)
 }
 
 // ListSleeps implements GET /api/sleep. REF: "SleepLog[] newest first (by
@@ -166,6 +167,7 @@ func (d Deps) CreateSleep(ctx context.Context, req gen.CreateSleepRequestObject)
 		StartTime:   pgtype.Timestamptz{Time: body.StartTime, Valid: true},
 		EndTime:     endTime,
 		Location:    body.Location,
+		Type:        enumStr(body.Type),
 		Notes:       body.Notes,
 	})
 	if err != nil {
@@ -269,12 +271,16 @@ func (d Deps) UpdateSleep(ctx context.Context, req gen.UpdateSleepRequestObject)
 	if err != nil {
 		return nil, err
 	}
+	typeSet, typeVal, err := patchField[string](fields, "type")
+	if err != nil {
+		return nil, err
+	}
 	notesSet, notesVal, err := patchField[string](fields, "notes")
 	if err != nil {
 		return nil, err
 	}
 
-	if !startSet && !endSet && !locationSet && !notesSet {
+	if !startSet && !endSet && !locationSet && !typeSet && !notesSet {
 		return gen.UpdateSleep200JSONResponse(serSleep(existing)), nil
 	}
 
@@ -300,6 +306,8 @@ func (d Deps) UpdateSleep(ctx context.Context, req gen.UpdateSleepRequestObject)
 		EndTimeVal:   endParam,
 		LocationSet:  locationSet,
 		LocationVal:  locationVal,
+		TypeSet:      typeSet,
+		TypeVal:      typeVal,
 		NotesSet:     notesSet,
 		NotesVal:     notesVal,
 	}); err != nil {
