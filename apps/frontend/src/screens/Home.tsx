@@ -6,14 +6,14 @@ import {
   IconPlus,
   IconTemperature,
 } from "@tabler/icons-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   HelpRequest,
   MeasurementType,
   PlayType,
   SleepLog,
 } from "@pjokk/shared";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
   ActiveFeedBanner,
   ActivePlayBanner,
@@ -58,6 +58,17 @@ import { describeNapWindow, napWindow, useNapGuide } from "@/lib/nap-window";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import { formatDuration, formatElapsed } from "@/lib/time";
 import { useAppearance } from "@/lib/appearance";
+
+const otherKinds: OtherKind[] = [
+  "medicine",
+  "bath",
+  "note",
+  "milestone",
+  "measurement",
+  "pump",
+];
+const isOtherKind = (v: string): v is OtherKind =>
+  (otherKinds as string[]).includes(v);
 
 type OpenSheet =
   | "feed"
@@ -137,6 +148,22 @@ export function HomeScreen() {
   const napGuide = useNapGuide();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  // ?log= from a manifest shortcut or a push action (issue #51): open that
+  // sheet once the baby is known, then drop the param so a reload or a
+  // back-swipe does not reopen it.
+  const { log } = useSearch({ strict: false }) as { log?: string };
+  useEffect(() => {
+    if (!log || !baby) return;
+    if (log === "feed" || log === "diaper" || log === "sleep") {
+      setSheet(log);
+    } else if (isOtherKind(log)) {
+      setOtherKind(log);
+      setPumpStop(false);
+      setMeasurementType("weight");
+      setSheet("other");
+    }
+    void navigate({ to: "/home", search: {}, replace: true });
+  }, [log, baby, navigate]);
 
   if (babies.isError) {
     return (

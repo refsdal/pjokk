@@ -56,6 +56,38 @@ export default defineConfig({
         orientation: "portrait",
         // An installed app opens the app, never the marketing page at "/".
         start_url: "/home",
+        // A long-press on the installed icon (Android, desktop; iOS
+        // ignores the field) opens the app straight into a log sheet —
+        // screens/Home.tsx reads ?log= (issue #51). Two taps fewer on the
+        // happy path. Same PNG as the app icon: WebKit-style hosts reject
+        // SVG here too, and a per-shortcut glyph is not worth a WebAPK
+        // regeneration.
+        shortcuts: [
+          {
+            name: "Log feed",
+            short_name: "Feed",
+            url: "/home?log=feed",
+            icons: [
+              { src: "icon-192.png", sizes: "192x192", type: "image/png" },
+            ],
+          },
+          {
+            name: "Log diaper",
+            short_name: "Diaper",
+            url: "/home?log=diaper",
+            icons: [
+              { src: "icon-192.png", sizes: "192x192", type: "image/png" },
+            ],
+          },
+          {
+            name: "Log sleep",
+            short_name: "Sleep",
+            url: "/home?log=sleep",
+            icons: [
+              { src: "icon-192.png", sizes: "192x192", type: "image/png" },
+            ],
+          },
+        ],
         // Both are DARK on purpose, and neither tracks the app's theme —
         // they cannot. An installed Android app is a WebAPK and these two
         // values are baked into it when it is generated, long before anyone

@@ -40,9 +40,14 @@ const appRoute = createRoute({
 // The app's home screen lives at /home, not "/" — the tab bar, the
 // active-session banner, and every internal link assume that path. "/"
 // itself is handled separately, below (rootIndexRoute): it redirects here.
+// ?log=feed|diaper|sleep|<other kind> opens that sheet on arrival — the
+// manifest shortcuts and the push "log it now" actions land here (issue
+// #51). Home clears it once the sheet is open so a reload does not reopen.
 const homeRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/home",
+  validateSearch: (search: Record<string, unknown>): { log?: string } =>
+    typeof search.log === "string" ? { log: search.log } : {},
   component: HomeScreen,
 });
 

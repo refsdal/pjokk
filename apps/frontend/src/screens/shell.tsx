@@ -3,7 +3,8 @@ import { Navigate, Outlet } from "@tanstack/react-router";
 import { TabBar } from "@/components/TabBar";
 import { client, unwrap } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
-import { useMe } from "@/lib/data";
+import { useAppBadge } from "@/lib/badge";
+import { useMe, useSummary } from "@/lib/data";
 import {
   judgeFamily,
   readFence,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/family-fence";
 import { t } from "@/lib/i18n";
 import { queryClient, resetCache } from "@/lib/query";
+import { useSelectedBaby } from "@/lib/selected-baby";
 import { toast } from "@/lib/toast";
 
 // Authed shell: session required; users without a family go to /welcome
@@ -23,6 +25,19 @@ import { toast } from "@/lib/toast";
 // session at all", and GET /api/me answers everything about it — the active
 // family and the impersonation banner included. Limen's own session payload
 // has neither.
+// Mounted only once the shell has a family: the selected baby's running
+// sleep / play / nursing / pump session puts a dot on the installed icon
+// (lib/badge.ts), and unmounting — sign-out, no family — clears it.
+function AppBadge() {
+  const { baby } = useSelectedBaby();
+  const summary = useSummary(baby?.id);
+  const s = summary.data;
+  useAppBadge(
+    !!s && !!(s.activeSleep || s.activePlay || s.activeFeed || s.activePump),
+  );
+  return null;
+}
+
 export function AppShell() {
   const { data: session, isPending } = useSession();
   const me = useMe();
@@ -108,6 +123,7 @@ export function AppShell() {
           </button>
         </div>
       )}
+      <AppBadge />
       <Outlet />
       <TabBar />
     </div>
