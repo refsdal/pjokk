@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { FeedLog } from "@pjokk/shared";
+import type { FeedLog, FeedTimer } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet } from "@/components/Sheet";
@@ -7,39 +7,23 @@ import { Stepper } from "@/components/Stepper";
 import { TimeField } from "@/components/TimeField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useDeleteFeed, useLogFeed, useUpdateFeed } from "@/lib/data";
+import {
+  isOptimisticTimer,
+  useDeleteFeed,
+  useDiscardFeedTimer,
+  useLogFeed,
+  useSetFeedTimerSide,
+  useStartFeedTimer,
+  useStopFeedTimer,
+  useUpdateFeed,
+} from "@/lib/data";
+import { clock, minutesFromSeconds, sideSeconds } from "@/lib/feed-timer-ui";
 import { t } from "@/lib/i18n";
 import { type FeedContents, feedContentsOptions } from "@/lib/log-detail";
-import {
-  clearNursing,
-  loadNursing,
-  saveNursing,
-  sideSeconds,
-  type NursingTimer,
-} from "@/lib/nursing-timer";
 import { toast } from "@/lib/toast";
 
 type FeedType = "bottle" | "breast" | "solids";
 type Side = "left" | "right" | "both";
-
-const emptyTimer: NursingTimer = {
-  running: null,
-  startedAt: null,
-  leftSec: 0,
-  rightSec: 0,
-};
-
-function clock(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
-
-/** Whole minutes for a side's accrued seconds — 0 when nothing accrued,
- *  otherwise at least 1 (so a 20-second toggle still registers). */
-function minutesFromSeconds(sec: number): number {
-  return sec > 0 ? Math.max(1, Math.round(sec / 60)) : 0;
-}
 
 // Legacy rows (pre per-side minutes) only have side + total durationMin —
 // reconstruct a left/right split so the steppers still seed sensibly.
@@ -69,17 +53,24 @@ function sidesFromFeed(
 // ONE component for create and edit (CLAUDE.md). Create: happy path is two
 // taps, prefilled from the last feed of the same type. Edit: prefilled from
 // the entry, plus delete.
+//
+// The nursing timer is the family's shared feed_timer row (issue #44),
+// handed in as `activeFeed` from the summary: it used to be this device's
+// localStorage, which no co-parent could see. The sheet only ever sends
+// "start left", "switch", "pause", "stop" — the seconds are the server's.
 export function FeedSheet({
   open,
   onOpenChange,
   babyId,
   recentFeeds,
+  activeFeed = null,
   edit = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   babyId: string;
   recentFeeds: FeedLog[];
+  activeFeed?: FeedTimer | null;
   edit?: FeedLog | null;
 }) {
   const lastByType = useMemo(() => {
@@ -111,7 +102,6 @@ export function FeedSheet({
   const [reaction, setReaction] = useState(false);
   const [leftMin, setLeftMin] = useState(10);
   const [rightMin, setRightMin] = useState(0);
-  const [timer, setTimer] = useState<NursingTimer>(emptyTimer);
   const [now, setNow] = useState(() => Date.now());
   const [time, setTime] = useState<Date | null>(null);
   const [notes, setNotes] = useState("");
@@ -119,20 +109,20 @@ export function FeedSheet({
   const [instance, setInstance] = useState(0);
   const [wasOpen, setWasOpen] = useState(false);
 
-  // Ticks the clock/derived seconds once a second while a side is running
-  // and the sheet is open. The timer's own state (running/startedAt) lives
-  // in localStorage via nursing-timer.ts, so it keeps counting across the
-  // sheet closing/reopening — this effect only drives the live display.
+  // The timer only matters on the create path: editing a past entry must
+  // never touch a clock that is running for the CURRENT feed.
+  const timer = edit ? null : activeFeed;
+  const timerBusy = isOptimisticTimer(timer);
+
+  // Ticks the live clocks once a second while a side is running and the
+  // sheet is open. The timer's own state lives on the server.
   useEffect(() => {
-    if (!open || !timer.running) return;
+    if (!open || !timer?.runningSide) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [open, timer.running]);
+  }, [open, timer?.runningSide]);
 
-  const applyPrefill = (
-    feedType: FeedType,
-    currentTimer: NursingTimer = timer,
-  ) => {
+  const applyPrefill = (feedType: FeedType) => {
     const last = lastByType.get(feedType);
     if (feedType === "bottle") {
       setAmountMl(last?.amountMl ?? 120);
@@ -144,18 +134,11 @@ export function FeedSheet({
       setReaction(false);
     }
     if (feedType === "breast") {
-      const hasAccrual =
-        currentTimer.leftSec > 0 ||
-        currentTimer.rightSec > 0 ||
-        currentTimer.running !== null;
-      if (hasAccrual) {
-        setLeftMin(minutesFromSeconds(sideSeconds(currentTimer, "left")));
-        setRightMin(minutesFromSeconds(sideSeconds(currentTimer, "right")));
-      } else {
-        const sides = sidesFromFeed(last) ?? { left: 10, right: 0 };
-        setLeftMin(sides.left);
-        setRightMin(sides.right);
-      }
+      const sides = sidesFromFeed(last) ?? { left: 10, right: 0 };
+      // With a timer running the steppers follow the clock (see liveLeft /
+      // liveRight); seed them at zero so the clock is what the parent sees.
+      setLeftMin(timer ? 0 : sides.left);
+      setRightMin(timer ? 0 : sides.right);
     }
   };
 
@@ -165,8 +148,6 @@ export function FeedSheet({
     setWasOpen(true);
     setInstance((i) => i + 1);
     setNotes(edit?.notes ?? "");
-    const loadedTimer = loadNursing();
-    setTimer(loadedTimer);
     setNow(Date.now());
     if (edit) {
       setType(edit.type);
@@ -179,47 +160,51 @@ export function FeedSheet({
       setRightMin(sides.right);
       setTime(new Date(edit.time));
     } else {
-      const initial = recentFeeds[0]?.type ?? "bottle";
+      // A running timer is the feed the parent is here to finish.
+      const initial: FeedType = timer
+        ? "breast"
+        : (recentFeeds[0]?.type ?? "bottle");
       setType(initial);
       setTime(null);
-      applyPrefill(initial, loadedTimer);
+      applyPrefill(initial);
     }
   }
   if (!open && wasOpen) {
     setWasOpen(false);
   }
 
+  const startTimer = useStartFeedTimer();
+  const setSide = useSetFeedTimerSide();
+  const stopTimer = useStopFeedTimer();
+  const discardTimer = useDiscardFeedTimer();
+
+  // Tapping a side's button: start the family timer on that side, switch
+  // to it, or pause it if it is the one running.
   const toggleTimer = (side: "left" | "right") => {
-    const clickedAt = Date.now();
-    let next = timer;
-    if (next.running) {
-      const key = next.running === "left" ? "leftSec" : "rightSec";
-      next = {
-        ...next,
-        [key]: sideSeconds(next, next.running, clickedAt),
-        running: null,
-        startedAt: null,
-      };
+    if (!timer) {
+      // From here on the clock drives the steppers; a prefilled "10 min"
+      // next to a clock at 00:00 would be a lie.
+      setLeftMin(0);
+      setRightMin(0);
+      startTimer.mutate({
+        babyId,
+        kind: "breast",
+        side,
+        startTime: new Date().toISOString(),
+      });
+      return;
     }
-    if (timer.running !== side) {
-      next = { ...next, running: side, startedAt: clickedAt };
-    }
-    setTimer(next);
-    saveNursing(next);
-    setNow(clickedAt);
-    // Bank whichever whole minutes just accrued, without ever moving the
-    // stepper backwards past a value the user already dialed in by hand.
-    setLeftMin((v) =>
-      Math.max(v, minutesFromSeconds(sideSeconds(next, "left", clickedAt))),
-    );
-    setRightMin((v) =>
-      Math.max(v, minutesFromSeconds(sideSeconds(next, "right", clickedAt))),
-    );
+    if (timerBusy) return;
+    setSide.mutate({
+      id: timer.id,
+      babyId,
+      side: timer.runningSide === side ? null : side,
+    });
   };
 
   const resetTimer = () => {
-    clearNursing();
-    setTimer(emptyTimer);
+    if (!timer || timerBusy) return;
+    discardTimer.mutate({ id: timer.id, babyId, kind: "breast" });
   };
 
   const changeType = (v: FeedType) => {
@@ -231,9 +216,17 @@ export function FeedSheet({
   const updateFeed = useUpdateFeed();
   const deleteFeed = useDeleteFeed();
 
+  // What the steppers show: never below what the clock has banked, never
+  // below what the parent dialed in by hand.
+  const liveLeft = timer
+    ? Math.max(leftMin, minutesFromSeconds(sideSeconds(timer, "left", now)))
+    : leftMin;
+  const liveRight = timer
+    ? Math.max(rightMin, minutesFromSeconds(sideSeconds(timer, "right", now)))
+    : rightMin;
   const breastSide: Side =
-    leftMin > 0 && rightMin > 0 ? "both" : rightMin > 0 ? "right" : "left";
-  const canSave = type !== "breast" || leftMin + rightMin > 0;
+    liveLeft > 0 && liveRight > 0 ? "both" : liveRight > 0 ? "right" : "left";
+  const canSave = type !== "breast" || (liveLeft + liveRight > 0 && !timerBusy);
 
   const save = () => {
     if (!canSave) return;
@@ -248,15 +241,29 @@ export function FeedSheet({
           type,
           amountMl: type === "breast" ? null : amountMl,
           side: type === "breast" ? breastSide : null,
-          durationMin: type === "breast" ? leftMin + rightMin : null,
-          leftMin: type === "breast" ? leftMin : null,
-          rightMin: type === "breast" ? rightMin : null,
+          durationMin: type === "breast" ? liveLeft + liveRight : null,
+          leftMin: type === "breast" ? liveLeft : null,
+          rightMin: type === "breast" ? liveRight : null,
           // Detail follows the type: a switch clears what no longer applies.
           contents: type === "bottle" ? contents : null,
           food: type === "solids" ? trimmedFood || null : null,
           reaction: type === "solids" && reaction ? true : null,
           notes: trimmedNotes || null,
         },
+      });
+    } else if (type === "breast" && timer) {
+      // Saving a timed feed IS stopping the timer: the server logs the row
+      // from its own clock, with the steppers as the parent's override.
+      stopTimer.mutate({
+        id: timer.id,
+        babyId,
+        kind: "breast",
+        leftMin: liveLeft,
+        rightMin: liveRight,
+        // Only a time the parent picked; otherwise the feed keeps the
+        // moment the timer started.
+        ...(time ? { time: when } : {}),
+        ...(trimmedNotes ? { notes: trimmedNotes } : {}),
       });
     } else {
       logFeed.mutate({
@@ -266,9 +273,9 @@ export function FeedSheet({
         ...(type === "breast"
           ? {
               side: breastSide,
-              durationMin: leftMin + rightMin,
-              leftMin,
-              rightMin,
+              durationMin: liveLeft + liveRight,
+              leftMin: liveLeft,
+              rightMin: liveRight,
             }
           : { amountMl }),
         ...(type === "bottle" && contents ? { contents } : {}),
@@ -276,13 +283,6 @@ export function FeedSheet({
         ...(type === "solids" && reaction ? { reaction: true } : {}),
         ...(trimmedNotes ? { notes: trimmedNotes } : {}),
       });
-    }
-    // Only the create path's steppers are seeded from the live nursing
-    // timer — editing a past entry must never clear a timer that's still
-    // running for the CURRENT feed.
-    if (type === "breast" && !edit) {
-      clearNursing();
-      setTimer(emptyTimer);
     }
     if (!navigator.onLine) toast(t("Saved offline — will sync"));
     onOpenChange(false);
@@ -292,6 +292,42 @@ export function FeedSheet({
     if (!edit) return;
     deleteFeed.mutate({ id: edit.id });
     onOpenChange(false);
+  };
+
+  const sideRow = (side: "left" | "right") => {
+    const running = timer?.runningSide === side;
+    const seconds = timer ? sideSeconds(timer, side, now) : 0;
+    return (
+      <div className="space-y-1">
+        <div className="flex items-center justify-between px-1">
+          <p className="text-xs font-semibold tracking-wide text-muted uppercase">
+            {side === "left" ? t("Left") : t("Right")}
+          </p>
+          {!edit && (
+            <button
+              type="button"
+              onClick={() => toggleTimer(side)}
+              disabled={timerBusy}
+              className="rounded-full bg-surface-2 px-3 py-1 text-sm font-semibold text-ink active:scale-95 disabled:opacity-60"
+            >
+              {running
+                ? `${t("Pause")} · ${clock(seconds)}`
+                : seconds > 0
+                  ? `${t("Resume")} · ${clock(seconds)}`
+                  : t("Start timer")}
+            </button>
+          )}
+        </div>
+        <Stepper
+          value={side === "left" ? liveLeft : liveRight}
+          onChange={side === "left" ? setLeftMin : setRightMin}
+          step={1}
+          min={0}
+          max={90}
+          unit="min"
+        />
+      </div>
+    );
   };
 
   return (
@@ -362,63 +398,21 @@ export function FeedSheet({
 
         {type === "breast" && (
           <>
-            <div className="space-y-1">
-              <div className="flex items-center justify-between px-1">
-                <p className="text-xs font-semibold tracking-wide text-muted uppercase">
-                  {t("Left")}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => toggleTimer("left")}
-                  className="rounded-full bg-surface-2 px-3 py-1 text-sm font-semibold text-ink active:scale-95"
-                >
-                  {timer.running === "left"
-                    ? `${t("Stop")} · ${clock(sideSeconds(timer, "left", now))}`
-                    : t("Start timer")}
-                </button>
-              </div>
-              <Stepper
-                value={leftMin}
-                onChange={setLeftMin}
-                step={1}
-                min={0}
-                max={90}
-                unit="min"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center justify-between px-1">
-                <p className="text-xs font-semibold tracking-wide text-muted uppercase">
-                  {t("Right")}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => toggleTimer("right")}
-                  className="rounded-full bg-surface-2 px-3 py-1 text-sm font-semibold text-ink active:scale-95"
-                >
-                  {timer.running === "right"
-                    ? `${t("Stop")} · ${clock(sideSeconds(timer, "right", now))}`
-                    : t("Start timer")}
-                </button>
-              </div>
-              <Stepper
-                value={rightMin}
-                onChange={setRightMin}
-                step={1}
-                min={0}
-                max={90}
-                unit="min"
-              />
-            </div>
-
-            {(timer.leftSec + timer.rightSec > 0 || timer.running) && (
+            {timer && timer.caretakerName && (
+              <p className="px-1 text-sm text-muted">
+                {t("Timer started by")} {timer.caretakerName}
+              </p>
+            )}
+            {sideRow("left")}
+            {sideRow("right")}
+            {timer && (
               <button
                 type="button"
                 onClick={resetTimer}
-                className="px-1 text-xs text-muted underline"
+                disabled={timerBusy}
+                className="px-1 text-xs text-muted underline disabled:opacity-60"
               >
-                {t("Reset timer")}
+                {t("Discard timer")}
               </button>
             )}
           </>

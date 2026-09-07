@@ -1,8 +1,19 @@
-import { IconMoon, type Icon as TablerIcon } from "@tabler/icons-react";
+import {
+  IconBabyBottle,
+  IconMilk,
+  IconMoon,
+  type Icon as TablerIcon,
+} from "@tabler/icons-react";
 import { useEffect, useState } from "react";
-import type { PlayLog, SleepLog } from "@pjokk/shared";
+import type { FeedTimer, PlayLog, SleepLog } from "@pjokk/shared";
 import { Button } from "@/components/ui/button";
-import { useStopPlay, useWakeSleep } from "@/lib/data";
+import {
+  isOptimisticTimer,
+  useStopFeedTimer,
+  useStopPlay,
+  useWakeSleep,
+} from "@/lib/data";
+import { clock, totalSeconds } from "@/lib/feed-timer-ui";
 import { t } from "@/lib/i18n";
 import { playKindMeta } from "@/lib/play-ui";
 import { formatClock, formatDuration } from "@/lib/time";
@@ -32,6 +43,10 @@ function SessionBanner({
   openLabel,
   disabled,
   emphasis = "ring",
+  elapsedMs,
+  detail,
+  tickMs = 30_000,
+  format = formatDuration,
 }: {
   icon: TablerIcon;
   tint: string;
@@ -50,8 +65,16 @@ function SessionBanner({
   // radiating ring as the help card, but slower and fainter, since it can
   // be on screen for hours (styles.css animate-sleep-breathe).
   emphasis?: "ring" | "breathe";
+  // A timer that pauses (nursing) counts banked seconds, not wall time —
+  // the default counter is now minus startTime.
+  elapsedMs?: (now: number) => number;
+  // Replaces "since HH:MM" when given ("Left", "Paused").
+  detail?: string;
+  tickMs?: number;
+  // A nursing clock reads mm:ss; a nap reads "1:10".
+  format?: (ms: number) => string;
 }) {
-  const now = useNow();
+  const now = useNow(tickMs);
   const body = (
     <>
       <span
@@ -67,9 +90,9 @@ function SessionBanner({
           {label}
         </p>
         <p className="text-base font-bold text-ink">
-          {formatDuration(now - startTime.getTime())}
+          {format(elapsedMs ? elapsedMs(now) : now - startTime.getTime())}
           <span className="ml-1.5 font-medium text-ink-soft">
-            {t("since")} {formatClock(startTime)}
+            {detail ?? `${t("since")} ${formatClock(startTime)}`}
           </span>
         </p>
       </div>
@@ -129,6 +152,73 @@ export function ActiveSleepBanner({
       openLabel={t("Edit sleep")}
       disabled={wakeSleep.isPending || session.id === "optimistic"}
       emphasis="breathe"
+    />
+  );
+}
+
+// The shared nursing timer (issue #44): Stop logs the feed from the
+// server's clock in one tap; the body opens the feed sheet to adjust the
+// minutes or add a note first. Banked seconds, not wall time, so a paused
+// timer stands still.
+export function ActiveFeedBanner({
+  timer,
+  onOpen,
+}: {
+  timer: FeedTimer;
+  onOpen?: () => void;
+}) {
+  const stop = useStopFeedTimer();
+  const busy = stop.isPending || isOptimisticTimer(timer);
+  const side =
+    timer.runningSide === "left"
+      ? t("Left")
+      : timer.runningSide === "right"
+        ? t("Right")
+        : t("Paused");
+  return (
+    <SessionBanner
+      icon={IconBabyBottle}
+      tint="text-feed"
+      label={t("Feeding")}
+      startTime={new Date(timer.startTime)}
+      elapsedMs={(now) => totalSeconds(timer, now) * 1000}
+      format={(ms) => clock(Math.floor(ms / 1000))}
+      detail={side}
+      tickMs={1000}
+      action={t("Stop")}
+      onAction={() =>
+        stop.mutate({ id: timer.id, babyId: timer.babyId, kind: "breast" })
+      }
+      onOpen={busy ? undefined : onOpen}
+      openLabel={t("Feed")}
+      disabled={busy}
+      emphasis="ring"
+    />
+  );
+}
+
+// A pump timer is one clock; Stop opens the pump sheet, because the amount
+// is the one thing the clock cannot know.
+export function ActivePumpBanner({
+  timer,
+  onStop,
+}: {
+  timer: FeedTimer;
+  onStop: () => void;
+}) {
+  return (
+    <SessionBanner
+      icon={IconMilk}
+      tint="text-feed"
+      label={t("Pumping")}
+      startTime={new Date(timer.startTime)}
+      elapsedMs={(now) => totalSeconds(timer, now) * 1000}
+      format={(ms) => clock(Math.floor(ms / 1000))}
+      tickMs={1000}
+      action={t("Stop")}
+      onAction={onStop}
+      disabled={isOptimisticTimer(timer)}
+      emphasis="ring"
     />
   );
 }

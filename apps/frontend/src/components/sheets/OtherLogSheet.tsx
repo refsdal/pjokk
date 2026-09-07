@@ -11,8 +11,9 @@ import {
   type Icon as TablerIcon,
 } from "@tabler/icons-react";
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
+  FeedTimer,
   MeasurementType,
   MedicineUnit,
   PlayType,
@@ -26,13 +27,17 @@ import { TimeField } from "@/components/TimeField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  isOptimisticTimer,
   useCreateOther,
   useDeleteOther,
   useOtherList,
+  useStartFeedTimer,
+  useStopFeedTimer,
   useUpdateOther,
   type CreateOtherVars,
   type OtherKind,
 } from "@/lib/data";
+import { minutesFromSeconds, totalSeconds } from "@/lib/feed-timer-ui";
 import { t } from "@/lib/i18n";
 import { playKindMeta, playTypeOrder } from "@/lib/play-ui";
 import { toast } from "@/lib/toast";
@@ -149,6 +154,8 @@ export function OtherLogSheet({
   kind,
   edit = null,
   initialMeasurementType = "weight",
+  activePump = null,
+  stopTimer = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -158,8 +165,23 @@ export function OtherLogSheet({
   // Which measurement type the sheet opens on. Only meaningful for
   // kind="measurement"; ignored otherwise.
   initialMeasurementType?: MeasurementType;
+  // The family's running pump timer (issue #44), and whether this open is
+  // the banner's Stop: then the duration follows the clock and Save stops
+  // the timer instead of logging a fresh row. Only meaningful for
+  // kind="pump".
+  activePump?: FeedTimer | null;
+  stopTimer?: boolean;
 }) {
   const recent = useOtherList(kind, babyId, open && !edit);
+  const startFeedTimer = useStartFeedTimer();
+  const stopFeedTimer = useStopFeedTimer();
+  const pumpTimer = kind === "pump" && !edit && stopTimer ? activePump : null;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!open || !pumpTimer) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [open, pumpTimer]);
 
   const [time, setTime] = useState<Date | null>(null);
   const [notes, setNotes] = useState("");
@@ -233,11 +255,19 @@ export function OtherLogSheet({
       }
       if (kind === "pump") {
         setSide(
-          last?.side === "right" || last?.side === "both" ? last.side : "left",
+          pumpTimer?.runningSide ??
+            (last?.side === "right" || last?.side === "both"
+              ? last.side
+              : "left"),
         );
         setAmountMl(typeof last?.amountMl === "number" ? last.amountMl : 100);
+        // Stopping the timer: the clock is the duration (see liveDuration).
         setDurationMin(
-          typeof last?.durationMin === "number" ? last.durationMin : 15,
+          pumpTimer
+            ? 0
+            : typeof last?.durationMin === "number"
+              ? last.durationMin
+              : 15,
         );
       }
     }
@@ -258,9 +288,41 @@ export function OtherLogSheet({
   const updateOther = useUpdateOther();
   const deleteOther = useDeleteOther();
 
+  // Never below what the clock has banked, never below the parent's own
+  // number — the same rule as the feed sheet's steppers.
+  const liveDuration = pumpTimer
+    ? Math.max(durationMin, minutesFromSeconds(totalSeconds(pumpTimer, now)))
+    : durationMin;
+
+  const startPump = () => {
+    startFeedTimer.mutate({
+      babyId,
+      kind: "pump",
+      side,
+      startTime: new Date().toISOString(),
+    });
+    if (!navigator.onLine) toast(t("Saved offline — will sync"));
+    onOpenChange(false);
+  };
+
   const save = () => {
     const when = (time ?? new Date()).toISOString();
     const trimmedNotes = notes.trim();
+    if (pumpTimer) {
+      stopFeedTimer.mutate({
+        id: pumpTimer.id,
+        babyId,
+        kind: "pump",
+        amountMl,
+        side,
+        durationMin: liveDuration,
+        ...(time ? { time: when } : {}),
+        ...(trimmedNotes ? { notes: trimmedNotes } : {}),
+      });
+      if (!navigator.onLine) toast(t("Saved offline — will sync"));
+      onOpenChange(false);
+      return;
+    }
     const fields: Record<string, unknown> =
       kind === "medicine"
         ? { name: name.trim(), amount, unit }
@@ -404,13 +466,28 @@ export function OtherLogSheet({
               unit="ml"
             />
             <Stepper
-              value={durationMin}
+              value={liveDuration}
               onChange={setDurationMin}
               step={5}
-              min={5}
+              min={pumpTimer ? 0 : 5}
               max={90}
               unit="min"
             />
+            {!edit && !pumpTimer && !activePump && (
+              <Button
+                variant="secondary"
+                size="full"
+                onClick={startPump}
+                disabled={startFeedTimer.isPending}
+              >
+                {t("Start timer")}
+              </Button>
+            )}
+            {!edit && !pumpTimer && activePump && (
+              <p className="px-1 text-sm text-muted">
+                {t("A pump timer is running — stop it from Home.")}
+              </p>
+            )}
           </>
         )}
 
@@ -426,7 +503,13 @@ export function OtherLogSheet({
           />
         )}
 
-        <Button size="full" onClick={save} disabled={saveDisabled}>
+        <Button
+          size="full"
+          onClick={save}
+          disabled={
+            saveDisabled || (!!pumpTimer && isOptimisticTimer(pumpTimer))
+          }
+        >
           {t("Save")}
         </Button>
 

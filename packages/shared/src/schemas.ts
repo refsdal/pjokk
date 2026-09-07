@@ -429,6 +429,25 @@ export const HelpRequestSchema = z.object({
   delivered: z.number().int(),
 });
 
+// A running nursing / pump timer, shared by the whole family (issue #44).
+// Elapsed time is computed by the reader (lib/feed-timer-ui.ts): the banked
+// seconds plus, while runningSide is set, now minus sideStartedAt.
+export const feedTimerKinds = ["breast", "pump"] as const;
+export const FeedTimerSchema = z.object({
+  id: z.string(),
+  babyId: z.string(),
+  caretakerId: z.string(),
+  caretakerName: z.string(),
+  kind: z.enum(feedTimerKinds),
+  startTime: isoTime(),
+  // The side counting now; null = paused (nursing only — a pump timer is one
+  // clock and is never paused).
+  runningSide: z.enum(["left", "right", "both"]).nullable(),
+  sideStartedAt: isoTime().nullable(),
+  leftSec: z.number().int(),
+  rightSec: z.number().int(),
+});
+
 // --- Home screen summary: one query answers "when did she last …" ---
 
 export const SummarySchema = z.object({
@@ -438,6 +457,9 @@ export const SummarySchema = z.object({
   lastSleep: SleepLogSchema.nullable(),
   // The running timed activity (tummy time, a walk), or null.
   activePlay: PlayLogSchema.nullable(),
+  // The running nursing / pump timers, or null (issue #44).
+  activeFeed: FeedTimerSchema.nullable(),
+  activePump: FeedTimerSchema.nullable(),
   // The newest `temperature` measurement, or null — specifically the newest
   // of that TYPE, so weighing the baby afterwards does not displace it.
   // Backs the Home screen's temperature card.
@@ -795,6 +817,8 @@ export type CreateContact = z.infer<typeof CreateContactSchema>;
 export type UpdateContact = z.infer<typeof UpdateContactSchema>;
 export type ContactIcon = (typeof contactIcons)[number];
 export type PlayLog = z.infer<typeof PlayLogSchema>;
+export type FeedTimer = z.infer<typeof FeedTimerSchema>;
+export type FeedTimerKind = (typeof feedTimerKinds)[number];
 export type PlayType = (typeof playTypes)[number];
 export type VaccineLog = z.infer<typeof VaccineLogSchema>;
 export type VaccineDocument = z.infer<typeof VaccineDocumentSchema>;
