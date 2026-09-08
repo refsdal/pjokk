@@ -1167,3 +1167,103 @@ func TestOrgCreationGuardMatrix(t *testing.T) {
 		t.Fatal("open signup: existing member created a second family, want refusal")
 	}
 }
+
+// -----------------------------------------------------------------------
+// Creating a family on somebody else's behalf —
+// docs/superpowers/specs/2026-09-08-admin-family-management-design.md §2
+// -----------------------------------------------------------------------
+
+// The regression the CreateFamilyForUser seam exists for. allowOrgCreation
+// measures the CREATOR, and CreateOrganization's creator is the family's
+// first admin — so under closed signup a plain CreateFamily on a freshly
+// provisioned account is refused, which is right for every self-serve path
+// and useless for an operator creating a family for a new parent.
+//
+// The second half is the security half: the override must not be reachable
+// any other way. It travels on an unexported context key, so a caller
+// holding only the Service interface has exactly one door to it.
+func TestCreateFamilyForUserBypassesTheGuardOnlyThroughItsOwnMethod(t *testing.T) {
+	f := newFixture(t, false) // closed signup — the shipped default
+
+	// A provisioned, passwordless account, exactly as the admin console
+	// creates one: no membership, no system role.
+	parentID, err := f.svc.CreateUser(f.ctx, "Nora", "nora@example.com", "")
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	if _, err := f.svc.CreateFamily(f.ctx, parentID, "Dahl"); err == nil {
+		t.Fatal("CreateFamily created a family for a family-less account under closed signup")
+	}
+
+	familyID, err := f.svc.CreateFamilyForUser(f.ctx, parentID, "Dahl")
+	if err != nil {
+		t.Fatalf("CreateFamilyForUser: %v", err)
+	}
+	if familyID == "" {
+		t.Fatal("CreateFamilyForUser returned an empty id")
+	}
+
+	// And the account it was created for really does run it.
+	role, err := f.rig.Q.GetFamilyMembershipRole(f.ctx, gen.GetFamilyMembershipRoleParams{
+		OrganizationID: familyID,
+		UserID:         parentID,
+	})
+	if err != nil {
+		t.Fatalf("read membership: %v", err)
+	}
+	if role.Role != auth.RoleAdmin {
+		t.Errorf("first admin's role = %q, want %q", role.Role, auth.RoleAdmin)
+	}
+
+	// The marker does not leak into later calls made with the same base
+	// context: a second plain CreateFamily is refused exactly as the first
+	// was.
+	otherID, err := f.svc.CreateUser(f.ctx, "Ola", "ola@example.com", "")
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	if _, err := f.svc.CreateFamily(f.ctx, otherID, "Berg"); err == nil {
+		t.Fatal("the sysadmin override leaked into an ordinary CreateFamily call")
+	}
+}
+
+// CreateEmptyFamily is the invite-only creation path. Limen cannot create an
+// ownerless organization, so the operator is a momentary member and the
+// method's whole job is that they do not stay one — a system admin left
+// inside a family would hold ordinary in-app access to a child's health
+// record.
+func TestCreateEmptyFamilyLeavesNoMembers(t *testing.T) {
+	f := newFixture(t, false)
+
+	operatorID, _ := f.signIn("Operator", "operator@example.com")
+	f.promote(operatorID)
+
+	familyID, err := f.svc.CreateEmptyFamily(f.ctx, operatorID, "Solo")
+	if err != nil {
+		t.Fatalf("CreateEmptyFamily: %v", err)
+	}
+
+	var members, roles int
+	if err := f.rig.Pool.QueryRow(f.ctx,
+		`SELECT
+			(SELECT COUNT(*) FROM "organization_members" WHERE "organization_id" = $1),
+			(SELECT COUNT(*) FROM "organization_member_roles" WHERE "organization_id" = $1)`,
+		familyID).Scan(&members, &roles); err != nil {
+		t.Fatalf("count membership rows: %v", err)
+	}
+	if members != 0 || roles != 0 {
+		t.Errorf("family has %d members and %d role rows, want 0 and 0 — the operator was left inside it",
+			members, roles)
+	}
+
+	// The family itself exists, so an invite can reference it.
+	var name string
+	if err := f.rig.Pool.QueryRow(f.ctx,
+		`SELECT "name" FROM "organizations" WHERE "id" = $1`, familyID).Scan(&name); err != nil {
+		t.Fatalf("read the created family: %v", err)
+	}
+	if name != "Solo" {
+		t.Errorf("family name = %q, want Solo", name)
+	}
+}

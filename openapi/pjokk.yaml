@@ -2686,9 +2686,18 @@ paths:
       operationId: listAdminFamilies
       summary: >-
         Every family on the platform, newest first, with member and baby
-        counts and the timestamp of its most recent feed (null when it has
-        never logged one). System admin only.
+        counts, whether it still has an admin, and the timestamp of its most
+        recent feed (null when it has never logged one). `query` filters on
+        name or slug (case-insensitive substring). System admin only.
       tags: [admin]
+      parameters:
+        - name: query
+          in: query
+          description: Case-insensitive substring match on name or slug.
+          required: false
+          schema:
+            type: string
+            maxLength: 200
       responses:
         "200":
           description: All families.
@@ -2698,7 +2707,106 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/AdminFamily"
+    post:
+      operationId: createAdminFamily
+      summary: >-
+        Create a family on someone's behalf. Three behaviours, chosen by the
+        body: `adminEmail` naming an existing account makes it the family
+        admin; `adminEmail` with no account is refused with 404 UNLESS
+        `createAccount` is true, which provisions a passwordless account
+        (`adminName` required) that the person later claims by signing in
+        with Google on the same address; no `adminEmail` at all creates an
+        empty family plus an admin-role invite, returned as a join URL.
+
+        Not one transaction — account creation and family creation each go
+        through the auth library, which opens its own. The steps are ordered
+        so a partial failure leaves only a memberless account, which is
+        inert and swept by the orphan purge after seven days. Audited as
+        `user.create` (when one is provisioned) and `family.create`. System
+        admin only.
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAdminFamily"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminFamilyCreated"
+        "400":
+          description: >-
+            `createAccount` without `adminName`, or an account already
+            exists for that address in a way that cannot be used.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No account for `adminEmail` and `createAccount` was not set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/admin/families/{id}:
+    get:
+      operationId: getAdminFamily
+      summary: >-
+        One family in full: metadata, members with roles, babies, live
+        invites and API keys. Deliberately carries NO log content and no
+        per-type counts — the operator console stays metadata-only, so
+        nothing derived from a child's health record enters it.
+        Impersonation remains the only route to a family's entries. System
+        admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: The family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminFamilyDetail"
+        "404":
+          description: No family with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      operationId: updateAdminFamily
+      summary: >-
+        Rename a family. The slug is deliberately left alone: it is derived
+        at creation time and regenerating it would change an identifier
+        under whatever already holds it. Audited as `family.rename`. System
+        admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAdminFamily"
+      responses:
+        "200":
+          description: Renamed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No family with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
     delete:
       operationId: deleteAdminFamily
       summary: >-
@@ -2717,6 +2825,190 @@ paths:
                 $ref: "#/components/schemas/Ok"
         "404":
           description: No family with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/families/{id}/members:
+    post:
+      operationId: addAdminFamilyMember
+      summary: >-
+        Add an existing account to a family by email address. The account
+        must already exist — this route never creates one, so a mistyped
+        address is a 404 rather than a stray user. Audited as
+        `family.member.add`. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddAdminFamilyMember"
+      responses:
+        "200":
+          description: Added.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "400":
+          description: The account is already a member of this family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No family with this id, or no account for that email.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/families/{id}/members/{memberId}:
+    delete:
+      operationId: removeAdminFamilyMember
+      summary: >-
+        Remove a member from a family. The last-admin guard applies to
+        system admins too: a family must never be left with a role nobody
+        holds, and promoting someone else first is always available.
+        Audited as `family.member.remove`. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+        - $ref: "#/components/parameters/memberIdPath"
+      responses:
+        "200":
+          description: Removed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "400":
+          description: Cannot remove the family's last admin.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No family with this id, or no such member in it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/families/{id}/members/{memberId}/role:
+    post:
+      operationId: setAdminFamilyMemberRole
+      summary: >-
+        Change a member's role within a family. Demoting the last admin is
+        refused for the same reason removing them is. Audited as
+        `family.member.role`. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+        - $ref: "#/components/parameters/memberIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetMemberRole"
+      responses:
+        "200":
+          description: Role changed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "400":
+          description: Cannot demote the family's last admin.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No family with this id, or no such member in it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/families/{id}/invites:
+    post:
+      operationId: createAdminFamilyInvite
+      summary: >-
+        Mint an invite for a family the operator is not a member of. Same
+        code generation, defaults and response shape as the family-admin
+        route — both call one shared core, so the two can never grow
+        different alphabets or expiry rules. Audited as
+        `family.invite.create`. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInvite"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invite"
+        "404":
+          description: No family with this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/families/{id}/invites/{code}:
+    delete:
+      operationId: revokeAdminFamilyInvite
+      summary: >-
+        Revoke one of a family's invite codes. Scoped by family id as well
+        as code, so an operator cannot revoke another family's invite by
+        guessing its code. Audited as `family.invite.revoke`. System admin
+        only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+        - $ref: "#/components/parameters/codePath"
+      responses:
+        "200":
+          description: Revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No such live invite in this family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/families/{id}/keys/{keyId}:
+    delete:
+      operationId: revokeAdminFamilyKey
+      summary: >-
+        Revoke one of a family's API keys — the way to kill a leaked
+        integration token without impersonating anyone. Sets revoked_at
+        rather than deleting the row, exactly as the family-admin route
+        does. Audited as `family.key.revoke`. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+        - $ref: "#/components/parameters/keyIdPath"
+      responses:
+        "200":
+          description: Revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No such live key in this family.
           content:
             application/json:
               schema:
@@ -3039,6 +3331,15 @@ components:
       name: code
       in: path
       description: An invite code.
+      required: true
+      schema:
+        type: string
+    keyIdPath:
+      name: keyId
+      in: path
+      description: >-
+        An API key's id. Named separately from idPath because the admin
+        route that uses it already spends `id` on the family.
       required: true
       schema:
         type: string
@@ -5594,7 +5895,7 @@ components:
     AdminFamily:
       type: object
       required:
-        [id, name, slug, plan, createdAt, members, babies, lastFeedAt]
+        [id, name, slug, plan, createdAt, members, babies, lastFeedAt, hasAdmin]
       properties:
         id:
           type: string
@@ -5615,6 +5916,164 @@ components:
           type: string
           format: date-time
           nullable: true
+        hasAdmin:
+          type: boolean
+          description: >-
+            Whether anyone in the family still holds the admin (or owner)
+            role. False means the family is stranded — deleting an account
+            cascades its membership away without consulting the last-admin
+            guard — and the console badges it so an operator can promote
+            someone.
+    AdminFamilyMember:
+      type: object
+      required: [memberId, userId, name, email, role, joinedAt, banned]
+      properties:
+        memberId:
+          type: string
+          description: The family-membership row id (NOT the user id).
+        userId:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        joinedAt:
+          type: string
+          format: date-time
+        banned:
+          type: boolean
+    AdminFamilyDetail:
+      type: object
+      description: >-
+        Metadata only, by design — no log content and no per-type counts.
+        See getAdminFamily's summary.
+      required:
+        [
+          id,
+          name,
+          slug,
+          plan,
+          createdAt,
+          lastFeedAt,
+          members,
+          babies,
+          invites,
+          apiKeys,
+        ]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        plan:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastFeedAt:
+          type: string
+          format: date-time
+          nullable: true
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminFamilyMember"
+        babies:
+          type: array
+          items:
+            $ref: "#/components/schemas/Baby"
+        invites:
+          type: array
+          items:
+            $ref: "#/components/schemas/Invite"
+        apiKeys:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiKey"
+    CreateAdminFamily:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        adminEmail:
+          type: string
+          format: email
+          maxLength: 254
+          description: >-
+            The account to install as the family's first admin. Omit it to
+            get an empty family plus an admin-role invite instead.
+        adminName:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Required when createAccount is true; ignored otherwise.
+        createAccount:
+          type: boolean
+          default: false
+          description: >-
+            Provision a passwordless account for adminEmail when none
+            exists. An explicit flag rather than implicit behaviour so a
+            mistyped address is refused instead of silently creating a user.
+    AdminFamilyCreated:
+      type: object
+      required: [id, name, slug, firstAdmin, invite]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        firstAdmin:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/AdminFamilyFirstAdmin"
+        invite:
+          description: >-
+            Present only when the family was created without a first admin:
+            the admin-role invite to hand to whoever will run it.
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Invite"
+    AdminFamilyFirstAdmin:
+      type: object
+      required: [userId, email, accountCreated]
+      properties:
+        userId:
+          type: string
+        email:
+          type: string
+        accountCreated:
+          type: boolean
+          description: >-
+            True when this call provisioned the account (passwordless — the
+            person claims it by signing in with Google on the same address).
+    UpdateAdminFamily:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+    AddAdminFamilyMember:
+      type: object
+      required: [email, role]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        role:
+          type: string
+          enum: [admin, member]
     AdminUser:
       type: object
       required: [id, name, email, role, banned, banReason, createdAt]

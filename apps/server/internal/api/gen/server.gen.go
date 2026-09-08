@@ -25,12 +25,40 @@ type ServerInterface interface {
 	// CreateAdminAuditNote Append an entry to the trail by hand, for an admin action performed outside these routes. System admin only.
 	// (POST /api/admin/audit)
 	CreateAdminAuditNote(w http.ResponseWriter, r *http.Request)
-	// ListAdminFamilies Every family on the platform, newest first, with member and baby counts and the timestamp of its most recent feed (null when it has never logged one). System admin only.
+	// ListAdminFamilies Every family on the platform, newest first, with member and baby counts, whether it still has an admin, and the timestamp of its most recent feed (null when it has never logged one). `query` filters on name or slug (case-insensitive substring). System admin only.
 	// (GET /api/admin/families)
-	ListAdminFamilies(w http.ResponseWriter, r *http.Request)
+	ListAdminFamilies(w http.ResponseWriter, r *http.Request, params ListAdminFamiliesParams)
+	// CreateAdminFamily Create a family on someone's behalf. Three behaviours, chosen by the body: `adminEmail` naming an existing account makes it the family admin; `adminEmail` with no account is refused with 404 UNLESS `createAccount` is true, which provisions a passwordless account (`adminName` required) that the person later claims by signing in with Google on the same address; no `adminEmail` at all creates an empty family plus an admin-role invite, returned as a join URL.
+	// Not one transaction — account creation and family creation each go through the auth library, which opens its own. The steps are ordered so a partial failure leaves only a memberless account, which is inert and swept by the orphan purge after seven days. Audited as `user.create` (when one is provisioned) and `family.create`. System admin only.
+	// (POST /api/admin/families)
+	CreateAdminFamily(w http.ResponseWriter, r *http.Request)
 	// DeleteAdminFamily Delete a family and ALL its data — members, babies, invites, keys and every log cascade with the organization row. Audited as `family.delete` before the delete runs. System admin only.
 	// (DELETE /api/admin/families/{id})
 	DeleteAdminFamily(w http.ResponseWriter, r *http.Request, id IdPath)
+	// GetAdminFamily One family in full: metadata, members with roles, babies, live invites and API keys. Deliberately carries NO log content and no per-type counts — the operator console stays metadata-only, so nothing derived from a child's health record enters it. Impersonation remains the only route to a family's entries. System admin only.
+	// (GET /api/admin/families/{id})
+	GetAdminFamily(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdateAdminFamily Rename a family. The slug is deliberately left alone: it is derived at creation time and regenerating it would change an identifier under whatever already holds it. Audited as `family.rename`. System admin only.
+	// (PATCH /api/admin/families/{id})
+	UpdateAdminFamily(w http.ResponseWriter, r *http.Request, id IdPath)
+	// CreateAdminFamilyInvite Mint an invite for a family the operator is not a member of. Same code generation, defaults and response shape as the family-admin route — both call one shared core, so the two can never grow different alphabets or expiry rules. Audited as `family.invite.create`. System admin only.
+	// (POST /api/admin/families/{id}/invites)
+	CreateAdminFamilyInvite(w http.ResponseWriter, r *http.Request, id IdPath)
+	// RevokeAdminFamilyInvite Revoke one of a family's invite codes. Scoped by family id as well as code, so an operator cannot revoke another family's invite by guessing its code. Audited as `family.invite.revoke`. System admin only.
+	// (DELETE /api/admin/families/{id}/invites/{code})
+	RevokeAdminFamilyInvite(w http.ResponseWriter, r *http.Request, id IdPath, code CodePath)
+	// RevokeAdminFamilyKey Revoke one of a family's API keys — the way to kill a leaked integration token without impersonating anyone. Sets revoked_at rather than deleting the row, exactly as the family-admin route does. Audited as `family.key.revoke`. System admin only.
+	// (DELETE /api/admin/families/{id}/keys/{keyId})
+	RevokeAdminFamilyKey(w http.ResponseWriter, r *http.Request, id IdPath, keyId KeyIdPath)
+	// AddAdminFamilyMember Add an existing account to a family by email address. The account must already exist — this route never creates one, so a mistyped address is a 404 rather than a stray user. Audited as `family.member.add`. System admin only.
+	// (POST /api/admin/families/{id}/members)
+	AddAdminFamilyMember(w http.ResponseWriter, r *http.Request, id IdPath)
+	// RemoveAdminFamilyMember Remove a member from a family. The last-admin guard applies to system admins too: a family must never be left with a role nobody holds, and promoting someone else first is always available. Audited as `family.member.remove`. System admin only.
+	// (DELETE /api/admin/families/{id}/members/{memberId})
+	RemoveAdminFamilyMember(w http.ResponseWriter, r *http.Request, id IdPath, memberId MemberIdPath)
+	// SetAdminFamilyMemberRole Change a member's role within a family. Demoting the last admin is refused for the same reason removing them is. Audited as `family.member.role`. System admin only.
+	// (POST /api/admin/families/{id}/members/{memberId}/role)
+	SetAdminFamilyMemberRole(w http.ResponseWriter, r *http.Request, id IdPath, memberId MemberIdPath)
 	// GetAdminStats Platform totals for the /admin dashboard. coreLogs is feeds + diapers + sleeps; usersLast7d counts accounts created in the last seven days. System admin only.
 	// (GET /api/admin/stats)
 	GetAdminStats(w http.ResponseWriter, r *http.Request)
@@ -415,8 +443,41 @@ func (siw *ServerInterfaceWrapper) CreateAdminAuditNote(w http.ResponseWriter, r
 // ListAdminFamilies operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminFamilies(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminFamiliesParams
+
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "query", r.URL.Query(), &params.Query, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListAdminFamilies(w, r)
+		siw.Handler.ListAdminFamilies(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminFamily operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminFamily(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminFamily(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -443,6 +504,250 @@ func (siw *ServerInterfaceWrapper) DeleteAdminFamily(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteAdminFamily(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminFamily operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminFamily(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminFamily(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminFamily operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminFamily(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminFamily(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminFamilyInvite operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminFamilyInvite(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminFamilyInvite(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeAdminFamilyInvite operation middleware
+func (siw *ServerInterfaceWrapper) RevokeAdminFamilyInvite(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "code" -------------
+	var code CodePath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "code", r.PathValue("code"), &code, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeAdminFamilyInvite(w, r, id, code)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeAdminFamilyKey operation middleware
+func (siw *ServerInterfaceWrapper) RevokeAdminFamilyKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "keyId" -------------
+	var keyId KeyIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "keyId", r.PathValue("keyId"), &keyId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "keyId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeAdminFamilyKey(w, r, id, keyId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddAdminFamilyMember operation middleware
+func (siw *ServerInterfaceWrapper) AddAdminFamilyMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddAdminFamilyMember(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveAdminFamilyMember operation middleware
+func (siw *ServerInterfaceWrapper) RemoveAdminFamilyMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "memberId" -------------
+	var memberId MemberIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "memberId", r.PathValue("memberId"), &memberId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "memberId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveAdminFamilyMember(w, r, id, memberId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetAdminFamilyMemberRole operation middleware
+func (siw *ServerInterfaceWrapper) SetAdminFamilyMemberRole(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "memberId" -------------
+	var memberId MemberIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "memberId", r.PathValue("memberId"), &memberId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "memberId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetAdminFamilyMemberRole(w, r, id, memberId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3546,7 +3851,16 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/invites/redeem", wrapper.RedeemInvite)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/admin/stats", wrapper.GetAdminStats)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/admin/families", wrapper.ListAdminFamilies)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/families", wrapper.CreateAdminFamily)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/admin/families/{id}", wrapper.DeleteAdminFamily)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/admin/families/{id}", wrapper.GetAdminFamily)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/admin/families/{id}", wrapper.UpdateAdminFamily)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/families/{id}/members", wrapper.AddAdminFamilyMember)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/admin/families/{id}/members/{memberId}", wrapper.RemoveAdminFamilyMember)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/families/{id}/members/{memberId}/role", wrapper.SetAdminFamilyMemberRole)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/families/{id}/invites", wrapper.CreateAdminFamilyInvite)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/admin/families/{id}/invites/{code}", wrapper.RevokeAdminFamilyInvite)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/admin/families/{id}/keys/{keyId}", wrapper.RevokeAdminFamilyKey)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/admin/users", wrapper.ListAdminUsers)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/users/{id}/delete", wrapper.DeleteAdminUser)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/users/{id}/ban", wrapper.BanAdminUser)
@@ -3605,6 +3919,7 @@ func (response CreateAdminAuditNote200JSONResponse) VisitCreateAdminAuditNoteRes
 }
 
 type ListAdminFamiliesRequestObject struct {
+	Params ListAdminFamiliesParams
 }
 
 type ListAdminFamiliesResponseObject interface {
@@ -3621,6 +3936,56 @@ func (response ListAdminFamilies200JSONResponse) VisitListAdminFamiliesResponse(
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAdminFamilyRequestObject struct {
+	Body *CreateAdminFamilyJSONRequestBody
+}
+
+type CreateAdminFamilyResponseObject interface {
+	VisitCreateAdminFamilyResponse(w http.ResponseWriter) error
+}
+
+type CreateAdminFamily201JSONResponse AdminFamilyCreated
+
+func (response CreateAdminFamily201JSONResponse) VisitCreateAdminFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAdminFamily400JSONResponse Error
+
+func (response CreateAdminFamily400JSONResponse) VisitCreateAdminFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAdminFamily404JSONResponse Error
+
+func (response CreateAdminFamily404JSONResponse) VisitCreateAdminFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -3650,6 +4015,344 @@ func (response DeleteAdminFamily200JSONResponse) VisitDeleteAdminFamilyResponse(
 type DeleteAdminFamily404JSONResponse Error
 
 func (response DeleteAdminFamily404JSONResponse) VisitDeleteAdminFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAdminFamilyRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type GetAdminFamilyResponseObject interface {
+	VisitGetAdminFamilyResponse(w http.ResponseWriter) error
+}
+
+type GetAdminFamily200JSONResponse AdminFamilyDetail
+
+func (response GetAdminFamily200JSONResponse) VisitGetAdminFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAdminFamily404JSONResponse Error
+
+func (response GetAdminFamily404JSONResponse) VisitGetAdminFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAdminFamilyRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdateAdminFamilyJSONRequestBody
+}
+
+type UpdateAdminFamilyResponseObject interface {
+	VisitUpdateAdminFamilyResponse(w http.ResponseWriter) error
+}
+
+type UpdateAdminFamily200JSONResponse Ok
+
+func (response UpdateAdminFamily200JSONResponse) VisitUpdateAdminFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAdminFamily404JSONResponse Error
+
+func (response UpdateAdminFamily404JSONResponse) VisitUpdateAdminFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAdminFamilyInviteRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *CreateAdminFamilyInviteJSONRequestBody
+}
+
+type CreateAdminFamilyInviteResponseObject interface {
+	VisitCreateAdminFamilyInviteResponse(w http.ResponseWriter) error
+}
+
+type CreateAdminFamilyInvite201JSONResponse Invite
+
+func (response CreateAdminFamilyInvite201JSONResponse) VisitCreateAdminFamilyInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAdminFamilyInvite404JSONResponse Error
+
+func (response CreateAdminFamilyInvite404JSONResponse) VisitCreateAdminFamilyInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeAdminFamilyInviteRequestObject struct {
+	Id   IdPath   `json:"id"`
+	Code CodePath `json:"code"`
+}
+
+type RevokeAdminFamilyInviteResponseObject interface {
+	VisitRevokeAdminFamilyInviteResponse(w http.ResponseWriter) error
+}
+
+type RevokeAdminFamilyInvite200JSONResponse Ok
+
+func (response RevokeAdminFamilyInvite200JSONResponse) VisitRevokeAdminFamilyInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeAdminFamilyInvite404JSONResponse Error
+
+func (response RevokeAdminFamilyInvite404JSONResponse) VisitRevokeAdminFamilyInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeAdminFamilyKeyRequestObject struct {
+	Id    IdPath    `json:"id"`
+	KeyId KeyIdPath `json:"keyId"`
+}
+
+type RevokeAdminFamilyKeyResponseObject interface {
+	VisitRevokeAdminFamilyKeyResponse(w http.ResponseWriter) error
+}
+
+type RevokeAdminFamilyKey200JSONResponse Ok
+
+func (response RevokeAdminFamilyKey200JSONResponse) VisitRevokeAdminFamilyKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeAdminFamilyKey404JSONResponse Error
+
+func (response RevokeAdminFamilyKey404JSONResponse) VisitRevokeAdminFamilyKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddAdminFamilyMemberRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *AddAdminFamilyMemberJSONRequestBody
+}
+
+type AddAdminFamilyMemberResponseObject interface {
+	VisitAddAdminFamilyMemberResponse(w http.ResponseWriter) error
+}
+
+type AddAdminFamilyMember200JSONResponse Ok
+
+func (response AddAdminFamilyMember200JSONResponse) VisitAddAdminFamilyMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddAdminFamilyMember400JSONResponse Error
+
+func (response AddAdminFamilyMember400JSONResponse) VisitAddAdminFamilyMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddAdminFamilyMember404JSONResponse Error
+
+func (response AddAdminFamilyMember404JSONResponse) VisitAddAdminFamilyMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveAdminFamilyMemberRequestObject struct {
+	Id       IdPath       `json:"id"`
+	MemberId MemberIdPath `json:"memberId"`
+}
+
+type RemoveAdminFamilyMemberResponseObject interface {
+	VisitRemoveAdminFamilyMemberResponse(w http.ResponseWriter) error
+}
+
+type RemoveAdminFamilyMember200JSONResponse Ok
+
+func (response RemoveAdminFamilyMember200JSONResponse) VisitRemoveAdminFamilyMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveAdminFamilyMember400JSONResponse Error
+
+func (response RemoveAdminFamilyMember400JSONResponse) VisitRemoveAdminFamilyMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveAdminFamilyMember404JSONResponse Error
+
+func (response RemoveAdminFamilyMember404JSONResponse) VisitRemoveAdminFamilyMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetAdminFamilyMemberRoleRequestObject struct {
+	Id       IdPath       `json:"id"`
+	MemberId MemberIdPath `json:"memberId"`
+	Body     *SetAdminFamilyMemberRoleJSONRequestBody
+}
+
+type SetAdminFamilyMemberRoleResponseObject interface {
+	VisitSetAdminFamilyMemberRoleResponse(w http.ResponseWriter) error
+}
+
+type SetAdminFamilyMemberRole200JSONResponse Ok
+
+func (response SetAdminFamilyMemberRole200JSONResponse) VisitSetAdminFamilyMemberRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetAdminFamilyMemberRole400JSONResponse Error
+
+func (response SetAdminFamilyMemberRole400JSONResponse) VisitSetAdminFamilyMemberRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetAdminFamilyMemberRole404JSONResponse Error
+
+func (response SetAdminFamilyMemberRole404JSONResponse) VisitSetAdminFamilyMemberRoleResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -7677,12 +8380,40 @@ type StrictServerInterface interface {
 	// CreateAdminAuditNote Append an entry to the trail by hand, for an admin action performed outside these routes. System admin only.
 	// (POST /api/admin/audit)
 	CreateAdminAuditNote(ctx context.Context, request CreateAdminAuditNoteRequestObject) (CreateAdminAuditNoteResponseObject, error)
-	// ListAdminFamilies Every family on the platform, newest first, with member and baby counts and the timestamp of its most recent feed (null when it has never logged one). System admin only.
+	// ListAdminFamilies Every family on the platform, newest first, with member and baby counts, whether it still has an admin, and the timestamp of its most recent feed (null when it has never logged one). `query` filters on name or slug (case-insensitive substring). System admin only.
 	// (GET /api/admin/families)
 	ListAdminFamilies(ctx context.Context, request ListAdminFamiliesRequestObject) (ListAdminFamiliesResponseObject, error)
+	// CreateAdminFamily Create a family on someone's behalf. Three behaviours, chosen by the body: `adminEmail` naming an existing account makes it the family admin; `adminEmail` with no account is refused with 404 UNLESS `createAccount` is true, which provisions a passwordless account (`adminName` required) that the person later claims by signing in with Google on the same address; no `adminEmail` at all creates an empty family plus an admin-role invite, returned as a join URL.
+	// Not one transaction — account creation and family creation each go through the auth library, which opens its own. The steps are ordered so a partial failure leaves only a memberless account, which is inert and swept by the orphan purge after seven days. Audited as `user.create` (when one is provisioned) and `family.create`. System admin only.
+	// (POST /api/admin/families)
+	CreateAdminFamily(ctx context.Context, request CreateAdminFamilyRequestObject) (CreateAdminFamilyResponseObject, error)
 	// DeleteAdminFamily Delete a family and ALL its data — members, babies, invites, keys and every log cascade with the organization row. Audited as `family.delete` before the delete runs. System admin only.
 	// (DELETE /api/admin/families/{id})
 	DeleteAdminFamily(ctx context.Context, request DeleteAdminFamilyRequestObject) (DeleteAdminFamilyResponseObject, error)
+	// GetAdminFamily One family in full: metadata, members with roles, babies, live invites and API keys. Deliberately carries NO log content and no per-type counts — the operator console stays metadata-only, so nothing derived from a child's health record enters it. Impersonation remains the only route to a family's entries. System admin only.
+	// (GET /api/admin/families/{id})
+	GetAdminFamily(ctx context.Context, request GetAdminFamilyRequestObject) (GetAdminFamilyResponseObject, error)
+	// UpdateAdminFamily Rename a family. The slug is deliberately left alone: it is derived at creation time and regenerating it would change an identifier under whatever already holds it. Audited as `family.rename`. System admin only.
+	// (PATCH /api/admin/families/{id})
+	UpdateAdminFamily(ctx context.Context, request UpdateAdminFamilyRequestObject) (UpdateAdminFamilyResponseObject, error)
+	// CreateAdminFamilyInvite Mint an invite for a family the operator is not a member of. Same code generation, defaults and response shape as the family-admin route — both call one shared core, so the two can never grow different alphabets or expiry rules. Audited as `family.invite.create`. System admin only.
+	// (POST /api/admin/families/{id}/invites)
+	CreateAdminFamilyInvite(ctx context.Context, request CreateAdminFamilyInviteRequestObject) (CreateAdminFamilyInviteResponseObject, error)
+	// RevokeAdminFamilyInvite Revoke one of a family's invite codes. Scoped by family id as well as code, so an operator cannot revoke another family's invite by guessing its code. Audited as `family.invite.revoke`. System admin only.
+	// (DELETE /api/admin/families/{id}/invites/{code})
+	RevokeAdminFamilyInvite(ctx context.Context, request RevokeAdminFamilyInviteRequestObject) (RevokeAdminFamilyInviteResponseObject, error)
+	// RevokeAdminFamilyKey Revoke one of a family's API keys — the way to kill a leaked integration token without impersonating anyone. Sets revoked_at rather than deleting the row, exactly as the family-admin route does. Audited as `family.key.revoke`. System admin only.
+	// (DELETE /api/admin/families/{id}/keys/{keyId})
+	RevokeAdminFamilyKey(ctx context.Context, request RevokeAdminFamilyKeyRequestObject) (RevokeAdminFamilyKeyResponseObject, error)
+	// AddAdminFamilyMember Add an existing account to a family by email address. The account must already exist — this route never creates one, so a mistyped address is a 404 rather than a stray user. Audited as `family.member.add`. System admin only.
+	// (POST /api/admin/families/{id}/members)
+	AddAdminFamilyMember(ctx context.Context, request AddAdminFamilyMemberRequestObject) (AddAdminFamilyMemberResponseObject, error)
+	// RemoveAdminFamilyMember Remove a member from a family. The last-admin guard applies to system admins too: a family must never be left with a role nobody holds, and promoting someone else first is always available. Audited as `family.member.remove`. System admin only.
+	// (DELETE /api/admin/families/{id}/members/{memberId})
+	RemoveAdminFamilyMember(ctx context.Context, request RemoveAdminFamilyMemberRequestObject) (RemoveAdminFamilyMemberResponseObject, error)
+	// SetAdminFamilyMemberRole Change a member's role within a family. Demoting the last admin is refused for the same reason removing them is. Audited as `family.member.role`. System admin only.
+	// (POST /api/admin/families/{id}/members/{memberId}/role)
+	SetAdminFamilyMemberRole(ctx context.Context, request SetAdminFamilyMemberRoleRequestObject) (SetAdminFamilyMemberRoleResponseObject, error)
 	// GetAdminStats Platform totals for the /admin dashboard. coreLogs is feeds + diapers + sleeps; usersLast7d counts accounts created in the last seven days. System admin only.
 	// (GET /api/admin/stats)
 	GetAdminStats(ctx context.Context, request GetAdminStatsRequestObject) (GetAdminStatsResponseObject, error)
@@ -8122,8 +8853,10 @@ func (sh *strictHandler) CreateAdminAuditNote(w http.ResponseWriter, r *http.Req
 }
 
 // ListAdminFamilies operation middleware
-func (sh *strictHandler) ListAdminFamilies(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) ListAdminFamilies(w http.ResponseWriter, r *http.Request, params ListAdminFamiliesParams) {
 	var request ListAdminFamiliesRequestObject
+
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ListAdminFamilies(ctx, request.(ListAdminFamiliesRequestObject))
@@ -8138,6 +8871,37 @@ func (sh *strictHandler) ListAdminFamilies(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListAdminFamiliesResponseObject); ok {
 		if err := validResponse.VisitListAdminFamiliesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateAdminFamily operation middleware
+func (sh *strictHandler) CreateAdminFamily(w http.ResponseWriter, r *http.Request) {
+	var request CreateAdminFamilyRequestObject
+
+	var body CreateAdminFamilyJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateAdminFamily(ctx, request.(CreateAdminFamilyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateAdminFamily")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateAdminFamilyResponseObject); ok {
+		if err := validResponse.VisitCreateAdminFamilyResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -8164,6 +8928,249 @@ func (sh *strictHandler) DeleteAdminFamily(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(DeleteAdminFamilyResponseObject); ok {
 		if err := validResponse.VisitDeleteAdminFamilyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAdminFamily operation middleware
+func (sh *strictHandler) GetAdminFamily(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request GetAdminFamilyRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAdminFamily(ctx, request.(GetAdminFamilyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAdminFamily")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAdminFamilyResponseObject); ok {
+		if err := validResponse.VisitGetAdminFamilyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateAdminFamily operation middleware
+func (sh *strictHandler) UpdateAdminFamily(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdateAdminFamilyRequestObject
+
+	request.Id = id
+
+	var body UpdateAdminFamilyJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateAdminFamily(ctx, request.(UpdateAdminFamilyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateAdminFamily")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateAdminFamilyResponseObject); ok {
+		if err := validResponse.VisitUpdateAdminFamilyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateAdminFamilyInvite operation middleware
+func (sh *strictHandler) CreateAdminFamilyInvite(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request CreateAdminFamilyInviteRequestObject
+
+	request.Id = id
+
+	var body CreateAdminFamilyInviteJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateAdminFamilyInvite(ctx, request.(CreateAdminFamilyInviteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateAdminFamilyInvite")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateAdminFamilyInviteResponseObject); ok {
+		if err := validResponse.VisitCreateAdminFamilyInviteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeAdminFamilyInvite operation middleware
+func (sh *strictHandler) RevokeAdminFamilyInvite(w http.ResponseWriter, r *http.Request, id IdPath, code CodePath) {
+	var request RevokeAdminFamilyInviteRequestObject
+
+	request.Id = id
+	request.Code = code
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeAdminFamilyInvite(ctx, request.(RevokeAdminFamilyInviteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeAdminFamilyInvite")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeAdminFamilyInviteResponseObject); ok {
+		if err := validResponse.VisitRevokeAdminFamilyInviteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeAdminFamilyKey operation middleware
+func (sh *strictHandler) RevokeAdminFamilyKey(w http.ResponseWriter, r *http.Request, id IdPath, keyId KeyIdPath) {
+	var request RevokeAdminFamilyKeyRequestObject
+
+	request.Id = id
+	request.KeyId = keyId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeAdminFamilyKey(ctx, request.(RevokeAdminFamilyKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeAdminFamilyKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeAdminFamilyKeyResponseObject); ok {
+		if err := validResponse.VisitRevokeAdminFamilyKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AddAdminFamilyMember operation middleware
+func (sh *strictHandler) AddAdminFamilyMember(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request AddAdminFamilyMemberRequestObject
+
+	request.Id = id
+
+	var body AddAdminFamilyMemberJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AddAdminFamilyMember(ctx, request.(AddAdminFamilyMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddAdminFamilyMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AddAdminFamilyMemberResponseObject); ok {
+		if err := validResponse.VisitAddAdminFamilyMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveAdminFamilyMember operation middleware
+func (sh *strictHandler) RemoveAdminFamilyMember(w http.ResponseWriter, r *http.Request, id IdPath, memberId MemberIdPath) {
+	var request RemoveAdminFamilyMemberRequestObject
+
+	request.Id = id
+	request.MemberId = memberId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RemoveAdminFamilyMember(ctx, request.(RemoveAdminFamilyMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveAdminFamilyMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveAdminFamilyMemberResponseObject); ok {
+		if err := validResponse.VisitRemoveAdminFamilyMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetAdminFamilyMemberRole operation middleware
+func (sh *strictHandler) SetAdminFamilyMemberRole(w http.ResponseWriter, r *http.Request, id IdPath, memberId MemberIdPath) {
+	var request SetAdminFamilyMemberRoleRequestObject
+
+	request.Id = id
+	request.MemberId = memberId
+
+	var body SetAdminFamilyMemberRoleJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetAdminFamilyMemberRole(ctx, request.(SetAdminFamilyMemberRoleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetAdminFamilyMemberRole")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetAdminFamilyMemberRoleResponseObject); ok {
+		if err := validResponse.VisitSetAdminFamilyMemberRoleResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

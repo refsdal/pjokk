@@ -417,19 +417,32 @@ var operationAuthTiers = map[string]authTier{
 	// and refuses any session without one, so an ordinary user calling it
 	// gets 400 NOT_IMPERSONATING and nothing else. See internal/api/
 	// admin.go's StopImpersonating.
-	"GetAdminStats":           tierSysadmin,
-	"ListAdminFamilies":       tierSysadmin,
-	"DeleteAdminFamily":       tierSysadmin,
-	"ListAdminUsers":          tierSysadmin,
-	"DeleteAdminUser":         tierSysadmin,
-	"BanAdminUser":            tierSysadmin,
-	"UnbanAdminUser":          tierSysadmin,
-	"SetAdminUserPassword":    tierSysadmin,
-	"RevokeAdminUserSessions": tierSysadmin,
-	"ImpersonateAdminUser":    tierSysadmin,
-	"StopImpersonating":       tierSession,
-	"ListAdminAudit":          tierSysadmin,
-	"CreateAdminAuditNote":    tierSysadmin,
+	"GetAdminStats":     tierSysadmin,
+	"ListAdminFamilies": tierSysadmin,
+	"DeleteAdminFamily": tierSysadmin,
+	// Admin-side family management (admin_families.go). tierSysadmin, not
+	// tierAdmin: these act on a family the caller is NOT a member of, which
+	// is the whole point — a family-admin route resolves its family from the
+	// session's active organization and an operator has none.
+	"CreateAdminFamily":        tierSysadmin,
+	"GetAdminFamily":           tierSysadmin,
+	"UpdateAdminFamily":        tierSysadmin,
+	"AddAdminFamilyMember":     tierSysadmin,
+	"RemoveAdminFamilyMember":  tierSysadmin,
+	"SetAdminFamilyMemberRole": tierSysadmin,
+	"CreateAdminFamilyInvite":  tierSysadmin,
+	"RevokeAdminFamilyInvite":  tierSysadmin,
+	"RevokeAdminFamilyKey":     tierSysadmin,
+	"ListAdminUsers":           tierSysadmin,
+	"DeleteAdminUser":          tierSysadmin,
+	"BanAdminUser":             tierSysadmin,
+	"UnbanAdminUser":           tierSysadmin,
+	"SetAdminUserPassword":     tierSysadmin,
+	"RevokeAdminUserSessions":  tierSysadmin,
+	"ImpersonateAdminUser":     tierSysadmin,
+	"StopImpersonating":        tierSession,
+	"ListAdminAudit":           tierSysadmin,
+	"CreateAdminAuditNote":     tierSysadmin,
 }
 
 // tierPublicAPIAllowlist is the exhaustive set of tierPublic operations
