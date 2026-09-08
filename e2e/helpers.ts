@@ -123,3 +123,39 @@ export async function freshFamily(
   await uiCreateFamily(page, `The ${tag} family`, `Baby ${tag}`, landing);
   return { email };
 }
+
+/**
+ * Promotes an account to the SYSTEM admin role — the one that opens /admin,
+ * which has nothing to do with the per-family admin role.
+ *
+ * It writes the column directly, through the stack's Postgres container,
+ * exactly as the Go suite's makeSysadmin does and for the same reason:
+ * there is deliberately no endpoint for this. The first operator is
+ * bootstrapped by whoever runs the deployment, and an HTTP route that
+ * minted system admins would be a far worse thing to own than a test helper
+ * that shells out.
+ *
+ * The container name is the one scripts/e2e-stack.sh creates; override it
+ * with E2E_PG_CONTAINER when running against a stack started some other
+ * way. A failure here is loud on purpose — a silently skipped admin spec is
+ * worth less than no admin spec, because it looks like coverage.
+ */
+export async function makeSysadmin(email: string): Promise<void> {
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const run = promisify(execFile);
+  const container = process.env.E2E_PG_CONTAINER ?? "pjokk-e2e-pg";
+  await run("docker", [
+    "exec",
+    container,
+    "psql",
+    "-U",
+    "pjokk",
+    "-d",
+    "pjokk",
+    "-v",
+    "ON_ERROR_STOP=1",
+    "-c",
+    `UPDATE "users" SET "role" = 'admin' WHERE "email" = '${email}'`,
+  ]);
+}

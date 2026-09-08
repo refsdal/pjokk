@@ -1,7 +1,10 @@
 # Admin console: family management — Design
 
 **Date:** 2026-09-08
-**Status:** Approved design, pending implementation plan
+**Status:** Implemented. Three things changed during the build and are
+recorded inline below, marked **Changed in implementation** — an ownerless
+family needed a second auth method, the last-admin guard is anticipated
+rather than caught, and invite minting offers a role.
 
 ## Problem
 
@@ -155,9 +158,22 @@ handed to `organization.CreateOrganization`, which `allowOrgCreation`
 consults before its ordinary rules. The key type is private to
 `internal/auth`, so nothing outside the package can forge it, and the
 closed-alpha guarantee is unchanged: the only caller is an audited
-`tierSysadmin` route. This is the only change this spec makes outside
-`internal/api`, and it respects the rule that Limen stays confined to
+`tierSysadmin` route. This respects the rule that Limen stays confined to
 `internal/auth`.
+
+**Changed in implementation — a second method was needed.** Limen's
+`CreateOrganization` always installs its creator as the first member, inside
+its own transaction; there is no ownerless organization to create. The
+invite-only path (below) would therefore have made the *operator* the first
+admin of a family built for someone else — ordinary in-app access to a
+child's health record, and a silent contradiction of the console's
+metadata-only rule. `auth.CreateEmptyFamily(operatorUserID, name)` creates
+the family and then removes that membership. It deliberately does not go
+through `RemoveMember`, which enforces the last-admin guard: leaving the
+family adminless is the point. The removal is checked and its failure is the
+whole call's failure; if it did somehow fail, the family is visible in the
+list with the operator inside it and repairable in one click, which beats a
+compensating delete.
 
 ### 3. Family creation
 
@@ -248,6 +264,16 @@ on both remove and demote, and maps to a 400. Promoting someone else first
 is always available, and a refusal is a better outcome than a stranded
 family.
 
+**Changed in implementation — the guard is anticipated, not caught.**
+Audit-first means reaching `ErrLastAdmin` costs a row saying a demotion
+happened when it did not, and "remove the last admin" is the first thing an
+operator tries on a family that looks wrong, so that false row would be the
+single most common entry the console ever writes. The two member handlers
+now count admins (`auth.IsPrivilegedRole`, exported for this) before writing
+the row. The guard inside the transaction stays authoritative — a concurrent
+removal still lands on it, at the cost of one unnecessary row — so this buys
+a clean trail, not correctness.
+
 ### 5. Frontend (`apps/frontend`)
 
 **`/admin/families` (reworked).** A search field wired to `?query=`. Rows
@@ -268,6 +294,11 @@ iOS-style grouped `Card` sections:
   promoted first.
 - **Babies** — read-only: name, birth date, age.
 - **Invites** — code, role, uses/max, expiry, revoked state; mint and revoke.
+  **Changed in implementation:** minting asks for the role rather than
+  always issuing a member code. An admin code is the only way to repair a
+  family left with no admin and no members, which is exactly the state
+  `hasAdmin` exists to surface — a mint button that could not produce one
+  would have surfaced the problem without offering the fix.
 - **API keys** — label, read-only chip, created, last used; revoke.
 - **Danger zone** — delete family.
 
