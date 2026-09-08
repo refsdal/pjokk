@@ -2212,3 +2212,35 @@ a photographed clinic card can carry a fødselsnummer) and avatars. A
 - **Nara stays unread.** No public export, no public parser; the tools that
   import it keep the format to themselves. The issue narrows to Nara and
   waits for a header row.
+
+## 2026-09-08 — responsive shell: phone, tablet, desktop from one layout
+
+- **Tiers by viewport width, never user-agent.** `md` (768) and `xl`
+  (1280) — Tailwind's own — so the CSS side (`md:` / `xl:` classes) and the
+  JS side (`lib/layout.ts`, used only for the vaul direction and the
+  wide-only Recent query) cannot disagree. A narrowed desktop window is a
+  phone; a phone in landscape is not a tablet.
+- **The bottom sheet becomes a 420 px right panel at `md`**, in the one
+  component that imports vaul. Every sheet was laid out for `max-w-md`,
+  so nothing inside them changed. The direction is latched when the sheet
+  opens: resizing across 768 px mid-edit keeps the half-filled sheet
+  rather than remounting it (the same hazard as the 22:00 night flip).
+- **"Left informs, right acts."** Home at `md` puts the status cards on
+  the left and the actions on the right edge — the edge the panel opens
+  from — so the cards stay readable beside an open sheet. Option B
+  (actions across the bottom) lost on the mockups because the panel
+  covered its buttons and there was nowhere for the desktop Recent pane.
+- **No More button above 768 px.** The three primaries become a row and
+  the eleven More-sheet actions unfold beneath them as 44 px row tiles,
+  from the SAME `moreActions()` list the sheet renders — a new kind lands
+  in both. Row tiles over the sheet's 96 px tiles because they keep the
+  hierarchy (three big things, then a list) and fit a 712 px tablet
+  without scrolling.
+- **Desktop is the tablet tier plus a keyboard.** F / D / S on Home,
+  Escape, visible focus rings — and nothing else: no density, no hover
+  menus, no master–detail. Touch targets never shrink.
+- **The account avatar stays in the baby header; the rail is navigation
+  only.**
+- **Manifest `orientation: "any"`.** It was `portrait`, which locked an
+  installed tablet app in a landscape stand. An already-installed Android
+  app only sees this after Chrome regenerates the WebAPK.

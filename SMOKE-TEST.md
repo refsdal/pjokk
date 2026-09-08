@@ -142,6 +142,17 @@ replica depending on it starts.
 21. Settings → Night mode → On: near-black warm screen, three big actions in
     the bottom half.
 22. `/api/docs` serves the Scalar API reference (signed-in only).
+23. **Tablet & desktop.** On a tablet in landscape (or a desktop window
+    ≥ 768 px wide): the tab bar is a left rail; Feed opens as a panel on
+    the right with Save reachable without scrolling; Home shows status
+    left, actions right, with Feed / Diaper / Sleep on top and the eleven
+    More actions as small row tiles below (no More button). At ≥ 1280 px
+    a Recent list sits between them and tapping a row opens its edit
+    sheet. Resize the window across 768 px with a sheet half-filled: the
+    value survives. Press `f`, `d`, `s` on Home: the sheets open; Escape
+    closes. Rotate an installed Android tablet app: it follows (a
+    reinstall may be needed for the WebAPK to pick up the manifest). On
+    an iPad Safari PWA check the panel's full height and the safe areas.
 
 ## 7. Health and rollout checks
 
