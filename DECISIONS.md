@@ -2278,3 +2278,40 @@ a photographed clinic card can carry a fødselsnummer) and avatars. A
 - **No server change.** Every card is Home's data through the existing
   offline-resumable mutations; the kiosk logs as the signed-in user and
   Settings says so.
+
+## Landing page refresh (2026-09-08)
+
+The marketing page still described the Phase 1 core loop a year of features
+later, and it had no door for a stranger: signup is invite-only, so the only
+button was "Sign in".
+
+- **Two doors, still invite-only.** The primary button is unchanged (session
+  + `OPEN_SIGNUP` decide it). A second, quieter "Run it yourself" goes to the
+  GitHub repository, whose README quick start needs neither an account nor
+  an invite. The invite line now says so in words. No "request an invite"
+  address was added: the only mailbox that exists is `personvern@`, and
+  inventing another on a public page would have been a lie until someone
+  reads it.
+- **Breadth as one-line tiles, not more `.points`.** Eight features in the
+  order a first year unfolds (night mode → nap window → reminders →
+  medicine → growth → vaccines → calendar → milestones + the PDF), each an
+  icon beside one sentence. Three big `.points` cards stayed the 80 %
+  story; a second row of big cards would have been a feature wall. The PDF
+  line names helsestasjonen deliberately — that visit asks exactly the
+  questions the app answers.
+- **One more mock-up, still CSS, still a still.** The care station gets a
+  landscape tablet built from the phone mock-up's pieces (same tokens, same
+  card rules) so the two age together, but it does not animate: the point
+  is the three cards, and a second loop next to the hero's would be noise.
+  Below ~460 px of mock-up width the three columns become three rows —
+  the phone-portrait reading of the same cards — rather than truncating
+  their own button labels.
+- **The nap window moved into the hero.** The banner reads "Awake · 1 h
+  40 m / Nap window 13:10–14:25" instead of "Sleeping". The guide is the
+  feature a stranger has not seen elsewhere; an active sleep session is
+  not.
+- **Open source and importers live in the privacy band.** "Where your data
+  lives" and "you can take it with you" are one promise, so the band
+  gained a second paragraph rather than a new section. The technical row
+  under it (Docker, CSV, API keys, ICS) is a single muted line: present
+  for the parent who will run it, invisible to the one who won't.

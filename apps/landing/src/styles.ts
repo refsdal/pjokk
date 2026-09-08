@@ -157,6 +157,13 @@ a { color: inherit; }
 .btn:hover { filter: brightness(1.05); }
 .btn:active { transform: scale(.97); }
 .btn--sm { min-height: 44px; padding-inline: 20px; font-size: .95rem; }
+/* The second door: quieter than the primary, still a 48 px target. */
+.btn--ghost {
+  background: transparent;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--line);
+}
+.btn--ghost:hover { background: var(--surface-2); filter: none; }
 
 /* ---------- hero ---------- */
 
@@ -200,7 +207,7 @@ h1 {
 }
 
 .free-line {
-  margin: 0;
+  margin: 14px 0 0;
   color: var(--muted);
   font-size: .95rem;
   font-weight: 600;
@@ -267,14 +274,16 @@ h1 {
 .demo-age { color: var(--muted); font-size: 11px; }
 
 .demo-banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin-bottom: 10px;
   padding: 9px 11px;
   border-radius: 14px;
   background: var(--surface);
   border: 1px solid var(--line);
+}
+.demo-banner-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .demo-dot {
   width: 8px; height: 8px;
@@ -284,6 +293,15 @@ h1 {
 }
 .demo-banner-label { font-weight: 700; color: var(--sleep); }
 .demo-banner-time { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* The nap-window guide, the way the Awake card carries it in the app. */
+.demo-banner-sub {
+  margin-top: 3px;
+  padding-left: 16px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 
 .demo-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .demo-card {
@@ -481,6 +499,207 @@ h1 {
 .point:nth-child(2) .point-mark { color: var(--diaper); }
 .point:nth-child(3) .point-mark { color: var(--sleep); }
 
+/* ---------- grows-with-you tiles ---------- */
+
+/* One line each, icon beside the text rather than above it: eight tiles
+   stacked the way .points are would be a wall, and the section has to read
+   as a list you can skim in the time a bottle takes to warm. */
+.tiles {
+  display: grid;
+  gap: 22px 32px;
+}
+@media (min-width: 640px) {
+  .tiles { grid-template-columns: repeat(2, 1fr); }
+}
+.tile {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.tile h3 {
+  margin: 0 0 4px;
+  font-size: 1.02rem;
+  font-weight: 800;
+  letter-spacing: -.01em;
+}
+.tile p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: .95rem;
+  text-wrap: pretty;
+}
+.tile-mark {
+  flex: none;
+  width: 34px; height: 34px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+}
+.tile-mark svg { width: 19px; height: 19px; }
+/* Category tints on icons only, never as backgrounds, in the order the
+   copy lists them: night, nap, reminders, medicine, growth, vaccines,
+   calendar, milestones. */
+.tile:nth-child(1) .tile-mark { color: var(--sleep); }
+.tile:nth-child(2) .tile-mark { color: var(--sleep); }
+.tile:nth-child(3) .tile-mark { color: var(--feed); }
+.tile:nth-child(4) .tile-mark { color: var(--growth); }
+.tile:nth-child(5) .tile-mark { color: var(--growth); }
+.tile:nth-child(6) .tile-mark { color: var(--diaper); }
+.tile:nth-child(7) .tile-mark { color: var(--accent); }
+.tile:nth-child(8) .tile-mark { color: var(--feed); }
+
+/* ---------- the care station ---------- */
+
+.station-section {
+  display: grid;
+  gap: 32px;
+  align-items: center;
+}
+@media (min-width: 900px) {
+  .station-section {
+    grid-template-columns: .8fr 1.2fr;
+    gap: 56px;
+  }
+}
+.station-body {
+  margin: 0;
+  color: var(--ink-soft);
+  max-width: 30em;
+  text-wrap: pretty;
+}
+.station-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* A landscape tablet, built from the same pieces as the phone above so the
+   two mock-ups age together. It is a still, not an animation: the point is
+   the three cards, and a second loop next to the first would be noise. */
+.station {
+  width: 100%;
+  max-width: 620px;
+  border: 8px solid var(--bezel);
+  border-radius: 26px;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+  padding: 14px 16px 16px;
+  font-size: 12px;
+  user-select: none;
+  container-type: inline-size;
+}
+.station-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px 12px;
+}
+.station-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 13px;
+}
+.station-name .demo-avatar { width: 26px; height: 26px; font-size: 12px; }
+.station-clock {
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+}
+.station-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.station-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 12px 10px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+.station-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.station-card-head svg { width: 16px; height: 16px; }
+.station-card-value {
+  margin-top: 4px;
+  font-weight: 800;
+  font-size: clamp(16px, 5cqw, 26px);
+  letter-spacing: -.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.station-card-detail {
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.station-btn {
+  margin-top: 10px;
+  padding: 8px 6px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 800;
+  font-size: 11.5px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.station-undo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 600;
+}
+.station-undo b { color: var(--accent); font-weight: 800; }
+/* Below ~460 px of mock-up the three columns crush their own labels, so
+   each card becomes a row: text on the left, the one button on the right.
+   Same cards, same order — just the phone-portrait reading of them. */
+@container (max-width: 460px) {
+  .station-cards { grid-template-columns: 1fr; gap: 8px; }
+  .station-card {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "head btn" "value btn" "detail btn";
+    align-items: center;
+    column-gap: 12px;
+    padding: 10px 12px;
+  }
+  .station-card-head { grid-area: head; }
+  .station-card-value { grid-area: value; margin-top: 2px; font-size: 20px; }
+  .station-card-detail { grid-area: detail; }
+  .station-btn { grid-area: btn; margin-top: 0; padding-inline: 14px; }
+}
+
 /* ---------- privacy band ---------- */
 
 .band {
@@ -502,6 +721,26 @@ h1 {
   margin: 0;
   color: var(--ink-soft);
   max-width: 46em;
+}
+.band p + p { margin-top: 12px; }
+
+/* The technical row: a single muted line under the band, dot-separated.
+   Present for the parent who will run it, invisible to the one who won't. */
+.tech {
+  margin: -48px 0 72px;
+  padding-inline: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 0;
+  color: var(--muted);
+  font-size: .88rem;
+  font-weight: 600;
+}
+.tech-title { color: var(--ink-soft); }
+.tech > span + span::before {
+  content: "·";
+  margin-inline: 10px;
+  color: var(--line);
 }
 
 /* ---------- founder story ---------- */
