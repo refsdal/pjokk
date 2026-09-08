@@ -259,7 +259,7 @@ export function StatsScreen() {
       : null;
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-safe">
+    <div className="mx-auto max-w-md px-4 pt-safe md:max-w-3xl md:px-6">
       <div className="flex items-center justify-between gap-2 pt-4 pb-2">
         <h1 className="text-2xl font-extrabold text-ink">{t("Stats")}</h1>
         <BabySwitcher compact />
