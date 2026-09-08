@@ -36,7 +36,13 @@ export function KioskBand({
       onHold();
     }, HOLD_MS);
   };
-  useEffect(() => stop, []);
+  // Unmount mid-hold: drop the pending timer without touching state.
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
   return (
     <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 pt-5">
       <div className="min-w-0">
