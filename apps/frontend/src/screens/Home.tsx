@@ -25,6 +25,7 @@ import { HelpCard } from "@/components/HelpCard";
 import { InstallBanner } from "@/components/InstallBanner";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { HomeActions } from "@/components/HomeActions";
+import { HomeRecent } from "@/components/HomeRecent";
 import { StatusCard } from "@/components/StatusCard";
 import {
   showsTemperatureCard,
@@ -494,11 +495,6 @@ export function HomeScreen() {
       <InstallBanner />
     </div>
   );
-}
-
-// Replaced by components/HomeRecent.tsx in the next task.
-function HomeRecent(_props: { babyId: string }) {
-  return null;
 }
 
 // Night mode home: three actions only, everything in the bottom half,
