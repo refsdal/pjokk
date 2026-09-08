@@ -72,6 +72,10 @@
 
     el.classList.toggle("dark", dark);
     el.classList.toggle("night", night);
+    // Kiosk mode (lib/kiosk.ts): the care station's own palette, before the
+    // first paint like the other two. Night still wins in the stylesheet.
+    const kiosk = localStorage.getItem("pjokk.kiosk.on") === "1";
+    el.classList.toggle("kiosk", kiosk);
 
     // An installed app never gets a light colour, whatever its theme: its
     // status-bar background is baked from the manifest and cannot follow, so
@@ -86,9 +90,11 @@
     // Same mapping as systemChromeColor(); --color-bg per theme.
     const color = night
       ? "#171310"
-      : dark || standalone
-        ? "#171512"
-        : "#faf9f7";
+      : kiosk
+        ? "#131a21"
+        : dark || standalone
+          ? "#171512"
+          : "#faf9f7";
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", color);
   } catch (e) {

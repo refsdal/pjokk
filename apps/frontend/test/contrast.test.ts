@@ -45,6 +45,7 @@ const light = tokens(blockAfter("@theme"));
 // Dark and night only override some tokens; the rest inherit from light.
 const dark = { ...light, ...tokens(blockAfter(".dark")) };
 const night = { ...light, ...tokens(blockAfter(".night")) };
+const kiosk = { ...light, ...tokens(blockAfter(".kiosk")) };
 
 function luminance(hex: string): number {
   const n = Number.parseInt(hex.slice(1), 16);
@@ -76,6 +77,7 @@ const themes: [string, Record<string, string>][] = [
   ["light", light],
   ["dark", dark],
   ["night", night],
+  ["kiosk", kiosk],
 ];
 
 describe("palette contrast", () => {
