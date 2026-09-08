@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { cn } from "@/lib/utils";
+import { cn, focusRing } from "@/lib/utils";
 
 // Chip groups replace dropdowns everywhere (CLAUDE.md §5): one tap, no
 // keyboard, big targets.
@@ -24,6 +24,7 @@ export function ChipGroup<T extends string>({
           onClick={() => onChange(opt.value)}
           className={cn(
             "h-11 min-w-16 rounded-full border px-4 text-sm font-semibold transition-colors select-none active:scale-[0.97]",
+            focusRing,
             value === opt.value
               ? "border-accent bg-accent text-on-accent"
               : "border-line bg-surface text-ink-soft",
@@ -61,6 +62,7 @@ export function MultiChipGroup<T extends string>({
             onClick={() => onToggle(opt.value)}
             className={cn(
               "inline-flex h-11 min-w-16 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-colors select-none active:scale-[0.97]",
+              focusRing,
               opt.leading && "pl-2",
               active
                 ? "border-accent bg-accent text-on-accent"

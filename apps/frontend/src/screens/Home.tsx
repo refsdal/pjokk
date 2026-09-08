@@ -61,6 +61,7 @@ import { describeNapWindow, napWindow, useNapGuide } from "@/lib/nap-window";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import { formatDuration, formatElapsed } from "@/lib/time";
 import { useAppearance } from "@/lib/appearance";
+import { useHotkeys } from "@/lib/hotkeys";
 import { cn, focusRing } from "@/lib/utils";
 import {
   formatMeasurementIn,
@@ -179,6 +180,21 @@ export function HomeScreen() {
     onPickHelp: () => setSheet("help"),
     onVaccines: () => void navigate({ to: "/vaccines" }),
   });
+  // F / D / S with no sheet open (spec §6). S wakes a running session, as
+  // the banner's button does, because the Sleep button is disabled then.
+  const wakeSleep = useWakeSleep();
+  const activeSleepId = summary.data?.activeSleep?.id ?? null;
+  useHotkeys(
+    {
+      f: () => setSheet("feed"),
+      d: () => setSheet("diaper"),
+      s: () =>
+        activeSleepId
+          ? wakeSleep.mutate({ id: activeSleepId })
+          : setSheet("sleep"),
+    },
+    sheet === null && !!baby,
+  );
   // ?log= from a manifest shortcut or a push action (issue #51): open that
   // sheet once the baby is known, then drop the param so a reload or a
   // back-swipe does not reopen it.

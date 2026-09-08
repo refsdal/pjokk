@@ -1,7 +1,7 @@
 import { IconMinus, IconPlus } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { t } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn, focusRing } from "@/lib/utils";
 
 // Number stepper: amounts change by taps — but the number itself is a real
 // input, so a big jump can be typed directly (numeric keypad, clamped).
@@ -59,7 +59,10 @@ export function Stepper({
         type="button"
         aria-label={`${t("decrease")} ${unit}`}
         onClick={() => adjust(-1)}
-        className="flex h-12 w-14 items-center justify-center rounded-xl bg-surface-2 text-ink active:scale-95"
+        className={cn(
+          "flex h-12 w-14 items-center justify-center rounded-xl bg-surface-2 text-ink active:scale-95",
+          focusRing,
+        )}
       >
         <IconMinus className="h-5 w-5" />
       </button>
@@ -84,7 +87,10 @@ export function Stepper({
         type="button"
         aria-label={`${t("increase")} ${unit}`}
         onClick={() => adjust(1)}
-        className="flex h-12 w-14 items-center justify-center rounded-xl bg-surface-2 text-ink active:scale-95"
+        className={cn(
+          "flex h-12 w-14 items-center justify-center rounded-xl bg-surface-2 text-ink active:scale-95",
+          focusRing,
+        )}
       >
         <IconPlus className="h-5 w-5" />
       </button>
