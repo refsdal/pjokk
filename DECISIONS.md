@@ -2169,3 +2169,27 @@ a photographed clinic card can carry a fødselsnummer) and avatars. A
   Tables only: a nurse reads numbers, not sparklines. Norwegian letters
   render through Helvetica's WinAnsi set; the file name slugs ø → o and
   æ → ae because NFD does not decompose them.
+
+## 2026-09-07 — one import writer, readers only against real exports (#54)
+
+- **The writer is shared; a reader is per source.** Everything that must
+  not differ between sources — how a timestamp or boolean is rendered for
+  Postgres, deterministic ids, the `--resolve-by-email` guard that aborts
+  unless exactly one (user, family) matches, `ON CONFLICT DO NOTHING`, the
+  baby prelude, the summary — moved out of the sprout-track script into
+  `scripts/lib/import-writer.mjs`, and the sprout script became the first
+  reader over it. A smoke test with a minimal sprout schema guards that
+  move; the full mapping is still exercised by hand against real exports.
+- **Baby Buddy is the second reader, written against its source.** Its
+  export is the admin's django-import-export CSV: model field names, the
+  child as `child_id` + names, timestamps in the server's zone with no
+  offset, amounts with no unit. So the reader takes `--tz` and unit flags
+  rather than guessing, detects the model from the header row, and keeps
+  the "lossy on purpose, preserved in notes" policy.
+- **No Huckleberry or Nara reader yet, on purpose.** Their column names
+  are not documented anywhere public, and a guessed mapping would silently
+  import feeds as diapers. The docs ask for a few anonymised rows of a
+  real export; the Baby Buddy reader is the template.
+- **Still a CLI that writes SQL, not an upload.** Reading the file before
+  applying it is the safety net, and an admin action does not need a
+  button.

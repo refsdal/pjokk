@@ -597,6 +597,14 @@ sheet pattern — build the pattern well once.
 
 ## Engineering conventions
 
+- Importers (`docs/importing.md`, #54): one shared writer
+  (`scripts/lib/import-writer.mjs` — SQL rendering by column type,
+  deterministic ids, the resolve-by-email guard, ON CONFLICT DO NOTHING,
+  the summary) and one reader per source (`import-sprout-track.mjs`,
+  `import-babybuddy.mjs`). They emit SQL to review, never touch a live
+  connection, and are tested with fixtures under `scripts/test`
+  (`bun test scripts`, part of `bun run test`). No reader is written
+  without a real export to write against.
 - Two languages, one repo. Go for the server (`apps/server`, its own module,
   outside the bun workspace); TypeScript strict for everything else. Neither
   toolchain runs the other's build — `bun run build` produces the SPA and the

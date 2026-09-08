@@ -75,8 +75,13 @@
 //   A breastfeed recorded as two sided rows in sprout stays two rows here.
 //
 // The summary printed at the end lists everything skipped, and why.
-import { writeFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
+import {
+  CARETAKER_REF,
+  createWriter,
+  esc,
+  escOrNull,
+} from "./lib/import-writer.mjs";
 
 const args = process.argv.slice(2);
 const dbPath = args.find((a) => !a.startsWith("--"));
@@ -108,9 +113,6 @@ const ms = (v) => {
   const t = Date.parse(normalized);
   return Number.isNaN(t) ? null : t;
 };
-const esc = (s) => `'${String(s).replaceAll("'", "''")}'`;
-const escOrNull = (s) =>
-  s === null || s === undefined || s === "" ? "NULL" : esc(s);
 
 if (args.includes("--inspect")) {
   console.log("== Babies ==");
@@ -231,59 +233,11 @@ const toCelsius = (v, unit) => {
   return u === "f" ? ((v - 32) * 5) / 9 : v;
 };
 
-const out = [];
-const skipped = {};
-const skip = (why) => (skipped[why] = (skipped[why] ?? 0) + 1);
-const now = Date.now();
-
-// Postgres columns are typed, unlike SQLite's, so values are rendered by
-// column name at this single boundary rather than at each of the ~20 call
-// sites: timestamps are timestamptz (an epoch-ms integer is not accepted)
-// and flags are real booleans (1/0 is not accepted either).
-const TIMESTAMP_COLS = new Set([
-  "time",
-  "start_time",
-  "end_time",
-  "birth_date",
-  "created_at",
-  "reminded_at",
-  "expires_at",
-  "last_used_at",
-  "revoked_at",
-  "last_reminded_at",
-  "archived_at",
-]);
-const BOOLEAN_COLS = new Set([
-  "all_day",
-  "read_only",
-  "email_verified",
-  "is_supplement",
-]);
-
-const at = (msValue) => `'${new Date(msValue).toISOString()}'`;
-
-const render = (col, v) => {
-  if (v === "NULL" || v === null || v === undefined) return "NULL";
-  if (TIMESTAMP_COLS.has(col) && typeof v === "number") return at(v);
-  if (BOOLEAN_COLS.has(col)) return v && v !== "0" ? "true" : "false";
-  return v;
-};
-
-const insert = (table, cols, vals) => {
-  const exprs = cols.map((col, i) => render(col, vals[i])).join(", ");
-  const head = `INSERT INTO "${table}" (${cols.join(", ")})`;
-  // In resolve mode family_id/caretaker_id are bare column references into the
-  // single-row _import_target, so the statement is a SELECT rather than VALUES.
-  out.push(
-    resolveEmail
-      ? `${head} SELECT ${exprs} FROM _import_target ON CONFLICT DO NOTHING;`
-      : `${head} VALUES (${exprs}) ON CONFLICT DO NOTHING;`,
-  );
-};
-
-const FAMILY_REF = "family_id";
-const CARETAKER_REF = "caretaker_id";
-const familyExpr = () => (resolveEmail ? FAMILY_REF : esc(familyId));
+// The writer (scripts/lib/import-writer.mjs) owns SQL rendering, the
+// resolve-by-email prelude, ON CONFLICT DO NOTHING and the summary — shared
+// with every other importer (issue #54). This file is the sprout READER.
+const writer = createWriter({ resolveEmail, familyId });
+const { skip, now, familyExpr, insert } = writer;
 
 const base = (r, timeMs) => {
   const babyId = babyMap.get(r.babyId);
@@ -301,31 +255,7 @@ const base = (r, timeMs) => {
 
 // The prelude: resolve the target, then create the babies. Both must precede
 // every log insert, so they are emitted before the per-table loops run.
-if (resolveEmail) {
-  out.push(
-    "BEGIN;",
-    "",
-    "-- Resolve the family and the caretaker from one account, rather than",
-    "-- baking ids in. A missing or ambiguous match aborts the transaction:",
-    "-- importing 4000 rows into the wrong family is not a recoverable typo.",
-    "CREATE TEMP TABLE _import_target ON COMMIT DROP AS",
-    "SELECT u.id AS caretaker_id, o.id AS family_id",
-    'FROM "users" u',
-    'JOIN "organization_members" m ON m.user_id = u.id',
-    'JOIN "organizations" o ON o.id = m.organization_id',
-    `WHERE u.email = ${esc(resolveEmail)} AND u.deleted_at IS NULL;`,
-    "",
-    "DO $$",
-    "DECLARE n int;",
-    "BEGIN",
-    "  SELECT count(*) INTO n FROM _import_target;",
-    "  IF n <> 1 THEN",
-    `    RAISE EXCEPTION 'expected exactly one (user, family) for ${resolveEmail}, found %', n;`,
-    "  END IF;",
-    "END $$;",
-    "",
-  );
-}
+writer.prelude();
 for (const b of sproutBabies) {
   const name = [b.firstName, b.lastName].filter(Boolean).join(" ") || "Baby";
   const sex = { FEMALE: "girl", MALE: "boy" }[b.gender];
@@ -341,7 +271,7 @@ for (const b of sproutBabies) {
     ],
   );
 }
-if (sproutBabies.length) out.push("");
+if (sproutBabies.length) writer.out.push("");
 
 for (const r of rows(`SELECT * FROM FeedLog WHERE deletedAt IS NULL`)) {
   const b = base(r, ms(r.time));
@@ -1094,12 +1024,4 @@ for (const r of rows(`SELECT * FROM Contact WHERE deletedAt IS NULL`)) {
   );
 }
 
-if (resolveEmail) out.push("", "COMMIT;");
-writeFileSync(outPath, out.join("\n") + "\n");
-const inserts = out.filter((l) => l.startsWith("INSERT")).length;
-console.log(`wrote ${outPath} (${inserts} inserts)`);
-if (Object.keys(skipped).length) {
-  console.log("skipped:");
-  for (const [why, n] of Object.entries(skipped))
-    console.log(`  ${n} × ${why}`);
-}
+writer.finish(outPath);

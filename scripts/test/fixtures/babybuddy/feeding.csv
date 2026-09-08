@@ -1,0 +1,5 @@
+id,child_id,child_first_name,child_last_name,start,end,duration,type,method,amount,notes,tags
+10,1,Nora,Hansen,2026-09-01 08:00:00,2026-09-01 08:15:00,00:15:00,formula,bottle,4,"morning, hungry",
+11,1,Nora,Hansen,2026-09-01 12:00:00,2026-09-01 12:20:00,00:20:00,breast milk,left breast,,,"sleepy"
+12,1,Nora,Hansen,2026-09-01 18:00:00,2026-09-01 18:10:00,00:10:00,solid food,parent fed,30,avocado,
+13,1,Nora,Hansen,2026-09-01 21:00:00,2026-09-01 21:05:00,00:05:00,fortified breast milk,bottle,3.5,,

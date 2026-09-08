@@ -264,6 +264,10 @@ you provision the database and the bucket, and check the backup target too. The
 nightly snapshot contains every table, so a bucket in the wrong place undoes
 the arrangement.
 
+## Importing from another tracker
+
+One-off scripts read sprout-track's database or Baby Buddy's CSV exports and write reviewable SQL: deterministic ids, `ON CONFLICT DO NOTHING`, units normalised, a resolve-by-email guard against the wrong family. See [docs/importing.md](docs/importing.md).
+
 ## How it's built
 
 Two deploys. The container is one Go process serving the SPA and the API under
