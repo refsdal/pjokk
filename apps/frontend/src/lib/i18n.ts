@@ -642,6 +642,16 @@ const nb: Record<string, string> = {
   logged: "logget",
   "Sleep started": "Søvn startet",
   "Wrong PIN": "Feil PIN",
+  "Kiosk mode": "Kioskmodus",
+  digits: "siffer",
+  "PINs do not match": "PIN-kodene er ulike",
+  "Turns this device into the family's care station: a big clock, the last feed, diaper and sleep with one-tap logging, and nothing else. Entries are logged as you. Leaving asks for a PIN.":
+    "Gjør denne enheten til familiens stellestasjon: en stor klokke, siste måltid, bleie og søvn med ett-trykks logging, og ingenting annet. Oppføringer logges som deg. Du må oppgi en PIN for å avslutte.",
+  "Turn on kiosk mode": "Slå på kioskmodus",
+  "Choose a PIN for leaving kiosk mode on this device.":
+    "Velg en PIN for å forlate kioskmodus på denne enheten.",
+  "Repeat PIN": "Gjenta PIN",
+  "Start kiosk": "Start kiosk",
   live: "nå",
   "last dose": "siste dose",
   "Log dose": "Logg dose",
