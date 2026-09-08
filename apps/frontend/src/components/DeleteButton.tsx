@@ -6,9 +6,15 @@ import { t } from "@/lib/i18n";
 export function DeleteButton({
   onDelete,
   label,
+  disabled,
 }: {
   onDelete: () => void;
   label?: string;
+  // For deletes a caller can already tell will be refused — the operator
+  // console's last-admin guard. Disabled rather than hidden: the control
+  // should be visibly present and visibly unavailable, with the reason
+  // stated beside it.
+  disabled?: boolean;
 }) {
   const [armed, setArmed] = useState(false);
 
@@ -23,6 +29,7 @@ export function DeleteButton({
       size="full"
       variant={armed ? "danger" : "ghost"}
       className={armed ? "" : "text-danger"}
+      disabled={disabled}
       onClick={() => {
         if (armed) onDelete();
         else setArmed(true);

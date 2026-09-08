@@ -1221,10 +1221,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every family on the platform, newest first, with member and baby counts and the timestamp of its most recent feed (null when it has never logged one). System admin only. */
+        /** Every family on the platform, newest first, with member and baby counts, whether it still has an admin, and the timestamp of its most recent feed (null when it has never logged one). `query` filters on name or slug (case-insensitive substring). System admin only. */
         get: operations["listAdminFamilies"];
         put?: never;
-        post?: never;
+        /**
+         * Create a family on someone's behalf. Three behaviours, chosen by the body: `adminEmail` naming an existing account makes it the family admin; `adminEmail` with no account is refused with 404 UNLESS `createAccount` is true, which provisions a passwordless account (`adminName` required) that the person later claims by signing in with Google on the same address; no `adminEmail` at all creates an empty family plus an admin-role invite, returned as a join URL.
+         *     Not one transaction — account creation and family creation each go through the auth library, which opens its own. The steps are ordered so a partial failure leaves only a memberless account, which is inert and swept by the orphan purge after seven days. Audited as `user.create` (when one is provisioned) and `family.create`. System admin only.
+         */
+        post: operations["createAdminFamily"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1238,11 +1242,115 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** One family in full: metadata, members with roles, babies, live invites and API keys. Deliberately carries NO log content and no per-type counts — the operator console stays metadata-only, so nothing derived from a child's health record enters it. Impersonation remains the only route to a family's entries. System admin only. */
+        get: operations["getAdminFamily"];
         put?: never;
         post?: never;
         /** Delete a family and ALL its data — members, babies, invites, keys and every log cascade with the organization row. Audited as `family.delete` before the delete runs. System admin only. */
         delete: operations["deleteAdminFamily"];
+        options?: never;
+        head?: never;
+        /** Rename a family. The slug is deliberately left alone: it is derived at creation time and regenerating it would change an identifier under whatever already holds it. Audited as `family.rename`. System admin only. */
+        patch: operations["updateAdminFamily"];
+        trace?: never;
+    };
+    "/api/admin/families/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add an existing account to a family by email address. The account must already exist — this route never creates one, so a mistyped address is a 404 rather than a stray user. Audited as `family.member.add`. System admin only. */
+        post: operations["addAdminFamilyMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/families/{id}/members/{memberId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a member from a family. The last-admin guard applies to system admins too: a family must never be left with a role nobody holds, and promoting someone else first is always available. Audited as `family.member.remove`. System admin only. */
+        delete: operations["removeAdminFamilyMember"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/families/{id}/members/{memberId}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change a member's role within a family. Demoting the last admin is refused for the same reason removing them is. Audited as `family.member.role`. System admin only. */
+        post: operations["setAdminFamilyMemberRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/families/{id}/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mint an invite for a family the operator is not a member of. Same code generation, defaults and response shape as the family-admin route — both call one shared core, so the two can never grow different alphabets or expiry rules. Audited as `family.invite.create`. System admin only. */
+        post: operations["createAdminFamilyInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/families/{id}/invites/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke one of a family's invite codes. Scoped by family id as well as code, so an operator cannot revoke another family's invite by guessing its code. Audited as `family.invite.revoke`. System admin only. */
+        delete: operations["revokeAdminFamilyInvite"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/families/{id}/keys/{keyId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke one of a family's API keys — the way to kill a leaked integration token without impersonating anyone. Sets revoked_at rather than deleting the row, exactly as the family-admin route does. Audited as `family.key.revoke`. System admin only. */
+        delete: operations["revokeAdminFamilyKey"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2547,6 +2655,72 @@ export interface components {
             babies: number;
             /** Format: date-time */
             lastFeedAt: string | null;
+            /** @description Whether anyone in the family still holds the admin (or owner) role. False means the family is stranded — deleting an account cascades its membership away without consulting the last-admin guard — and the console badges it so an operator can promote someone. */
+            hasAdmin: boolean;
+        };
+        AdminFamilyMember: {
+            /** @description The family-membership row id (NOT the user id). */
+            memberId: string;
+            userId: string;
+            name: string;
+            email: string;
+            role: string;
+            /** Format: date-time */
+            joinedAt: string;
+            banned: boolean;
+        };
+        /** @description Metadata only, by design — no log content and no per-type counts. See getAdminFamily's summary. */
+        AdminFamilyDetail: {
+            id: string;
+            name: string;
+            slug: string;
+            plan: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            lastFeedAt: string | null;
+            members: components["schemas"]["AdminFamilyMember"][];
+            babies: components["schemas"]["Baby"][];
+            invites: components["schemas"]["Invite"][];
+            apiKeys: components["schemas"]["ApiKey"][];
+        };
+        CreateAdminFamily: {
+            name: string;
+            /**
+             * Format: email
+             * @description The account to install as the family's first admin. Omit it to get an empty family plus an admin-role invite instead.
+             */
+            adminEmail?: string;
+            /** @description Required when createAccount is true; ignored otherwise. */
+            adminName?: string;
+            /**
+             * @description Provision a passwordless account for adminEmail when none exists. An explicit flag rather than implicit behaviour so a mistyped address is refused instead of silently creating a user.
+             * @default false
+             */
+            createAccount: boolean;
+        };
+        AdminFamilyCreated: {
+            id: string;
+            name: string;
+            slug: string;
+            firstAdmin: components["schemas"]["AdminFamilyFirstAdmin"] | null;
+            /** @description Present only when the family was created without a first admin: the admin-role invite to hand to whoever will run it. */
+            invite: components["schemas"]["Invite"] | null;
+        };
+        AdminFamilyFirstAdmin: {
+            userId: string;
+            email: string;
+            /** @description True when this call provisioned the account (passwordless — the person claims it by signing in with Google on the same address). */
+            accountCreated: boolean;
+        };
+        UpdateAdminFamily: {
+            name: string;
+        };
+        AddAdminFamilyMember: {
+            /** Format: email */
+            email: string;
+            /** @enum {string} */
+            role: "admin" | "member";
         };
         AdminUser: {
             id: string;
@@ -2604,6 +2778,8 @@ export interface components {
         memberIdPath: string;
         /** @description An invite code. */
         codePath: string;
+        /** @description An API key's id. Named separately from idPath because the admin route that uses it already spends `id` on the family. */
+        keyIdPath: string;
     };
     requestBodies: never;
     headers: never;
@@ -6012,7 +6188,10 @@ export interface operations {
     };
     listAdminFamilies: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Case-insensitive substring match on name or slug. */
+                query?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6026,6 +6205,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminFamily"][];
+                };
+            };
+        };
+    };
+    createAdminFamily: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAdminFamily"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminFamilyCreated"];
+                };
+            };
+            /** @description `createAccount` without `adminName`, or an account already exists for that address in a way that cannot be used. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No account for `adminEmail` and `createAccount` was not set. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getAdminFamily: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The family. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminFamilyDetail"];
+                };
+            };
+            /** @description No family with this id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -6052,6 +6305,281 @@ export interface operations {
                 };
             };
             /** @description No family with this id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateAdminFamily: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAdminFamily"];
+            };
+        };
+        responses: {
+            /** @description Renamed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description No family with this id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    addAdminFamilyMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddAdminFamilyMember"];
+            };
+        };
+        responses: {
+            /** @description Added. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description The account is already a member of this family. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No family with this id, or no account for that email. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    removeAdminFamilyMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+                /** @description The family-membership row id (NOT the user id). */
+                memberId: components["parameters"]["memberIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description Cannot remove the family's last admin. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No family with this id, or no such member in it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setAdminFamilyMemberRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+                /** @description The family-membership row id (NOT the user id). */
+                memberId: components["parameters"]["memberIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetMemberRole"];
+            };
+        };
+        responses: {
+            /** @description Role changed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description Cannot demote the family's last admin. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No family with this id, or no such member in it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createAdminFamilyInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CreateInvite"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invite"];
+                };
+            };
+            /** @description No family with this id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    revokeAdminFamilyInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+                /** @description An invite code. */
+                code: components["parameters"]["codePath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description No such live invite in this family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    revokeAdminFamilyKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+                /** @description An API key's id. Named separately from idPath because the admin route that uses it already spends `id` on the family. */
+                keyId: components["parameters"]["keyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description No such live key in this family. */
             404: {
                 headers: {
                     [name: string]: unknown;

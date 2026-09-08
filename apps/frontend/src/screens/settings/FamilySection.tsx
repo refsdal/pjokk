@@ -1,9 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import QRCode from "qrcode";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import type { Invite, Member } from "@pjokk/shared";
 import { Avatar } from "@/components/Avatar";
 import { DeleteButton } from "@/components/DeleteButton";
+import { InviteQR } from "@/components/InviteQR";
 import { Sheet } from "@/components/Sheet";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -102,23 +102,6 @@ function MemberSheet({
         </div>
       )}
     </Sheet>
-  );
-}
-
-function InviteQR({ url }: { url: string }) {
-  const { data } = useQuery({
-    queryKey: ["qr", url],
-    queryFn: () => QRCode.toDataURL(url, { width: 480, margin: 1 }),
-    staleTime: Infinity,
-  });
-  if (!data)
-    return <div className="mx-auto h-48 w-48 rounded-xl bg-surface-2" />;
-  return (
-    <img
-      src={data}
-      alt={t("Invite QR code")}
-      className="mx-auto h-48 w-48 rounded-xl"
-    />
   );
 }
 

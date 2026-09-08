@@ -2315,3 +2315,42 @@ button was "Sign in".
   gained a second paragraph rather than a new section. The technical row
   under it (Docker, CSV, API keys, ICS) is a single muted line: present
   for the parent who will run it, invisible to the one who won't.
+
+## Admin-side family management (2026-09-08)
+
+The operator console could count and destroy families; it could not fix
+one. Spec: `docs/superpowers/specs/2026-09-08-admin-family-management-design.md`.
+Three decisions that only became visible while building it:
+
+- **An operator never becomes a member, so the invite path needed its own
+  auth method.** Limen's `CreateOrganization` always installs its creator as
+  the first member, inside its own transaction — there is no ownerless
+  organization to create. The first attempt made the sysadmin the creator of
+  a family they were building for someone else, which would have handed them
+  ordinary in-app access to a child's health record and quietly undone the
+  console's metadata-only rule. `auth.CreateEmptyFamily` therefore creates
+  and then removes that membership, checked, with its failure being the
+  whole call's failure. It deliberately does not go through `RemoveMember`:
+  that enforces the last-admin guard, and leaving the family adminless is
+  the intended outcome — the invite that follows carries the admin role, and
+  the list badges the family until someone redeems it.
+- **The last-admin guard is anticipated, not merely caught.** Every console
+  mutation writes its audit row first, which is right when the alternative
+  is a silent change — but reaching `ErrLastAdmin` that way costs a row
+  saying a demotion happened when it did not, and "remove the last admin" is
+  the first thing an operator tries on a family that looks wrong. The
+  handlers now count admins before writing the row. The guard inside the
+  transaction stays authoritative; the pre-check buys a clean trail, not
+  correctness.
+- **`createAccount` is an explicit flag, not inferred.** Provisioning an
+  account whenever the address is unknown would turn a mistyped email into a
+  stray user and a family nobody can reach. A 404 is recoverable in one
+  keystroke, and the console only reveals the checkbox after the server has
+  said there is no such account.
+
+The console stays **metadata-only** — members, babies, invites and keys, and
+nothing derived from a log — which is what lets the privacy policy stand
+unchanged. Impersonation remains the only route to a family's entries, and it
+is audited and shows the family a banner. A structural test
+(`apps/frontend/test/admin-family-ui.test.ts`) fails if a screen under
+`screens/admin/` ever reads a log endpoint.

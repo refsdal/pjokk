@@ -169,6 +169,18 @@ const adminFamiliesRoute = createRoute({
   ),
 });
 
+// The family detail page. A child of adminRoute rather than of
+// adminFamiliesRoute: the list and the detail are two screens, not a screen
+// with a nested one, and the tab bar highlights Families for both.
+const adminFamilyDetailRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: "/families/$id",
+  component: lazyRouteComponent(
+    () => import("@/screens/admin/FamilyDetail"),
+    "AdminFamilyDetailScreen",
+  ),
+});
+
 const adminUsersRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: "/users",
@@ -217,6 +229,7 @@ export const routeTree = rootRoute.addChildren([
   adminRoute.addChildren([
     adminOverviewRoute,
     adminFamiliesRoute,
+    adminFamilyDetailRoute,
     adminUsersRoute,
     adminAuditRoute,
   ]),
