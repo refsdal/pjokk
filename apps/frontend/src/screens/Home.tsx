@@ -3,7 +3,6 @@ import {
   IconBabyCarriage,
   IconDiaper,
   IconMoon,
-  IconPlus,
   IconTemperature,
 } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
@@ -25,7 +24,7 @@ import { BabySwitcher } from "@/components/BabySwitcher";
 import { HelpCard } from "@/components/HelpCard";
 import { InstallBanner } from "@/components/InstallBanner";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
-import { LogButton } from "@/components/LogButton";
+import { HomeActions } from "@/components/HomeActions";
 import { StatusCard } from "@/components/StatusCard";
 import {
   showsTemperatureCard,
@@ -40,7 +39,11 @@ import { AccountSheet } from "@/components/sheets/AccountSheet";
 import { DiaperSheet } from "@/components/sheets/DiaperSheet";
 import { FeedSheet } from "@/components/sheets/FeedSheet";
 import { HelpSheet } from "@/components/sheets/HelpSheet";
-import { MoreSheet, OtherLogSheet } from "@/components/sheets/OtherLogSheet";
+import {
+  MoreSheet,
+  moreActions,
+  OtherLogSheet,
+} from "@/components/sheets/OtherLogSheet";
 import { PlaySheet } from "@/components/sheets/PlaySheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
 import { useQueryClient } from "@tanstack/react-query";
@@ -57,6 +60,7 @@ import { describeNapWindow, napWindow, useNapGuide } from "@/lib/nap-window";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import { formatDuration, formatElapsed } from "@/lib/time";
 import { useAppearance } from "@/lib/appearance";
+import { cn, focusRing } from "@/lib/utils";
 import {
   formatMeasurementIn,
   formatVolume,
@@ -158,6 +162,22 @@ export function HomeScreen() {
   const napGuide = useNapGuide();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  // The unfolded tiles at md and up (components/HomeActions.tsx) — the
+  // same list the More sheet renders on the phone, with the same handlers.
+  const actions = moreActions({
+    onPick: (kind) => {
+      setOtherKind(kind);
+      setPumpStop(false);
+      setMeasurementType("weight");
+      setSheet("other");
+    },
+    onPickPlay: (type) => {
+      setPlayType(type);
+      setSheet("play");
+    },
+    onPickHelp: () => setSheet("help"),
+    onVaccines: () => void navigate({ to: "/vaccines" }),
+  });
   // ?log= from a manifest shortcut or a push action (issue #51): open that
   // sheet once the baby is known, then drop the param so a reload or a
   // back-swipe does not reopen it.
@@ -249,169 +269,162 @@ export function HomeScreen() {
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-safe">
-      {/* Baby header */}
-      <header className="flex items-center justify-between py-4">
-        <BabySwitcher />
-        <button
-          type="button"
-          aria-label={t("Account")}
-          onClick={() => setSheet("account")}
-          className="rounded-full active:scale-95"
-        >
-          <Avatar
-            src={me.data?.avatarUrl}
-            name={me.data?.displayName ?? "?"}
-            size={11}
-          />
-        </button>
-      </header>
+    // Compact: one column, exactly as before. md: two panes — status on
+    // the left, actions on the right edge, the edge the side panel opens
+    // from, so the cards stay readable beside an open sheet ("left informs,
+    // right acts", spec §4). xl: a third pane, Recent, in the middle.
+    <div className="mx-auto max-w-md px-4 pt-safe md:grid md:max-w-none md:grid-cols-[minmax(0,1fr)_minmax(320px,440px)] md:items-start md:gap-6 md:px-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_440px] xl:px-8">
+      <div className="min-w-0">
+        {/* Baby header */}
+        <header className="flex items-center justify-between py-4">
+          <BabySwitcher />
+          <button
+            type="button"
+            aria-label={t("Account")}
+            onClick={() => setSheet("account")}
+            className={cn("rounded-full active:scale-95", focusRing)}
+          >
+            <Avatar
+              src={me.data?.avatarUrl}
+              name={me.data?.displayName ?? "?"}
+              size={11}
+            />
+          </button>
+        </header>
 
-      <div className="space-y-3 pb-tabbar">
-        {/* Below the baby header, above everything else: a call for help is
-            the first thing to see, but it must not displace whose home this
-            is. */}
-        {openHelp && <HelpCard request={openHelp} />}
-        {active && (
-          <ActiveSleepBanner
-            session={active}
-            onEdit={(session) => {
-              setEditSleep(session);
-              setSheet("sleep-edit");
-            }}
-          />
-        )}
-        {activePlay && <ActivePlayBanner session={activePlay} />}
-        {activeFeed && (
-          <ActiveFeedBanner
-            timer={activeFeed}
-            onOpen={() => setSheet("feed")}
-          />
-        )}
-        {activePump && (
-          <ActivePumpBanner
-            timer={activePump}
-            onStop={() => {
-              setOtherKind("pump");
-              setPumpStop(true);
-              setSheet("other");
-            }}
-          />
-        )}
-
-        {/* Status before action: last feed / last diaper at a glance */}
-        <div className="grid grid-cols-1 gap-3">
-          <StatusCard
-            icon={IconBabyBottle}
-            label={t("Last feed")}
-            time={s?.lastFeed ? new Date(s.lastFeed.time) : null}
-            detail={s?.lastFeed ? feedDetail(s.lastFeed, units) : undefined}
-            sub={
-              s
-                ? `${s.today.feeds} ${t("feeds")} · ${formatVolume(s.today.intakeMl, units)}${
-                    s.today.solidsG > 0 ? ` · ${s.today.solidsG} g` : ""
-                  } ${t("today")}`
-                : undefined
-            }
-            tintClass="text-feed"
-            onClick={() => setSheet("feed")}
-          />
-          <StatusCard
-            icon={IconDiaper}
-            label={t("Last diaper")}
-            time={s?.lastDiaper ? new Date(s.lastDiaper.time) : null}
-            detail={s?.lastDiaper ? t(s.lastDiaper.type) : undefined}
-            sub={
-              s
-                ? `${s.today.wet} ${t("wet")} · ${s.today.dirty} ${t("dirty")} · ${s.today.both} ${t("both")}${s.today.dry > 0 ? ` · ${s.today.dry} ${t("dry")}` : ""}`
-                : undefined
-            }
-            tintClass="text-diaper"
-            onClick={() => setSheet("diaper")}
-          />
-          {/* The wake window, not "last sleep N ago": the same instant read
-              as a duration, because how long she has been up is what decides
-              whether the next nap is due. The last sleep's length rides
-              along as the detail. */}
-          {!active && s?.lastSleep?.endTime && (
-            <StatusCard
-              icon={IconMoon}
-              label={t("Awake")}
-              time={new Date(s.lastSleep.endTime)}
-              format={formatElapsed}
-              detail={`${formatDuration(
-                new Date(s.lastSleep.endTime).getTime() -
-                  new Date(s.lastSleep.startTime).getTime(),
-              )} ${t("nap")}`}
-              sub={`${s.today.sleeps} ${s.today.sleeps === 1 ? t("nap") : t("naps")} · ${formatDuration(s.today.sleepMin * 60_000)} ${t("today")}`}
-              note={nap ? describeNapWindow(nap) : undefined}
-              tintClass="text-sleep"
-              onClick={() => setSheet("sleep")}
+        <div className="space-y-3">
+          {/* Below the baby header, above everything else: a call for help is
+              the first thing to see, but it must not displace whose home this
+              is. */}
+          {openHelp && <HelpCard request={openHelp} />}
+          {active && (
+            <ActiveSleepBanner
+              session={active}
+              onEdit={(session) => {
+                setEditSleep(session);
+                setSheet("sleep-edit");
+              }}
             />
           )}
-          {/* Only while it is still a live question — see
-              showsTemperatureCard. A fever takes the danger tint so it reads
-              at a glance, which is the whole reason the card exists. */}
-          {s?.lastTemperature &&
-            showsTemperatureCard(new Date(s.lastTemperature.time)) && (
+          {activePlay && <ActivePlayBanner session={activePlay} />}
+          {activeFeed && (
+            <ActiveFeedBanner
+              timer={activeFeed}
+              onOpen={() => setSheet("feed")}
+            />
+          )}
+          {activePump && (
+            <ActivePumpBanner
+              timer={activePump}
+              onStop={() => {
+                setOtherKind("pump");
+                setPumpStop(true);
+                setSheet("other");
+              }}
+            />
+          )}
+          {/* Status before action: last feed / last diaper at a glance */}
+          <div className="grid grid-cols-1 gap-3">
+            <StatusCard
+              icon={IconBabyBottle}
+              label={t("Last feed")}
+              time={s?.lastFeed ? new Date(s.lastFeed.time) : null}
+              detail={s?.lastFeed ? feedDetail(s.lastFeed, units) : undefined}
+              sub={
+                s
+                  ? `${s.today.feeds} ${t("feeds")} · ${formatVolume(s.today.intakeMl, units)}${
+                      s.today.solidsG > 0 ? ` · ${s.today.solidsG} g` : ""
+                    } ${t("today")}`
+                  : undefined
+              }
+              tintClass="text-feed"
+              onClick={() => setSheet("feed")}
+            />
+            <StatusCard
+              icon={IconDiaper}
+              label={t("Last diaper")}
+              time={s?.lastDiaper ? new Date(s.lastDiaper.time) : null}
+              detail={s?.lastDiaper ? t(s.lastDiaper.type) : undefined}
+              sub={
+                s
+                  ? `${s.today.wet} ${t("wet")} · ${s.today.dirty} ${t("dirty")} · ${s.today.both} ${t("both")}${s.today.dry > 0 ? ` · ${s.today.dry} ${t("dry")}` : ""}`
+                  : undefined
+              }
+              tintClass="text-diaper"
+              onClick={() => setSheet("diaper")}
+            />
+            {/* The wake window, not "last sleep N ago": the same instant read
+                as a duration, because how long she has been up is what decides
+                whether the next nap is due. The last sleep's length rides
+                along as the detail. */}
+            {!active && s?.lastSleep?.endTime && (
               <StatusCard
-                icon={IconTemperature}
-                label={t("Last temperature")}
-                time={new Date(s.lastTemperature.time)}
-                detail={`${formatMeasurementIn(
-                  s.lastTemperature.type,
-                  s.lastTemperature.value,
-                  units,
-                )} ${TREND_ARROW[tempTrend]}`}
-                sub={
-                  tempStatus === "ok" ? undefined : t(TREND_LABEL[tempTrend])
-                }
-                tintClass={STATUS_TINT[tempStatus]}
-                accessory={
-                  <span className={STATUS_TINT[tempStatus]}>
-                    <TemperatureSparkline rows={measurementRows} />
-                  </span>
-                }
-                onClick={() => {
-                  setOtherKind("measurement");
-                  setMeasurementType("temperature");
-                  setSheet("other");
-                }}
+                icon={IconMoon}
+                label={t("Awake")}
+                time={new Date(s.lastSleep.endTime)}
+                format={formatElapsed}
+                detail={`${formatDuration(
+                  new Date(s.lastSleep.endTime).getTime() -
+                    new Date(s.lastSleep.startTime).getTime(),
+                )} ${t("nap")}`}
+                sub={`${s.today.sleeps} ${s.today.sleeps === 1 ? t("nap") : t("naps")} · ${formatDuration(s.today.sleepMin * 60_000)} ${t("today")}`}
+                note={nap ? describeNapWindow(nap) : undefined}
+                tintClass="text-sleep"
+                onClick={() => setSheet("sleep")}
               />
             )}
+            {/* Only while it is still a live question — see
+                showsTemperatureCard. A fever takes the danger tint so it reads
+                at a glance, which is the whole reason the card exists. */}
+            {s?.lastTemperature &&
+              showsTemperatureCard(new Date(s.lastTemperature.time)) && (
+                <StatusCard
+                  icon={IconTemperature}
+                  label={t("Last temperature")}
+                  time={new Date(s.lastTemperature.time)}
+                  detail={`${formatMeasurementIn(
+                    s.lastTemperature.type,
+                    s.lastTemperature.value,
+                    units,
+                  )} ${TREND_ARROW[tempTrend]}`}
+                  sub={
+                    tempStatus === "ok" ? undefined : t(TREND_LABEL[tempTrend])
+                  }
+                  tintClass={STATUS_TINT[tempStatus]}
+                  accessory={
+                    <span className={STATUS_TINT[tempStatus]}>
+                      <TemperatureSparkline rows={measurementRows} />
+                    </span>
+                  }
+                  onClick={() => {
+                    setOtherKind("measurement");
+                    setMeasurementType("temperature");
+                    setSheet("other");
+                  }}
+                />
+              )}
+          </div>
         </div>
+      </div>
 
-        {/* 2×2 log grid */}
-        <div className="grid grid-cols-2 gap-3 pt-1">
-          <LogButton
-            icon={IconBabyBottle}
-            label={t("Feed")}
-            tintClass="text-feed"
-            onClick={() => setSheet("feed")}
-          />
-          <LogButton
-            icon={IconDiaper}
-            label={t("Diaper")}
-            tintClass="text-diaper"
-            onClick={() => setSheet("diaper")}
-          />
-          <LogButton
-            icon={IconMoon}
-            label={active ? t("Sleeping…") : t("Sleep")}
-            tintClass="text-sleep"
-            onClick={() => setSheet("sleep")}
-            disabled={!!active}
-          />
-          <LogButton
-            icon={IconPlus}
-            label={t("More")}
-            tintClass="text-growth"
-            onClick={() => {
-              prefetchOtherLists(queryClient, baby.id);
-              setSheet("more");
-            }}
-          />
-        </div>
+      {/* xl only: today's log beside the actions. */}
+      <HomeRecent babyId={baby.id} />
+
+      {/* Primaries (+ More on the phone; the unfolded tiles from md up).
+          pb-tabbar clears the bottom bar on the phone and is 1.5rem from md
+          (styles.css). */}
+      <div className="pt-4 pb-tabbar md:sticky md:top-0 md:pt-6">
+        <HomeActions
+          active={!!active}
+          onFeed={() => setSheet("feed")}
+          onDiaper={() => setSheet("diaper")}
+          onSleep={() => setSheet("sleep")}
+          onMore={() => {
+            prefetchOtherLists(queryClient, baby.id);
+            setSheet("more");
+          }}
+          actions={actions}
+        />
       </div>
 
       <FeedSheet
@@ -483,6 +496,11 @@ export function HomeScreen() {
   );
 }
 
+// Replaced by components/HomeRecent.tsx in the next task.
+function HomeRecent(_props: { babyId: string }) {
+  return null;
+}
+
 // Night mode home: three actions only, everything in the bottom half,
 // nothing bright (CLAUDE.md §6).
 function NightHome({
@@ -524,7 +542,9 @@ function NightHome({
   };
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-end px-4 pb-tabbar">
+    // md and up: the same phone-width column, anchored bottom-right — "right
+    // acts", and never three 1000 px buttons across a tablet (spec §4).
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-end px-4 pb-tabbar md:mr-0 md:ml-auto md:px-6">
       <div className="space-y-3 pb-4">
         <IconBabyCarriage className="mx-auto h-6 w-6 text-muted" />
         {openHelp && <HelpCard request={openHelp} />}
