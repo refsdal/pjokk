@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { Icon as TablerIcon } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { formatRelative } from "@/lib/time";
-import { cn } from "@/lib/utils";
+import { cn, focusRing } from "@/lib/utils";
 
 // Status before action (CLAUDE.md §1): relative time, zero taps. Category
 // color goes on the icon only, never the background.
@@ -49,7 +49,10 @@ export function StatusCard({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-xl2 border border-line bg-surface p-4 text-left active:bg-surface-2"
+      className={cn(
+        "flex w-full items-center gap-3 rounded-xl2 border border-line bg-surface p-4 text-left active:bg-surface-2",
+        focusRing,
+      )}
     >
       <div
         className={cn(
