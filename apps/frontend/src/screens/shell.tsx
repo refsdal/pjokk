@@ -124,7 +124,13 @@ export function AppShell() {
         </div>
       )}
       <AppBadge />
-      <Outlet />
+      {/* md and up: clear the 88 px rail and cap the content at 1400 px
+          (spec §1–2). Screens keep their own max-w inside this. */}
+      <div className="md:pl-22">
+        <div className="mx-auto max-w-[1400px]">
+          <Outlet />
+        </div>
+      </div>
       <TabBar />
     </div>
   );

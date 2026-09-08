@@ -33,16 +33,18 @@ export function AdminShell() {
 
   return (
     <div className="min-h-dvh">
-      <div className="mx-auto max-w-xl px-4 pt-safe">
-        <header className="flex items-center gap-3 py-4">
-          <Link to="/settings" className="text-muted" title="Back to app">
-            <IconArrowLeft className="h-6 w-6" />
-          </Link>
-          <IconShieldCog className="h-6 w-6 text-accent" />
-          <h1 className="text-2xl font-extrabold text-ink">Admin</h1>
-        </header>
-        <div className="pb-tabbar">
-          <Outlet />
+      <div className="md:pl-22">
+        <div className="mx-auto max-w-xl px-4 pt-safe md:max-w-3xl">
+          <header className="flex items-center gap-3 py-4">
+            <Link to="/settings" className="text-muted" title="Back to app">
+              <IconArrowLeft className="h-6 w-6" />
+            </Link>
+            <IconShieldCog className="h-6 w-6 text-accent" />
+            <h1 className="text-2xl font-extrabold text-ink">Admin</h1>
+          </header>
+          <div className="pb-tabbar">
+            <Outlet />
+          </div>
         </div>
       </div>
       <TabBar tabs={adminTabs} />

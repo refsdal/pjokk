@@ -129,6 +129,14 @@ body {
 .pb-tabbar {
   padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
 }
+/* md and up: the tab bar is a left rail (components/TabBar.tsx), so there
+   is nothing at the bottom to clear. One rule here rather than 22 call
+   sites. */
+@media (min-width: 768px) {
+  .pb-tabbar {
+    padding-bottom: 1.5rem;
+  }
+}
 
 /* Remove number input spinners; steppers own the interaction. */
 input[type="number"]::-webkit-outer-spin-button,

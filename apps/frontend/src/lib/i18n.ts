@@ -629,6 +629,8 @@ const nb: Record<string, string> = {
     "Alt som noen gang er logget, én rad per oppføring — ren CSV.",
   "Export CSV": "Eksporter CSV",
   Account: "Konto",
+  Main: "Hoved",
+  Close: "Lukk",
   Families: "Familier",
   "Finish syncing before switching family":
     "Vent til alt er synkronisert før du bytter familie",
