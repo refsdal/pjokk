@@ -179,3 +179,14 @@ SELECT COUNT(*)::int FROM "organization_members" WHERE "user_id" = $1;
 UPDATE "sessions"
 SET "active_organization_id" = $2
 WHERE "token" = $1 AND "active_organization_id" IS NULL;
+
+-- name: GetFamilyMembershipIDForUser :one
+-- The membership row id a user holds in a family, which is what the member
+-- writes are addressed by. GetFamilyMembershipRole (middleware.sql) answers
+-- the tenancy question from the same pair but returns the role, not the id.
+--
+-- Used by CreateEmptyFamily to find the membership Limen insisted on
+-- creating so it can be removed again; see that method for why an empty
+-- family is a state worth reaching.
+SELECT "id" FROM "organization_members"
+WHERE "organization_id" = $1 AND "user_id" = $2;

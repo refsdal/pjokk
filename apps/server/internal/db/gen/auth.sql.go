@@ -256,6 +256,30 @@ func (q *Queries) GetFamilyMember(ctx context.Context, arg GetFamilyMemberParams
 	return i, err
 }
 
+const getFamilyMembershipIDForUser = `-- name: GetFamilyMembershipIDForUser :one
+SELECT "id" FROM "organization_members"
+WHERE "organization_id" = $1 AND "user_id" = $2
+`
+
+type GetFamilyMembershipIDForUserParams struct {
+	OrganizationID string
+	UserID         string
+}
+
+// The membership row id a user holds in a family, which is what the member
+// writes are addressed by. GetFamilyMembershipRole (middleware.sql) answers
+// the tenancy question from the same pair but returns the role, not the id.
+//
+// Used by CreateEmptyFamily to find the membership Limen insisted on
+// creating so it can be removed again; see that method for why an empty
+// family is a state worth reaching.
+func (q *Queries) GetFamilyMembershipIDForUser(ctx context.Context, arg GetFamilyMembershipIDForUserParams) (string, error) {
+	row := q.db.QueryRow(ctx, getFamilyMembershipIDForUser, arg.OrganizationID, arg.UserID)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getImpersonation = `-- name: GetImpersonation :one
 SELECT "admin_token", "admin_id"
 FROM "impersonation"

@@ -131,8 +131,15 @@ func (d Deps) GetAdminStats(ctx context.Context, _ gen.GetAdminStatsRequestObjec
 }
 
 // ListAdminFamilies implements GET /api/admin/families.
-func (d Deps) ListAdminFamilies(ctx context.Context, _ gen.ListAdminFamiliesRequestObject) (gen.ListAdminFamiliesResponseObject, error) {
-	rows, err := d.Q.ListAdminFamilies(ctx)
+//
+// hasAdmin is what makes the list actionable rather than merely
+// informative: a family loses its last admin whenever DeleteAdminUser
+// removes that account, because the membership cascades away without
+// passing auth.RemoveMember's last-admin guard. The family keeps working
+// for everyone in it and silently cannot be administered, which is
+// invisible without this flag.
+func (d Deps) ListAdminFamilies(ctx context.Context, req gen.ListAdminFamiliesRequestObject) (gen.ListAdminFamiliesResponseObject, error) {
+	rows, err := d.Q.ListAdminFamilies(ctx, req.Params.Query)
 	if err != nil {
 		return nil, err
 	}
@@ -147,6 +154,7 @@ func (d Deps) ListAdminFamilies(ctx context.Context, _ gen.ListAdminFamiliesRequ
 			Members:    int(row.Members),
 			Babies:     int(row.Babies),
 			LastFeedAt: tsPtr(row.LastFeedAt),
+			HasAdmin:   row.HasAdmin,
 		}
 	}
 	return gen.ListAdminFamilies200JSONResponse(out), nil

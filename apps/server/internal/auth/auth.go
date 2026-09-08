@@ -65,12 +65,22 @@ const (
 // guard below treats an "owner" exactly like an "admin".
 const roleOwner = "owner"
 
-// isPrivilegedRole reports whether role is one of the two values that count
+// IsPrivilegedRole reports whether role is one of the two values that count
 // as "runs the family" for the last-admin guard (RemoveMember,
 // SetMemberRole): admin, or Limen's "owner".
-func isPrivilegedRole(role string) bool {
+//
+// Exported so a caller can ANTICIPATE the guard rather than only react to
+// ErrLastAdmin. internal/api's admin console needs that: it writes an audit
+// row before every mutation, and a row describing a demotion that was then
+// refused is a false entry in an append-only trail. The guard inside the
+// transaction stays authoritative — this only lets a caller avoid recording
+// an action it can already see will not happen.
+func IsPrivilegedRole(role string) bool {
 	return role == RoleAdmin || role == roleOwner
 }
+
+// isPrivilegedRole is the unexported spelling this package uses internally.
+func isPrivilegedRole(role string) bool { return IsPrivilegedRole(role) }
 
 // RoleSystemAdmin is the value of Session.Role that opens the /admin console.
 // It comes from our own users.role column and has nothing to do with the
@@ -113,6 +123,16 @@ var (
 	ErrSessionNotFound = errors.New("auth: session not found")
 )
 
+// NormalizeEmail is the canonical form addresses are STORED in, exported so
+// that code outside this package can match a users row by email without
+// importing Limen (nothing outside internal/auth may) and, more to the
+// point, without guessing at the rule. Guessing would work right up until
+// the library changed it, at which point a lookup would silently miss and
+// an operator would be told an account does not exist.
+func NormalizeEmail(email string) string {
+	return limen.NormalizeEmail(email)
+}
+
 // Session is what the rest of the app knows about the caller. It is
 // assembled from Limen's validated session plus one query against our own
 // users/sessions columns, because the fields the app actually branches on
@@ -148,6 +168,17 @@ type Service interface {
 	CreateUser(ctx context.Context, name, email, password string) (userID string, err error)
 
 	CreateFamily(ctx context.Context, userID, name string) (familyID string, err error)
+
+	// CreateFamilyForUser creates a family whose first admin is ownerUserID,
+	// on the authority of a system administrator rather than the owner's
+	// own — the operator console's manual family creation. See the
+	// implementation for why the ordinary CreateFamily cannot serve it.
+	CreateFamilyForUser(ctx context.Context, ownerUserID, name string) (familyID string, err error)
+
+	// CreateEmptyFamily creates a family with no members, for the operator
+	// console's invite-only creation path. operatorUserID is a momentary
+	// member because Limen insists on one; see the implementation.
+	CreateEmptyFamily(ctx context.Context, operatorUserID, name string) (familyID string, err error)
 	AddMember(ctx context.Context, familyID, userID, role string) error
 	RemoveMember(ctx context.Context, familyID, memberID string) error
 	SetMemberRole(ctx context.Context, familyID, memberID, role string) error
@@ -603,6 +634,14 @@ func (s *service) createUserWithoutCredential(ctx context.Context, name, email s
 // verified as either a system admin or family-less, and "deny" is the safe
 // side of that ambiguity — never "allow, and find out later."
 func allowOrgCreation(ctx context.Context, q *gen.Queries, userID string, openSignup bool) bool {
+	// A system administrator creating a family FOR somebody else. The
+	// creator being checked here is that somebody — typically an account
+	// provisioned seconds ago, which every rule below would refuse — so the
+	// authority has to arrive out of band. It can only have been put there
+	// by CreateFamilyForUser; see sysadminCreateKey.
+	if hasSysadminCreate(ctx) {
+		return true
+	}
 	role, err := q.GetUserRole(ctx, userID)
 	if err != nil {
 		return false
@@ -621,9 +660,124 @@ func allowOrgCreation(ctx context.Context, q *gen.Queries, userID string, openSi
 	return memberships == 0 && openSignup
 }
 
+// sysadminCreateKey marks a context as carrying a system administrator's
+// authority to create a family on somebody else's behalf. allowOrgCreation
+// honours it before its ordinary rules.
+//
+// The type is unexported and the value is a struct{} literal, so no package
+// outside this one can construct the key — a caller in internal/api cannot
+// forge the marker even by accident, and the only way to obtain it is to go
+// through CreateFamilyForUser, whose sole caller is an audited tierSysadmin
+// route. That is what keeps the closed-alpha guarantee ("no families without
+// an invite") intact while still allowing an operator to create one.
+type sysadminCreateKey struct{}
+
+// withSysadminCreate returns ctx carrying the marker above.
+func withSysadminCreate(ctx context.Context) context.Context {
+	return context.WithValue(ctx, sysadminCreateKey{}, true)
+}
+
+// hasSysadminCreate reports whether ctx was produced by withSysadminCreate.
+func hasSysadminCreate(ctx context.Context) bool {
+	authorized, _ := ctx.Value(sysadminCreateKey{}).(bool)
+	return authorized
+}
+
 // CreateFamily creates the organization and makes userID its first member
 // with the admin role.
 func (s *service) CreateFamily(ctx context.Context, userID, name string) (string, error) {
+	return s.createFamily(ctx, userID, name)
+}
+
+// CreateFamilyForUser creates a family whose first admin is ownerUserID, on
+// the authority of a system administrator rather than the owner's own.
+//
+// It exists because allowOrgCreation measures the CREATOR, and
+// CreateOrganization's creator is the family's first admin. Under closed
+// signup a freshly provisioned account is neither a system admin nor
+// family-less-during-the-bootstrap-window, so a plain CreateFamily on its
+// behalf fails closed — correctly, for every self-serve path, and uselessly
+// for an operator creating a family for a new parent.
+//
+// The marker travels on the context because that is the only thing
+// CreateOrganization threads through to the hook: the hook's signature is
+// (ctx, *limen.User), so there is nowhere else to put an actor. See
+// sysadminCreateKey for why that cannot be abused from outside this package.
+func (s *service) CreateFamilyForUser(ctx context.Context, ownerUserID, name string) (string, error) {
+	return s.createFamily(withSysadminCreate(ctx), ownerUserID, name)
+}
+
+// CreateEmptyFamily creates a family with NO members at all: the operator
+// console's "create a family and hand its invite link to whoever will run
+// it" path, where the person who will be its admin has no account yet and
+// may never sign in with the address anyone guessed for them.
+//
+// Limen has no way to express this. CreateOrganization always installs its
+// creator as the first member, inside its own transaction, so the only
+// route to an empty family is to create one and then remove that
+// membership. operatorUserID is therefore a *momentary* member — which is
+// exactly why this method exists rather than the caller doing the two steps
+// itself. A system administrator quietly left inside a family would have
+// standing access to a child's health record through the ordinary app,
+// which is the one thing the console is built not to do, so the removal is
+// checked and its failure is the whole call's failure.
+//
+// The removal deliberately does NOT go through RemoveMember: that enforces
+// the last-admin guard, and the operator IS the last admin here. Leaving the
+// family adminless is the intended outcome — the invite that follows carries
+// the admin role, and ListAdminFamilies badges the family until someone
+// redeems it.
+//
+// If the removal fails the family survives with the operator inside it. That
+// is visible (the console lists it, with the operator as a member) and
+// repairable with one click, which is the least bad of the available
+// outcomes: the alternative — deleting the family to clean up — would be a
+// compensating delete of exactly the kind the Go port removed.
+func (s *service) CreateEmptyFamily(ctx context.Context, operatorUserID, name string) (string, error) {
+	familyID, err := s.createFamily(withSysadminCreate(ctx), operatorUserID, name)
+	if err != nil {
+		return "", err
+	}
+
+	if err := s.inTx(ctx, func(q *gen.Queries) error {
+		memberID, err := q.GetFamilyMembershipIDForUser(ctx, gen.GetFamilyMembershipIDForUserParams{
+			OrganizationID: familyID,
+			UserID:         operatorUserID,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				// Already empty. Limen changed its mind about seeding a
+				// creator, which is fine and leaves nothing to do.
+				return nil
+			}
+			return fmt.Errorf("auth: load operator membership: %w", err)
+		}
+		if err := q.ClearActiveFamilyForUser(ctx, gen.ClearActiveFamilyForUserParams{
+			ActiveOrganizationID: &familyID,
+			UserID:               operatorUserID,
+		}); err != nil {
+			return fmt.Errorf("auth: clear active family: %w", err)
+		}
+		if err := q.DeleteFamilyMemberRoles(ctx, gen.DeleteFamilyMemberRolesParams{
+			OrganizationID: familyID,
+			MemberID:       memberID,
+		}); err != nil {
+			return fmt.Errorf("auth: delete operator member roles: %w", err)
+		}
+		if err := q.DeleteFamilyMember(ctx, gen.DeleteFamilyMemberParams{
+			OrganizationID: familyID,
+			ID:             memberID,
+		}); err != nil {
+			return fmt.Errorf("auth: delete operator membership: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return "", err
+	}
+	return familyID, nil
+}
+
+func (s *service) createFamily(ctx context.Context, userID, name string) (string, error) {
 	user, err := s.core.DBAction.FindUserByID(ctx, userID)
 	if err != nil {
 		return "", fmt.Errorf("auth: load family creator: %w", err)

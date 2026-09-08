@@ -143,39 +143,63 @@ func (d Deps) ListInvites(ctx context.Context, _ gen.ListInvitesRequestObject) (
 // apps/api/src/routes/invites.ts's `c.req.valid("json") ?? {…defaults}`.
 func (d Deps) CreateInvite(ctx context.Context, req gen.CreateInviteRequestObject) (gen.CreateInviteResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
+	invite, err := d.createInvite(ctx, fam.FamilyID, fam.UserID, req.Body)
+	if err != nil {
+		return nil, err
+	}
+	return gen.CreateInvite201JSONResponse(invite), nil
+}
 
+// createInvite is the shared core of BOTH invite-minting routes: this
+// file's family-admin POST /api/invites and admin_families.go's
+// tierSysadmin POST /api/admin/families/{id}/invites. The two differ only
+// in where the family and the creator come from — the session's active
+// family for one, a path parameter for the other — so everything that
+// defines an invite lives here: the code alphabet, the 72 h / 5-use /
+// member defaults, and the wire shape.
+//
+// Sharing it is not tidiness. A second copy of these defaults would drift,
+// and a drift in the code alphabet in particular would be invisible: one
+// path would keep minting codes the other's generator could never produce,
+// which is exactly the divergence inviteCodeAlphabet's comment warns
+// against.
+//
+// body may be nil, and so may any field within it: the spec marks the
+// request body optional with every field defaulted, so "absent" and
+// "present but null" both mean "use the default".
+func (d Deps) createInvite(ctx context.Context, familyID, createdBy string, body *gen.CreateInvite) (gen.Invite, error) {
 	role := string(gen.CreateInviteRoleMember)
 	expiresInHours := 72
 	maxUses := 5
-	if req.Body != nil {
-		if req.Body.Role != nil {
-			role = string(*req.Body.Role)
+	if body != nil {
+		if body.Role != nil {
+			role = string(*body.Role)
 		}
-		if req.Body.ExpiresInHours != nil {
-			expiresInHours = *req.Body.ExpiresInHours
+		if body.ExpiresInHours != nil {
+			expiresInHours = *body.ExpiresInHours
 		}
-		if req.Body.MaxUses != nil {
-			maxUses = *req.Body.MaxUses
+		if body.MaxUses != nil {
+			maxUses = *body.MaxUses
 		}
 	}
 
 	code, err := generateInviteCode()
 	if err != nil {
-		return nil, err
+		return gen.Invite{}, err
 	}
 
 	row, err := d.Q.CreateInvite(ctx, dbgen.CreateInviteParams{
 		Code:      code,
-		FamilyID:  fam.FamilyID,
+		FamilyID:  familyID,
 		Role:      role,
 		ExpiresAt: pgtype.Timestamptz{Time: d.Now().Add(time.Duration(expiresInHours) * time.Hour), Valid: true},
 		MaxUses:   int32(maxUses),
-		CreatedBy: fam.UserID,
+		CreatedBy: createdBy,
 	})
 	if err != nil {
-		return nil, err
+		return gen.Invite{}, err
 	}
-	return gen.CreateInvite201JSONResponse(serInvite(row, d.AppURL)), nil
+	return serInvite(row, d.AppURL), nil
 }
 
 // RevokeInvite implements DELETE /api/invites/{code}. REF: "{ok:true} /

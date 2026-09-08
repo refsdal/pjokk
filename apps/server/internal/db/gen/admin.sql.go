@@ -71,6 +71,46 @@ func (q *Queries) DeleteOrganization(ctx context.Context, id string) (int64, err
 	return result.RowsAffected(), nil
 }
 
+const getAdminFamilyRow = `-- name: GetAdminFamilyRow :one
+SELECT
+    o."id",
+    o."name",
+    o."slug",
+    o."plan",
+    o."created_at",
+    (SELECT MAX(f."time") FROM "feed_log" f WHERE f."family_id" = o."id")::timestamptz AS last_feed_at
+FROM "organizations" o
+WHERE o."id" = $1
+`
+
+type GetAdminFamilyRowRow struct {
+	ID         string
+	Name       string
+	Slug       string
+	Plan       string
+	CreatedAt  pgtype.Timestamptz
+	LastFeedAt pgtype.Timestamptz
+}
+
+// The header of GET /api/admin/families/{id}, and the existence check every
+// other /api/admin/families/{id}/… route runs first. Metadata only — no log
+// content and no per-type counts reach the console (see the route summary);
+// last_feed_at is the sole activity signal, and ListAdminFamilies already
+// exposes it.
+func (q *Queries) GetAdminFamilyRow(ctx context.Context, id string) (GetAdminFamilyRowRow, error) {
+	row := q.db.QueryRow(ctx, getAdminFamilyRow, id)
+	var i GetAdminFamilyRowRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.Plan,
+		&i.CreatedAt,
+		&i.LastFeedAt,
+	)
+	return i, err
+}
+
 const getAdminStats = `-- name: GetAdminStats :one
 
 SELECT
@@ -173,6 +213,21 @@ func (q *Queries) GetOrganizationName(ctx context.Context, id string) (string, e
 	return name, err
 }
 
+const getUserIDByEmail = `-- name: GetUserIDByEmail :one
+SELECT "id" FROM "users" WHERE "email" = $1
+`
+
+// Resolves the address AddAdminFamilyMember and CreateAdminFamily are given
+// to an account. Emails are stored normalized by Limen (NormalizeEmail), so
+// the caller normalizes before asking rather than this query lowercasing a
+// column and losing its index.
+func (q *Queries) GetUserIDByEmail(ctx context.Context, email string) (string, error) {
+	row := q.db.QueryRow(ctx, getUserIDByEmail, email)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
 const listAdminAudit = `-- name: ListAdminAudit :many
 SELECT
     a."id",
@@ -243,8 +298,24 @@ SELECT
     -- The ::timestamptz cast is load-bearing for codegen, not for
     -- Postgres: without it sqlc types the aggregate as interface{} and the
     -- Go side loses the Timestamptz scan.
-    (SELECT MAX(f."time") FROM "feed_log" f WHERE f."family_id" = o."id")::timestamptz AS last_feed_at
+    (SELECT MAX(f."time") FROM "feed_log" f WHERE f."family_id" = o."id")::timestamptz AS last_feed_at,
+    -- Whether anyone still runs this family. A family can lose its last
+    -- admin without passing the last-admin guard: DeleteAdminUser removes
+    -- the account and the membership cascades away with it. The console
+    -- badges the result so an operator can promote someone. 'owner' counts
+    -- for the same reason isPrivilegedRole accepts it — Limen's
+    -- organization plugin can still assign its own default role.
+    EXISTS (
+        SELECT 1
+        FROM "organization_members" am
+        JOIN "organization_member_roles" amr ON amr."member_id" = am."id"
+        WHERE am."organization_id" = o."id" AND amr."role" IN ('admin', 'owner')
+    ) AS has_admin
 FROM "organizations" o
+WHERE
+    $1::text IS NULL
+    OR o."name" ILIKE '%' || $1::text || '%'
+    OR o."slug" ILIKE '%' || $1::text || '%'
 ORDER BY o."created_at" DESC
 `
 
@@ -257,6 +328,7 @@ type ListAdminFamiliesRow struct {
 	Members    int32
 	Babies     int32
 	LastFeedAt pgtype.Timestamptz
+	HasAdmin   bool
 }
 
 // Every family, newest first, with its member and baby counts and the
@@ -267,8 +339,10 @@ type ListAdminFamiliesRow struct {
 // by every feed before collapsing it again, which is why the member and
 // baby counts had to be subqueries there too. Three subqueries say the
 // same thing without the fan-out.
-func (q *Queries) ListAdminFamilies(ctx context.Context) ([]ListAdminFamiliesRow, error) {
-	rows, err := q.db.Query(ctx, listAdminFamilies)
+// Same sqlc.narg pattern as ListAdminUsers: NULL collapses the filter to
+// true, and the search text stays a bound parameter rather than spliced SQL.
+func (q *Queries) ListAdminFamilies(ctx context.Context, query *string) ([]ListAdminFamiliesRow, error) {
+	rows, err := q.db.Query(ctx, listAdminFamilies, query)
 	if err != nil {
 		return nil, err
 	}
@@ -285,6 +359,77 @@ func (q *Queries) ListAdminFamilies(ctx context.Context) ([]ListAdminFamiliesRow
 			&i.Members,
 			&i.Babies,
 			&i.LastFeedAt,
+			&i.HasAdmin,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAdminFamilyMembers = `-- name: ListAdminFamilyMembers :many
+SELECT
+    om."id" AS member_id,
+    om."user_id",
+    COALESCE(u."display_name", '') AS name,
+    u."email",
+    COALESCE(r."role", '') AS role,
+    om."created_at" AS joined_at,
+    u."banned"
+FROM "organization_members" om
+JOIN "users" u ON u."id" = om."user_id"
+LEFT JOIN LATERAL (
+    SELECT omr."role"
+    FROM "organization_member_roles" omr
+    WHERE omr."member_id" = om."id"
+    ORDER BY CASE omr."role"
+        WHEN 'admin' THEN 0
+        WHEN 'owner' THEN 1
+        ELSE 2
+    END, omr."role"
+    LIMIT 1
+) r ON true
+WHERE om."organization_id" = $1
+ORDER BY om."created_at"
+`
+
+type ListAdminFamilyMembersRow struct {
+	MemberID string
+	UserID   string
+	Name     string
+	Email    string
+	Role     string
+	JoinedAt pgtype.Timestamptz
+	Banned   bool
+}
+
+// Like family.sql's ListFamilyMembers, but for the operator console: it
+// carries joined_at and the account's ban state (both of which answer
+// support questions) and drops avatar_key and has_push (both of which only
+// serve in-app rendering). Same LATERAL most-privileged-role pick, for the
+// same reason — one role per membership today, but the tenancy gate does
+// not assume it either.
+func (q *Queries) ListAdminFamilyMembers(ctx context.Context, organizationID string) ([]ListAdminFamilyMembersRow, error) {
+	rows, err := q.db.Query(ctx, listAdminFamilyMembers, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAdminFamilyMembersRow
+	for rows.Next() {
+		var i ListAdminFamilyMembersRow
+		if err := rows.Scan(
+			&i.MemberID,
+			&i.UserID,
+			&i.Name,
+			&i.Email,
+			&i.Role,
+			&i.JoinedAt,
+			&i.Banned,
 		); err != nil {
 			return nil, err
 		}
@@ -452,6 +597,26 @@ type ReassignUserReferencesParams struct {
 func (q *Queries) ReassignUserReferences(ctx context.Context, arg ReassignUserReferencesParams) error {
 	_, err := q.db.Exec(ctx, reassignUserReferences, arg.TombstoneID, arg.UserID, arg.Now)
 	return err
+}
+
+const renameOrganization = `-- name: RenameOrganization :execrows
+UPDATE "organizations" SET "name" = $2 WHERE "id" = $1
+`
+
+type RenameOrganizationParams struct {
+	ID   string
+	Name string
+}
+
+// The slug is deliberately NOT touched: it is derived by Limen's configured
+// slug generator when the family is created, and regenerating it on a
+// rename would change an identifier under whatever already holds it.
+func (q *Queries) RenameOrganization(ctx context.Context, arg RenameOrganizationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, renameOrganization, arg.ID, arg.Name)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const unbanAdminUser = `-- name: UnbanAdminUser :exec

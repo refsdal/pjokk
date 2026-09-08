@@ -11,6 +11,24 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AddAdminFamilyMemberRole.
+const (
+	AddAdminFamilyMemberRoleAdmin  AddAdminFamilyMemberRole = "admin"
+	AddAdminFamilyMemberRoleMember AddAdminFamilyMemberRole = "member"
+)
+
+// Valid indicates whether the value is a known member of the AddAdminFamilyMemberRole enum.
+func (e AddAdminFamilyMemberRole) Valid() bool {
+	switch e {
+	case AddAdminFamilyMemberRoleAdmin:
+		return true
+	case AddAdminFamilyMemberRoleMember:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for BabySex.
 const (
 	BabySexBoy  BabySex = "boy"
@@ -1679,16 +1697,74 @@ func (e Readyz503JSONResponseBodyOk) Valid() bool {
 	}
 }
 
+// AddAdminFamilyMember defines model for AddAdminFamilyMember.
+type AddAdminFamilyMember struct {
+	Email openapi_types.Email      `json:"email"`
+	Role  AddAdminFamilyMemberRole `json:"role"`
+}
+
+// AddAdminFamilyMemberRole defines model for AddAdminFamilyMember.Role.
+type AddAdminFamilyMemberRole string
+
 // AdminFamily defines model for AdminFamily.
 type AdminFamily struct {
-	Babies     int        `json:"babies"`
-	CreatedAt  time.Time  `json:"createdAt"`
+	Babies    int       `json:"babies"`
+	CreatedAt time.Time `json:"createdAt"`
+
+	// HasAdmin Whether anyone in the family still holds the admin (or owner) role. False means the family is stranded — deleting an account cascades its membership away without consulting the last-admin guard — and the console badges it so an operator can promote someone.
+	HasAdmin   bool       `json:"hasAdmin"`
 	Id         string     `json:"id"`
 	LastFeedAt *time.Time `json:"lastFeedAt"`
 	Members    int        `json:"members"`
 	Name       string     `json:"name"`
 	Plan       string     `json:"plan"`
 	Slug       string     `json:"slug"`
+}
+
+// AdminFamilyCreated defines model for AdminFamilyCreated.
+type AdminFamilyCreated struct {
+	FirstAdmin *AdminFamilyFirstAdmin `json:"firstAdmin"`
+	Id         string                 `json:"id"`
+
+	// Invite Present only when the family was created without a first admin: the admin-role invite to hand to whoever will run it.
+	Invite *Invite `json:"invite"`
+	Name   string  `json:"name"`
+	Slug   string  `json:"slug"`
+}
+
+// AdminFamilyDetail Metadata only, by design — no log content and no per-type counts. See getAdminFamily's summary.
+type AdminFamilyDetail struct {
+	ApiKeys    []ApiKey            `json:"apiKeys"`
+	Babies     []Baby              `json:"babies"`
+	CreatedAt  time.Time           `json:"createdAt"`
+	Id         string              `json:"id"`
+	Invites    []Invite            `json:"invites"`
+	LastFeedAt *time.Time          `json:"lastFeedAt"`
+	Members    []AdminFamilyMember `json:"members"`
+	Name       string              `json:"name"`
+	Plan       string              `json:"plan"`
+	Slug       string              `json:"slug"`
+}
+
+// AdminFamilyFirstAdmin defines model for AdminFamilyFirstAdmin.
+type AdminFamilyFirstAdmin struct {
+	// AccountCreated True when this call provisioned the account (passwordless — the person claims it by signing in with Google on the same address).
+	AccountCreated bool   `json:"accountCreated"`
+	Email          string `json:"email"`
+	UserId         string `json:"userId"`
+}
+
+// AdminFamilyMember defines model for AdminFamilyMember.
+type AdminFamilyMember struct {
+	Banned   bool      `json:"banned"`
+	Email    string    `json:"email"`
+	JoinedAt time.Time `json:"joinedAt"`
+
+	// MemberId The family-membership row id (NOT the user id).
+	MemberId string `json:"memberId"`
+	Name     string `json:"name"`
+	Role     string `json:"role"`
+	UserId   string `json:"userId"`
 }
 
 // AdminStats Platform totals. Every count is a plain integer — the underlying COUNT(*) is bigint and must be cast (`::int`) in SQL, or the driver hands it back as a string (CLAUDE.md's Postgres notes).
@@ -1854,6 +1930,19 @@ type Contact struct {
 
 // ContactIcon defines model for Contact.Icon.
 type ContactIcon string
+
+// CreateAdminFamily defines model for CreateAdminFamily.
+type CreateAdminFamily struct {
+	// AdminEmail The account to install as the family's first admin. Omit it to get an empty family plus an admin-role invite instead.
+	AdminEmail *openapi_types.Email `json:"adminEmail,omitempty"`
+
+	// AdminName Required when createAccount is true; ignored otherwise.
+	AdminName *string `json:"adminName,omitempty"`
+
+	// CreateAccount Provision a passwordless account for adminEmail when none exists. An explicit flag rather than implicit behaviour so a mistyped address is refused instead of silently creating a user.
+	CreateAccount *bool  `json:"createAccount,omitempty"`
+	Name          string `json:"name"`
+}
 
 // CreateApiKey defines model for CreateApiKey.
 type CreateApiKey struct {
@@ -2747,6 +2836,11 @@ type Unsubscribe struct {
 	Endpoint string `json:"endpoint"`
 }
 
+// UpdateAdminFamily defines model for UpdateAdminFamily.
+type UpdateAdminFamily struct {
+	Name string `json:"name"`
+}
+
 // UpdateBaby Every field is optional; an empty object is a no-op. `sex` may also be sent as `null`, which — like omitting it — leaves the baby's sex unchanged (Go's JSON decoding cannot tell "absent" from "null" for a nullable-optional field without a bespoke wrapper type, and no caller needs to clear sex back to unknown today; see internal/api/babies.go).
 type UpdateBaby struct {
 	BirthDate *time.Time     `json:"birthDate,omitempty"`
@@ -2994,11 +3088,20 @@ type CodePath = string
 // IdPath defines model for idPath.
 type IdPath = string
 
+// KeyIdPath defines model for keyIdPath.
+type KeyIdPath = string
+
 // LimitQuery defines model for limitQuery.
 type LimitQuery = int
 
 // MemberIdPath defines model for memberIdPath.
 type MemberIdPath = string
+
+// ListAdminFamiliesParams defines parameters for ListAdminFamilies.
+type ListAdminFamiliesParams struct {
+	// Query Case-insensitive substring match on name or slug.
+	Query *string `form:"query,omitempty" json:"query,omitempty"`
+}
 
 // ListAdminUsersParams defines parameters for ListAdminUsers.
 type ListAdminUsersParams struct {
@@ -3192,6 +3295,21 @@ type Readyz503JSONResponseBodyOk bool
 
 // CreateAdminAuditNoteJSONRequestBody defines body for CreateAdminAuditNote for application/json ContentType.
 type CreateAdminAuditNoteJSONRequestBody = AuditNote
+
+// CreateAdminFamilyJSONRequestBody defines body for CreateAdminFamily for application/json ContentType.
+type CreateAdminFamilyJSONRequestBody = CreateAdminFamily
+
+// UpdateAdminFamilyJSONRequestBody defines body for UpdateAdminFamily for application/json ContentType.
+type UpdateAdminFamilyJSONRequestBody = UpdateAdminFamily
+
+// CreateAdminFamilyInviteJSONRequestBody defines body for CreateAdminFamilyInvite for application/json ContentType.
+type CreateAdminFamilyInviteJSONRequestBody = CreateInvite
+
+// AddAdminFamilyMemberJSONRequestBody defines body for AddAdminFamilyMember for application/json ContentType.
+type AddAdminFamilyMemberJSONRequestBody = AddAdminFamilyMember
+
+// SetAdminFamilyMemberRoleJSONRequestBody defines body for SetAdminFamilyMemberRole for application/json ContentType.
+type SetAdminFamilyMemberRoleJSONRequestBody = SetMemberRole
 
 // BanAdminUserJSONRequestBody defines body for BanAdminUser for application/json ContentType.
 type BanAdminUserJSONRequestBody = BanUser
