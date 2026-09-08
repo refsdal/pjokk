@@ -25,7 +25,7 @@ test.beforeEach(async ({ context }) => {
 });
 
 test("a kiosk device lands on the care station and logs a diaper with undo", async ({ page, request }) => {
-  await freshFamily(page, request, "kiosk-diaper");
+  await freshFamily(page, request, "kiosk-diaper", /\/kiosk/);
   await expect(page).toHaveURL(/\/kiosk/);
   await expect(page.getByTestId("kiosk-clock")).toBeVisible();
   await expect(page.getByRole("navigation")).toHaveCount(0);
@@ -41,7 +41,7 @@ test("a kiosk device lands on the care station and logs a diaper with undo", asy
 });
 
 test("sleep and wake from the card", async ({ page, request }) => {
-  await freshFamily(page, request, "kiosk-sleep");
+  await freshFamily(page, request, "kiosk-sleep", /\/kiosk/);
   const card = page.getByTestId("kiosk-sleep");
   await card.getByRole("button", { name: "Sleep" }).click();
   await expect(card).toHaveAttribute("data-tone", "live", { timeout: 10_000 });
@@ -51,7 +51,7 @@ test("sleep and wake from the card", async ({ page, request }) => {
 });
 
 test("nursing timer from the card", async ({ page, request }) => {
-  await freshFamily(page, request, "kiosk-breast");
+  await freshFamily(page, request, "kiosk-breast", /\/kiosk/);
   const card = page.getByTestId("kiosk-feed");
   await card.getByRole("button", { name: "Breast L" }).click();
   await expect(card).toHaveAttribute("data-tone", "live", { timeout: 10_000 });
@@ -61,7 +61,7 @@ test("nursing timer from the card", async ({ page, request }) => {
 });
 
 test("/home redirects to /kiosk while the flag is on; the PIN leaves", async ({ page, request }) => {
-  await freshFamily(page, request, "kiosk-leave");
+  await freshFamily(page, request, "kiosk-leave", /\/kiosk/);
   await page.goto("/home");
   await expect(page).toHaveURL(/\/kiosk/);
 
@@ -88,7 +88,7 @@ test("night keeps the cards on the amber palette without totals", async ({ page,
       // storage unavailable
     }
   });
-  await freshFamily(page, request, "kiosk-night");
+  await freshFamily(page, request, "kiosk-night", /\/kiosk/);
   await expect(page.locator("html")).toHaveClass(/kiosk/);
   await expect(page.locator("html")).toHaveClass(/night/);
   await expect(page.getByTestId("kiosk-sleep")).toBeVisible();
