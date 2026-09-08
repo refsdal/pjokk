@@ -9,10 +9,13 @@ export function useTimeline(
   filter: TimelineFilter | null,
   // A search term (issue #52); "" is the plain feed.
   q = "",
+  // Home's Recent pane exists only at the wide tier; a phone must never
+  // fetch a page it will not render.
+  enabled = true,
 ) {
   return useInfiniteQuery({
     queryKey: ["timeline", babyId, filter ?? "all", q],
-    enabled: !!babyId,
+    enabled: !!babyId && enabled,
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) =>
       unwrap<Timeline>(
