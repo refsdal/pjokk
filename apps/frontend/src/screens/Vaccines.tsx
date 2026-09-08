@@ -64,7 +64,7 @@ export function VaccinesScreen() {
     dismissedRows.find((d) => d.slotKey === slotKey)?.id ?? null;
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-safe">
+    <div className="mx-auto max-w-md px-4 pt-safe md:max-w-lg md:px-6">
       <div className="flex items-center gap-2 py-4">
         <button
           type="button"

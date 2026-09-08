@@ -87,7 +87,7 @@ export function ProfileScreen() {
   const busy = updateMe.isPending || upload.isPending || removeAvatar.isPending;
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-safe">
+    <div className="mx-auto max-w-md px-4 pt-safe md:max-w-lg md:px-6">
       <div className="flex items-center gap-2 py-4">
         <Link
           to="/settings"

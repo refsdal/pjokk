@@ -323,7 +323,7 @@ export function TimelineScreen() {
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-safe">
+    <div className="mx-auto max-w-md px-4 pt-safe md:max-w-2xl md:px-6">
       <div className="flex items-center justify-between gap-2 py-4">
         <h1 className="text-2xl font-extrabold text-ink">{t("Timeline")}</h1>
         <div className="flex items-center gap-2">

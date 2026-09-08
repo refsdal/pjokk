@@ -33,7 +33,7 @@ export function SettingsScreen() {
   const isAdmin = myRole === "admin" || myRole === "owner";
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-safe">
+    <div className="mx-auto max-w-md px-4 pt-safe md:max-w-lg md:px-6">
       <h1 className="py-4 text-2xl font-extrabold text-ink">{t("Settings")}</h1>
       <div className="pb-tabbar">
         <FamilySection isAdmin={isAdmin} />
