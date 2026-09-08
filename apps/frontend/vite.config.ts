@@ -58,7 +58,9 @@ export default defineConfig({
         description: "Family baby tracker",
         lang: "en",
         display: "standalone",
-        orientation: "portrait",
+        // "any": a tablet in a landscape stand rotates (spec §7). Phones
+        // follow their own rotation lock regardless.
+        orientation: "any",
         // An installed app opens the app, never the marketing page at "/".
         start_url: "/home",
         // A long-press on the installed icon (Android, desktop; iOS

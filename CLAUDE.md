@@ -267,6 +267,16 @@ separate test deploy).
   URL). Widgets, Live Activities and Watch need a native shell and stay on
   the Phase 7 backlog.
 - `viewport-fit=cover` + `env(safe-area-inset-*)` padding from the start.
+- Responsive shell (spec `docs/superpowers/specs/2026-09-08-responsive-shell-design.md`):
+  three viewport tiers — compact (< 768), regular (`md:`), wide (`xl:`).
+  From `md` the tab bar is a left rail (CSS only, `TabBar.tsx`), sheets
+  are a 420 px right panel (`Sheet.tsx`, the only vaul import), and Home
+  is two panes with the More actions unfolded as row tiles
+  (`HomeActions.tsx`, fed by `moreActions()`); `xl` adds a Recent pane
+  (`HomeRecent.tsx` over `TimelineList.tsx`). `lib/layout.ts` is the JS
+  side of the tier and exists for exactly what CSS cannot do. Desktop is
+  the tablet tier plus F / D / S hotkeys (`lib/hotkeys.ts`) — never
+  density or hover UI.
 - Push subscription logic behind a small interface (web push now; native push
   token later is a second implementation of the same interface).
 
