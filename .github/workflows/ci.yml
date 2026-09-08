@@ -254,6 +254,12 @@ jobs:
       - name: E2E tests
         env:
           E2E_BASE_URL: http://127.0.0.1:3000
+          # admin.spec.ts promotes an account to the system-admin role by
+          # writing the column directly — there is deliberately no endpoint
+          # for it (e2e/helpers.ts's makeSysadmin). This job's Postgres
+          # container is `pg`; scripts/e2e-stack.sh calls its own
+          # `pjokk-e2e-pg`, which is the helper's default.
+          E2E_PG_CONTAINER: pg
           # install.spec.ts asserts the Settings footer shows the version
           # the binary was stamped with (the pinned preview tag, above).
           PJOKK_VERSION: ${{ steps.version.outputs.pinned }}

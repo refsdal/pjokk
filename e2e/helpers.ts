@@ -145,17 +145,30 @@ export async function makeSysadmin(email: string): Promise<void> {
   const { promisify } = await import("node:util");
   const run = promisify(execFile);
   const container = process.env.E2E_PG_CONTAINER ?? "pjokk-e2e-pg";
-  await run("docker", [
-    "exec",
-    container,
-    "psql",
-    "-U",
-    "pjokk",
-    "-d",
-    "pjokk",
-    "-v",
-    "ON_ERROR_STOP=1",
-    "-c",
-    `UPDATE "users" SET "role" = 'admin' WHERE "email" = '${email}'`,
-  ]);
+  try {
+    await run("docker", [
+      "exec",
+      container,
+      "psql",
+      "-U",
+      "pjokk",
+      "-d",
+      "pjokk",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      `UPDATE "users" SET "role" = 'admin' WHERE "email" = '${email}'`,
+    ]);
+  } catch (cause) {
+    // The one thing about this helper that a green local run cannot check:
+    // the container is named by whoever started the stack, and CI does not
+    // use scripts/e2e-stack.sh. Say so rather than surfacing docker's
+    // "No such container", which reads like a broken test.
+    throw new Error(
+      `makeSysadmin could not reach Postgres in container "${container}". ` +
+        "Set E2E_PG_CONTAINER to the name the running stack uses " +
+        "(scripts/e2e-stack.sh: pjokk-e2e-pg; .github/workflows/ci.yml: pg).",
+      { cause },
+    );
+  }
 }
