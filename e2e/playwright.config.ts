@@ -8,6 +8,11 @@ import { defineConfig, devices } from "@playwright/test";
 // Workers = 1 on purpose: the specs share one database and one signup-open
 // app instance; user isolation is per-spec via unique emails, but ordering
 // noise (rate limits, invite counts) is not worth parallelism at this size.
+//
+// Three projects, one browser (Chromium). Pjokk is mobile-first, so every
+// spec runs on the Pixel 7 profile; only layout.spec.ts — the responsive
+// shell — also runs on a landscape tablet (the regular tier) and a desktop
+// window (the wide tier), so the rest of the suite keeps its single run.
 export default defineConfig({
   testDir: ".",
   workers: 1,
@@ -17,6 +22,18 @@ export default defineConfig({
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://127.0.0.1:3300",
     trace: "retain-on-failure",
-    ...devices["Pixel 7"], // Pjokk is mobile-first; Chromium mobile profile (one browser)
   },
+  projects: [
+    { name: "mobile", use: { ...devices["Pixel 7"] } },
+    {
+      name: "tablet",
+      testMatch: /layout\.spec\.ts/,
+      use: { ...devices["Galaxy Tab S4 landscape"] },
+    },
+    {
+      name: "desktop",
+      testMatch: /layout\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } },
+    },
+  ],
 });
