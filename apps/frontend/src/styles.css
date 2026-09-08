@@ -73,6 +73,31 @@
   --color-growth: #efa07e;
 }
 
+/* Kiosk mode (spec §3): the care station's own palette — cool, dark, one
+   mint accent, a different hue from the warm dark mode and from the amber
+   night ramp so the state reads from across the room. Declared after .dark
+   (wins over it) and before .night (loses to it at 22:00). Checked by
+   test/contrast.test.ts like the other three. */
+.kiosk {
+  --color-bg: #131a21;
+  --color-surface: #1b242d;
+  --color-surface-2: #253039;
+  --color-ink: #e8eef2;
+  --color-ink-soft: #b7c3cc;
+  --color-muted: #8a98a3;
+  --color-line: #2b3640;
+  --color-accent: #7fd6b5;
+  --color-accent-soft: #1d3a31;
+  --color-on-accent: #0f1a17;
+  --color-danger: #e08a7e;
+  --color-ok: #6fcf97;
+  --color-caution: #e0a94a;
+  --color-sleep: #a294e6;
+  --color-feed: #7fb3e8;
+  --color-diaper: #56c6b9;
+  --color-growth: #efa07e;
+}
+
 /* Night mode: near-black warm background, single amber ramp, no blue light.
    Toggled by putting .night on <html>. Declared after .dark so it wins when
    both classes are present. */

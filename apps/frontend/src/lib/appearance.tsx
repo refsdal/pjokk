@@ -11,6 +11,7 @@ import {
   setLanguageMode as applyLanguageMode,
   type LanguageMode,
 } from "./i18n";
+import { useKiosk } from "./kiosk";
 import { useNight } from "./night";
 import { STANDALONE_QUERY, systemChromeColor } from "./system-chrome";
 
@@ -34,6 +35,8 @@ function readThemeMode(): ThemeMode {
 }
 
 type AppearanceValue = ReturnType<typeof useNight> & {
+  /** Kiosk mode (lib/kiosk.ts) is on for this device. */
+  kiosk: boolean;
   themeMode: ThemeMode;
   setThemeMode: (m: ThemeMode) => void;
   dark: boolean;
@@ -51,6 +54,7 @@ export function useAppearance(): AppearanceValue {
 
 export function AppearanceProvider({ children }: { children: ReactNode }) {
   const nightValue = useNight();
+  const kiosk = useKiosk();
   const [themeMode, setThemeModeState] = useState<ThemeMode>(readThemeMode);
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false,
@@ -82,16 +86,23 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
 
+  // The care station's palette rides on the same <html> class mechanism;
+  // public/theme-init.js sets it before the first paint, this keeps it true.
+  useEffect(() => {
+    document.documentElement.classList.toggle("kiosk", kiosk);
+  }, [kiosk]);
+
   useEffect(() => {
     const color = systemChromeColor({
       night: nightValue.night,
       dark,
       standalone,
+      kiosk,
     });
     document
       .querySelector('meta[name="theme-color"]')
       ?.setAttribute("content", color);
-  }, [nightValue.night, dark, standalone]);
+  }, [nightValue.night, dark, standalone, kiosk]);
 
   const setThemeMode = useCallback((m: ThemeMode) => {
     try {
@@ -115,6 +126,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     <AppearanceContext.Provider
       value={{
         ...nightValue,
+        kiosk,
         themeMode,
         setThemeMode,
         dark,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   SYSTEM_CHROME_DARK,
+  SYSTEM_CHROME_KIOSK,
   SYSTEM_CHROME_LIGHT,
   SYSTEM_CHROME_NIGHT,
   systemChromeColor,
@@ -93,5 +94,24 @@ describe("systemChromeColor", () => {
         ).toBeLessThan(0.1);
       }
     }
+  });
+
+  it("reports the kiosk background while kiosk is on, unless it is night", () => {
+    expect(
+      systemChromeColor({
+        night: false,
+        dark: false,
+        standalone: false,
+        kiosk: true,
+      }),
+    ).toBe(SYSTEM_CHROME_KIOSK);
+    expect(
+      systemChromeColor({
+        night: true,
+        dark: false,
+        standalone: false,
+        kiosk: true,
+      }),
+    ).toBe(SYSTEM_CHROME_NIGHT);
   });
 });

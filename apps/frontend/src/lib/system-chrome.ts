@@ -36,20 +36,26 @@ export const SYSTEM_CHROME_LIGHT = "#faf9f7";
 export const SYSTEM_CHROME_DARK = "#171512";
 /** --color-bg of the night palette. */
 export const SYSTEM_CHROME_NIGHT = "#171310";
+/** --color-bg of the kiosk palette (the care station, spec §3). */
+export const SYSTEM_CHROME_KIOSK = "#131a21";
 
 export type SystemChromeEnv = {
   night: boolean;
   dark: boolean;
   /** Running as an installed app rather than in a browser tab. */
   standalone: boolean;
+  /** Kiosk mode is on for this device (lib/kiosk.ts). Night still wins. */
+  kiosk?: boolean;
 };
 
 export function systemChromeColor({
   night,
   dark,
   standalone,
+  kiosk = false,
 }: SystemChromeEnv): string {
   if (night) return SYSTEM_CHROME_NIGHT;
+  if (kiosk) return SYSTEM_CHROME_KIOSK;
   return dark || standalone ? SYSTEM_CHROME_DARK : SYSTEM_CHROME_LIGHT;
 }
 

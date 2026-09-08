@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
   SYSTEM_CHROME_DARK,
+  SYSTEM_CHROME_KIOSK,
   SYSTEM_CHROME_LIGHT,
   SYSTEM_CHROME_NIGHT,
 } from "../src/lib/system-chrome";
@@ -29,6 +30,7 @@ type Env = {
   schedule?: string | null;
   systemDark?: boolean;
   standalone?: boolean;
+  kiosk?: boolean;
 };
 
 type Result = { color: string; classes: string[] };
@@ -43,6 +45,7 @@ function runInit(env: Env): Result {
     "pjokk.theme.mode": env.theme ?? null,
     "pjokk.night.mode": env.nightMode ?? "off",
     "pjokk.night.schedule": env.schedule ?? null,
+    "pjokk.kiosk.on": env.kiosk ? "1" : null,
   };
 
   const classes = new Set<string>();
@@ -127,5 +130,18 @@ describe("theme-init.js", () => {
     // not cost it.
     expect(runInit({ theme: "dark" }).classes).toContain("dark");
     expect(runInit({ theme: "light" }).classes).not.toContain("dark");
+  });
+
+  it("applies the kiosk class and colour before the paint", () => {
+    const r = runInit({ theme: "light", kiosk: true });
+    expect(r.classes).toContain("kiosk");
+    expect(r.color).toBe(SYSTEM_CHROME_KIOSK);
+  });
+
+  it("kiosk at night carries both classes and night's colour", () => {
+    const r = runInit({ theme: "light", kiosk: true, nightMode: "on" });
+    expect(r.classes).toContain("kiosk");
+    expect(r.classes).toContain("night");
+    expect(r.color).toBe(SYSTEM_CHROME_NIGHT);
   });
 });
