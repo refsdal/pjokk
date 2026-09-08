@@ -133,12 +133,26 @@ visible beside it. You can read "last feed 120 ml, 2 h 10 m ago" while
 filling in the next one.
 
 - **compact:** today's single column, untouched.
-- **regular:** two panes, `md:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]`.
-  Left: baby header (switcher + account avatar), help card, active-session
-  banners, status cards. Right: the 2×2 log grid, sticky at the top of its
-  column, buttons grown from `h-28` to `h-36` with the icon disc and label
-  scaled to match. Big screens get bigger targets, not more of them.
-- **wide:** three panes, `xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_420px]`:
+- **regular:** two panes, `md:grid-cols-[minmax(0,1fr)_minmax(320px,440px)]`.
+  Left: baby header (switcher + account avatar, exactly as on the phone),
+  help card, active-session banners, status cards. Right: the **action
+  column**, sticky at the top of its column — see "Actions unfolded"
+  below.
+- **Actions unfolded (regular and wide).** The More button disappears
+  above 768 px. Feed, Diaper and Sleep become a row of three big buttons
+  (`h-32`, icon disc and label scaled up from the phone's `h-28` tile).
+  Beneath them, under a quiet uppercase "Log something" label (the More
+  sheet's own title), the eleven More-sheet actions render as **row
+  tiles**: 44 px pill-shaped rows, icon disc left and label right, two
+  across, in the sheet's own order and tints (medicine, bath, note,
+  milestone, measurement, pump, tummy time, walk, play, vaccines, ask for
+  help). Smaller and lighter than the primaries so the hierarchy stays:
+  three big things, then a list. The tile list is built from the SAME
+  data the More sheet uses (`otherKindMeta`, `playKindMeta`, vaccines,
+  help), so a new activity kind appears in both without a second edit.
+  Everything fits a 712 px tablet without scrolling. The phone keeps the
+  More sheet; night mode keeps its three actions.
+- **wide:** three panes, `xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_440px]`:
   status · **Recent** · actions. Recent is the first page of the selected
   baby's timeline (the merged `/api/timeline` query, no filter, no search)
   in the same day-grouped dense rows as the Timeline tab, with tap-to-edit
@@ -206,6 +220,15 @@ that has the old one.
 - Touch target sizes never shrink at any tier.
 - Night mode's palette and its three-action rule.
 - The tab order and information architecture: five tabs, two sheets.
+- The account avatar's home: the baby header's right edge at every tier.
+  The rail stays navigation-only.
+
+### 9. Decisions taken on the mockups (2026-09-08)
+
+Reviewed on the design canvas (eight frames built from the app's own
+tokens): **Option A** ("left informs, right acts") over Option B
+("bottom acts"), **row tiles** over the sheet's 96 px tiles for the
+unfolded actions at both tiers, and the avatar stays in the baby header.
 
 ## Testing
 
@@ -256,6 +279,8 @@ Safari PWA, whose `100dvh` and safe-area handling differ from Chromium.
 - Tiers by viewport width, never user-agent.
 - Bottom sheet → 420 px right panel at `md:`, one component, direction
   latched at open.
+- No More button above 768 px: three primaries + row tiles, one data
+  source with the More sheet.
 - "Left informs, right acts" for Home at regular and wide.
 - Hotkeys are plain single keys on Home only, not tier-gated.
 - No density, hover or master–detail on desktop: the desktop tier is the
