@@ -92,6 +92,9 @@ export async function uiCreateFamily(
   page: Page,
   family: string,
   baby: string,
+  // Where the app lands once the baby exists. /home, unless the device is a
+  // kiosk (e2e/kiosk.spec.ts), which redirects on to /kiosk at once.
+  landing: RegExp = /\/home/,
 ): Promise<void> {
   await expect(page.getByText("Set up your family")).toBeVisible();
   await page.getByPlaceholder(/Family name/).fill(family);
@@ -102,19 +105,21 @@ export async function uiCreateFamily(
   await page.getByLabel("Birth date").fill("2026-06-15");
   await page.getByRole("button", { name: "Add baby" }).click();
 
-  await expect(page).toHaveURL(/\/home/, { timeout: 10_000 });
+  await expect(page).toHaveURL(landing, { timeout: 10_000 });
 }
 
-/** Full fixture: fresh account signed in with a family and a baby, on Home. */
+/** Full fixture: fresh account signed in with a family and a baby, on Home
+ *  (or wherever `landing` says a kiosk device ends up). */
 export async function freshFamily(
   page: Page,
   request: APIRequestContext,
   tag: string,
+  landing: RegExp = /\/home/,
 ): Promise<{ email: string }> {
   const email = freshEmail(tag);
   await apiSignup(request, email);
   await apiSignIn(page, email);
   await page.goto("/");
-  await uiCreateFamily(page, `The ${tag} family`, `Baby ${tag}`);
+  await uiCreateFamily(page, `The ${tag} family`, `Baby ${tag}`, landing);
   return { email };
 }
