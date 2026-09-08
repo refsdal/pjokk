@@ -277,6 +277,15 @@ separate test deploy).
   side of the tier and exists for exactly what CSS cannot do. Desktop is
   the tablet tier plus F / D / S hotkeys (`lib/hotkeys.ts`) — never
   density or hover UI.
+- Kiosk mode (spec `docs/superpowers/specs/2026-09-08-kiosk-mode-design.md`):
+  a per-device switch (`lib/kiosk.ts`, localStorage + a local PIN hash)
+  that routes every app screen to `/kiosk`, the care station
+  (`screens/Kiosk.tsx`, `components/kiosk/*`): its own `.kiosk` palette
+  (night still wins), three cards that log with one tap and an Undo
+  through the ordinary mutations, a medicine strip, wake lock and idle dim
+  (`lib/kiosk-screen.ts`). Pure view logic in `lib/kiosk-ui.ts`. No server
+  change; the kiosk logs as the signed-in user until the device
+  credential + caretaker selector (spec 3) ships.
 - Push subscription logic behind a small interface (web push now; native push
   token later is a second implementation of the same interface).
 

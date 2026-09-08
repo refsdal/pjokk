@@ -2244,3 +2244,37 @@ a photographed clinic card can carry a fødselsnummer) and avatars. A
 - **Manifest `orientation: "any"`.** It was `portrait`, which locked an
   installed tablet app in a landscape stand. An already-installed Android
   app only sees this after Chrome regenerates the WebAPK.
+
+## 2026-09-08 — kiosk mode: a care station, not a bigger Home
+
+- **Its own palette.** Round one of the mockups scaled Home up and looked
+  like Home; the state was invisible. The kiosk got a cool slate palette
+  with a mint accent — a different hue from the warm dark mode and from
+  the amber night ramp — so "this is the room's screen" reads from across
+  the room. Night still wins at 22:00: `.kiosk` sits between `.dark` and
+  `.night` in the stylesheet.
+- **One tap and an Undo, no sheet.** Sprout Track's nursery mode logs from
+  buttons on the card; that is the genuinely different idea and the
+  ergonomic win. Bottle at the last amount, Breast L/R, Wet/Dirty/Both,
+  Sleep at the last location. Instant logs get a six-second Undo that
+  deletes the row; timers do not (a mis-tap is corrected by tapping
+  again).
+- **Elapsed time first, clock second.** Sprout makes the clock the hero;
+  Pjokk's reason to exist is "how long since", so the 48 px number on each
+  card is the elapsed time and the clock is the second-largest thing.
+  Compact "1 h 32 min", not Home's "1 hour 32 minutes" — the card has no
+  room for the words.
+- **Amber from the reminder interval.** The one thing Sprout Track had and
+  Pjokk lacked: a card that says "too long". No new setting — the
+  signed-in user's own `since_last` reminder is the threshold, exactly as
+  the push nudge uses it.
+- **A local PIN until spec 3.** Leaving kiosk asks for a 4–6 digit PIN
+  stored on the device as a domain-separated SHA-256. A convenience lock
+  against toddlers and guests, not a security boundary; the device
+  credential in spec 3 replaces it.
+- **No scenes, sprites, photos or hue sliders.** Sprout's nursery mode has
+  four animated scenes and a settings drawer. Calm, not cute: one palette,
+  one fixed idle dim.
+- **No server change.** Every card is Home's data through the existing
+  offline-resumable mutations; the kiosk logs as the signed-in user and
+  Settings says so.

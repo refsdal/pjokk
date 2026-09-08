@@ -27,7 +27,7 @@ export default defineConfig({
     { name: "mobile", use: { ...devices["Pixel 7"] } },
     {
       name: "tablet",
-      testMatch: /layout\.spec\.ts/,
+      testMatch: /(layout|kiosk)\.spec\.ts/,
       use: { ...devices["Galaxy Tab S4 landscape"] },
     },
     {

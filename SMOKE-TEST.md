@@ -153,6 +153,13 @@ replica depending on it starts.
     closes. Rotate an installed Android tablet app: it follows (a
     reinstall may be needed for the WebAPK to pick up the manifest). On
     an iPad Safari PWA check the panel's full height and the safe areas.
+24. **Kiosk mode.** Settings → Kiosk mode → a PIN → Start kiosk: the tablet
+    shows the slate care station with the clock, three cards and, when a
+    medicine has a running interval, the strip. Tap Wet: the card updates
+    and an Undo toast appears; Undo removes it. Leave it for an hour: the
+    screen stays on, dims after two minutes, the first tap only wakes it,
+    and it turns amber at 22:00. Hold the baby's name: the PIN pad; three
+    wrong PINs lock the name for 30 s; the right one lands on Home.
 
 ## 7. Health and rollout checks
 
