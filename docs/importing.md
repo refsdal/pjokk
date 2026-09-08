@@ -81,15 +81,49 @@ tablets → dose; the next-dose interval and tummy-time milestone become
 notes. Tags are dropped and counted; BMI rows are skipped (derived);
 pictures and note images are not in Baby Buddy's CSV.
 
-## Huckleberry and Nara
+## Huckleberry
 
-Both apps export CSV (Huckleberry: from the child profile, delivered as an
-emailed link valid 24 h; Nara: Activity → child avatar → Export Data). Their
-column names are not documented anywhere public, and a guessed mapping
-would silently import feeds as diapers, so Pjokk ships **no reader for
-them yet**. If you have an export, please attach a few anonymised rows to
-the tracking issue and a reader will be written against the real file —
-the Baby Buddy reader is the template, about 250 lines.
+Source: one CSV per child. In the app, open the child profile, scroll to
+**Export tracking data as CSV**; the link arrives by email and lasts 24 h
+([Huckleberry's help article](https://huckleberry.zendesk.com/hc/en-us/articles/5055945148819)).
+
+Huckleberry does not document the file. The reader was written against a
+real export its owner published ([archiewood/baby-tracker](https://github.com/archiewood/baby-tracker/blob/main/sources/huckleberry/events.csv),
+about 3 600 rows) and cross-checked against four independent open-source
+parsers of the same format ([richardqhill/huckleberry-to-posthog](https://github.com/richardqhill/huckleberry-to-posthog),
+[matthewsmorrison/baby-tracker](https://github.com/matthewsmorrison/baby-tracker),
+[murphb52/BabyTracker](https://github.com/murphb52/BabyTracker),
+[anaandresarroyo/baby-tracker](https://github.com/anaandresarroyo/baby-tracker)).
+A row shape none of those show is skipped and counted, never guessed.
+
+Timestamps are the phone's local time with no offset, so say the zone:
+
+```sh
+node scripts/import-huckleberry.mjs nora.csv --inspect
+node scripts/import-huckleberry.mjs nora.csv \
+  --resolve-by-email you@example.com --create-baby "Nora" --birth-date 2026-06-15 \
+  --tz Europe/Oslo --out pjokk-import.sql
+```
+
+Mapping: bottle feeds (ml or oz) with Formula / Breast Milk / Mixed as the
+contents; nursing with per-side minutes; solids with the food list;
+diapers as pee → wet, poo → dirty, both → both, with the colour and the
+sizes ("pee:large") kept in notes; growth rows become weight, length and
+head measurements (kg / lb, cm / in / decimal feet); pumps sum both sides
+and note the split; meds keep the name and the dose; tummy time → play;
+baths. Sleep rows carry no nap/night flag in Huckleberry and import
+untyped; a sleep's "Start Location" text becomes the sleep location. The
+export has no row ids, so Pjokk ids are a hash of each row's content —
+re-exporting the same data gives the same ids.
+
+## Nara
+
+Nara exports CSV from Activity → child avatar → Export Data, but the column
+names are not documented anywhere public and no open-source project reads
+the file, so Pjokk ships **no Nara reader yet**. If you have an export,
+please attach a header row and a few anonymised lines to the tracking
+issue and a reader will be written against the real file — the Huckleberry
+and Baby Buddy readers are the templates.
 
 ## Baby Daybook and Napper
 

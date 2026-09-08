@@ -2193,3 +2193,22 @@ a photographed clinic card can carry a fødselsnummer) and avatars. A
 - **Still a CLI that writes SQL, not an upload.** Reading the file before
   applying it is the safety net, and an admin action does not need a
   button.
+
+## 2026-09-08 — a Huckleberry reader from a public export, still no Nara (#67)
+
+- **"Real export" can mean a public one.** The rule from #54 stands — no
+  reader without a real file — and a family's own export is not the only
+  kind of real file: a Huckleberry owner published theirs (about 3 600
+  rows), and four independent parsers of the same format agree with it on
+  every shape (eight columns, local time with no offset, the diaper colour
+  riding in the Duration column, decimal feet in the growth rows, the
+  per-side nursing minutes). The reader cites those sources in its header
+  and imports that whole file with nothing skipped. The family's rows were
+  not copied into the repo; the fixture is a distilled twenty-one-row
+  file with the same shapes.
+- **Row ids are a content hash.** Huckleberry's export has no ids, so a
+  deterministic id has to come from the row itself; a re-export of the
+  same data gives the same ids and stays idempotent.
+- **Nara stays unread.** No public export, no public parser; the tools that
+  import it keep the format to themselves. The issue narrows to Nara and
+  waits for a header row.
