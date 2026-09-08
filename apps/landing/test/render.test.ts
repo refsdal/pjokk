@@ -163,6 +163,82 @@ describe("renderLandingPage", () => {
   });
 });
 
+describe("renderLandingPage — the 2026-09 refresh", () => {
+  const render = (lang: "en" | "nb") =>
+    renderLandingPage({
+      lang,
+      cta: {
+        label: lang === "en" ? "Sign in" : "Logg inn",
+        href: `${APP_URL}/login`,
+      },
+      origin: SITE_URL,
+      noindex: false,
+    });
+
+  it("offers self-hosting as the second door, since signup is invite-only", () => {
+    for (const lang of ["en", "nb"] as const) {
+      const html = render(lang);
+      const c = LANDING_COPY[lang];
+      expect(html).toContain(
+        `<a class="btn btn--ghost" href="https://github.com/refsdal/pjokk">${c.ctaSelfHost}</a>`,
+      );
+      // The hosted app's primary button stays first in the hero.
+      expect(html.indexOf(`href="${APP_URL}/login"`)).toBeLessThan(
+        html.indexOf('href="https://github.com/refsdal/pjokk"'),
+      );
+    }
+  });
+
+  it("shows the nap-window guide inside the hero mock-up", () => {
+    for (const lang of ["en", "nb"] as const) {
+      expect(render(lang)).toContain(LANDING_COPY[lang].demo.napWindow);
+    }
+  });
+
+  it("renders the eight grows-with-you tiles in the page's own language", () => {
+    for (const lang of ["en", "nb"] as const) {
+      const html = render(lang);
+      const c = LANDING_COPY[lang];
+      expect(c.grow).toHaveLength(8);
+      expect(html).toContain(`<h2>${c.growTitle}</h2>`);
+      expect(html.match(/class="tile"/g)).toHaveLength(8);
+      for (const tile of c.grow) {
+        expect(html).toContain(`<h3>${tile.title}</h3>`);
+        expect(html).toContain(tile.body);
+      }
+    }
+  });
+
+  it("renders the care station section with a static mock-up", () => {
+    for (const lang of ["en", "nb"] as const) {
+      const html = render(lang);
+      const c = LANDING_COPY[lang];
+      expect(html).toContain(`<h2>${c.stationTitle}</h2>`);
+      expect(html).toContain(c.stationBody);
+      expect(html).toContain(`aria-label="${c.stationAlt}"`);
+      expect(html.match(/class="station-card"/g)).toHaveLength(3);
+    }
+  });
+
+  it("says the app is open source and importable inside the privacy band", () => {
+    for (const lang of ["en", "nb"] as const) {
+      const html = render(lang);
+      const c = LANDING_COPY[lang];
+      expect(html).toContain(c.privacyOpenSource);
+      for (const item of c.tech) expect(html).toContain(item);
+    }
+  });
+
+  it("keeps the invite line honest about invite-only signup", () => {
+    for (const lang of ["en", "nb"] as const) {
+      expect(render(lang)).toContain(LANDING_COPY[lang].inviteLine);
+    }
+    // No invented contact address: the only mailbox that exists is
+    // personvern@, and it is not an invite desk.
+    expect(render("en")).not.toContain("hei@pjokk.no");
+  });
+});
+
 describe("renderLegalPage", () => {
   it("scopes the footer's legal links and the home link to the page's own language", () => {
     const en = renderLegalPage({
