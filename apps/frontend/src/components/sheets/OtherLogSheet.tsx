@@ -71,6 +71,60 @@ export const otherKindMeta: Record<
 
 // The "More" picker: the extra activity types, vaccines, and asking another
 // caretaker for a hand — one tap each.
+export type MoreAction = {
+  key: string;
+  label: string;
+  icon: TablerIcon;
+  tint: string;
+  pick: () => void;
+};
+
+export type MoreHandlers = {
+  onPick: (kind: OtherKind) => void;
+  onPickPlay: (type: PlayType) => void;
+  onPickHelp: () => void;
+  onVaccines: () => void;
+};
+
+// The "More" actions, in display order: the six generic kinds, the three
+// play kinds (timed sessions with their own endpoints, so they sit beside
+// the generic kinds rather than inside otherKindMeta), the vaccines
+// screen, and asking another caretaker for help. ONE list, rendered by the
+// phone's More sheet below and by Home's unfolded tiles at md and up
+// (components/HomeActions.tsx) — test/more-actions.test.ts pins the order.
+export function moreActions(h: MoreHandlers): MoreAction[] {
+  return [
+    ...(Object.keys(otherKindMeta) as OtherKind[]).map((kind) => ({
+      key: kind,
+      ...otherKindMeta[kind],
+      pick: () => h.onPick(kind),
+    })),
+    ...playTypeOrder.map((type) => ({
+      key: `play:${type}`,
+      ...playKindMeta[type],
+      pick: () => h.onPickPlay(type),
+    })),
+    // Vaccines open a screen, not a sheet — the programme schedule needs
+    // more room than a tray.
+    {
+      key: "vaccines",
+      label: "Vaccines",
+      icon: IconVaccine,
+      tint: "text-growth",
+      pick: h.onVaccines,
+    },
+    // Not a log at all — a ping to another caretaker. Lives here because
+    // More is the one place every extra action is reachable from.
+    {
+      key: "help",
+      label: "Ask for help",
+      icon: IconHandStop,
+      tint: "text-danger",
+      pick: h.onPickHelp,
+    },
+  ];
+}
+
 export function MoreSheet({
   open,
   onOpenChange,
@@ -86,47 +140,15 @@ export function MoreSheet({
 }) {
   const navigate = useNavigate();
 
-  // Play kinds are timed sessions with their own endpoints, so they sit
-  // beside the generic kinds here rather than inside otherKindMeta.
-  const tiles: {
-    key: string;
-    label: string;
-    icon: TablerIcon;
-    tint: string;
-    pick: () => void;
-  }[] = [
-    ...(Object.keys(otherKindMeta) as OtherKind[]).map((kind) => ({
-      key: kind,
-      ...otherKindMeta[kind],
-      pick: () => onPick(kind),
-    })),
-    ...playTypeOrder.map((type) => ({
-      key: `play:${type}`,
-      ...playKindMeta[type],
-      pick: () => onPickPlay(type),
-    })),
-    // Vaccines open a screen, not a sheet — the programme schedule needs
-    // more room than a tray.
-    {
-      key: "vaccines",
-      label: "Vaccines",
-      icon: IconVaccine,
-      tint: "text-growth",
-      pick: () => {
-        onOpenChange(false);
-        void navigate({ to: "/vaccines" });
-      },
+  const tiles = moreActions({
+    onPick,
+    onPickPlay,
+    onPickHelp,
+    onVaccines: () => {
+      onOpenChange(false);
+      void navigate({ to: "/vaccines" });
     },
-    // Not a log at all — a ping to another caretaker. Lives here because
-    // More is the one place every extra action is reachable from.
-    {
-      key: "help",
-      label: "Ask for help",
-      icon: IconHandStop,
-      tint: "text-danger",
-      pick: onPickHelp,
-    },
-  ];
+  });
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange} title={t("Log something")}>
