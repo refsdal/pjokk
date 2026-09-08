@@ -41,4 +41,23 @@ describe("responsive shell guards", () => {
       /@media \(min-width: 768px\)\s*\{\s*\.pb-tabbar\s*\{\s*padding-bottom: 1\.5rem;\s*\}\s*\}/,
     );
   });
+
+  it("the kiosk never imports the app's sheets, nav or hotkeys", () => {
+    const files = [
+      ...walk(join(SRC, "components", "kiosk")),
+      join(SRC, "screens", "Kiosk.tsx"),
+    ];
+    expect(files.length).toBeGreaterThan(1);
+    for (const p of files) {
+      const src = readFileSync(p, "utf8");
+      for (const banned of [
+        "components/Sheet",
+        "components/TabBar",
+        "components/HomeActions",
+        "lib/hotkeys",
+      ]) {
+        expect(src, `${p} imports ${banned}`).not.toContain(banned);
+      }
+    }
+  });
 });

@@ -190,6 +190,15 @@ const adminAuditRoute = createRoute({
 // Exported for apps/frontend/test/router.test.ts, which finds rootIndexRoute
 // by id and calls its beforeLoad directly to pin the "/" redirect — this
 // suite has no DOM, and TanStack Router's client load path needs one.
+// The care station (spec: kiosk mode). A sibling of the authed shell, not
+// a child: it shares the guards through AuthGate but has no tab bar, no
+// rail and no width cap.
+const kioskRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/kiosk",
+  component: lazyRouteComponent(() => import("@/screens/Kiosk"), "KioskRoute"),
+});
+
 export const routeTree = rootRoute.addChildren([
   rootIndexRoute,
   appRoute.addChildren([
@@ -204,6 +213,7 @@ export const routeTree = rootRoute.addChildren([
   loginRoute,
   joinRoute,
   welcomeRoute,
+  kioskRoute,
   adminRoute.addChildren([
     adminOverviewRoute,
     adminFamiliesRoute,

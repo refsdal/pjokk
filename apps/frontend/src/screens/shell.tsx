@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { type ReactNode, useEffect } from "react";
 import { Navigate, Outlet } from "@tanstack/react-router";
 import { TabBar } from "@/components/TabBar";
 import { client, unwrap } from "@/lib/api";
@@ -13,6 +13,7 @@ import {
   writeFence,
 } from "@/lib/family-fence";
 import { t } from "@/lib/i18n";
+import { useKiosk } from "@/lib/kiosk";
 import { queryClient, resetCache } from "@/lib/query";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import { toast } from "@/lib/toast";
@@ -38,7 +39,10 @@ function AppBadge() {
   return null;
 }
 
-export function AppShell() {
+// Session + family guard shared by the app shell and the kiosk (spec §2).
+// Renders `children` only once the session is known and the family is
+// settled; otherwise the same blank / login / welcome handling as before.
+export function AuthGate({ children }: { children: ReactNode }) {
   const { data: session, isPending } = useSession();
   const me = useMe();
 
@@ -89,8 +93,26 @@ export function AppShell() {
   if (!me.data?.familyId) {
     return <Navigate to="/welcome" />;
   }
+  return <>{children}</>;
+}
 
-  const { impersonatedBy, name } = me.data;
+export function AppShell() {
+  return (
+    <AuthGate>
+      <AppChrome />
+    </AuthGate>
+  );
+}
+
+// While kiosk is on, the device IS the kiosk: every app route lands on the
+// care station (a reload, a manifest shortcut, a push action). /login,
+// /join, /welcome and /admin are outside this shell and untouched.
+function AppChrome() {
+  const me = useMe();
+  const kiosk = useKiosk();
+  if (kiosk) return <Navigate to="/kiosk" />;
+
+  const { impersonatedBy, name } = me.data ?? {};
 
   // The impersonated session IS the target user's, so ending it is a
   // session-level route rather than a system-admin one — and the cache has to

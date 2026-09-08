@@ -1,5 +1,4 @@
 import type {
-  FeedContents,
   FeedLog,
   FeedTimer,
   MedicineCatalogueEntry,
@@ -153,7 +152,7 @@ export function feedCardView(
 // The quick Bottle action logs the last bottle again (last-value prefill).
 export function lastBottle(feeds: FeedLog[]): {
   amountMl: number;
-  contents: FeedContents | null;
+  contents: FeedLog["contents"];
 } {
   const last = feeds.find((f) => f.type === "bottle");
   return { amountMl: last?.amountMl ?? 120, contents: last?.contents ?? null };

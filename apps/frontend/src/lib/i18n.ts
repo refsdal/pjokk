@@ -642,6 +642,7 @@ const nb: Record<string, string> = {
   logged: "logget",
   "Sleep started": "Søvn startet",
   "Wrong PIN": "Feil PIN",
+  "Hold to leave kiosk mode": "Hold inne navnet for å forlate kioskmodus",
   Main: "Hoved",
   Close: "Lukk",
   Families: "Familier",
