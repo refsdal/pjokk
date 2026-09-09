@@ -7,7 +7,7 @@ import {
 import { useState } from "react";
 import type { VaccineLog } from "@pjokk/shared";
 import { DeleteButton } from "@/components/DeleteButton";
-import { Sheet } from "@/components/Sheet";
+import { Sheet, useSheetReset } from "@/components/Sheet";
 import { ChipGroup } from "@/components/Chips";
 import { TimeField } from "@/components/TimeField";
 import { Button } from "@/components/ui/button";
@@ -55,18 +55,13 @@ export function VaccineSheet({
   const [dose, setDose] = useState(1);
   const [time, setTime] = useState<Date | null>(null);
   const [notes, setNotes] = useState("");
-  const [instance, setInstance] = useState(0);
-  const [wasOpen, setWasOpen] = useState(false);
 
-  if (open && !wasOpen) {
-    setWasOpen(true);
-    setInstance((i) => i + 1);
+  const instance = useSheetReset(open, () => {
     setName(edit?.name ?? slot?.name ?? "");
     setDose(edit?.doseNumber ?? slot?.dose ?? 1);
     setTime(edit ? new Date(edit.time) : null);
     setNotes(edit?.notes ?? "");
-  }
-  if (!open && wasOpen) setWasOpen(false);
+  });
 
   // Prefer the slot key (exact), fall back to matching the typed name, so a
   // hand-written "MMR" still finds FHI's page.

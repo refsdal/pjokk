@@ -19,6 +19,42 @@ export function directionFor(tier: Tier): SheetDirection {
   return tier === "compact" ? "bottom" : "right";
 }
 
+// useSheetReset seeds a sheet's fields on the render in which it opens.
+//
+// Every log sheet is one component for create AND edit (CLAUDE.md), so its
+// fields have to be re-seeded each time it opens — from the entry being
+// edited, or from the last entry of that kind for the last-value prefill.
+// Doing that in an effect would mount the children with the previous open's
+// values and then visibly correct them, so `seed` runs DURING the render
+// that sees `open` flip, which is React's documented "adjusting state when
+// props change": the setters it calls are the caller's own, and React
+// re-runs the component before committing anything to the DOM.
+//
+// The bookkeeping this replaces — a wasOpen flag, its two guard blocks, and
+// an instance counter — was written out in all twelve sheets identically.
+//
+// The returned counter increments on each open and exists for children that
+// hold their own uncontrolled state and must therefore be remounted rather
+// than re-seeded: `<TimeField key={instance} …>`. Sheets with no such child
+// ignore it.
+//
+// Reset by unmounting the body instead was considered and rejected: vaul
+// animates the sheet out after `open` goes false, and an unmounted body
+// animates out empty.
+export function useSheetReset(open: boolean, seed: () => void): number {
+  const [wasOpen, setWasOpen] = useState(false);
+  const [instance, setInstance] = useState(0);
+  if (open && !wasOpen) {
+    setWasOpen(true);
+    setInstance((i) => i + 1);
+    seed();
+  }
+  if (!open && wasOpen) {
+    setWasOpen(false);
+  }
+  return instance;
+}
+
 export function Sheet({
   open,
   onOpenChange,

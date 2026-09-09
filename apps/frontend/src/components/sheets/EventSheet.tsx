@@ -7,7 +7,7 @@ import type {
 import { Avatar } from "@/components/Avatar";
 import { ChipGroup, MultiChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
-import { Sheet } from "@/components/Sheet";
+import { Sheet, useSheetReset } from "@/components/Sheet";
 import { Stepper } from "@/components/Stepper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,10 +71,8 @@ export function EventSheet({
   // the date shown is the series start, never the tapped occurrence.
   const [recurrence, setRecurrence] = useState<CalendarRecurrence>("none");
   const [until, setUntil] = useState("");
-  const [wasOpen, setWasOpen] = useState(false);
 
-  if (open && !wasOpen) {
-    setWasOpen(true);
+  useSheetReset(open, () => {
     if (edit) {
       const start = new Date(edit.seriesStart);
       setRecurrence(edit.recurrence);
@@ -117,8 +115,7 @@ export function EventSheet({
       setRecurrence("none");
       setUntil("");
     }
-  }
-  if (!open && wasOpen) setWasOpen(false);
+  });
 
   const createEvent = useCreateCalendarEvent();
   const updateEvent = useUpdateCalendarEvent();

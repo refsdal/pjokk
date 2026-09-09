@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { DiaperLog } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
-import { Sheet } from "@/components/Sheet";
+import { Sheet, useSheetReset } from "@/components/Sheet";
 import { TimeField } from "@/components/TimeField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,12 +43,8 @@ export function DiaperSheet({
   const [showDetail, setShowDetail] = useState(false);
   const [time, setTime] = useState<Date | null>(null);
   const [notes, setNotes] = useState("");
-  const [instance, setInstance] = useState(0);
-  const [wasOpen, setWasOpen] = useState(false);
 
-  if (open && !wasOpen) {
-    setWasOpen(true);
-    setInstance((i) => i + 1);
+  const instance = useSheetReset(open, () => {
     setNotes(edit?.notes ?? "");
     if (edit) {
       setType(edit.type);
@@ -63,10 +59,7 @@ export function DiaperSheet({
       setShowDetail(false);
       setTime(null);
     }
-  }
-  if (!open && wasOpen) {
-    setWasOpen(false);
-  }
+  });
 
   const logDiaper = useLogDiaper();
   const updateDiaper = useUpdateDiaper();

@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { Baby } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
-import { Sheet } from "@/components/Sheet";
+import { Sheet, useSheetReset } from "@/components/Sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { client, unwrap } from "@/lib/api";
@@ -28,15 +28,12 @@ export function BabySheet({
   const [name, setName] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [sex, setSex] = useState<"girl" | "boy" | null>(null);
-  const [wasOpen, setWasOpen] = useState(false);
 
-  if (open && !wasOpen) {
-    setWasOpen(true);
+  useSheetReset(open, () => {
     setName(baby?.name ?? "");
     setBirthDate(baby ? toLocalDateInput(new Date(baby.birthDate)) : "");
     setSex(baby?.sex ?? null);
-  }
-  if (!open && wasOpen) setWasOpen(false);
+  });
 
   const done = () => {
     void queryClient.invalidateQueries({ queryKey: ["babies"] });

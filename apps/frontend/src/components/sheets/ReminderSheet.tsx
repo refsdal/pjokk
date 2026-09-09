@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Baby } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
-import { Sheet } from "@/components/Sheet";
+import { Sheet, useSheetReset } from "@/components/Sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -47,10 +47,8 @@ export function ReminderSheet({
   const [quiet, setQuiet] = useState(true);
   const [babyId, setBabyId] = useState<string | null>(null);
   const [label, setLabel] = useState("");
-  const [wasOpen, setWasOpen] = useState(false);
 
-  if (open && !wasOpen) {
-    setWasOpen(true);
+  useSheetReset(open, () => {
     setKind("feed");
     setMode("since_last");
     setIntervalMin(180);
@@ -59,8 +57,7 @@ export function ReminderSheet({
     setQuiet(true);
     setBabyId(null);
     setLabel("");
-  }
-  if (!open && wasOpen) setWasOpen(false);
+  });
 
   const create = useCreateReminder();
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChipGroup } from "@/components/Chips";
-import { Sheet } from "@/components/Sheet";
+import { Sheet, useSheetReset } from "@/components/Sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCreateHelpRequest, useMe, useMembers } from "@/lib/data";
@@ -30,14 +30,11 @@ export function HelpSheet({
   const create = useCreateHelpRequest();
   const [picked, setPicked] = useState<string | null>(null);
   const [message, setMessage] = useState("");
-  const [wasOpen, setWasOpen] = useState(false);
 
-  if (open && !wasOpen) {
-    setWasOpen(true);
+  useSheetReset(open, () => {
     setPicked(null);
     setMessage("");
-  }
-  if (!open && wasOpen) setWasOpen(false);
+  });
 
   const familyId = me.data?.familyId ?? "";
   const others = (members.data ?? []).filter(
