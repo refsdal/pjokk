@@ -86,8 +86,8 @@ import (
 // TypeScript apps/api this package replaced).
 //
 // Storage, RateLimit and Push are minimal ports declared in their own
-// packages ahead of their real implementations (Tasks 6/7) so this struct
-// does not have to change shape when those land.
+// packages, so a driver swap (s3 vs fs, real push vs no-op) changes the
+// composition root and nothing here.
 type Deps struct {
 	Pool *pgxpool.Pool
 	Q    *dbgen.Queries
@@ -131,7 +131,7 @@ type Deps struct {
 	// ExtraRoutes, when non-nil, is called while building the mux, after the
 	// standard routes are registered and before the /api/ catch-all. protect
 	// wraps a handler in the SAME Session + RequireFamily chain every real
-	// family-scoped route will use from Task 9 on, so a route registered
+	// family-scoped route uses, so a route registered
 	// through it is indistinguishable — from the middleware's point of
 	// view — from a shipped one.
 	//
@@ -698,10 +698,11 @@ func skipSpecValidation(r *http.Request) bool {
 // request","code":"VALIDATION"} on failure (REF §A1 item 15).
 //
 // A request whose path/method matches NO spec operation at all is not a
-// validation failure — most of /api/* is not in the spec yet (later tasks
-// add it operation by operation) — so it is passed through to next
-// untouched, which ends in the JSON 404 below. Only a request that DID match
-// a spec operation but failed parameter/body validation gets the 400.
+// validation failure — the hand-routed streaming endpoints live outside the
+// spec on purpose (see skipSpecValidation), and an unrecognised path is a
+// 404, not a 400 — so it is passed through to next untouched, which ends in
+// the JSON 404 below. Only a request that DID match a spec operation but
+// failed parameter/body validation gets the 400.
 func withSpecValidation(spec *openapi3.T, next http.Handler) http.Handler {
 	validate := nethttpmiddleware.OapiRequestValidatorWithOptions(spec, &nethttpmiddleware.Options{
 		// The spec's `servers: [{url: /}]` entry is relative (no host) so
@@ -749,10 +750,10 @@ func requireSession(d Deps, w http.ResponseWriter, r *http.Request) bool {
 }
 
 // NewHandler builds the /api/* handler: the auth handler (behind the
-// credential sign-in rate limit), the session-gated docs routes,
-// spec-validated routes for everything else in the spec (currently just
-// /healthz and /readyz, mounted here too since the generated router owns
-// them), and a JSON 404 for anything unmatched.
+// credential sign-in rate limit), the session-gated docs routes, the
+// hand-routed streaming endpoints, every operation in the spec (including
+// /healthz and /readyz, which sit outside /api/ but are mounted here since
+// the generated router owns them), and a JSON 404 for anything unmatched.
 //
 // The whole thing is wrapped in middleware.TrustedProxy — see the comment at
 // the return statement for why that wrapper has to be outermost.
@@ -847,10 +848,10 @@ func NewHandler(d Deps) http.Handler {
 	mux.Handle("/api/", withSpecValidation(spec, http.HandlerFunc(handleAPINotFound)))
 
 	// Registers every generated operation on mux: GET /healthz and GET
-	// /readyz (top-level, outside /api/, per REF §A1) plus, from Task 9
-	// on, every /api/ operation in the spec. See this package's doc
-	// comment for the two-layer wrapping below (spec validation, then
-	// auth) and why each lives at the generated-code layer it does.
+	// /readyz (top-level, outside /api/, per REF §A1) plus every /api/
+	// operation in the spec. See this package's doc comment for the
+	// two-layer wrapping below (spec validation, then auth) and why each
+	// lives at the generated-code layer it does.
 	//
 	// NewStrictHandlerWithOptions (not the plain NewStrictHandler) so both
 	// error paths the generated strict-server machinery can hit answer

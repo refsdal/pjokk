@@ -28,12 +28,11 @@ import (
 // The generated strict-server request type cannot represent this: Go's
 // encoding/json collapses "key omitted" and "key sent as null" to the same
 // nil pointer, so a struct-typed Body can only ever mean "set" or "leave",
-// never "clear". This is exactly the babies.go UpdateBaby `sex` field
-// simplification Task 9 documented and deliberately left unsolved — Task 10
-// is the task that has to actually solve it, because amountMl/side/
-// durationMin/leftMin/rightMin/notes are real, tested, higher-stakes
-// clearable fields (see TestUpdateFeedPatchClearsAmountMl in feeds_test.go),
-// unlike babies' cosmetic, never-cleared `sex`.
+// never "clear". babies.go's UpdateBaby gets away with that, because its one
+// nullable field (`sex`) is cosmetic and never cleared in practice;
+// amountMl/side/durationMin/leftMin/rightMin/notes are not (see
+// TestUpdateFeedPatchClearsAmountMl in feeds_test.go), which is why the
+// machinery below exists.
 //
 // The fix (patch.go): intercept the RAW request body before the strict
 // handler's own json.Decode consumes it, and decode it ourselves into
