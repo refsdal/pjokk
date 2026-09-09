@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
-
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
@@ -19,15 +17,18 @@ import (
 
 // photos is the hydrated milestone_photo rows (issue #48; photos.go), the
 // vaccine-documents shape: always present, empty when there are none.
-func serMilestone(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, title string, notes *string, photos []dbgen.ListMilestonePhotosForLogRow) gen.MilestoneLog {
+// serMilestone converts one joined milestone_log+users row, plus that
+// milestone's photos, into the wire shape. See convert.go on converting
+// between the per-query row types.
+func serMilestone(row dbgen.GetMilestoneRow, photos []dbgen.ListMilestonePhotosForLogRow) gen.MilestoneLog {
 	return gen.MilestoneLog{
-		Id:            id,
-		BabyId:        babyID,
-		CaretakerId:   caretakerID,
-		CaretakerName: caretakerName,
-		Time:          t.Time,
-		Title:         title,
-		Notes:         notes,
+		Id:            row.ID,
+		BabyId:        row.BabyID,
+		CaretakerId:   row.CaretakerID,
+		CaretakerName: row.CaretakerName,
+		Time:          row.Time.Time,
+		Title:         row.Title,
+		Notes:         row.Notes,
 		Photos:        serMilestonePhotos(photos),
 	}
 }
@@ -53,7 +54,7 @@ func (d Deps) ListMilestones(ctx context.Context, req gen.ListMilestonesRequestO
 	}
 	out := make([]gen.MilestoneLog, len(rows))
 	for i, row := range rows {
-		out[i] = serMilestone(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Title, row.Notes, photos[row.ID])
+		out[i] = serMilestone(dbgen.GetMilestoneRow(row), photos[row.ID])
 	}
 	return gen.ListMilestones200JSONResponse(out), nil
 }
@@ -89,7 +90,7 @@ func (d Deps) CreateMilestone(ctx context.Context, req gen.CreateMilestoneReques
 	if unknownBaby {
 		return gen.CreateMilestone404JSONResponse(unknownBabyErr()), nil
 	}
-	return gen.CreateMilestone201JSONResponse(serMilestone(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Title, row.Notes, nil)), nil
+	return gen.CreateMilestone201JSONResponse(serMilestone(row, nil)), nil
 }
 
 // UpdateMilestone implements PATCH /api/milestones/{id}. REF: "partial
@@ -138,7 +139,7 @@ func (d Deps) UpdateMilestone(ctx context.Context, req gen.UpdateMilestoneReques
 	if err != nil {
 		return nil, err
 	}
-	return gen.UpdateMilestone200JSONResponse(serMilestone(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Title, row.Notes, photos)), nil
+	return gen.UpdateMilestone200JSONResponse(serMilestone(row, photos)), nil
 }
 
 // DeleteMilestone implements DELETE /api/milestones/{id}. REF: "{ok:true} / 404".

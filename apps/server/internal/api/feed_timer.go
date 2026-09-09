@@ -56,27 +56,22 @@ func noFeedTimer() gen.Error {
 	return gen.Error{Error: "No running timer", Code: "NOT_FOUND"}
 }
 
-func serFeedTimerRow(id, babyID, caretakerID, caretakerName, kind string, start pgtype.Timestamptz, runningSide *string, sideStartedAt pgtype.Timestamptz, leftSec, rightSec int32) gen.FeedTimer {
-	return gen.FeedTimer{
-		Id:            id,
-		BabyId:        babyID,
-		CaretakerId:   caretakerID,
-		CaretakerName: caretakerName,
-		Kind:          gen.FeedTimerKind(kind),
-		StartTime:     start.Time,
-		RunningSide:   enumPtr[gen.FeedTimerRunningSide](runningSide),
-		SideStartedAt: tsPtr(sideStartedAt),
-		LeftSec:       leftSec,
-		RightSec:      rightSec,
-	}
-}
-
+// serFeedTimer converts one joined feed_timer+users row into the wire
+// shape. GetFeedTimer and ActiveFeedTimer produce two names for this one
+// shape; callers holding the other convert (see convert.go).
 func serFeedTimer(r dbgen.GetFeedTimerRow) gen.FeedTimer {
-	return serFeedTimerRow(r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.Kind, r.StartTime, r.RunningSide, r.SideStartedAt, r.LeftSec, r.RightSec)
-}
-
-func serActiveFeedTimer(r dbgen.ActiveFeedTimerRow) gen.FeedTimer {
-	return serFeedTimerRow(r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.Kind, r.StartTime, r.RunningSide, r.SideStartedAt, r.LeftSec, r.RightSec)
+	return gen.FeedTimer{
+		Id:            r.ID,
+		BabyId:        r.BabyID,
+		CaretakerId:   r.CaretakerID,
+		CaretakerName: r.CaretakerName,
+		Kind:          gen.FeedTimerKind(r.Kind),
+		StartTime:     r.StartTime.Time,
+		RunningSide:   enumPtr[gen.FeedTimerRunningSide](r.RunningSide),
+		SideStartedAt: tsPtr(r.SideStartedAt),
+		LeftSec:       r.LeftSec,
+		RightSec:      r.RightSec,
+	}
 }
 
 // bankedSeconds is the banked totals plus whatever stretch is running, as
@@ -118,7 +113,7 @@ func (d Deps) activeFeedTimer(ctx context.Context, familyID, babyID, kind string
 		}
 		return nil, err
 	}
-	v := serActiveFeedTimer(row)
+	v := serFeedTimer(dbgen.GetFeedTimerRow(row))
 	return &v, nil
 }
 
@@ -307,7 +302,7 @@ func (d Deps) StopFeedTimer(ctx context.Context, req gen.StopFeedTimerRequestObj
 		if err != nil {
 			return nil, err
 		}
-		pump := serPump(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Side, row.AmountMl, row.DurationMin, row.Notes)
+		pump := serPump(row)
 		out.Pump = &pump
 	default:
 		side := "left"

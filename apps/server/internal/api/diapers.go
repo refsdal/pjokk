@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
-
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
@@ -17,26 +15,18 @@ import (
 // (patch.go's withRawBody/patchBody/patchField) this file reuses
 // verbatim for `notes`, the one clearable field diaper_log has.
 
-func serDiaperRow(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, typ string, color, consistency, notes *string) gen.DiaperLog {
-	return gen.DiaperLog{
-		Id:            id,
-		BabyId:        babyID,
-		CaretakerId:   caretakerID,
-		CaretakerName: caretakerName,
-		Notes:         notes,
-		Time:          t.Time,
-		Type:          gen.DiaperLogType(typ),
-		Color:         enumPtr[gen.DiaperLogColor](color),
-		Consistency:   enumPtr[gen.DiaperLogConsistency](consistency),
-	}
-}
-
 func serDiaper(row dbgen.GetDiaperRow) gen.DiaperLog {
-	return serDiaperRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Type, row.Color, row.Consistency, row.Notes)
-}
-
-func serDiaperListRow(row dbgen.ListDiapersRow) gen.DiaperLog {
-	return serDiaperRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Type, row.Color, row.Consistency, row.Notes)
+	return gen.DiaperLog{
+		Id:            row.ID,
+		BabyId:        row.BabyID,
+		CaretakerId:   row.CaretakerID,
+		CaretakerName: row.CaretakerName,
+		Notes:         row.Notes,
+		Time:          row.Time.Time,
+		Type:          gen.DiaperLogType(row.Type),
+		Color:         enumPtr[gen.DiaperLogColor](row.Color),
+		Consistency:   enumPtr[gen.DiaperLogConsistency](row.Consistency),
+	}
 }
 
 // ListDiapers implements GET /api/diapers. REF: "DiaperLog[] newest first".
@@ -53,7 +43,7 @@ func (d Deps) ListDiapers(ctx context.Context, req gen.ListDiapersRequestObject)
 	}
 	out := make([]gen.DiaperLog, len(rows))
 	for i, row := range rows {
-		out[i] = serDiaperListRow(row)
+		out[i] = serDiaper(dbgen.GetDiaperRow(row))
 	}
 	return gen.ListDiapers200JSONResponse(out), nil
 }

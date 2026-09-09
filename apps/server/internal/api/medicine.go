@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
-
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
@@ -27,18 +25,20 @@ func medicineUnitPtr(s *string) *gen.MedicineLogUnit {
 	return &v
 }
 
-func serMedicine(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, name string, amount *float64, unit *string, medicineID *string, notes *string) gen.MedicineLog {
+// serMedicine converts one joined medicine_log+users row into the wire
+// shape. See convert.go on converting between the per-query row types.
+func serMedicine(row dbgen.GetMedicineRow) gen.MedicineLog {
 	return gen.MedicineLog{
-		Id:            id,
-		BabyId:        babyID,
-		CaretakerId:   caretakerID,
-		CaretakerName: caretakerName,
-		Time:          t.Time,
-		Name:          name,
-		Amount:        amount,
-		Unit:          medicineUnitPtr(unit),
-		MedicineId:    medicineID,
-		Notes:         notes,
+		Id:            row.ID,
+		BabyId:        row.BabyID,
+		CaretakerId:   row.CaretakerID,
+		CaretakerName: row.CaretakerName,
+		Time:          row.Time.Time,
+		Name:          row.Name,
+		Amount:        row.Amount,
+		Unit:          medicineUnitPtr(row.Unit),
+		MedicineId:    row.MedicineID,
+		Notes:         row.Notes,
 	}
 }
 
@@ -55,7 +55,7 @@ func (d Deps) ListMedicine(ctx context.Context, req gen.ListMedicineRequestObjec
 	}
 	out := make([]gen.MedicineLog, len(rows))
 	for i, row := range rows {
-		out[i] = serMedicine(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Name, row.Amount, row.Unit, row.MedicineID, row.Notes)
+		out[i] = serMedicine(dbgen.GetMedicineRow(row))
 	}
 	return gen.ListMedicine200JSONResponse(out), nil
 }
@@ -105,7 +105,7 @@ func (d Deps) CreateMedicine(ctx context.Context, req gen.CreateMedicineRequestO
 	if unknownBaby {
 		return gen.CreateMedicine404JSONResponse(unknownBabyErr()), nil
 	}
-	return gen.CreateMedicine201JSONResponse(serMedicine(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Name, row.Amount, row.Unit, row.MedicineID, row.Notes)), nil
+	return gen.CreateMedicine201JSONResponse(serMedicine(row)), nil
 }
 
 // UpdateMedicine implements PATCH /api/medicine/{id}. REF: "partial
@@ -169,7 +169,7 @@ func (d Deps) UpdateMedicine(ctx context.Context, req gen.UpdateMedicineRequestO
 	if !found {
 		return gen.UpdateMedicine404JSONResponse(notFound()), nil
 	}
-	return gen.UpdateMedicine200JSONResponse(serMedicine(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Name, row.Amount, row.Unit, row.MedicineID, row.Notes)), nil
+	return gen.UpdateMedicine200JSONResponse(serMedicine(row)), nil
 }
 
 // DeleteMedicine implements DELETE /api/medicine/{id}. REF: "{ok:true} / 404".

@@ -72,27 +72,28 @@ import (
 // clear_reminded_at parameter (queries/calendar.sql) is that reset,
 // computed here as `startTimeSet || remindMinutesBeforeSet`.
 
-func serCalendarEvent(id, title string, description, location *string, category string,
-	startTime pgtype.Timestamptz, allDay bool, durationMin, remindMinutesBefore *int32,
-	recurrence string, recurrenceUntil pgtype.Timestamptz,
-	createdBy, createdByName string,
+// serCalendarEvent converts one calendar_event row, plus its baby and
+// assignee join rows, into the wire shape. GetCalendarEvent and
+// ListCalendarEvents produce two names for the event row; callers holding
+// the other convert (see convert.go).
+func serCalendarEvent(row dbgen.GetCalendarEventRow,
 	babies []dbgen.CalendarEventBabiesForEventRow, assignees []dbgen.CalendarAssigneesForEventRow,
 ) gen.CalendarEvent {
 	out := gen.CalendarEvent{
-		Id:                  id,
-		Title:               title,
-		Description:         description,
-		Location:            location,
-		Category:            gen.CalendarEventCategory(category),
-		StartTime:           startTime.Time,
-		SeriesStart:         startTime.Time,
-		Recurrence:          gen.CalendarEventRecurrence(recurrence),
-		RecurrenceUntil:     tsPtr(recurrenceUntil),
-		AllDay:              allDay,
-		DurationMin:         durationMin,
-		RemindMinutesBefore: remindMinutesBefore,
-		CreatedBy:           createdBy,
-		CreatedByName:       createdByName,
+		Id:                  row.ID,
+		Title:               row.Title,
+		Description:         row.Description,
+		Location:            row.Location,
+		Category:            gen.CalendarEventCategory(row.Category),
+		StartTime:           row.StartTime.Time,
+		SeriesStart:         row.StartTime.Time,
+		Recurrence:          gen.CalendarEventRecurrence(row.Recurrence),
+		RecurrenceUntil:     tsPtr(row.RecurrenceUntil),
+		AllDay:              row.AllDay,
+		DurationMin:         row.DurationMin,
+		RemindMinutesBefore: row.RemindMinutesBefore,
+		CreatedBy:           row.CreatedBy,
+		CreatedByName:       row.CreatedByName,
 		Babies: make([]struct {
 			Id   string `json:"id"`
 			Name string `json:"name"`
@@ -115,20 +116,6 @@ func serCalendarEvent(id, title string, description, location *string, category 
 		}{Name: a.Name, UserId: a.UserID}
 	}
 	return out
-}
-
-func serCalendarEventRow(row dbgen.GetCalendarEventRow, babies []dbgen.CalendarEventBabiesForEventRow, assignees []dbgen.CalendarAssigneesForEventRow) gen.CalendarEvent {
-	return serCalendarEvent(row.ID, row.Title, row.Description, row.Location, row.Category,
-		row.StartTime, row.AllDay, row.DurationMin, row.RemindMinutesBefore,
-		row.Recurrence, row.RecurrenceUntil,
-		row.CreatedBy, row.CreatedByName, babies, assignees)
-}
-
-func serCalendarEventListRow(row dbgen.ListCalendarEventsRow, babies []dbgen.CalendarEventBabiesForEventRow, assignees []dbgen.CalendarAssigneesForEventRow) gen.CalendarEvent {
-	return serCalendarEvent(row.ID, row.Title, row.Description, row.Location, row.Category,
-		row.StartTime, row.AllDay, row.DurationMin, row.RemindMinutesBefore,
-		row.Recurrence, row.RecurrenceUntil,
-		row.CreatedBy, row.CreatedByName, babies, assignees)
 }
 
 // seriesOf is the recur view of a stored row.
@@ -156,7 +143,7 @@ func (d Deps) getCalendarEventHydrated(ctx context.Context, familyID, id string)
 	if err != nil {
 		return gen.CalendarEvent{}, err
 	}
-	return serCalendarEventRow(row, babies, assignees), nil
+	return serCalendarEvent(row, babies, assignees), nil
 }
 
 const maxCalendarRange = 366 * 24 * time.Hour
@@ -210,7 +197,7 @@ func (d Deps) ListCalendarEvents(ctx context.Context, req gen.ListCalendarEvents
 	// because a series row sorts by its stored start, not its occurrences.
 	out := make([]gen.CalendarEvent, 0, len(rows))
 	for _, row := range rows {
-		base := serCalendarEventListRow(row, babiesByEvent[row.ID], assigneesByEvent[row.ID])
+		base := serCalendarEvent(dbgen.GetCalendarEventRow(row), babiesByEvent[row.ID], assigneesByEvent[row.ID])
 		for _, occ := range seriesOf(row.StartTime, row.Recurrence, row.RecurrenceUntil).Between(from, to) {
 			e := base
 			// recur steps in Oslo; the wire is UTC like every other timestamp.

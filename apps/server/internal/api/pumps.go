@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
-
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
@@ -18,17 +16,19 @@ import (
 // and feeds.go's package doc comment for the PATCH tri-state pattern this
 // file's UpdatePump reuses.
 
-func serPump(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, side *string, amountMl, durationMin *int32, notes *string) gen.PumpLog {
+// serPump converts one joined pump_log+users row into the wire shape. See
+// convert.go on converting between the per-query row types.
+func serPump(row dbgen.GetPumpRow) gen.PumpLog {
 	return gen.PumpLog{
-		Id:            id,
-		BabyId:        babyID,
-		CaretakerId:   caretakerID,
-		CaretakerName: caretakerName,
-		Time:          t.Time,
-		Side:          enumPtr[gen.PumpLogSide](side),
-		AmountMl:      amountMl,
-		DurationMin:   durationMin,
-		Notes:         notes,
+		Id:            row.ID,
+		BabyId:        row.BabyID,
+		CaretakerId:   row.CaretakerID,
+		CaretakerName: row.CaretakerName,
+		Time:          row.Time.Time,
+		Side:          enumPtr[gen.PumpLogSide](row.Side),
+		AmountMl:      row.AmountMl,
+		DurationMin:   row.DurationMin,
+		Notes:         row.Notes,
 	}
 }
 
@@ -45,7 +45,7 @@ func (d Deps) ListPumps(ctx context.Context, req gen.ListPumpsRequestObject) (ge
 	}
 	out := make([]gen.PumpLog, len(rows))
 	for i, row := range rows {
-		out[i] = serPump(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Side, row.AmountMl, row.DurationMin, row.Notes)
+		out[i] = serPump(dbgen.GetPumpRow(row))
 	}
 	return gen.ListPumps200JSONResponse(out), nil
 }
@@ -83,7 +83,7 @@ func (d Deps) CreatePump(ctx context.Context, req gen.CreatePumpRequestObject) (
 	if unknownBaby {
 		return gen.CreatePump404JSONResponse(unknownBabyErr()), nil
 	}
-	return gen.CreatePump201JSONResponse(serPump(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Side, row.AmountMl, row.DurationMin, row.Notes)), nil
+	return gen.CreatePump201JSONResponse(serPump(row)), nil
 }
 
 // UpdatePump implements PATCH /api/pumps/{id}. REF: "partial (nullable
@@ -134,7 +134,7 @@ func (d Deps) UpdatePump(ctx context.Context, req gen.UpdatePumpRequestObject) (
 	if !found {
 		return gen.UpdatePump404JSONResponse(notFound()), nil
 	}
-	return gen.UpdatePump200JSONResponse(serPump(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Side, row.AmountMl, row.DurationMin, row.Notes)), nil
+	return gen.UpdatePump200JSONResponse(serPump(row)), nil
 }
 
 // DeletePump implements DELETE /api/pumps/{id}. REF: "{ok:true} / 404".

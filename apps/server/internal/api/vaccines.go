@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
@@ -77,23 +76,22 @@ func doseNumberPtr(v *int32) *int {
 	return &i
 }
 
-func serVaccineRow(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, name string, doseNumber *int32, scheduleSlot, notes *string, docs []dbgen.ListVaccineDocumentsForLogRow) gen.VaccineLog {
+// serVaccine converts one joined vaccine_log+users row, plus that entry's
+// documents, into the wire shape. GetVaccine and ListVaccines produce two
+// names for the log row; callers holding the other convert (see convert.go).
+func serVaccine(row dbgen.GetVaccineRow, docs []dbgen.ListVaccineDocumentsForLogRow) gen.VaccineLog {
 	return gen.VaccineLog{
-		Id:            id,
-		BabyId:        babyID,
-		CaretakerId:   caretakerID,
-		CaretakerName: caretakerName,
-		Time:          t.Time,
-		Name:          name,
-		DoseNumber:    doseNumberPtr(doseNumber),
-		ScheduleSlot:  scheduleSlot,
-		Notes:         notes,
+		Id:            row.ID,
+		BabyId:        row.BabyID,
+		CaretakerId:   row.CaretakerID,
+		CaretakerName: row.CaretakerName,
+		Time:          row.Time.Time,
+		Name:          row.Name,
+		DoseNumber:    doseNumberPtr(row.DoseNumber),
+		ScheduleSlot:  row.ScheduleSlot,
+		Notes:         row.Notes,
 		Documents:     serVaccineDocuments(docs),
 	}
-}
-
-func serVaccine(row dbgen.GetVaccineRow, docs []dbgen.ListVaccineDocumentsForLogRow) gen.VaccineLog {
-	return serVaccineRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Name, row.DoseNumber, row.ScheduleSlot, row.Notes, docs)
 }
 
 // getVaccineWithDocuments re-reads one vaccine log plus its documents — the
@@ -140,7 +138,7 @@ func (d Deps) ListVaccines(ctx context.Context, req gen.ListVaccinesRequestObjec
 
 	out := make([]gen.VaccineLog, len(rows))
 	for i, row := range rows {
-		out[i] = serVaccineRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Name, row.DoseNumber, row.ScheduleSlot, row.Notes, byLog[row.ID])
+		out[i] = serVaccine(dbgen.GetVaccineRow(row), byLog[row.ID])
 	}
 	return gen.ListVaccines200JSONResponse(out), nil
 }
