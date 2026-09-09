@@ -1,5 +1,6 @@
 import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
 import type { DiaperLog, FeedLog, SleepLog, Summary } from "@pjokk/shared";
+import type { components } from "../api-schema";
 import { client, unwrap } from "../api";
 import { t } from "../i18n";
 import { toast } from "../toast";
@@ -85,80 +86,44 @@ export function useDiapers(babyId: string | undefined, limit = 25) {
   });
 }
 
-export interface LogFeedVars {
-  babyId: string;
-  time: string;
-  type: "bottle" | "breast" | "solids";
-  amountMl?: number;
-  side?: "left" | "right" | "both";
-  durationMin?: number;
-  leftMin?: number;
-  rightMin?: number;
-  contents?: "formula" | "breast_milk" | "mixed";
-  food?: string;
-  reaction?: boolean;
-  notes?: string;
-}
+// The request shapes are the SPA's half of openapi/pjokk.yaml, so they are
+// TAKEN from it rather than restated: `bun run gen:client` regenerates
+// api-schema.d.ts, and a field or enum member that moves on the server stops
+// this file compiling. These were hand-written until now, which meant every
+// enum ("bottle" | "breast" | "solids", the six diaper colours, …) had a
+// second definition that nothing checked against the first — and one had
+// already drifted, CreateFeed's leftMin/rightMin being nullable on the wire
+// and not here.
+type Schemas = components["schemas"];
 
-export interface LogDiaperVars {
-  babyId: string;
-  time: string;
-  type: "wet" | "dirty" | "both" | "dry";
-  color?: "yellow" | "green" | "brown" | "black" | "red" | "other";
-  consistency?: "normal" | "loose" | "firm";
-  notes?: string;
-}
+export type LogFeedVars = Schemas["CreateFeed"];
+export type LogDiaperVars = Schemas["CreateDiaper"];
 
-export interface StartSleepVars {
-  babyId: string;
-  startTime: string;
-  location?: string;
-  type?: "nap" | "night";
-}
+// POST /api/sleep starts a RUNNING session when endTime is absent and logs a
+// finished one when it is present. This mutation is the former, so the field
+// is omitted deliberately rather than left to the caller.
+export type StartSleepVars = Omit<Schemas["CreateSleep"], "endTime">;
 
 export interface WakeSleepVars {
   id: string;
   endTime?: string;
 }
 
-// Patch payloads: omitted = untouched, null = cleared.
+// Patch payloads: omitted = untouched, null = cleared. The nullability is
+// the spec's, so it cannot fall out of step with what the server accepts.
 export interface UpdateFeedVars {
   id: string;
-  patch: {
-    time?: string;
-    type?: "bottle" | "breast" | "solids";
-    amountMl?: number | null;
-    side?: "left" | "right" | "both" | null;
-    durationMin?: number | null;
-    leftMin?: number | null;
-    rightMin?: number | null;
-    contents?: "formula" | "breast_milk" | "mixed" | null;
-    food?: string | null;
-    reaction?: boolean | null;
-    notes?: string | null;
-  };
+  patch: Schemas["UpdateFeed"];
 }
 
 export interface UpdateDiaperVars {
   id: string;
-  patch: {
-    time?: string;
-    type?: "wet" | "dirty" | "both" | "dry";
-    color?: "yellow" | "green" | "brown" | "black" | "red" | "other" | null;
-    consistency?: "normal" | "loose" | "firm" | null;
-    notes?: string | null;
-  };
+  patch: Schemas["UpdateDiaper"];
 }
 
 export interface UpdateSleepVars {
   id: string;
-  patch: {
-    startTime?: string;
-    endTime?: string | null;
-    location?: string | null;
-    type?: "nap" | "night" | null;
-    notes?: string | null;
-  };
+  patch: Schemas["UpdateSleep"];
 }
 
 export interface DeleteVars {

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
-import type { MeasurementType, MedicineUnit } from "@pjokk/shared";
+import type { MeasurementType } from "@pjokk/shared";
+import type { components } from "../api-schema";
 import { client, unwrap } from "../api";
 import { t } from "../i18n";
 import { toast } from "../toast";
@@ -70,27 +71,20 @@ function otherDelete(kind: OtherKind, id: string) {
   );
 }
 
-type OtherBase = { babyId: string; time: string; notes?: string };
+// The per-kind payloads come from openapi/pjokk.yaml via api-schema.d.ts,
+// not from a second hand-written copy: `bun run gen:client` regenerates
+// them, and a field the server adds or an enum member it drops stops this
+// file compiling. `kind` is the client's own discriminator — it selects the
+// path above and is stripped before the body is sent.
+type Schemas = components["schemas"];
 
 export type CreateOtherVars =
-  | ({ kind: "medicine" } & OtherBase & {
-        name: string;
-        amount?: number;
-        unit?: MedicineUnit;
-        medicineId?: string;
-      })
-  | ({ kind: "bath" } & OtherBase)
-  | ({ kind: "note" } & OtherBase & { content: string })
-  | ({ kind: "milestone" } & OtherBase & { title: string })
-  | ({ kind: "measurement" } & OtherBase & {
-        type: MeasurementType;
-        value: number;
-      })
-  | ({ kind: "pump" } & OtherBase & {
-        side?: "left" | "right" | "both";
-        amountMl?: number;
-        durationMin?: number;
-      });
+  | ({ kind: "medicine" } & Schemas["CreateMedicine"])
+  | ({ kind: "bath" } & Schemas["CreateBath"])
+  | ({ kind: "note" } & Schemas["CreateNote"])
+  | ({ kind: "milestone" } & Schemas["CreateMilestone"])
+  | ({ kind: "measurement" } & Schemas["CreateMeasurement"])
+  | ({ kind: "pump" } & Schemas["CreatePump"]);
 
 export interface UpdateOtherVars {
   kind: OtherKind;
