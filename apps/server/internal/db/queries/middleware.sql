@@ -64,7 +64,11 @@ WHERE "id" = $1;
 
 -- name: GetFamilyMembershipRole :one
 -- The tenancy gate's one query: does this user hold a membership row in this
--- family, and what role + plan does the request run under.
+-- family, and what role does the request run under.
+--
+-- It does NOT read organization.plan. That column is vestigial (CLAUDE.md,
+-- "No billing": always 'free', nothing gates on it) and carrying it here
+-- cost a JOIN on the hot path of every family-scoped request.
 --
 -- An active_organization_id on the session is NOT proof of membership (a
 -- member removed from a family keeps the column until their next switch), so
@@ -89,10 +93,8 @@ WHERE "id" = $1;
 -- fail-safe direction — the alternative locks a family out of its own data
 -- over a missing role row.
 SELECT
-    COALESCE(r."role", '') AS role,
-    o."plan"
+    COALESCE(r."role", '') AS role
 FROM "organization_members" om
-JOIN "organizations" o ON o."id" = om."organization_id"
 LEFT JOIN LATERAL (
     SELECT omr."role"
     FROM "organization_member_roles" omr
@@ -113,3 +115,30 @@ LIMIT 1;
 -- everything else.
 INSERT INTO "admin_audit" ("admin_id", "action", "target", "detail")
 VALUES ($1, $2, $3, $4);
+
+-- name: GetFamilyMembershipWithPlan :one
+-- GET /api/me's version of the query above: the same membership lookup, plus
+-- organization.plan for the `plan` field the Me schema still carries.
+--
+-- A second query rather than a `plan` column on the tenancy one: that query
+-- runs on EVERY family-scoped request and this runs once per app load, so
+-- the JOIN belongs here. The plan itself is vestigial (CLAUDE.md, "No
+-- billing": always 'free', nothing gates on it) and stays on the wire only
+-- because openapi/pjokk.yaml declares it.
+SELECT
+    COALESCE(r."role", '') AS role,
+    o."plan"
+FROM "organization_members" om
+JOIN "organizations" o ON o."id" = om."organization_id"
+LEFT JOIN LATERAL (
+    SELECT omr."role"
+    FROM "organization_member_roles" omr
+    WHERE omr."member_id" = om."id"
+    ORDER BY CASE omr."role"
+        WHEN 'admin' THEN 0
+        WHEN 'owner' THEN 1
+        ELSE 2
+    END, omr."role"
+    LIMIT 1
+) r ON true
+WHERE om."organization_id" = $1 AND om."user_id" = $2;

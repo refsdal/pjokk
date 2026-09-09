@@ -71,7 +71,6 @@ type FamilyCtx struct {
 	UserName   string
 	FamilyID   string
 	MemberRole string // "admin" | "member" (Limen's "owner" is possible but unused)
-	Plan       string // free | premium | lifetime | comp
 
 	// IsAPIKey marks a request authenticated by a pjk_ bearer key rather
 	// than a human session. Admin and device-bound endpoints refuse these.
@@ -215,7 +214,7 @@ func RequireFamily(d Deps) func(http.Handler) http.Handler {
 				return
 			}
 
-			membership, err := d.Q.GetFamilyMembershipRole(r.Context(), gen.GetFamilyMembershipRoleParams{
+			role, err := d.Q.GetFamilyMembershipRole(r.Context(), gen.GetFamilyMembershipRoleParams{
 				OrganizationID: session.ActiveFamilyID,
 				UserID:         session.UserID,
 			})
@@ -232,8 +231,7 @@ func RequireFamily(d Deps) func(http.Handler) http.Handler {
 				UserID:         session.UserID,
 				UserName:       session.Name,
 				FamilyID:       session.ActiveFamilyID,
-				MemberRole:     membership.Role,
-				Plan:           membership.Plan,
+				MemberRole:     role,
 				IsAPIKey:       id.isAPIKey,
 				ImpersonatedBy: session.ImpersonatedBy,
 			}
