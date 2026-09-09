@@ -69,6 +69,57 @@ func (p *problemCollector) requireNonEmpty(env map[string]string, field string) 
 	return v, true
 }
 
+// requireURL is requireNonEmpty plus the absolute-URL check the two
+// required URL settings (APP_URL, S3_ENDPOINT) both apply. Returns "" on
+// either failure, so a rejected value never reaches the Config.
+func (p *problemCollector) requireURL(env map[string]string, field string) string {
+	v, ok := p.requireNonEmpty(env, field)
+	if !ok {
+		return ""
+	}
+	if !isValidAbsoluteURL(v) {
+		p.add(field, "must be a valid absolute URL")
+		return ""
+	}
+	return v
+}
+
+// urlField is requireURL for an OPTIONAL setting: absent or empty leaves
+// *dest at whatever default the caller seeded it with, and so does an
+// invalid value — which is reported, so the process still refuses to boot.
+func (p *problemCollector) urlField(env map[string]string, field string, dest *string) {
+	v, present := env[field]
+	if !present || v == "" {
+		return
+	}
+	if !isValidAbsoluteURL(v) {
+		p.add(field, "must be a valid absolute URL")
+		return
+	}
+	*dest = v
+}
+
+// intField reads an optional integer setting, returning def when absent,
+// empty, or invalid. belowMin is spelled out per field rather than derived
+// from min: "must be positive" and "must be at least 0 (0 disables the
+// quota)" each tell the operator something a generic phrasing would lose.
+func (p *problemCollector) intField(env map[string]string, field string, def, min int, belowMin string) int {
+	v, present := env[field]
+	if !present || v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		p.add(field, "must be a valid integer")
+		return def
+	}
+	if n < min {
+		p.add(field, belowMin)
+		return def
+	}
+	return n
+}
+
 // boolFlag reads a strict "0"/"1" flag, defaulting to false when absent or
 // empty and reporting a problem for anything else.
 //
@@ -117,22 +168,10 @@ func Load(env map[string]string) (*Config, error) {
 		cfg.DatabaseURL = v
 	}
 
-	if v, ok := p.requireNonEmpty(env, "APP_URL"); ok {
-		if !isValidAbsoluteURL(v) {
-			p.add("APP_URL", "must be a valid absolute URL")
-		} else {
-			cfg.AppURL = v
-		}
-	}
+	cfg.AppURL = p.requireURL(env, "APP_URL")
 
 	cfg.SiteURL = "https://pjokk.no"
-	if v, present := env["SITE_URL"]; present && v != "" {
-		if !isValidAbsoluteURL(v) {
-			p.add("SITE_URL", "must be a valid absolute URL")
-		} else {
-			cfg.SiteURL = v
-		}
-	}
+	p.urlField(env, "SITE_URL", &cfg.SiteURL)
 
 	if v, ok := p.requireNonEmpty(env, "AUTH_SECRET"); ok {
 		if len(v) < 32 {
@@ -152,13 +191,7 @@ func Load(env map[string]string) (*Config, error) {
 			if v, ok := p.requireNonEmpty(env, "S3_BUCKET"); ok {
 				cfg.S3Bucket = v
 			}
-			if v, ok := p.requireNonEmpty(env, "S3_ENDPOINT"); ok {
-				if !isValidAbsoluteURL(v) {
-					p.add("S3_ENDPOINT", "must be a valid absolute URL")
-				} else {
-					cfg.S3Endpoint = v
-				}
-			}
+			cfg.S3Endpoint = p.requireURL(env, "S3_ENDPOINT")
 			if v, ok := p.requireNonEmpty(env, "S3_ACCESS_KEY_ID"); ok {
 				cfg.S3AccessKeyID = v
 			}
@@ -192,41 +225,9 @@ func Load(env map[string]string) (*Config, error) {
 
 	cfg.OpenSignup = p.boolFlag(env, "OPEN_SIGNUP")
 
-	cfg.Port = 3000
-	if v, present := env["PORT"]; present && v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil {
-			p.add("PORT", "must be a valid integer")
-		} else if n <= 0 {
-			p.add("PORT", "must be positive")
-		} else {
-			cfg.Port = n
-		}
-	}
-
-	cfg.TrustedProxyHops = 0
-	if v, present := env["TRUSTED_PROXY_HOPS"]; present && v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil {
-			p.add("TRUSTED_PROXY_HOPS", "must be a valid integer")
-		} else if n < 0 {
-			p.add("TRUSTED_PROXY_HOPS", "must be at least 0")
-		} else {
-			cfg.TrustedProxyHops = n
-		}
-	}
-
-	cfg.PhotoQuotaMB = 500
-	if v, present := env["PHOTO_QUOTA_MB"]; present && v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil {
-			p.add("PHOTO_QUOTA_MB", "must be a valid integer")
-		} else if n < 0 {
-			p.add("PHOTO_QUOTA_MB", "must be at least 0 (0 disables the quota)")
-		} else {
-			cfg.PhotoQuotaMB = n
-		}
-	}
+	cfg.Port = p.intField(env, "PORT", 3000, 1, "must be positive")
+	cfg.TrustedProxyHops = p.intField(env, "TRUSTED_PROXY_HOPS", 0, 0, "must be at least 0")
+	cfg.PhotoQuotaMB = p.intField(env, "PHOTO_QUOTA_MB", 500, 0, "must be at least 0 (0 disables the quota)")
 
 	if len(p.problems) > 0 {
 		return nil, fmt.Errorf("invalid configuration:\n  %s", strings.Join(p.problems, "\n  "))
@@ -234,18 +235,20 @@ func Load(env map[string]string) (*Config, error) {
 	return cfg, nil
 }
 
-// FromOS loads configuration from the process's real environment.
-func FromOS() (*Config, error) {
+// osEnv snapshots the process environment as the plain map Load and
+// LoadLanding both take — the one place either loader touches os.
+func osEnv() map[string]string {
 	env := make(map[string]string, len(os.Environ()))
 	for _, kv := range os.Environ() {
-		k, v, ok := strings.Cut(kv, "=")
-		if !ok {
-			continue
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			env[k] = v
 		}
-		env[k] = v
 	}
-	return Load(env)
+	return env
 }
+
+// FromOS loads configuration from the process's real environment.
+func FromOS() (*Config, error) { return Load(osEnv()) }
 
 // DisabledSubsystems names the optional subsystems that are unconfigured
 // (or only half-configured, which is the same as unconfigured — a public
@@ -294,32 +297,9 @@ func LoadLanding(env map[string]string) (*Landing, error) {
 		Port:    3000,
 	}
 
-	for _, f := range []struct {
-		name string
-		dest *string
-	}{
-		{"SITE_URL", &cfg.SiteURL},
-		{"APP_URL", &cfg.AppURL},
-	} {
-		if v, present := env[f.name]; present && v != "" {
-			if !isValidAbsoluteURL(v) {
-				p.add(f.name, "must be a valid absolute URL")
-			} else {
-				*f.dest = v
-			}
-		}
-	}
-
-	if v, present := env["PORT"]; present && v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil {
-			p.add("PORT", "must be a valid integer")
-		} else if n <= 0 {
-			p.add("PORT", "must be positive")
-		} else {
-			cfg.Port = n
-		}
-	}
+	p.urlField(env, "SITE_URL", &cfg.SiteURL)
+	p.urlField(env, "APP_URL", &cfg.AppURL)
+	cfg.Port = p.intField(env, "PORT", cfg.Port, 1, "must be positive")
 
 	// Both fail-safe: absent or "0" means off, matching the build-time flags
 	// these replaced. A deploy that forgets INDEXABLE must publish noindex,
@@ -336,14 +316,4 @@ func LoadLanding(env map[string]string) (*Landing, error) {
 
 // LandingFromOS loads the landing site's configuration from the process's
 // real environment.
-func LandingFromOS() (*Landing, error) {
-	env := make(map[string]string, len(os.Environ()))
-	for _, kv := range os.Environ() {
-		k, v, ok := strings.Cut(kv, "=")
-		if !ok {
-			continue
-		}
-		env[k] = v
-	}
-	return LoadLanding(env)
-}
+func LandingFromOS() (*Landing, error) { return LoadLanding(osEnv()) }
