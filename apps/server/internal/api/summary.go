@@ -86,7 +86,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 	}
 	var lastFeed *gen.FeedLog
 	if len(lastFeeds) > 0 {
-		v := serFeedListRow(lastFeeds[0])
+		v := serFeed(dbgen.GetFeedRow(lastFeeds[0]))
 		lastFeed = &v
 	}
 
@@ -103,7 +103,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 	var lastTemperature *gen.MeasurementLog
 	if len(lastTemps) > 0 {
 		r := lastTemps[0]
-		v := serMeasurement(r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.Time, r.Type, r.Value, r.Notes)
+		v := serMeasurement(dbgen.GetMeasurementRow(r))
 		lastTemperature = &v
 	}
 
@@ -113,13 +113,13 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 	}
 	var lastDiaper *gen.DiaperLog
 	if len(lastDiapers) > 0 {
-		v := serDiaperListRow(lastDiapers[0])
+		v := serDiaper(dbgen.GetDiaperRow(lastDiapers[0]))
 		lastDiaper = &v
 	}
 
 	var activeSleep *gen.SleepLog
 	if active, err := d.Q.ActiveSleep(ctx, dbgen.ActiveSleepParams{FamilyID: fam.FamilyID, BabyID: &babyID}); err == nil {
-		v := serActiveSleepRow(active)
+		v := serSleep(dbgen.GetSleepRow(active))
 		activeSleep = &v
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
@@ -131,13 +131,13 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 	}
 	var lastSleep *gen.SleepLog
 	if len(lastSleeps) > 0 {
-		v := serSleepListRow(lastSleeps[0])
+		v := serSleep(dbgen.GetSleepRow(lastSleeps[0]))
 		lastSleep = &v
 	}
 
 	var activePlay *gen.PlayLog
 	if play, err := d.Q.ActivePlay(ctx, dbgen.ActivePlayParams{FamilyID: fam.FamilyID, BabyID: &babyID}); err == nil {
-		v := serActivePlayRow(play)
+		v := serPlay(dbgen.GetPlayRow(play))
 		activePlay = &v
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
@@ -162,7 +162,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		FamilyID: fam.FamilyID,
 		Since:    ts(d.Now().Add(-helpRequestWindow)),
 	}); err == nil {
-		v := serNewestHelpRow(h)
+		v := serHelpRequest(dbgen.GetHelpRequestRow(h), 0)
 		openHelp = &v
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err

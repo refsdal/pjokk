@@ -71,38 +71,21 @@ func (getActivePlayNullResponse) VisitGetActivePlayResponse(w http.ResponseWrite
 	return err
 }
 
-// serPlayRow converts one joined play_log+users row into the wire shape.
-// Three sqlc queries (GetPlay, ListPlays, ActivePlay) produce
-// structurally-identical row types under different generated names, hence
-// the thin per-type wrappers below rather than one function taking a row
-// type directly — the same shape sleep.go's serSleepRow/serSleep/
-// serSleepListRow/serActiveSleepRow quartet uses.
-func serPlayRow(id, babyID, caretakerID, caretakerName, typ string, start, end pgtype.Timestamptz, notes *string) gen.PlayLog {
-	return gen.PlayLog{
-		Id:            id,
-		BabyId:        babyID,
-		CaretakerId:   caretakerID,
-		CaretakerName: caretakerName,
-		Notes:         notes,
-		Type:          gen.PlayLogType(typ),
-		StartTime:     start.Time,
-		EndTime:       tsPtr(end),
-	}
-}
-
+// serPlay converts one joined play_log+users row into the wire shape.
+// GetPlay, ListPlays, ActivePlay and ListPlaysPage produce four names for
+// this one shape; callers holding another of them convert (see convert.go).
+// It backs GetActivePlay here and GetSummary's activePlay field alike.
 func serPlay(row dbgen.GetPlayRow) gen.PlayLog {
-	return serPlayRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Type, row.StartTime, row.EndTime, row.Notes)
-}
-
-func serPlayListRow(row dbgen.ListPlaysRow) gen.PlayLog {
-	return serPlayRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Type, row.StartTime, row.EndTime, row.Notes)
-}
-
-// serActivePlayRow backs both GetActivePlay (this file) and GetSummary's
-// activePlay field (summary.go) — the same sharing sleep.go's
-// serActiveSleepRow provides for activeSleep.
-func serActivePlayRow(row dbgen.ActivePlayRow) gen.PlayLog {
-	return serPlayRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Type, row.StartTime, row.EndTime, row.Notes)
+	return gen.PlayLog{
+		Id:            row.ID,
+		BabyId:        row.BabyID,
+		CaretakerId:   row.CaretakerID,
+		CaretakerName: row.CaretakerName,
+		Notes:         row.Notes,
+		Type:          gen.PlayLogType(row.Type),
+		StartTime:     row.StartTime.Time,
+		EndTime:       tsPtr(row.EndTime),
+	}
 }
 
 // ListPlays implements GET /api/play. REF: "PlayLog[] newest first (by
@@ -120,7 +103,7 @@ func (d Deps) ListPlays(ctx context.Context, req gen.ListPlaysRequestObject) (ge
 	}
 	out := make([]gen.PlayLog, len(rows))
 	for i, row := range rows {
-		out[i] = serPlayListRow(row)
+		out[i] = serPlay(dbgen.GetPlayRow(row))
 	}
 	return gen.ListPlays200JSONResponse(out), nil
 }
@@ -201,7 +184,7 @@ func (d Deps) GetActivePlay(ctx context.Context, req gen.GetActivePlayRequestObj
 		}
 		return nil, err
 	}
-	return gen.GetActivePlay200JSONResponse(serActivePlayRow(row)), nil
+	return gen.GetActivePlay200JSONResponse(serPlay(dbgen.GetPlayRow(row))), nil
 }
 
 // StopPlay implements POST /api/play/{id}/stop. REF: "body optional

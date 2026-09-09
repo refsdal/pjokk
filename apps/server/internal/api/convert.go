@@ -16,6 +16,24 @@ import (
 // shapes hand-written at ~70 call sites, with the helpers that DO exist
 // (enumStr in feeds.go, enumPtr in diapers.go, tsPtr in sleep.go) each
 // discovered only by whoever happened to read that file first.
+//
+// # Converting between sqlc row types
+//
+// sqlc emits a distinct named struct PER QUERY, so the three queries that
+// read a feed the same way (GetFeed, ListFeeds, ListFeedsPage) produce
+// GetFeedRow, ListFeedsRow and ListFeedsPageRow — three names for one shape.
+// This package used to bridge that with a serialiser taking fifteen
+// positional parameters plus a thin unpacking wrapper per row type, which is
+// how a fifteen-argument call ends up in a file nobody wants to edit.
+//
+// Structurally identical structs convert directly in Go, so each family now
+// has ONE serialiser over the Get*Row spelling and every other call site
+// writes dbgen.GetFeedRow(row). That is not merely shorter: the conversion
+// is checked at compile time, so adding a column to one of the three queries
+// and not the others stops the build — where the old field-by-field literal
+// would have quietly dropped it, and a SELECT * over a shared view would
+// have quietly over-fetched. staticcheck's S1016 says the same thing about
+// the one place this package was already doing it by hand (ListContacts).
 
 // ts is a Postgres timestamptz holding t. Every non-NULL timestamp a handler
 // writes goes through here rather than through the four-field struct literal:

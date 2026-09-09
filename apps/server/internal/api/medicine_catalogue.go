@@ -22,21 +22,20 @@ import (
 // "next dose OK from HH:MM" without a second query. The app ships no
 // intervals of its own: the number is the family's, shown back to them.
 
-func serCatalogueMedicineRow(id, name string, defaultAmount *float64, unit *string, minInterval *int32, isSupplement bool, archivedAt, lastDose pgtype.Timestamptz) gen.MedicineCatalogueEntry {
-	return gen.MedicineCatalogueEntry{
-		Id:             id,
-		Name:           name,
-		DefaultAmount:  defaultAmount,
-		Unit:           enumPtr[gen.MedicineCatalogueEntryUnit](unit),
-		MinIntervalMin: minInterval,
-		IsSupplement:   isSupplement,
-		Archived:       archivedAt.Valid,
-		LastDoseAt:     tsPtr(lastDose),
-	}
-}
-
+// serCatalogueMedicine converts one medicine catalogue row into the wire
+// shape. GetCatalogueMedicine and ListCatalogueMedicines produce two names
+// for this one shape; callers holding the other convert (see convert.go).
 func serCatalogueMedicine(r dbgen.GetCatalogueMedicineRow) gen.MedicineCatalogueEntry {
-	return serCatalogueMedicineRow(r.ID, r.Name, r.DefaultAmount, r.Unit, r.MinIntervalMin, r.IsSupplement, r.ArchivedAt, r.LastDoseAt)
+	return gen.MedicineCatalogueEntry{
+		Id:             r.ID,
+		Name:           r.Name,
+		DefaultAmount:  r.DefaultAmount,
+		Unit:           enumPtr[gen.MedicineCatalogueEntryUnit](r.Unit),
+		MinIntervalMin: r.MinIntervalMin,
+		IsSupplement:   r.IsSupplement,
+		Archived:       r.ArchivedAt.Valid,
+		LastDoseAt:     tsPtr(r.LastDoseAt),
+	}
 }
 
 // ListMedicineCatalogue implements GET /api/medicines.
@@ -48,7 +47,7 @@ func (d Deps) ListMedicineCatalogue(ctx context.Context, req gen.ListMedicineCat
 	}
 	out := make([]gen.MedicineCatalogueEntry, len(rows))
 	for i, r := range rows {
-		out[i] = serCatalogueMedicineRow(r.ID, r.Name, r.DefaultAmount, r.Unit, r.MinIntervalMin, r.IsSupplement, r.ArchivedAt, r.LastDoseAt)
+		out[i] = serCatalogueMedicine(dbgen.GetCatalogueMedicineRow(r))
 	}
 	return gen.ListMedicineCatalogue200JSONResponse(out), nil
 }

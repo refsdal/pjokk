@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
-
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
@@ -17,15 +15,17 @@ import (
 // See other_logs.go's package doc comment for the shared createLog/
 // updateLog/deleteLog engine and medicine.go for a fuller worked example.
 
-func serNote(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, content string, notes *string) gen.NoteLog {
+// serNote converts one joined note_log+users row into the wire shape. See
+// convert.go on converting between the per-query row types.
+func serNote(row dbgen.GetNoteRow) gen.NoteLog {
 	return gen.NoteLog{
-		Id:            id,
-		BabyId:        babyID,
-		CaretakerId:   caretakerID,
-		CaretakerName: caretakerName,
-		Time:          t.Time,
-		Content:       content,
-		Notes:         notes,
+		Id:            row.ID,
+		BabyId:        row.BabyID,
+		CaretakerId:   row.CaretakerID,
+		CaretakerName: row.CaretakerName,
+		Time:          row.Time.Time,
+		Content:       row.Content,
+		Notes:         row.Notes,
 	}
 }
 
@@ -42,7 +42,7 @@ func (d Deps) ListNotes(ctx context.Context, req gen.ListNotesRequestObject) (ge
 	}
 	out := make([]gen.NoteLog, len(rows))
 	for i, row := range rows {
-		out[i] = serNote(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Content, row.Notes)
+		out[i] = serNote(dbgen.GetNoteRow(row))
 	}
 	return gen.ListNotes200JSONResponse(out), nil
 }
@@ -78,7 +78,7 @@ func (d Deps) CreateNote(ctx context.Context, req gen.CreateNoteRequestObject) (
 	if unknownBaby {
 		return gen.CreateNote404JSONResponse(unknownBabyErr()), nil
 	}
-	return gen.CreateNote201JSONResponse(serNote(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Content, row.Notes)), nil
+	return gen.CreateNote201JSONResponse(serNote(row)), nil
 }
 
 // UpdateNote implements PATCH /api/notes/{id}. REF: "partial (nullable
@@ -123,7 +123,7 @@ func (d Deps) UpdateNote(ctx context.Context, req gen.UpdateNoteRequestObject) (
 	if !found {
 		return gen.UpdateNote404JSONResponse(notFound()), nil
 	}
-	return gen.UpdateNote200JSONResponse(serNote(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Content, row.Notes)), nil
+	return gen.UpdateNote200JSONResponse(serNote(row)), nil
 }
 
 // DeleteNote implements DELETE /api/notes/{id}. REF: "{ok:true} / 404".

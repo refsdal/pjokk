@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
-
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
@@ -81,38 +79,27 @@ import (
 // and just re-reads the row, matching apps/api/src/db/scoped.ts's
 // compactPatch no-op and babies.go's UpdateBaby.
 
-// serFeed converts one joined feed_log+users row into the wire shape. Two
-// sqlc queries (GetFeed, ListFeeds) produce structurally-identical row
-// types under different generated names, hence the two thin wrappers below
-// rather than one function taking a row type directly.
-func serFeedRow(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, typ string, amountMl *int32, side *string, durationMin, leftMin, rightMin *int32, contents, food *string, reaction *bool, notes *string) gen.FeedLog {
-	return gen.FeedLog{
-		Id:            id,
-		BabyId:        babyID,
-		CaretakerId:   caretakerID,
-		CaretakerName: caretakerName,
-		Notes:         notes,
-		Time:          t.Time,
-		Type:          gen.FeedLogType(typ),
-		AmountMl:      amountMl,
-		Side:          enumPtr[gen.FeedLogSide](side),
-		DurationMin:   durationMin,
-		LeftMin:       leftMin,
-		RightMin:      rightMin,
-		Contents:      enumPtr[gen.FeedLogContents](contents),
-		Food:          food,
-		Reaction:      reaction,
-	}
-}
-
+// serFeed converts one joined feed_log+users row into the wire shape.
+// GetFeed, ListFeeds and ListFeedsPage produce three names for this one
+// shape; callers holding another of them convert (see convert.go).
 func serFeed(row dbgen.GetFeedRow) gen.FeedLog {
-	return serFeedRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Type,
-		row.AmountMl, row.Side, row.DurationMin, row.LeftMin, row.RightMin, row.Contents, row.Food, row.Reaction, row.Notes)
-}
-
-func serFeedListRow(row dbgen.ListFeedsRow) gen.FeedLog {
-	return serFeedRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Type,
-		row.AmountMl, row.Side, row.DurationMin, row.LeftMin, row.RightMin, row.Contents, row.Food, row.Reaction, row.Notes)
+	return gen.FeedLog{
+		Id:            row.ID,
+		BabyId:        row.BabyID,
+		CaretakerId:   row.CaretakerID,
+		CaretakerName: row.CaretakerName,
+		Notes:         row.Notes,
+		Time:          row.Time.Time,
+		Type:          gen.FeedLogType(row.Type),
+		AmountMl:      row.AmountMl,
+		Side:          enumPtr[gen.FeedLogSide](row.Side),
+		DurationMin:   row.DurationMin,
+		LeftMin:       row.LeftMin,
+		RightMin:      row.RightMin,
+		Contents:      enumPtr[gen.FeedLogContents](row.Contents),
+		Food:          row.Food,
+		Reaction:      row.Reaction,
+	}
 }
 
 // ListFeeds implements GET /api/feeds. REF: "FeedLog[] newest first".
@@ -129,7 +116,7 @@ func (d Deps) ListFeeds(ctx context.Context, req gen.ListFeedsRequestObject) (ge
 	}
 	out := make([]gen.FeedLog, len(rows))
 	for i, row := range rows {
-		out[i] = serFeedListRow(row)
+		out[i] = serFeed(dbgen.GetFeedRow(row))
 	}
 	return gen.ListFeeds200JSONResponse(out), nil
 }

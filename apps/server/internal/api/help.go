@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
@@ -75,32 +74,28 @@ func hitUserLimit(ctx context.Context, store ratelimit.Store, name, userID strin
 // acknowledgedByName is only meaningful once acknowledged: the query
 // COALESCEs it to ” in both the "nobody yet" and the "nameless answerer"
 // cases, and acknowledgedAt is what tells them apart.
-func serHelpRequestRow(id, fromUserID, fromName, toUserID, toName, message string, createdAt, acknowledgedAt pgtype.Timestamptz, acknowledgedByName string, delivered int) gen.HelpRequest {
+// serHelpRequest converts one help_request row into the wire shape.
+// GetHelpRequest and NewestHelpRequest produce two names for this one
+// shape; GetSummary's openHelp holds the latter and converts (see
+// convert.go). delivered is not a column — it is how many devices the push
+// actually reached, which only the sending path knows; a read passes 0.
+func serHelpRequest(row dbgen.GetHelpRequestRow, delivered int) gen.HelpRequest {
 	out := gen.HelpRequest{
-		Id:             id,
-		FromUserId:     fromUserID,
-		FromName:       fromName,
-		ToUserId:       toUserID,
-		ToName:         toName,
-		Message:        message,
-		CreatedAt:      createdAt.Time,
-		AcknowledgedAt: tsPtr(acknowledgedAt),
+		Id:             row.ID,
+		FromUserId:     row.FromUserID,
+		FromName:       row.FromName,
+		ToUserId:       row.ToUserID,
+		ToName:         row.ToName,
+		Message:        row.Message,
+		CreatedAt:      row.CreatedAt.Time,
+		AcknowledgedAt: tsPtr(row.AcknowledgedAt),
 		Delivered:      delivered,
 	}
-	if acknowledgedAt.Valid {
-		name := acknowledgedByName
+	if row.AcknowledgedAt.Valid {
+		name := row.AcknowledgedByName
 		out.AcknowledgedByName = &name
 	}
 	return out
-}
-
-func serHelpRequest(row dbgen.GetHelpRequestRow, delivered int) gen.HelpRequest {
-	return serHelpRequestRow(row.ID, row.FromUserID, row.FromName, row.ToUserID, row.ToName, row.Message, row.CreatedAt, row.AcknowledgedAt, row.AcknowledgedByName, delivered)
-}
-
-// serNewestHelpRow backs GetSummary's openHelp (summary.go).
-func serNewestHelpRow(row dbgen.NewestHelpRequestRow) gen.HelpRequest {
-	return serHelpRequestRow(row.ID, row.FromUserID, row.FromName, row.ToUserID, row.ToName, row.Message, row.CreatedAt, row.AcknowledgedAt, row.AcknowledgedByName, 0)
 }
 
 func displayName(name string) string {

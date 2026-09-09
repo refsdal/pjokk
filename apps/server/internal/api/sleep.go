@@ -61,36 +61,22 @@ func (getActiveSleepNullResponse) VisitGetActiveSleepResponse(w http.ResponseWri
 	return err
 }
 
-// serSleepRow converts one joined sleep_log+users row into the wire shape.
-// Three sqlc queries (GetSleep, ListSleeps, ActiveSleep) produce
-// structurally-identical row types under different generated names, hence
-// the thin per-type wrappers below rather than one function taking a row
-// type directly — the same shape feeds.go's serFeedRow/serFeed/
-// serFeedListRow trio uses.
-func serSleepRow(id, babyID, caretakerID, caretakerName string, start, end pgtype.Timestamptz, location, typ, notes *string) gen.SleepLog {
-	return gen.SleepLog{
-		Id:            id,
-		BabyId:        babyID,
-		CaretakerId:   caretakerID,
-		CaretakerName: caretakerName,
-		Notes:         notes,
-		StartTime:     start.Time,
-		EndTime:       tsPtr(end),
-		Location:      location,
-		Type:          enumPtr[gen.SleepLogType](typ),
-	}
-}
-
+// serSleep converts one joined sleep_log+users row into the wire shape.
+// GetSleep, ListSleeps, ActiveSleep and ListSleepsPage produce four names
+// for this one shape; callers holding another of them convert (see
+// convert.go).
 func serSleep(row dbgen.GetSleepRow) gen.SleepLog {
-	return serSleepRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.StartTime, row.EndTime, row.Location, row.Type, row.Notes)
-}
-
-func serSleepListRow(row dbgen.ListSleepsRow) gen.SleepLog {
-	return serSleepRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.StartTime, row.EndTime, row.Location, row.Type, row.Notes)
-}
-
-func serActiveSleepRow(row dbgen.ActiveSleepRow) gen.SleepLog {
-	return serSleepRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.StartTime, row.EndTime, row.Location, row.Type, row.Notes)
+	return gen.SleepLog{
+		Id:            row.ID,
+		BabyId:        row.BabyID,
+		CaretakerId:   row.CaretakerID,
+		CaretakerName: row.CaretakerName,
+		Notes:         row.Notes,
+		StartTime:     row.StartTime.Time,
+		EndTime:       tsPtr(row.EndTime),
+		Location:      row.Location,
+		Type:          enumPtr[gen.SleepLogType](row.Type),
+	}
 }
 
 // ListSleeps implements GET /api/sleep. REF: "SleepLog[] newest first (by
@@ -108,7 +94,7 @@ func (d Deps) ListSleeps(ctx context.Context, req gen.ListSleepsRequestObject) (
 	}
 	out := make([]gen.SleepLog, len(rows))
 	for i, row := range rows {
-		out[i] = serSleepListRow(row)
+		out[i] = serSleep(dbgen.GetSleepRow(row))
 	}
 	return gen.ListSleeps200JSONResponse(out), nil
 }
@@ -191,7 +177,7 @@ func (d Deps) GetActiveSleep(ctx context.Context, req gen.GetActiveSleepRequestO
 		}
 		return nil, err
 	}
-	return gen.GetActiveSleep200JSONResponse(serActiveSleepRow(row)), nil
+	return gen.GetActiveSleep200JSONResponse(serSleep(dbgen.GetSleepRow(row))), nil
 }
 
 // WakeSleep implements POST /api/sleep/{id}/wake. REF: "body optional

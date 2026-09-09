@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
-
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
@@ -45,16 +43,20 @@ func MeasurementUnit(typ string) string {
 	}
 }
 
-func serMeasurement(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, typ string, value float64, notes *string) gen.MeasurementLog {
+// serMeasurement converts one joined measurement_log+users row into the
+// wire shape. GetMeasurement, ListMeasurements, ListMeasurementsPage and
+// LastMeasurementOfType produce four names for this one shape; callers
+// holding another of them convert (see convert.go).
+func serMeasurement(row dbgen.GetMeasurementRow) gen.MeasurementLog {
 	return gen.MeasurementLog{
-		Id:            id,
-		BabyId:        babyID,
-		CaretakerId:   caretakerID,
-		CaretakerName: caretakerName,
-		Time:          t.Time,
-		Type:          gen.MeasurementLogType(typ),
-		Value:         value,
-		Notes:         notes,
+		Id:            row.ID,
+		BabyId:        row.BabyID,
+		CaretakerId:   row.CaretakerID,
+		CaretakerName: row.CaretakerName,
+		Time:          row.Time.Time,
+		Type:          gen.MeasurementLogType(row.Type),
+		Value:         row.Value,
+		Notes:         row.Notes,
 	}
 }
 
@@ -71,7 +73,7 @@ func (d Deps) ListMeasurements(ctx context.Context, req gen.ListMeasurementsRequ
 	}
 	out := make([]gen.MeasurementLog, len(rows))
 	for i, row := range rows {
-		out[i] = serMeasurement(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Type, row.Value, row.Notes)
+		out[i] = serMeasurement(dbgen.GetMeasurementRow(row))
 	}
 	return gen.ListMeasurements200JSONResponse(out), nil
 }
@@ -108,7 +110,7 @@ func (d Deps) CreateMeasurement(ctx context.Context, req gen.CreateMeasurementRe
 	if unknownBaby {
 		return gen.CreateMeasurement404JSONResponse(unknownBabyErr()), nil
 	}
-	return gen.CreateMeasurement201JSONResponse(serMeasurement(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Type, row.Value, row.Notes)), nil
+	return gen.CreateMeasurement201JSONResponse(serMeasurement(row)), nil
 }
 
 // UpdateMeasurement implements PATCH /api/measurements/{id}. REF: "partial
@@ -156,7 +158,7 @@ func (d Deps) UpdateMeasurement(ctx context.Context, req gen.UpdateMeasurementRe
 	if !found {
 		return gen.UpdateMeasurement404JSONResponse(notFound()), nil
 	}
-	return gen.UpdateMeasurement200JSONResponse(serMeasurement(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Type, row.Value, row.Notes)), nil
+	return gen.UpdateMeasurement200JSONResponse(serMeasurement(row)), nil
 }
 
 // DeleteMeasurement implements DELETE /api/measurements/{id}. REF:

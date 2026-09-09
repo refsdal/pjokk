@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
-
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
@@ -17,14 +15,17 @@ import (
 // shared createLog/updateLog/deleteLog engine and medicine.go for a fuller
 // worked example with the PATCH tri-state pattern.
 
-func serBath(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, notes *string) gen.BathLog {
+// serBath converts one joined bath_log+users row into the wire shape.
+// GetBath, ListBaths and ListBathsPage produce three names for this one
+// shape; callers holding another of them convert (see convert.go).
+func serBath(row dbgen.GetBathRow) gen.BathLog {
 	return gen.BathLog{
-		Id:            id,
-		BabyId:        babyID,
-		CaretakerId:   caretakerID,
-		CaretakerName: caretakerName,
-		Time:          t.Time,
-		Notes:         notes,
+		Id:            row.ID,
+		BabyId:        row.BabyID,
+		CaretakerId:   row.CaretakerID,
+		CaretakerName: row.CaretakerName,
+		Time:          row.Time.Time,
+		Notes:         row.Notes,
 	}
 }
 
@@ -41,7 +42,7 @@ func (d Deps) ListBaths(ctx context.Context, req gen.ListBathsRequestObject) (ge
 	}
 	out := make([]gen.BathLog, len(rows))
 	for i, row := range rows {
-		out[i] = serBath(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Notes)
+		out[i] = serBath(dbgen.GetBathRow(row))
 	}
 	return gen.ListBaths200JSONResponse(out), nil
 }
@@ -76,7 +77,7 @@ func (d Deps) CreateBath(ctx context.Context, req gen.CreateBathRequestObject) (
 	if unknownBaby {
 		return gen.CreateBath404JSONResponse(unknownBabyErr()), nil
 	}
-	return gen.CreateBath201JSONResponse(serBath(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Notes)), nil
+	return gen.CreateBath201JSONResponse(serBath(row)), nil
 }
 
 // UpdateBath implements PATCH /api/baths/{id}. REF: "partial (nullable
@@ -118,7 +119,7 @@ func (d Deps) UpdateBath(ctx context.Context, req gen.UpdateBathRequestObject) (
 	if !found {
 		return gen.UpdateBath404JSONResponse(notFound()), nil
 	}
-	return gen.UpdateBath200JSONResponse(serBath(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Notes)), nil
+	return gen.UpdateBath200JSONResponse(serBath(row)), nil
 }
 
 // DeleteBath implements DELETE /api/baths/{id}. REF: "{ok:true} / 404".
