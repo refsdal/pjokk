@@ -26,7 +26,7 @@ import type {
 } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
-import { Sheet } from "@/components/Sheet";
+import { Sheet, useSheetReset } from "@/components/Sheet";
 import { Stepper } from "@/components/Stepper";
 import { TimeField } from "@/components/TimeField";
 import { Button } from "@/components/ui/button";
@@ -270,8 +270,6 @@ export function OtherLogSheet({
           }[]
         ).find((m) => m.id === edit.id)?.photos ?? edit.photos)
       : [];
-  const [instance, setInstance] = useState(0);
-  const [wasOpen, setWasOpen] = useState(false);
 
   const lastMeasurement = (type: MeasurementType): number | null => {
     const rows = (recent.data ?? []) as { type?: string; value?: number }[];
@@ -279,9 +277,7 @@ export function OtherLogSheet({
     return typeof row?.value === "number" ? row.value : null;
   };
 
-  if (open && !wasOpen) {
-    setWasOpen(true);
-    setInstance((i) => i + 1);
+  const instance = useSheetReset(open, () => {
     setNotes(edit && "notes" in edit ? (edit.notes ?? "") : "");
     setPendingPhoto(null);
     setTime(edit ? new Date(edit.time) : null);
@@ -355,10 +351,7 @@ export function OtherLogSheet({
         );
       }
     }
-  }
-  if (!open && wasOpen) {
-    setWasOpen(false);
-  }
+  });
 
   const changeMtype = (type: MeasurementType) => {
     if (type === mtype) return;

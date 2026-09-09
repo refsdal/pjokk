@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { FeedLog, FeedTimer } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
-import { Sheet } from "@/components/Sheet";
+import { Sheet, useSheetReset } from "@/components/Sheet";
 import { Stepper } from "@/components/Stepper";
 import { TimeField } from "@/components/TimeField";
 import { Button } from "@/components/ui/button";
@@ -108,9 +108,6 @@ export function FeedSheet({
   const [now, setNow] = useState(() => Date.now());
   const [time, setTime] = useState<Date | null>(null);
   const [notes, setNotes] = useState("");
-  // Bumped on every open so TimeField remounts with fresh initial state.
-  const [instance, setInstance] = useState(0);
-  const [wasOpen, setWasOpen] = useState(false);
 
   // The timer only matters on the create path: editing a past entry must
   // never touch a clock that is running for the CURRENT feed.
@@ -145,11 +142,9 @@ export function FeedSheet({
     }
   };
 
-  // Initialize synchronously on open (state-during-render derived pattern),
-  // so children mount with the right values.
-  if (open && !wasOpen) {
-    setWasOpen(true);
-    setInstance((i) => i + 1);
+  // Seeded during the opening render so children mount with the right
+  // values — see useSheetReset.
+  const instance = useSheetReset(open, () => {
     setNotes(edit?.notes ?? "");
     setNow(Date.now());
     if (edit) {
@@ -171,10 +166,7 @@ export function FeedSheet({
       setTime(null);
       applyPrefill(initial);
     }
-  }
-  if (!open && wasOpen) {
-    setWasOpen(false);
-  }
+  });
 
   const startTimer = useStartFeedTimer();
   const setSide = useSetFeedTimerSide();

@@ -4,7 +4,7 @@ import type { Contact, ContactIcon } from "@pjokk/shared";
 import { contactIcons } from "@pjokk/shared";
 import { MultiChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
-import { Sheet } from "@/components/Sheet";
+import { Sheet, useSheetReset } from "@/components/Sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { contactIconMeta, websiteHref } from "@/lib/contact-ui";
@@ -76,10 +76,8 @@ export function ContactSheet({
   const [website, setWebsite] = useState("");
   const [notes, setNotes] = useState("");
   const [babyIds, setBabyIds] = useState<string[]>([]);
-  const [wasOpen, setWasOpen] = useState(false);
 
-  if (open && !wasOpen) {
-    setWasOpen(true);
+  useSheetReset(open, () => {
     setName(contact?.name ?? "");
     setRole(contact?.role ?? "");
     setIcon(contact?.icon ?? null);
@@ -88,8 +86,7 @@ export function ContactSheet({
     setWebsite(contact?.website ?? "");
     setNotes(contact?.notes ?? "");
     setBabyIds(contact?.babies.map((b) => b.id) ?? []);
-  }
-  if (!open && wasOpen) setWasOpen(false);
+  });
 
   const save = useSaveContact(contact?.id);
   const remove = useDeleteContact();

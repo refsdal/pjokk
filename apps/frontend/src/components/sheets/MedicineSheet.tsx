@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { MedicineCatalogueEntry, MedicineUnit } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
-import { Sheet } from "@/components/Sheet";
+import { Sheet, useSheetReset } from "@/components/Sheet";
 import { Stepper } from "@/components/Stepper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,17 +34,14 @@ export function MedicineSheet({
   const [unit, setUnit] = useState<MedicineUnit>("ml");
   const [interval, setInterval] = useState<number>(0);
   const [supplement, setSupplement] = useState(false);
-  const [wasOpen, setWasOpen] = useState(false);
 
-  if (open && !wasOpen) {
-    setWasOpen(true);
+  useSheetReset(open, () => {
     setName(entry?.name ?? "");
     setAmount(entry?.defaultAmount ?? 2.5);
     setUnit(entry?.unit ?? "ml");
     setInterval(entry?.minIntervalMin ?? 0);
     setSupplement(entry?.isSupplement ?? false);
-  }
-  if (!open && wasOpen) setWasOpen(false);
+  });
 
   const save = useSaveCatalogueMedicine(entry?.id);
   const remove = useDeleteCatalogueMedicine();
