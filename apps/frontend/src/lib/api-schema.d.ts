@@ -2027,6 +2027,16 @@ export interface components {
              * @description Per day, minutes of sessions typed `night`; the rest of avgSleepMin is day sleep (naps and untyped sessions).
              */
             avgNightSleepMin: number;
+            /**
+             * Format: int32
+             * @description The mean length of ONE nap, where a nap is any session not typed `night` (the same split as avgNightSleepMin). Unlike the day buckets, which cut a session at local midnight, this counts whole sessions and assigns each to the window by its START time; a running nap has no length yet and is excluded. 0 when no nap ended inside the window.
+             */
+            avgNapMin: number;
+            /**
+             * Format: double
+             * @description Naps per day over the whole window (the denominator is the window length, as for avgFeeds), counting the same completed sessions as avgNapMin.
+             */
+            avgNaps: number;
             avgFeedsByType: components["schemas"]["StatsFeedsByType"];
             /** Format: int32 */
             avgIntakeMl: number;

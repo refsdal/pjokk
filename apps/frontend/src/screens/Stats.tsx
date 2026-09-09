@@ -34,7 +34,7 @@ import {
 } from "@/lib/growth";
 import { measurementMeta } from "@/lib/measurements";
 import { t } from "@/lib/i18n";
-import { lastNight } from "@/lib/stats-ui";
+import { lastNight, napLine } from "@/lib/stats-ui";
 import {
   KG_PER_LB,
   formatMeasurementIn,
@@ -289,6 +289,12 @@ export function StatsScreen() {
               s
                 ? `${sleepFmt(s.avgNightSleepMin)} ${t("night")} · ${sleepFmt(s.avgSleepMin - s.avgNightSleepMin)} ${t("day")}`
                 : undefined
+            }
+            sub2={
+              napLine(s?.avgNapMin ?? 0, s?.avgNaps ?? 0, sleepFmt, {
+                nap: t("Nap"),
+                naps: t("naps"),
+              }) ?? undefined
             }
           />
           <StatCard

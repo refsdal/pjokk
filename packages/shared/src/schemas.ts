@@ -563,6 +563,8 @@ export const StatsSchema = z.object({
   nights: z.array(StatsNightSchema),
   avgSleepMin: z.number(),
   avgNightSleepMin: z.number(),
+  avgNapMin: z.number(),
+  avgNaps: z.number(),
   avgIntakeMl: z.number(),
   avgFeeds: z.number(),
   avgFeedsByType: StatsFeedsByTypeSchema,

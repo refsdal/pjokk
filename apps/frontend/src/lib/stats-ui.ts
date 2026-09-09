@@ -42,3 +42,19 @@ export function formatMinutes(min: number, h = "h", m = "min"): string {
   if (hours === 0) return `${rest} ${m}`;
   return rest === 0 ? `${hours} ${h}` : `${hours} ${h} ${rest} ${m}`;
 }
+
+/**
+ * The Sleep card's nap sub-line ("Nap 1 h 15 min · 3.2 naps"), or null when
+ * no nap ended inside the window — a "0 min" nap is noise, not a status.
+ * Worded by the caller so the strings stay in the screen, next to the
+ * other translated copy.
+ */
+export function napLine(
+  avgNapMin: number,
+  avgNaps: number,
+  fmt: (min: number) => string,
+  labels: { nap: string; naps: string },
+): string | null {
+  if (avgNapMin <= 0 || avgNaps <= 0) return null;
+  return `${labels.nap} ${fmt(avgNapMin)} · ${avgNaps} ${labels.naps}`;
+}
