@@ -106,10 +106,12 @@ func (d Deps) ListContacts(ctx context.Context, req gen.ListContactsRequestObjec
 
 	out := make([]gen.Contact, len(rows))
 	for i, row := range rows {
-		out[i] = serContact(dbgen.GetContactRow{
-			ID: row.ID, Name: row.Name, Role: row.Role, Icon: row.Icon,
-			Phone: row.Phone, Email: row.Email, Website: row.Website, Notes: row.Notes,
-		}, byContact[row.ID])
+		// A conversion, not a field-by-field rebuild: sqlc emits a distinct
+		// named type per query, so ListContactsRow and GetContactRow are
+		// structurally identical and Go converts between them directly. The
+		// literal this replaces would have silently dropped any column added
+		// to only one of the two queries.
+		out[i] = serContact(dbgen.GetContactRow(row), byContact[row.ID])
 	}
 	return gen.ListContacts200JSONResponse(out), nil
 }

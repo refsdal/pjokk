@@ -123,7 +123,7 @@ func (d Deps) putAvatar(w http.ResponseWriter, r *http.Request) {
 		respond.Error(w, http.StatusBadRequest, "No file", "NO_FILE")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	if header.Size <= 0 || header.Size > maxAvatarBytes {
 		respond.Error(w, http.StatusRequestEntityTooLarge, "File too large", "TOO_LARGE")
 		return
@@ -222,7 +222,7 @@ func (d Deps) getUserAvatar(w http.ResponseWriter, r *http.Request) {
 		respond.Error(w, http.StatusNotFound, "Not found", "NOT_FOUND")
 		return
 	}
-	defer body.Close()
+	defer func() { _ = body.Close() }()
 
 	h := w.Header()
 	h.Set("Content-Type", "image/jpeg")

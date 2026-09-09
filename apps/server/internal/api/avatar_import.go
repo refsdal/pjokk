@@ -121,7 +121,7 @@ func (d Deps) importGoogleAvatar(ctx context.Context, userID string) {
 		log.Printf("api: avatar import for %s from %s: %v", userID, u.Hostname(), err)
 		return
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != http.StatusOK {
 		log.Printf("api: avatar import for %s: status %d", userID, res.StatusCode)
 		return

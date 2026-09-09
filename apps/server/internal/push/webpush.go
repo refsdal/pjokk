@@ -132,7 +132,7 @@ func (w *WebPush) sendOne(ctx context.Context, sub gen.PushSubscription, body []
 		log.Printf("push: send to subscription %q failed: %v", sub.ID, err)
 		return outcomeError
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case http.StatusNotFound, http.StatusGone:

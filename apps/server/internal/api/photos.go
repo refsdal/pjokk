@@ -155,7 +155,7 @@ func (d Deps) uploadMilestonePhoto(w http.ResponseWriter, r *http.Request) {
 		respond.Error(w, http.StatusBadRequest, "No file", "NO_FILE")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	if header.Size <= 0 || header.Size > maxPhotoUploadBytes {
 		respond.Error(w, http.StatusRequestEntityTooLarge, "Photo too large", "TOO_LARGE")
 		return
@@ -237,7 +237,7 @@ func (d Deps) getMilestonePhoto(w http.ResponseWriter, r *http.Request) {
 		respond.Error(w, http.StatusNotFound, "Not found", "NOT_FOUND")
 		return
 	}
-	defer body.Close()
+	defer func() { _ = body.Close() }()
 
 	h := w.Header()
 	h.Set("Content-Type", "image/jpeg")

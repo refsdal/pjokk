@@ -1,0 +1,28 @@
+# golangci-lint for the Go half of the repo. Run from apps/server:
+#
+#   golangci-lint run
+#
+# CI runs it in .github/workflows/test.yml, next to `go vet`.
+#
+# This is deliberately the DEFAULT linter set (errcheck, govet, ineffassign,
+# staticcheck, unused) rather than a curated pile: a gate that is green the
+# day it lands is one that stays on. Adding a linter is a change with its own
+# diff, not something to inherit by enabling `all` and suppressing the fallout.
+version: "2"
+
+linters:
+  default: standard
+
+  exclusions:
+    # oapi-codegen and sqlc output. Neither is hand-edited (CLAUDE.md: "neither
+    # CI nor the image runs codegen" — the files are committed as generated),
+    # so a finding in one is not actionable.
+    paths:
+      - internal/api/gen
+      - internal/db/gen
+
+formatters:
+  enable:
+    # `go vet` does not check formatting and CI never did either, so a gofmt
+    # drift could sit in the tree indefinitely — one had.
+    - gofmt

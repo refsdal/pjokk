@@ -46,7 +46,7 @@ func NewFS(root string) (Storage, error) {
 		return nil, fmt.Errorf("storage: fs root %q is not writable: %w", root, err)
 	}
 	name := probe.Name()
-	probe.Close()
+	_ = probe.Close()
 	if err := os.Remove(name); err != nil {
 		return nil, fmt.Errorf("storage: fs root %q: remove write probe: %w", root, err)
 	}
@@ -104,8 +104,8 @@ func (f *fsStorage) Put(ctx context.Context, key string, body io.Reader, size in
 	committed := false
 	defer func() {
 		if !committed {
-			tmp.Close()
-			os.Remove(tmpName)
+			_ = tmp.Close()
+			_ = os.Remove(tmpName)
 		}
 	}()
 
@@ -139,11 +139,11 @@ func (f *fsStorage) GetStream(ctx context.Context, key string) (io.ReadCloser, b
 	}
 	info, err := file.Stat()
 	if err != nil {
-		file.Close()
+		_ = file.Close()
 		return nil, false, fmt.Errorf("storage: stat %q: %w", key, err)
 	}
 	if info.IsDir() {
-		file.Close()
+		_ = file.Close()
 		return nil, false, nil
 	}
 	return file, true, nil

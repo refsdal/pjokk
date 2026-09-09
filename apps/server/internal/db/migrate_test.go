@@ -29,7 +29,7 @@ func resetSchema(t *testing.T, databaseURL string) {
 	if err != nil {
 		t.Fatalf("open reset connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if _, err := conn.Exec(`DROP SCHEMA public CASCADE; CREATE SCHEMA public;`); err != nil {
 		t.Fatalf("reset public schema: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestApplyMigrations_CreatesSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open verify connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	var regclass sql.NullString
 	if err := conn.QueryRowContext(ctx, "select to_regclass('public.baby')").Scan(&regclass); err != nil {
@@ -94,7 +94,7 @@ func TestApplyMigrations_BlocksOnAdvisoryLock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open holder connection: %v", err)
 	}
-	defer holder.Close()
+	defer func() { _ = holder.Close() }()
 	holder.SetMaxOpenConns(1)
 	holder.SetMaxIdleConns(1)
 
