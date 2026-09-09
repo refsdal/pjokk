@@ -1212,8 +1212,8 @@ func TestCreateFamilyForUserBypassesTheGuardOnlyThroughItsOwnMethod(t *testing.T
 	if err != nil {
 		t.Fatalf("read membership: %v", err)
 	}
-	if role.Role != auth.RoleAdmin {
-		t.Errorf("first admin's role = %q, want %q", role.Role, auth.RoleAdmin)
+	if role != auth.RoleAdmin {
+		t.Errorf("first admin's role = %q, want %q", role, auth.RoleAdmin)
 	}
 
 	// The marker does not leak into later calls made with the same base

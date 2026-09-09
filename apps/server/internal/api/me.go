@@ -182,7 +182,7 @@ func (d Deps) buildMe(ctx context.Context, session *auth.Session) (gen.Me, error
 
 	if session.ActiveFamilyID != "" {
 		familyID := session.ActiveFamilyID
-		row, err := d.Q.GetFamilyMembershipRole(ctx, dbgen.GetFamilyMembershipRoleParams{
+		row, err := d.Q.GetFamilyMembershipWithPlan(ctx, dbgen.GetFamilyMembershipWithPlanParams{
 			OrganizationID: familyID,
 			UserID:         session.UserID,
 		})

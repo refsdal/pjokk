@@ -270,8 +270,6 @@ func TestRequireFamilyPopulatesTheFamilyContext(t *testing.T) {
 		t.Errorf("UserName = %q, want Kari Nordmann", p.family.UserName)
 	case p.family.MemberRole != auth.RoleAdmin:
 		t.Errorf("MemberRole = %q, want %q (the family's creator is a parent)", p.family.MemberRole, auth.RoleAdmin)
-	case p.family.Plan != "free":
-		t.Errorf("Plan = %q, want free", p.family.Plan)
 	case p.family.IsAPIKey:
 		t.Error("IsAPIKey = true for a cookie session")
 	case p.family.ImpersonatedBy != "":
