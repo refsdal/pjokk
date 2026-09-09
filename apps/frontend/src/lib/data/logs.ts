@@ -305,7 +305,7 @@ export function registerLogMutationDefaults(qc: QueryClient) {
           body: patch,
         }),
       ),
-    onError: saveErrorToast("feed"),
+    onError: saveErrorToast("sleep"),
     onSettled: () => invalidateLogs(qc),
   });
   qc.setMutationDefaults(["deleteFeed"], {
