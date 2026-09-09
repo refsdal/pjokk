@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
-
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
 )
 
@@ -83,7 +81,7 @@ func (d Deps) importGoogleAvatar(ctx context.Context, userID string) {
 	// it" and do nothing further, rather than fetch and store a duplicate.
 	rows, err := d.Q.MarkAvatarImportAttempted(ctx, dbgen.MarkAvatarImportAttemptedParams{
 		ID:               userID,
-		AvatarImportedAt: pgtype.Timestamptz{Time: d.Now(), Valid: true},
+		AvatarImportedAt: ts(d.Now()),
 	})
 	if err != nil {
 		log.Printf("api: mark avatar import for %s: %v", userID, err)

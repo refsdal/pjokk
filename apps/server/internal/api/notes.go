@@ -63,7 +63,7 @@ func (d Deps) CreateNote(ctx context.Context, req gen.CreateNoteRequestObject) (
 				FamilyID:    fam.FamilyID,
 				BabyID:      body.BabyId,
 				CaretakerID: fam.UserID,
-				Time:        pgtype.Timestamptz{Time: body.Time, Valid: true},
+				Time:        ts(body.Time),
 				Content:     body.Content,
 				Notes:       body.Notes,
 			})
@@ -114,15 +114,11 @@ func (d Deps) UpdateNote(ctx context.Context, req gen.UpdateNoteRequestObject) (
 		},
 		anySet,
 		func(ctx context.Context) error {
-			var timeParam pgtype.Timestamptz
-			if timeVal != nil {
-				timeParam = pgtype.Timestamptz{Time: *timeVal, Valid: true}
-			}
 			_, err := d.Q.UpdateNote(ctx, dbgen.UpdateNoteParams{
 				FamilyID:   fam.FamilyID,
 				ID:         req.Id,
 				TimeSet:    timeSet,
-				TimeVal:    timeParam,
+				TimeVal:    tsFrom(timeVal),
 				ContentSet: contentSet,
 				ContentVal: contentVal,
 				NotesSet:   notesSet,

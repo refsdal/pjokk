@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
@@ -78,14 +77,14 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 	rangeFrom := startIdx*summaryDayMs + tzMs
 	rangeTo := (todayIdx+1)*summaryDayMs + tzMs
 
-	fromTS := pgtype.Timestamptz{Time: time.UnixMilli(rangeFrom), Valid: true}
-	toTS := pgtype.Timestamptz{Time: time.UnixMilli(rangeTo), Valid: true}
+	fromTS := ts(time.UnixMilli(rangeFrom))
+	toTS := ts(time.UnixMilli(rangeTo))
 	// Sleep is read from noon of the day BEFORE the window (issue #50): the
 	// night that ended this morning began yesterday afternoon, and a
 	// one-day window must still be able to answer "how long was the
 	// longest stretch last night?". The day buckets clip to rangeFrom
 	// below, so the extra sessions never leak into a day outside the window.
-	sleepFromTS := pgtype.Timestamptz{Time: time.UnixMilli(rangeFrom - summaryDayMs/2), Valid: true}
+	sleepFromTS := ts(time.UnixMilli(rangeFrom - summaryDayMs/2))
 
 	feeds, err := d.Q.FeedsInRange(ctx, dbgen.FeedsInRangeParams{FamilyID: fam.FamilyID, BabyID: babyID, FromTs: fromTS, ToTs: toTS})
 	if err != nil {

@@ -73,7 +73,7 @@ func hitUserLimit(ctx context.Context, store ratelimit.Store, name, userID strin
 // rows under different generated names (see help.sql), hence the flat
 // parameter list and the two thin wrappers below — play.go's arrangement.
 // acknowledgedByName is only meaningful once acknowledged: the query
-// COALESCEs it to '' in both the "nobody yet" and the "nameless answerer"
+// COALESCEs it to ” in both the "nobody yet" and the "nameless answerer"
 // cases, and acknowledgedAt is what tells them apart.
 func serHelpRequestRow(id, fromUserID, fromName, toUserID, toName, message string, createdAt, acknowledgedAt pgtype.Timestamptz, acknowledgedByName string, delivered int) gen.HelpRequest {
 	out := gen.HelpRequest{
@@ -149,7 +149,7 @@ func (d Deps) CreateHelpRequest(ctx context.Context, req gen.CreateHelpRequestRe
 		FromUserID: fam.UserID,
 		ToUserID:   toUserID,
 		Message:    message,
-		CreatedAt:  pgtype.Timestamptz{Time: d.Now(), Valid: true},
+		CreatedAt:  ts(d.Now()),
 	})
 	if err != nil {
 		return nil, err
@@ -189,7 +189,7 @@ func (d Deps) AcknowledgeHelpRequest(ctx context.Context, req gen.AcknowledgeHel
 	changed, err := d.Q.AcknowledgeHelpRequest(ctx, dbgen.AcknowledgeHelpRequestParams{
 		FamilyID:       fam.FamilyID,
 		ID:             req.Id,
-		AcknowledgedAt: pgtype.Timestamptz{Time: d.Now(), Valid: true},
+		AcknowledgedAt: ts(d.Now()),
 		AcknowledgedBy: &userID,
 	})
 	if err != nil {

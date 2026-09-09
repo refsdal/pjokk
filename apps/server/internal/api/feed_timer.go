@@ -174,9 +174,9 @@ func (d Deps) StartFeedTimer(ctx context.Context, req gen.StartFeedTimerRequestO
 		BabyID:        body.BabyId,
 		CaretakerID:   fam.UserID,
 		Kind:          string(body.Kind),
-		StartTime:     pgtype.Timestamptz{Time: start, Valid: true},
+		StartTime:     ts(start),
 		RunningSide:   &side,
-		SideStartedAt: pgtype.Timestamptz{Time: start, Valid: true},
+		SideStartedAt: ts(start),
 	})
 	if err != nil {
 		// feed_timer_one_per_baby_kind: the only pre-check is the index.
@@ -217,7 +217,7 @@ func (d Deps) SetFeedTimerSide(ctx context.Context, req gen.SetFeedTimerSideRequ
 	if req.Body.Side != nil {
 		v := string(*req.Body.Side)
 		side = &v
-		startedAt = pgtype.Timestamptz{Time: now, Valid: true}
+		startedAt = ts(now)
 	}
 	if _, err := d.Q.SetFeedTimerSides(ctx, dbgen.SetFeedTimerSidesParams{
 		FamilyID:      fam.FamilyID,
@@ -271,7 +271,7 @@ func (d Deps) StopFeedTimer(ctx context.Context, req gen.StopFeedTimerRequestObj
 	}
 	logged := timer.StartTime
 	if body.Time != nil {
-		logged = pgtype.Timestamptz{Time: *body.Time, Valid: true}
+		logged = ts(*body.Time)
 	}
 
 	out := gen.FeedTimerStopped{Kind: gen.FeedTimerStoppedKind(timer.Kind)}

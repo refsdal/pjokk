@@ -62,7 +62,7 @@ func (d Deps) CreateBath(ctx context.Context, req gen.CreateBathRequestObject) (
 				FamilyID:    fam.FamilyID,
 				BabyID:      body.BabyId,
 				CaretakerID: fam.UserID,
-				Time:        pgtype.Timestamptz{Time: body.Time, Valid: true},
+				Time:        ts(body.Time),
 				Notes:       body.Notes,
 			})
 		},
@@ -108,15 +108,11 @@ func (d Deps) UpdateBath(ctx context.Context, req gen.UpdateBathRequestObject) (
 		},
 		anySet,
 		func(ctx context.Context) error {
-			var timeParam pgtype.Timestamptz
-			if timeVal != nil {
-				timeParam = pgtype.Timestamptz{Time: *timeVal, Valid: true}
-			}
 			_, err := d.Q.UpdateBath(ctx, dbgen.UpdateBathParams{
 				FamilyID: fam.FamilyID,
 				ID:       req.Id,
 				TimeSet:  timeSet,
-				TimeVal:  timeParam,
+				TimeVal:  tsFrom(timeVal),
 				NotesSet: notesSet,
 				NotesVal: notesVal,
 			})

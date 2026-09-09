@@ -180,7 +180,7 @@ func (d Deps) RevokeApiKey(ctx context.Context, req gen.RevokeApiKeyRequestObjec
 	n, err := d.Q.RevokeAPIKey(ctx, dbgen.RevokeAPIKeyParams{
 		ID:        req.Id,
 		FamilyID:  fam.FamilyID,
-		RevokedAt: pgtype.Timestamptz{Time: d.Now(), Valid: true},
+		RevokedAt: ts(d.Now()),
 	})
 	if err != nil {
 		return nil, err
