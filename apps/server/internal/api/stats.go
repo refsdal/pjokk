@@ -163,10 +163,26 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 	}
 	nightIndex := func(utcMs int64) int64 { return dayIndex(utcMs - summaryDayMs/2) }
 
+	// Typical nap: the mean length of ONE non-night session. Deliberately
+	// NOT computed from the day buckets above — those cut a session at
+	// local midnight, which is right for "sleep per day" and wrong for
+	// "how long is a nap". A nap is counted once, whole, against the day
+	// it STARTED in, so the guards below are its own: sessions starting
+	// before rangeFrom (SleepsInRange overlaps, so it returns them) and
+	// running sessions (no length yet) are both skipped.
+	var napMs int64
+	var napCount int64
+
 	// TS lines 76-89: split each session across the local midnights it
 	// crosses. Active sessions (EndTime not Valid) count up to now.
 	for _, sl := range sleeps {
 		isNight := sl.Type != nil && *sl.Type == "night"
+		if !isNight && sl.EndTime.Valid {
+			if start := sl.StartTime.Time.UnixMilli(); start >= rangeFrom {
+				napMs += sl.EndTime.Time.UnixMilli() - start
+				napCount++
+			}
+		}
 		if isNight {
 			if n, ok := nights[nightIndex(sl.StartTime.Time.UnixMilli())]; ok {
 				end := now
@@ -262,6 +278,11 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 	avgNightSleepMin := int32(math.Round(float64(sumNight) / daysF))
 	avgIntakeMl := int32(math.Round(float64(sumIntake) / daysF))
 	avg1 := func(sum int64) float64 { return math.Round(float64(sum)/daysF*10) / 10 }
+	var avgNapMin int32
+	if napCount > 0 {
+		avgNapMin = int32(math.Round(float64(napMs) / float64(napCount) / 60_000))
+	}
+	avgNaps := avg1(napCount)
 	avgFeeds := avg1(sumFeeds)
 	avgDiapers := avg1(sumDiapers)
 
@@ -297,6 +318,8 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 		Nights:           statsNights,
 		AvgSleepMin:      avgSleepMin,
 		AvgNightSleepMin: avgNightSleepMin,
+		AvgNapMin:        avgNapMin,
+		AvgNaps:          avgNaps,
 		AvgIntakeMl:      avgIntakeMl,
 		AvgFeeds:         avgFeeds,
 		AvgFeedsByType:   gen.StatsFeedsByType{Bottle: avg1(sumBottle), Breast: avg1(sumBreast), Solids: avg1(sumSolids)},

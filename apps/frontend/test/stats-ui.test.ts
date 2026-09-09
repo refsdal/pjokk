@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { formatMinutes, lastNight } from "../src/lib/stats-ui";
+import { formatMinutes, lastNight, napLine } from "../src/lib/stats-ui";
 
 const n = (date: string, longest: number | null, wakings: number | null) => ({
   date,
@@ -35,4 +35,25 @@ test("formatMinutes", () => {
   expect(formatMinutes(45)).toBe("45 min");
   expect(formatMinutes(0)).toBe("0 min");
   expect(formatMinutes(90, "t", "m")).toBe("1 t 30 m");
+});
+
+describe("napLine", () => {
+  const fmt = (min: number) => formatMinutes(min);
+  const labels = { nap: "Nap", naps: "naps" };
+
+  test("reads as a duration and a count, like the Intake card's sub-line", () => {
+    expect(napLine(75, 3.2, fmt, labels)).toBe("Nap 1 h 15 min · 3.2 naps");
+  });
+
+  test("is omitted when no nap ended in the window", () => {
+    expect(napLine(0, 0, fmt, labels)).toBeNull();
+    // Naps counted but none with a length: nothing worth a line either.
+    expect(napLine(0, 1.5, fmt, labels)).toBeNull();
+  });
+
+  test("takes its wording from the caller, so it translates", () => {
+    expect(napLine(45, 2, fmt, { nap: "Lur", naps: "lurer" })).toBe(
+      "Lur 45 min · 2 lurer",
+    );
+  });
 });
