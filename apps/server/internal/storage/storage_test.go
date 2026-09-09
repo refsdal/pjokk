@@ -52,7 +52,7 @@ func runConformance(t *testing.T, newStorage func(t *testing.T) storage.Storage)
 		if !found {
 			t.Fatalf("found = false, want true")
 		}
-		defer rc.Close()
+		defer func() { _ = rc.Close() }()
 
 		got, err := io.ReadAll(rc)
 		if err != nil {
@@ -74,7 +74,7 @@ func runConformance(t *testing.T, newStorage func(t *testing.T) storage.Storage)
 		}
 		if rc != nil {
 			t.Errorf("rc = %v, want nil", rc)
-			rc.Close()
+			_ = rc.Close()
 		}
 	})
 
@@ -176,7 +176,7 @@ func TestFSNestedKeysCreateSubdirectories(t *testing.T) {
 	if !found {
 		t.Fatalf("found = false, want true")
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 	got, err := io.ReadAll(rc)
 	if err != nil {
 		t.Fatalf("read: %v", err)
@@ -235,7 +235,7 @@ func TestFSUnwritableRootErrorsAtConstruction(t *testing.T) {
 	if err := os.Chmod(root, 0o500); err != nil {
 		t.Fatalf("chmod: %v", err)
 	}
-	defer os.Chmod(root, 0o700)
+	defer func() { _ = os.Chmod(root, 0o700) }()
 
 	if _, err := storage.NewFS(root); err == nil {
 		t.Error("NewFS on an unwritable root: got nil error, want one")

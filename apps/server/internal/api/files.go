@@ -138,7 +138,7 @@ func (d Deps) uploadVaccineDocument(w http.ResponseWriter, r *http.Request) {
 		respond.Error(w, http.StatusBadRequest, "No file", "NO_FILE")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	contentType := header.Header.Get("Content-Type")
 	if !allowedVaccineDocTypes[contentType] {
@@ -226,7 +226,7 @@ func (d Deps) getFile(w http.ResponseWriter, r *http.Request) {
 		respond.Error(w, http.StatusNotFound, "Not found", "NOT_FOUND")
 		return
 	}
-	defer body.Close()
+	defer func() { _ = body.Close() }()
 
 	h := w.Header()
 	h.Set("Content-Type", doc.ContentType)

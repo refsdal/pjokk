@@ -54,7 +54,7 @@ func ApplyMigrations(ctx context.Context, databaseURL string) error {
 	if err != nil {
 		return fmt.Errorf("db: open database: %w", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	sqlDB.SetMaxOpenConns(1)
 	sqlDB.SetMaxIdleConns(1)

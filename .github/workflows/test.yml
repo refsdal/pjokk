@@ -50,7 +50,7 @@ jobs:
           # mise itself, pinned like every other tool: the action otherwise
           # resolves "latest", which once pointed at a tag with no assets.
           version: 2026.9.1
-          install_args: "go bun aqua:goreleaser/goreleaser"
+          install_args: "go bun aqua:goreleaser/goreleaser aqua:golangci/golangci-lint"
 
       # mise does not cache Go modules; do it directly, keyed on the module
       # that actually owns go.sum.
@@ -81,8 +81,11 @@ jobs:
       # Postgres service — -p 1 because several Go test packages truncate
       # shared tables between tests and are not safe to run as concurrent
       # packages against one database.
-      - name: Go vet
-        run: cd apps/server && go vet ./...
+      # golangci-lint's default set is errcheck, govet, ineffassign,
+      # staticcheck and unused, so this subsumes the bare `go vet` it
+      # replaces. Config and rationale: apps/server/.golangci.yml.
+      - name: Go lint
+        run: cd apps/server && golangci-lint run
 
       - name: Go tests
         run: cd apps/server && go test -p 1 -count=1 ./...

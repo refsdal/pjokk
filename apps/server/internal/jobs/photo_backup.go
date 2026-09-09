@@ -127,7 +127,7 @@ func copyObject(ctx context.Context, d Deps, from, to string) error {
 	if !found {
 		return nil // raced with a delete; next night sorts it out
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 	data, err := io.ReadAll(rc)
 	if err != nil {
 		return fmt.Errorf("jobs: read %s: %w", from, err)
