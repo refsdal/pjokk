@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
@@ -115,7 +114,7 @@ func adminID(ctx context.Context) (string, error) {
 
 // GetAdminStats implements GET /api/admin/stats.
 func (d Deps) GetAdminStats(ctx context.Context, _ gen.GetAdminStatsRequestObject) (gen.GetAdminStatsResponseObject, error) {
-	weekAgo := pgtype.Timestamptz{Time: d.Now().Add(-7 * 24 * time.Hour), Valid: true}
+	weekAgo := ts(d.Now().Add(-7 * 24 * time.Hour))
 	row, err := d.Q.GetAdminStats(ctx, weekAgo)
 	if err != nil {
 		return nil, err
@@ -304,7 +303,7 @@ func (d Deps) DeleteAdminUser(ctx context.Context, req gen.DeleteAdminUserReques
 	if err := qtx.ReassignUserReferences(ctx, dbgen.ReassignUserReferencesParams{
 		UserID:      req.Id,
 		TombstoneID: db.TombstoneID,
-		Now:         pgtype.Timestamptz{Time: d.Now(), Valid: true},
+		Now:         ts(d.Now()),
 	}); err != nil {
 		return nil, err
 	}

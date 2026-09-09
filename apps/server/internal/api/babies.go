@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
@@ -116,7 +115,7 @@ func (d Deps) CreateBaby(ctx context.Context, req gen.CreateBabyRequestObject) (
 	baby, err := d.Q.CreateBaby(ctx, dbgen.CreateBabyParams{
 		FamilyID:  fam.FamilyID,
 		Name:      body.Name,
-		BirthDate: pgtype.Timestamptz{Time: body.BirthDate, Valid: true},
+		BirthDate: ts(body.BirthDate),
 		Sex:       sex,
 	})
 	if err != nil {
@@ -167,7 +166,7 @@ func (d Deps) UpdateBaby(ctx context.Context, req gen.UpdateBabyRequestObject) (
 	}
 	birthDate := existing.BirthDate
 	if body.BirthDate != nil {
-		birthDate = pgtype.Timestamptz{Time: *body.BirthDate, Valid: true}
+		birthDate = ts(*body.BirthDate)
 	}
 	sex := existing.Sex
 	if body.Sex != nil {

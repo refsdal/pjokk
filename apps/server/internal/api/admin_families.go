@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/auth"
@@ -659,7 +658,7 @@ func (d Deps) RevokeAdminFamilyInvite(ctx context.Context, req gen.RevokeAdminFa
 	n, err := d.Q.RevokeInvite(ctx, dbgen.RevokeInviteParams{
 		Code:      req.Code,
 		FamilyID:  req.Id,
-		RevokedAt: pgtype.Timestamptz{Time: d.Now(), Valid: true},
+		RevokedAt: ts(d.Now()),
 	})
 	if err != nil {
 		return nil, err
@@ -687,7 +686,7 @@ func (d Deps) RevokeAdminFamilyKey(ctx context.Context, req gen.RevokeAdminFamil
 	n, err := d.Q.RevokeAPIKey(ctx, dbgen.RevokeAPIKeyParams{
 		ID:        req.KeyId,
 		FamilyID:  req.Id,
-		RevokedAt: pgtype.Timestamptz{Time: d.Now(), Valid: true},
+		RevokedAt: ts(d.Now()),
 	})
 	if err != nil {
 		return nil, err

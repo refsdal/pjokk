@@ -137,7 +137,7 @@ func (d Deps) UpdateMedicineCatalogueEntry(ctx context.Context, req gen.UpdateMe
 	}
 	var archivedAt pgtype.Timestamptz
 	if archivedSet && archivedVal != nil && *archivedVal {
-		archivedAt = pgtype.Timestamptz{Time: d.Now(), Valid: true}
+		archivedAt = ts(d.Now())
 	}
 	if nameSet || amountSet || unitSet || intervalSet || supplementSet || archivedSet {
 		if _, err := d.Q.UpdateCatalogueMedicine(ctx, dbgen.UpdateCatalogueMedicineParams{

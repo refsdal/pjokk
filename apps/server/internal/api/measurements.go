@@ -92,7 +92,7 @@ func (d Deps) CreateMeasurement(ctx context.Context, req gen.CreateMeasurementRe
 				FamilyID:    fam.FamilyID,
 				BabyID:      body.BabyId,
 				CaretakerID: fam.UserID,
-				Time:        pgtype.Timestamptz{Time: body.Time, Valid: true},
+				Time:        ts(body.Time),
 				Type:        string(body.Type),
 				Value:       body.Value,
 				Notes:       body.Notes,
@@ -148,15 +148,11 @@ func (d Deps) UpdateMeasurement(ctx context.Context, req gen.UpdateMeasurementRe
 		},
 		anySet,
 		func(ctx context.Context) error {
-			var timeParam pgtype.Timestamptz
-			if timeVal != nil {
-				timeParam = pgtype.Timestamptz{Time: *timeVal, Valid: true}
-			}
 			_, err := d.Q.UpdateMeasurement(ctx, dbgen.UpdateMeasurementParams{
 				FamilyID: fam.FamilyID,
 				ID:       req.Id,
 				TimeSet:  timeSet,
-				TimeVal:  timeParam,
+				TimeVal:  tsFrom(timeVal),
 				TypeSet:  typeSet,
 				TypeVal:  typeVal,
 				ValueSet: valueSet,

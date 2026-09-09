@@ -166,7 +166,7 @@ func (d Deps) CreateVaccine(ctx context.Context, req gen.CreateVaccineRequestObj
 				FamilyID:     fam.FamilyID,
 				BabyID:       body.BabyId,
 				CaretakerID:  fam.UserID,
-				Time:         pgtype.Timestamptz{Time: body.Time, Valid: true},
+				Time:         ts(body.Time),
 				Name:         body.Name,
 				DoseNumber:   doseNumber,
 				ScheduleSlot: body.ScheduleSlot,
@@ -229,15 +229,11 @@ func (d Deps) UpdateVaccine(ctx context.Context, req gen.UpdateVaccineRequestObj
 		},
 		anySet,
 		func(ctx context.Context) error {
-			var timeParam pgtype.Timestamptz
-			if timeVal != nil {
-				timeParam = pgtype.Timestamptz{Time: *timeVal, Valid: true}
-			}
 			_, err := d.Q.UpdateVaccine(ctx, dbgen.UpdateVaccineParams{
 				FamilyID:        fam.FamilyID,
 				ID:              req.Id,
 				TimeSet:         timeSet,
-				TimeVal:         timeParam,
+				TimeVal:         tsFrom(timeVal),
 				NameSet:         nameSet,
 				NameVal:         nameVal,
 				DoseNumberSet:   doseNumberSet,

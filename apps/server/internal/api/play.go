@@ -160,7 +160,7 @@ func (d Deps) CreatePlay(ctx context.Context, req gen.CreatePlayRequestObject) (
 
 	var endTime pgtype.Timestamptz
 	if body.EndTime != nil {
-		endTime = pgtype.Timestamptz{Time: *body.EndTime, Valid: true}
+		endTime = ts(*body.EndTime)
 	}
 
 	id, err := d.Q.CreatePlay(ctx, dbgen.CreatePlayParams{
@@ -168,7 +168,7 @@ func (d Deps) CreatePlay(ctx context.Context, req gen.CreatePlayRequestObject) (
 		BabyID:      body.BabyId,
 		CaretakerID: fam.UserID,
 		Type:        string(body.Type),
-		StartTime:   pgtype.Timestamptz{Time: body.StartTime, Valid: true},
+		StartTime:   ts(body.StartTime),
 		EndTime:     endTime,
 		Notes:       body.Notes,
 	})
@@ -221,7 +221,7 @@ func (d Deps) StopPlay(ctx context.Context, req gen.StopPlayRequestObject) (gen.
 	n, err := d.Q.StopPlay(ctx, dbgen.StopPlayParams{
 		FamilyID: fam.FamilyID,
 		ID:       req.Id,
-		EndTime:  pgtype.Timestamptz{Time: endTime, Valid: true},
+		EndTime:  ts(endTime),
 	})
 	if err != nil {
 		return nil, err
@@ -282,14 +282,6 @@ func (d Deps) UpdatePlay(ctx context.Context, req gen.UpdatePlayRequestObject) (
 		return gen.UpdatePlay200JSONResponse(serPlay(existing)), nil
 	}
 
-	var startParam pgtype.Timestamptz
-	if startVal != nil {
-		startParam = pgtype.Timestamptz{Time: *startVal, Valid: true}
-	}
-	var endParam pgtype.Timestamptz
-	if endVal != nil {
-		endParam = pgtype.Timestamptz{Time: *endVal, Valid: true}
-	}
 	// reopening is "endTime present and explicitly null" — the one write
 	// this endpoint makes that can collide with the partial unique index
 	// (see this file's doc comment, divergence 1).
@@ -301,9 +293,9 @@ func (d Deps) UpdatePlay(ctx context.Context, req gen.UpdatePlayRequestObject) (
 		TypeSet:      typeSet,
 		TypeVal:      typeVal,
 		StartTimeSet: startSet,
-		StartTimeVal: startParam,
+		StartTimeVal: tsFrom(startVal),
 		EndTimeSet:   endSet,
-		EndTimeVal:   endParam,
+		EndTimeVal:   tsFrom(endVal),
 		NotesSet:     notesSet,
 		NotesVal:     notesVal,
 	}); err != nil {

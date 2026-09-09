@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
@@ -78,8 +77,8 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 	rangeFrom := dayIdx*summaryDayMs + tzMs
 	rangeTo := (dayIdx+1)*summaryDayMs + tzMs
 
-	fromTS := pgtype.Timestamptz{Time: time.UnixMilli(rangeFrom), Valid: true}
-	toTS := pgtype.Timestamptz{Time: time.UnixMilli(rangeTo), Valid: true}
+	fromTS := ts(time.UnixMilli(rangeFrom))
+	toTS := ts(time.UnixMilli(rangeTo))
 
 	lastFeeds, err := d.Q.ListFeeds(ctx, dbgen.ListFeedsParams{FamilyID: fam.FamilyID, BabyID: &babyID, Lim: 1})
 	if err != nil {
@@ -161,7 +160,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 	var openHelp *gen.HelpRequest
 	if h, err := d.Q.NewestHelpRequest(ctx, dbgen.NewestHelpRequestParams{
 		FamilyID: fam.FamilyID,
-		Since:    pgtype.Timestamptz{Time: d.Now().Add(-helpRequestWindow), Valid: true},
+		Since:    ts(d.Now().Add(-helpRequestWindow)),
 	}); err == nil {
 		v := serNewestHelpRow(h)
 		openHelp = &v

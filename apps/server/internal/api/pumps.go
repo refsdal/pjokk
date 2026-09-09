@@ -18,14 +18,6 @@ import (
 // and feeds.go's package doc comment for the PATCH tri-state pattern this
 // file's UpdatePump reuses.
 
-func pumpSidePtr(s *string) *gen.PumpLogSide {
-	if s == nil {
-		return nil
-	}
-	v := gen.PumpLogSide(*s)
-	return &v
-}
-
 func serPump(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, side *string, amountMl, durationMin *int32, notes *string) gen.PumpLog {
 	return gen.PumpLog{
 		Id:            id,
@@ -33,7 +25,7 @@ func serPump(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz
 		CaretakerId:   caretakerID,
 		CaretakerName: caretakerName,
 		Time:          t.Time,
-		Side:          pumpSidePtr(side),
+		Side:          enumPtr[gen.PumpLogSide](side),
 		AmountMl:      amountMl,
 		DurationMin:   durationMin,
 		Notes:         notes,
@@ -80,7 +72,7 @@ func (d Deps) CreatePump(ctx context.Context, req gen.CreatePumpRequestObject) (
 				FamilyID:    fam.FamilyID,
 				BabyID:      body.BabyId,
 				CaretakerID: fam.UserID,
-				Time:        pgtype.Timestamptz{Time: body.Time, Valid: true},
+				Time:        ts(body.Time),
 				Side:        side,
 				AmountMl:    body.AmountMl,
 				DurationMin: body.DurationMin,
@@ -141,15 +133,11 @@ func (d Deps) UpdatePump(ctx context.Context, req gen.UpdatePumpRequestObject) (
 		},
 		anySet,
 		func(ctx context.Context) error {
-			var timeParam pgtype.Timestamptz
-			if timeVal != nil {
-				timeParam = pgtype.Timestamptz{Time: *timeVal, Valid: true}
-			}
 			_, err := d.Q.UpdatePump(ctx, dbgen.UpdatePumpParams{
 				FamilyID:       fam.FamilyID,
 				ID:             req.Id,
 				TimeSet:        timeSet,
-				TimeVal:        timeParam,
+				TimeVal:        tsFrom(timeVal),
 				SideSet:        sideSet,
 				SideVal:        sideVal,
 				AmountMlSet:    amountSet,

@@ -114,7 +114,7 @@ func parseTimelineCursor(before *string) timelineCursor {
 	}
 	id := (*before)[sep+1:]
 	return timelineCursor{
-		time: pgtype.Timestamptz{Time: time.UnixMilli(ms), Valid: true},
+		time: ts(time.UnixMilli(ms)),
 		id:   &id,
 	}
 }

@@ -61,15 +61,6 @@ func (getActiveSleepNullResponse) VisitGetActiveSleepResponse(w http.ResponseWri
 	return err
 }
 
-// tsPtr converts a nullable Postgres timestamptz to a *time.Time: nil when
-// SQL NULL (an active session's endTime), a pointer to the value otherwise.
-func tsPtr(t pgtype.Timestamptz) *time.Time {
-	if !t.Valid {
-		return nil
-	}
-	return &t.Time
-}
-
 // serSleepRow converts one joined sleep_log+users row into the wire shape.
 // Three sqlc queries (GetSleep, ListSleeps, ActiveSleep) produce
 // structurally-identical row types under different generated names, hence
@@ -157,14 +148,14 @@ func (d Deps) CreateSleep(ctx context.Context, req gen.CreateSleepRequestObject)
 
 	var endTime pgtype.Timestamptz
 	if body.EndTime != nil {
-		endTime = pgtype.Timestamptz{Time: *body.EndTime, Valid: true}
+		endTime = ts(*body.EndTime)
 	}
 
 	id, err := d.Q.CreateSleep(ctx, dbgen.CreateSleepParams{
 		FamilyID:    fam.FamilyID,
 		BabyID:      body.BabyId,
 		CaretakerID: fam.UserID,
-		StartTime:   pgtype.Timestamptz{Time: body.StartTime, Valid: true},
+		StartTime:   ts(body.StartTime),
 		EndTime:     endTime,
 		Location:    body.Location,
 		Type:        enumStr(body.Type),
@@ -219,7 +210,7 @@ func (d Deps) WakeSleep(ctx context.Context, req gen.WakeSleepRequestObject) (ge
 	n, err := d.Q.WakeSleep(ctx, dbgen.WakeSleepParams{
 		FamilyID: fam.FamilyID,
 		ID:       req.Id,
-		EndTime:  pgtype.Timestamptz{Time: endTime, Valid: true},
+		EndTime:  ts(endTime),
 	})
 	if err != nil {
 		return nil, err
@@ -284,14 +275,6 @@ func (d Deps) UpdateSleep(ctx context.Context, req gen.UpdateSleepRequestObject)
 		return gen.UpdateSleep200JSONResponse(serSleep(existing)), nil
 	}
 
-	var startParam pgtype.Timestamptz
-	if startVal != nil {
-		startParam = pgtype.Timestamptz{Time: *startVal, Valid: true}
-	}
-	var endParam pgtype.Timestamptz
-	if endVal != nil {
-		endParam = pgtype.Timestamptz{Time: *endVal, Valid: true}
-	}
 	// reopening is "endTime present and explicitly null" — the one write
 	// this endpoint makes that can collide with the partial unique index
 	// (see this file's doc comment, divergence 1).
@@ -301,9 +284,9 @@ func (d Deps) UpdateSleep(ctx context.Context, req gen.UpdateSleepRequestObject)
 		FamilyID:     fam.FamilyID,
 		ID:           req.Id,
 		StartTimeSet: startSet,
-		StartTimeVal: startParam,
+		StartTimeVal: tsFrom(startVal),
 		EndTimeSet:   endSet,
-		EndTimeVal:   endParam,
+		EndTimeVal:   tsFrom(endVal),
 		LocationSet:  locationSet,
 		LocationVal:  locationVal,
 		TypeSet:      typeSet,

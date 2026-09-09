@@ -173,8 +173,8 @@ func (d Deps) ListCalendarEvents(ctx context.Context, req gen.ListCalendarEvents
 
 	rows, err := d.Q.ListCalendarEvents(ctx, dbgen.ListCalendarEventsParams{
 		FamilyID: fam.FamilyID,
-		FromTime: pgtype.Timestamptz{Time: from, Valid: true},
-		ToTime:   pgtype.Timestamptz{Time: to, Valid: true},
+		FromTime: ts(from),
+		ToTime:   ts(to),
 	})
 	if err != nil {
 		return nil, err
@@ -268,7 +268,7 @@ func (d Deps) CreateCalendarEvent(ctx context.Context, req gen.CreateCalendarEve
 	}
 	var until pgtype.Timestamptz
 	if recurrence != string(recur.None) && body.RecurrenceUntil != nil {
-		until = pgtype.Timestamptz{Time: *body.RecurrenceUntil, Valid: true}
+		until = ts(*body.RecurrenceUntil)
 	}
 
 	tx, err := d.Pool.Begin(ctx)
@@ -285,7 +285,7 @@ func (d Deps) CreateCalendarEvent(ctx context.Context, req gen.CreateCalendarEve
 		Description:         body.Description,
 		Location:            body.Location,
 		Category:            string(category),
-		StartTime:           pgtype.Timestamptz{Time: body.StartTime, Valid: true},
+		StartTime:           ts(body.StartTime),
 		AllDay:              allDay,
 		DurationMin:         durationMin,
 		RemindMinutesBefore: body.RemindMinutesBefore,
@@ -396,10 +396,6 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 	if recurrenceSet && recurrenceStr == string(recur.None) {
 		untilSet, untilVal = true, nil
 	}
-	var untilParam pgtype.Timestamptz
-	if untilVal != nil {
-		untilParam = pgtype.Timestamptz{Time: *untilVal, Valid: true}
-	}
 
 	var babyIDs, assigneeIDs []string
 	if babyIdsSet {
@@ -447,10 +443,6 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 	qtx := d.Q.WithTx(tx)
 
 	if anySet {
-		var startParam pgtype.Timestamptz
-		if startVal != nil {
-			startParam = pgtype.Timestamptz{Time: *startVal, Valid: true}
-		}
 		n, err := qtx.UpdateCalendarEvent(ctx, dbgen.UpdateCalendarEventParams{
 			FamilyID:               fam.FamilyID,
 			ID:                     req.Id,
@@ -463,7 +455,7 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 			CategorySet:            categorySet,
 			CategoryVal:            categoryVal,
 			StartTimeSet:           startSet,
-			StartTimeVal:           startParam,
+			StartTimeVal:           tsFrom(startVal),
 			AllDaySet:              allDaySet,
 			AllDayVal:              allDayVal,
 			DurationMinSet:         durationSet,
@@ -473,7 +465,7 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 			RecurrenceSet:          recurrenceSet,
 			RecurrenceVal:          recurrenceStr,
 			RecurrenceUntilSet:     untilSet,
-			RecurrenceUntilVal:     untilParam,
+			RecurrenceUntilVal:     tsFrom(untilVal),
 			ClearRemindedAt:        rearm,
 		})
 		if err != nil {

@@ -87,7 +87,7 @@ func (d Deps) CreateMedicine(ctx context.Context, req gen.CreateMedicineRequestO
 				FamilyID:    fam.FamilyID,
 				BabyID:      body.BabyId,
 				CaretakerID: fam.UserID,
-				Time:        pgtype.Timestamptz{Time: body.Time, Valid: true},
+				Time:        ts(body.Time),
 				Name:        body.Name,
 				Amount:      body.Amount,
 				Unit:        unit,
@@ -163,15 +163,11 @@ func (d Deps) UpdateMedicine(ctx context.Context, req gen.UpdateMedicineRequestO
 		},
 		anySet,
 		func(ctx context.Context) error {
-			var timeParam pgtype.Timestamptz
-			if timeVal != nil {
-				timeParam = pgtype.Timestamptz{Time: *timeVal, Valid: true}
-			}
 			_, err := d.Q.UpdateMedicine(ctx, dbgen.UpdateMedicineParams{
 				FamilyID:      fam.FamilyID,
 				ID:            req.Id,
 				TimeSet:       timeSet,
-				TimeVal:       timeParam,
+				TimeVal:       tsFrom(timeVal),
 				NameSet:       nameSet,
 				NameVal:       nameVal,
 				AmountSet:     amountSet,

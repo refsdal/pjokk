@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/refsdal/pjokk/server/internal/api/gen"
 	"github.com/refsdal/pjokk/server/internal/api/middleware"
@@ -192,7 +191,7 @@ func (d Deps) createInvite(ctx context.Context, familyID, createdBy string, body
 		Code:      code,
 		FamilyID:  familyID,
 		Role:      role,
-		ExpiresAt: pgtype.Timestamptz{Time: d.Now().Add(time.Duration(expiresInHours) * time.Hour), Valid: true},
+		ExpiresAt: ts(d.Now().Add(time.Duration(expiresInHours) * time.Hour)),
 		MaxUses:   int32(maxUses),
 		CreatedBy: createdBy,
 	})
@@ -213,7 +212,7 @@ func (d Deps) RevokeInvite(ctx context.Context, req gen.RevokeInviteRequestObjec
 	n, err := d.Q.RevokeInvite(ctx, dbgen.RevokeInviteParams{
 		Code:      req.Code,
 		FamilyID:  fam.FamilyID,
-		RevokedAt: pgtype.Timestamptz{Time: d.Now(), Valid: true},
+		RevokedAt: ts(d.Now()),
 	})
 	if err != nil {
 		return nil, err

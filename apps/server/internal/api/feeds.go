@@ -93,11 +93,11 @@ func serFeedRow(id, babyID, caretakerID, caretakerName string, t pgtype.Timestam
 		Time:          t.Time,
 		Type:          gen.FeedLogType(typ),
 		AmountMl:      amountMl,
-		Side:          feedLogSidePtr(side),
+		Side:          enumPtr[gen.FeedLogSide](side),
 		DurationMin:   durationMin,
 		LeftMin:       leftMin,
 		RightMin:      rightMin,
-		Contents:      feedContentsPtr(contents),
+		Contents:      enumPtr[gen.FeedLogContents](contents),
 		Food:          food,
 		Reaction:      reaction,
 	}
@@ -111,32 +111,6 @@ func serFeed(row dbgen.GetFeedRow) gen.FeedLog {
 func serFeedListRow(row dbgen.ListFeedsRow) gen.FeedLog {
 	return serFeedRow(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Type,
 		row.AmountMl, row.Side, row.DurationMin, row.LeftMin, row.RightMin, row.Contents, row.Food, row.Reaction, row.Notes)
-}
-
-func feedLogSidePtr(s *string) *gen.FeedLogSide {
-	if s == nil {
-		return nil
-	}
-	v := gen.FeedLogSide(*s)
-	return &v
-}
-
-func feedContentsPtr(s *string) *gen.FeedLogContents {
-	if s == nil {
-		return nil
-	}
-	v := gen.FeedLogContents(*s)
-	return &v
-}
-
-// enumStr flattens an optional generated enum pointer (CreateFeedContents,
-// CreateDiaperColor, …) to the plain *string the sqlc params take.
-func enumStr[T ~string](v *T) *string {
-	if v == nil {
-		return nil
-	}
-	s := string(*v)
-	return &s
 }
 
 // listFeedsDefaultLimit mirrors apps/api/src/db/scoped.ts's `opts.limit ??
@@ -195,7 +169,7 @@ func (d Deps) CreateFeed(ctx context.Context, req gen.CreateFeedRequestObject) (
 		FamilyID:    fam.FamilyID,
 		BabyID:      body.BabyId,
 		CaretakerID: fam.UserID,
-		Time:        pgtype.Timestamptz{Time: body.Time, Valid: true},
+		Time:        ts(body.Time),
 		Type:        string(body.Type),
 		AmountMl:    body.AmountMl,
 		Side:        side,
@@ -292,16 +266,11 @@ func (d Deps) UpdateFeed(ctx context.Context, req gen.UpdateFeedRequestObject) (
 		return gen.UpdateFeed200JSONResponse(serFeed(existing)), nil
 	}
 
-	var timeParam pgtype.Timestamptz
-	if timeVal != nil {
-		timeParam = pgtype.Timestamptz{Time: *timeVal, Valid: true}
-	}
-
 	if _, err := d.Q.UpdateFeed(ctx, dbgen.UpdateFeedParams{
 		FamilyID:       fam.FamilyID,
 		ID:             req.Id,
 		TimeSet:        timeSet,
-		TimeVal:        timeParam,
+		TimeVal:        tsFrom(timeVal),
 		TypeSet:        typeSet,
 		TypeVal:        typeVal,
 		AmountMlSet:    amountSet,
