@@ -532,12 +532,22 @@ func adaptMiddleware(mw func(http.Handler) http.Handler) gen.StrictMiddlewareFun
 	}
 }
 
+// mwDeps narrows this package's Deps to what internal/api/middleware needs.
+// The middleware package deliberately declares its OWN Deps rather than
+// taking this one (it must not depend on the API surface it guards), so the
+// four places that build a chain need the same four-field projection — and a
+// field added to middleware.Deps should be a compile error in one place, not
+// a silent nil in three.
+func (d Deps) mwDeps() middleware.Deps {
+	return middleware.Deps{Auth: d.Auth, Q: d.Q, RateLimit: d.RateLimit, Now: d.Now}
+}
+
 // authChain is the one gen.StrictMiddlewareFunc passed to gen.NewStrictHandler:
 // it looks up operationID in operationAuthTiers and wraps the call in the
 // matching middleware chain (REF §A5's order: APIKeyAuth, Session,
 // RequireFamily/RequireSession, RequireAdmin).
 func authChain(d Deps) gen.StrictMiddlewareFunc {
-	mwDeps := middleware.Deps{Auth: d.Auth, Q: d.Q, RateLimit: d.RateLimit, Now: d.Now}
+	mwDeps := d.mwDeps()
 	apiKey := middleware.APIKeyAuth(mwDeps)
 	session := middleware.Session(mwDeps)
 	requireSession := middleware.RequireSession()
@@ -638,7 +648,7 @@ func rateLimitChain(d Deps) gen.StrictMiddlewareFunc {
 // that sit outside gen.StrictServerInterface entirely and therefore never
 // go through authChain's operationID-keyed dispatch.
 func familyChain(d Deps) func(http.Handler) http.Handler {
-	mwDeps := middleware.Deps{Auth: d.Auth, Q: d.Q, RateLimit: d.RateLimit, Now: d.Now}
+	mwDeps := d.mwDeps()
 	apiKey := middleware.APIKeyAuth(mwDeps)
 	session := middleware.Session(mwDeps)
 	family := middleware.RequireFamily(mwDeps)
@@ -822,7 +832,7 @@ func NewHandler(d Deps) http.Handler {
 	d.mountICSRoutes(mux, familyChain(d))
 
 	if d.ExtraRoutes != nil {
-		mwDeps := middleware.Deps{Auth: d.Auth, Q: d.Q, RateLimit: d.RateLimit, Now: d.Now}
+		mwDeps := d.mwDeps()
 		protect := func(h http.Handler) http.Handler {
 			return middleware.Session(mwDeps)(middleware.RequireFamily(mwDeps)(h))
 		}
