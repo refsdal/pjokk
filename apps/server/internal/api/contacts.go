@@ -187,44 +187,20 @@ func (d Deps) CreateContact(ctx context.Context, req gen.CreateContactRequestObj
 func (d Deps) UpdateContact(ctx context.Context, req gen.UpdateContactRequestObject) (gen.UpdateContactResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
-	fields, err := rawBodyFields(ctx)
+	p, err := patchBody(ctx, "UpdateContact")
 	if err != nil {
 		return nil, err
-	}
-	if fields == nil {
-		return nil, errNoRequestBody("UpdateContact")
 	}
 
-	nameSet, nameVal, err := patchField[string](fields, "name")
-	if err != nil {
-		return nil, err
-	}
-	roleSet, roleVal, err := patchField[string](fields, "role")
-	if err != nil {
-		return nil, err
-	}
-	iconSet, iconVal, err := patchField[string](fields, "icon")
-	if err != nil {
-		return nil, err
-	}
-	phoneSet, phoneVal, err := patchField[string](fields, "phone")
-	if err != nil {
-		return nil, err
-	}
-	emailSet, emailVal, err := patchField[string](fields, "email")
-	if err != nil {
-		return nil, err
-	}
-	websiteSet, websiteVal, err := patchField[string](fields, "website")
-	if err != nil {
-		return nil, err
-	}
-	notesSet, notesVal, err := patchField[string](fields, "notes")
-	if err != nil {
-		return nil, err
-	}
-	babyIdsSet, babyIdsVal, err := patchField[[]string](fields, "babyIds")
-	if err != nil {
+	nameSet, nameVal := patchField[string](p, "name")
+	roleSet, roleVal := patchField[string](p, "role")
+	iconSet, iconVal := patchField[string](p, "icon")
+	phoneSet, phoneVal := patchField[string](p, "phone")
+	emailSet, emailVal := patchField[string](p, "email")
+	websiteSet, websiteVal := patchField[string](p, "website")
+	notesSet, notesVal := patchField[string](p, "notes")
+	babyIdsSet, babyIdsVal := patchField[[]string](p, "babyIds")
+	if err := p.Err(); err != nil {
 		return nil, err
 	}
 
@@ -252,8 +228,10 @@ func (d Deps) UpdateContact(ctx context.Context, req gen.UpdateContactRequestObj
 		return nil, err
 	}
 
-	anySet := nameSet || roleSet || iconSet || phoneSet || emailSet || websiteSet || notesSet
-	if !anySet && !babyIdsSet {
+	// The contact row's own columns, as distinct from p.Any(): a patch
+	// carrying only babyIds touches the join table and leaves the row.
+	rowSet := nameSet || roleSet || iconSet || phoneSet || emailSet || websiteSet || notesSet
+	if !p.Any() {
 		existing, err := d.getContactHydrated(ctx, fam.FamilyID, req.Id)
 		if err != nil {
 			return nil, err
@@ -268,7 +246,7 @@ func (d Deps) UpdateContact(ctx context.Context, req gen.UpdateContactRequestObj
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := d.Q.WithTx(tx)
 
-	if anySet {
+	if rowSet {
 		n, err := qtx.UpdateContact(ctx, dbgen.UpdateContactParams{
 			FamilyID:   fam.FamilyID,
 			ID:         req.Id,

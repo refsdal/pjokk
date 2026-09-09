@@ -16,7 +16,7 @@ import (
 // (medicine: false in the TS route table). See other_logs.go's package doc
 // comment for the shared createLog/updateLog/deleteLog engine this and every
 // other Phase 3 kind's file instantiates, and feeds.go's package doc comment
-// for the PATCH tri-state (patchField/rawBodyFields) pattern UpdateMedicine
+// for the PATCH tri-state (patchBody/patchField) pattern UpdateMedicine
 // reuses.
 
 func medicineUnitPtr(s *string) *gen.MedicineLogUnit {
@@ -116,34 +116,16 @@ func (d Deps) CreateMedicine(ctx context.Context, req gen.CreateMedicineRequestO
 func (d Deps) UpdateMedicine(ctx context.Context, req gen.UpdateMedicineRequestObject) (gen.UpdateMedicineResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
-	fields, err := rawBodyFields(ctx)
+	p, err := patchBody(ctx, "UpdateMedicine")
 	if err != nil {
 		return nil, err
-	}
-	if fields == nil {
-		return nil, errNoRequestBody("UpdateMedicine")
 	}
 
-	timeSet, timeVal, err := patchField[time.Time](fields, "time")
-	if err != nil {
-		return nil, err
-	}
-	nameSet, nameVal, err := patchField[string](fields, "name")
-	if err != nil {
-		return nil, err
-	}
-	amountSet, amountVal, err := patchField[float64](fields, "amount")
-	if err != nil {
-		return nil, err
-	}
-	unitSet, unitVal, err := patchField[string](fields, "unit")
-	if err != nil {
-		return nil, err
-	}
-	medicineSet, medicineVal, err := patchField[string](fields, "medicineId")
-	if err != nil {
-		return nil, err
-	}
+	timeSet, timeVal := patchField[time.Time](p, "time")
+	nameSet, nameVal := patchField[string](p, "name")
+	amountSet, amountVal := patchField[float64](p, "amount")
+	unitSet, unitVal := patchField[string](p, "unit")
+	medicineSet, medicineVal := patchField[string](p, "medicineId")
 	if medicineSet {
 		if ok, err := d.catalogueMedicineBelongs(ctx, fam.FamilyID, medicineVal); err != nil {
 			return nil, err
@@ -151,17 +133,16 @@ func (d Deps) UpdateMedicine(ctx context.Context, req gen.UpdateMedicineRequestO
 			return gen.UpdateMedicine404JSONResponse{Error: "Unknown medicine", Code: "NOT_FOUND"}, nil
 		}
 	}
-	notesSet, notesVal, err := patchField[string](fields, "notes")
-	if err != nil {
+	notesSet, notesVal := patchField[string](p, "notes")
+	if err := p.Err(); err != nil {
 		return nil, err
 	}
-	anySet := timeSet || nameSet || amountSet || unitSet || medicineSet || notesSet
 
 	row, found, err := updateLog(ctx,
 		func(ctx context.Context) (dbgen.GetMedicineRow, error) {
 			return d.Q.GetMedicine(ctx, dbgen.GetMedicineParams{FamilyID: fam.FamilyID, ID: req.Id})
 		},
-		anySet,
+		p.Any(),
 		func(ctx context.Context) error {
 			_, err := d.Q.UpdateMedicine(ctx, dbgen.UpdateMedicineParams{
 				FamilyID:      fam.FamilyID,

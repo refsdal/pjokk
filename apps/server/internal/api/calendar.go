@@ -330,60 +330,24 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 		return nil, err
 	}
 
-	fields, err := rawBodyFields(ctx)
+	p, err := patchBody(ctx, "UpdateCalendarEvent")
 	if err != nil {
 		return nil, err
-	}
-	if fields == nil {
-		return nil, errNoRequestBody("UpdateCalendarEvent")
 	}
 
-	titleSet, titleVal, err := patchField[string](fields, "title")
-	if err != nil {
-		return nil, err
-	}
-	descSet, descVal, err := patchField[string](fields, "description")
-	if err != nil {
-		return nil, err
-	}
-	locSet, locVal, err := patchField[string](fields, "location")
-	if err != nil {
-		return nil, err
-	}
-	categorySet, categoryVal, err := patchField[string](fields, "category")
-	if err != nil {
-		return nil, err
-	}
-	startSet, startVal, err := patchField[time.Time](fields, "startTime")
-	if err != nil {
-		return nil, err
-	}
-	allDaySet, allDayVal, err := patchField[bool](fields, "allDay")
-	if err != nil {
-		return nil, err
-	}
-	durationSet, durationVal, err := patchField[int32](fields, "durationMin")
-	if err != nil {
-		return nil, err
-	}
-	remindSet, remindVal, err := patchField[int32](fields, "remindMinutesBefore")
-	if err != nil {
-		return nil, err
-	}
-	babyIdsSet, babyIdsVal, err := patchField[[]string](fields, "babyIds")
-	if err != nil {
-		return nil, err
-	}
-	assigneeIdsSet, assigneeIdsVal, err := patchField[[]string](fields, "assigneeUserIds")
-	if err != nil {
-		return nil, err
-	}
-	recurrenceSet, recurrenceVal, err := patchField[string](fields, "recurrence")
-	if err != nil {
-		return nil, err
-	}
-	untilSet, untilVal, err := patchField[time.Time](fields, "recurrenceUntil")
-	if err != nil {
+	titleSet, titleVal := patchField[string](p, "title")
+	descSet, descVal := patchField[string](p, "description")
+	locSet, locVal := patchField[string](p, "location")
+	categorySet, categoryVal := patchField[string](p, "category")
+	startSet, startVal := patchField[time.Time](p, "startTime")
+	allDaySet, allDayVal := patchField[bool](p, "allDay")
+	durationSet, durationVal := patchField[int32](p, "durationMin")
+	remindSet, remindVal := patchField[int32](p, "remindMinutesBefore")
+	babyIdsSet, babyIdsVal := patchField[[]string](p, "babyIds")
+	assigneeIdsSet, assigneeIdsVal := patchField[[]string](p, "assigneeUserIds")
+	recurrenceSet, recurrenceVal := patchField[string](p, "recurrence")
+	untilSet, untilVal := patchField[time.Time](p, "recurrenceUntil")
+	if err := p.Err(); err != nil {
 		return nil, err
 	}
 	// The spec forbids a null recurrence; treat one as "none" rather than
@@ -433,7 +397,9 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 	// sweep latch.
 	rearm := startSet || remindSet || recurrenceSet || untilSet
 
-	anySet := titleSet || descSet || locSet || categorySet || startSet || allDaySet || durationSet || remindSet || recurrenceSet || untilSet
+	// The event row's own columns, as distinct from p.Any(): a patch
+	// carrying only babyIds/assigneeUserIds writes join tables only.
+	rowSet := titleSet || descSet || locSet || categorySet || startSet || allDaySet || durationSet || remindSet || recurrenceSet || untilSet
 
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
@@ -442,7 +408,7 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := d.Q.WithTx(tx)
 
-	if anySet {
+	if rowSet {
 		n, err := qtx.UpdateCalendarEvent(ctx, dbgen.UpdateCalendarEventParams{
 			FamilyID:               fam.FamilyID,
 			ID:                     req.Id,

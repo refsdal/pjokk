@@ -86,33 +86,23 @@ func (d Deps) CreateNote(ctx context.Context, req gen.CreateNoteRequestObject) (
 func (d Deps) UpdateNote(ctx context.Context, req gen.UpdateNoteRequestObject) (gen.UpdateNoteResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
-	fields, err := rawBodyFields(ctx)
+	p, err := patchBody(ctx, "UpdateNote")
 	if err != nil {
 		return nil, err
-	}
-	if fields == nil {
-		return nil, errNoRequestBody("UpdateNote")
 	}
 
-	timeSet, timeVal, err := patchField[time.Time](fields, "time")
-	if err != nil {
+	timeSet, timeVal := patchField[time.Time](p, "time")
+	contentSet, contentVal := patchField[string](p, "content")
+	notesSet, notesVal := patchField[string](p, "notes")
+	if err := p.Err(); err != nil {
 		return nil, err
 	}
-	contentSet, contentVal, err := patchField[string](fields, "content")
-	if err != nil {
-		return nil, err
-	}
-	notesSet, notesVal, err := patchField[string](fields, "notes")
-	if err != nil {
-		return nil, err
-	}
-	anySet := timeSet || contentSet || notesSet
 
 	row, found, err := updateLog(ctx,
 		func(ctx context.Context) (dbgen.GetNoteRow, error) {
 			return d.Q.GetNote(ctx, dbgen.GetNoteParams{FamilyID: fam.FamilyID, ID: req.Id})
 		},
-		anySet,
+		p.Any(),
 		func(ctx context.Context) error {
 			_, err := d.Q.UpdateNote(ctx, dbgen.UpdateNoteParams{
 				FamilyID:   fam.FamilyID,

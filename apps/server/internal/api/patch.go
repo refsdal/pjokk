@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -23,7 +24,7 @@ import (
 //     generated strict-server's own json.Decode — consumes r.Body, and
 //     replaces r.Body with a fresh reader over the same bytes so every
 //     later stage still sees a normal, once-only-readable body.
-//  2. rawBodyFields + patchField turn those captured bytes into presence
+//  2. patchBody + patchField turn those captured bytes into presence
 //     information a PATCH handler can act on: for each JSON field, was it
 //     omitted, sent as `null`, or sent with a value?
 
@@ -95,7 +96,7 @@ func withRawBody(next http.Handler) http.Handler {
 // buffering at all: GET/HEAD/DELETE carry no body semantics anywhere in
 // this API (every route reads those methods' inputs from query/path
 // params), and a request whose Content-Type isn't JSON has nothing for
-// rawBodyFields' map[string]json.RawMessage decode to work with regardless.
+// patchBody's map[string]json.RawMessage decode to work with regardless.
 // Gating on both keeps this middleware's cost — and its size cap's
 // relevance — scoped to the JSON POST/PATCH bodies it exists for, so a
 // future non-JSON route added to this SAME mux (unlike vaccine documents,
@@ -113,52 +114,99 @@ func hasJSONBody(r *http.Request) bool {
 	return mt == "application/json"
 }
 
-// rawBodyFields decodes the body withRawBody captured into a map keyed by
+// patchSet is one PATCH request's decoded body, plus the two answers every
+// handler needs from it after reading its fields: did anything fail to
+// decode, and was any field present at all.
+//
+// It exists because the alternative — which is what this package did until
+// now — is three lines of error handling per field:
+//
+//	xSet, xVal, err := patchField[T](fields, "x")
+//	if err != nil {
+//		return nil, err
+//	}
+//
+// times eleven fields in UpdateFeed, plus a hand-written
+// `!aSet && !bSet && …` chain that has to be extended by hand every time a
+// column is added. Collecting the first error instead — the same shape
+// internal/config's problemCollector uses for the same reason — makes the
+// per-field line a single assignment and the empty-patch check a method
+// call that cannot fall out of step with the fields above it.
+type patchSet struct {
+	fields map[string]json.RawMessage
+	// err is the FIRST decode failure; later ones are dropped, since the
+	// handler abandons the request on any of them.
+	err error
+	// touched records whether any field a handler ASKED FOR was present.
+	// Not "the body was non-empty": a body carrying only keys this
+	// operation does not read must still count as an empty patch, exactly
+	// as the `!aSet && !bSet && …` chains it replaces did.
+	touched bool
+}
+
+// patchBody decodes the body withRawBody captured into a patchSet, keyed by
 // JSON field name — a plain Go map already distinguishes the three states a
 // PATCH body's nullable-optional field can be in: a missing key means
-// "omitted" (patchField's `present` comes back false), a key whose raw
-// value is the literal `null` means "explicit clear" (`present` true,
-// `value` nil), anything else means "set to this value" (`present` true,
-// `value` non-nil). Returns (nil, nil) when withRawBody never ran or the
-// body was empty; callers treat that as errNoRequestBody, mirroring
-// CreateBaby/UpdateBaby's convention for an impossible-in-practice empty
-// body (spec validation already rejects a PATCH with no body before this
-// can be reached in practice).
-func rawBodyFields(ctx context.Context) (map[string]json.RawMessage, error) {
+// "omitted" (patchField's `set` comes back false), a key whose raw value is
+// the literal `null` means "explicit clear" (`set` true, value nil),
+// anything else means "set to this value" (`set` true, value non-nil).
+//
+// operation names the caller for the empty-body error, which is
+// impossible-in-practice — spec validation rejects a PATCH with no body
+// well before this — but is reported rather than assumed away, mirroring
+// CreateBaby/UpdateBaby's convention.
+func patchBody(ctx context.Context, operation string) (*patchSet, error) {
 	raw, _ := ctx.Value(rawBodyCtxKey{}).([]byte)
 	if len(raw) == 0 {
-		return nil, nil
+		return nil, errNoRequestBody(operation)
 	}
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &m); err != nil {
 		return nil, err
 	}
-	return m, nil
+	return &patchSet{fields: m}, nil
 }
 
-// patchField reports whether key is present in fields and, if so, decodes
-// its value into a *T: nil when the JSON value was the literal `null` (an
-// explicit clear), non-nil otherwise. An absent key reports present=false
-// and a nil value, meaning "leave the column alone" — the caller must not
-// read anything into that as a clear.
+// patchField reports whether key is present in p and, if so, decodes its
+// value into a *T: nil when the JSON value was the literal `null` (an
+// explicit clear), non-nil otherwise. An absent key reports set=false and a
+// nil value, meaning "leave the column alone" — the caller must not read
+// anything into that as a clear.
 //
-// By the time a handler calls this, kin-openapi's spec validation has
-// already checked the raw body against the operation's schema (see
-// withRawBody's doc comment on ordering), so a value present here is
-// already known to satisfy whatever type/bounds/enum the OpenAPI schema
-// declared for it — this function only needs to decode it into the target
-// Go type, not re-validate it.
-func patchField[T any](fields map[string]json.RawMessage, key string) (present bool, value *T, err error) {
-	raw, ok := fields[key]
+// A value that fails to decode is latched on p (see Err) and reported as
+// ABSENT, so a handler that forgot its Err check leaves the column alone
+// rather than clearing it. Reaching that at all takes a body that parses as
+// JSON, satisfies the operation's OpenAPI schema, and still fails Go's
+// stricter decode — see requestErrorHandler in api.go, which documents the
+// same near-impossible gap one layer up.
+//
+// A free function rather than a method because Go methods cannot take type
+// parameters.
+func patchField[T any](p *patchSet, key string) (set bool, value *T) {
+	raw, ok := p.fields[key]
 	if !ok {
-		return false, nil, nil
+		return false, nil
 	}
 	if string(raw) == "null" {
-		return true, nil, nil
+		p.touched = true
+		return true, nil
 	}
 	var v T
 	if err := json.Unmarshal(raw, &v); err != nil {
-		return false, nil, err
+		if p.err == nil {
+			p.err = fmt.Errorf("api: patch field %q: %w", key, err)
+		}
+		return false, nil
 	}
-	return true, &v, nil
+	p.touched = true
+	return true, &v
 }
+
+// Err reports the first field that failed to decode, or nil. Every handler
+// must check it after reading its fields and before acting on them.
+func (p *patchSet) Err() error { return p.err }
+
+// Any reports whether at least one field the handler read was present —
+// the empty-patch test. A patch with no fields at all is a no-op that
+// re-reads and returns the row unchanged, matching scoped.ts's compactPatch.
+func (p *patchSet) Any() bool { return p.touched }

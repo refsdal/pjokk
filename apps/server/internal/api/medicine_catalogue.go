@@ -97,17 +97,11 @@ func (d Deps) UpdateMedicineCatalogueEntry(ctx context.Context, req gen.UpdateMe
 		}
 		return nil, err
 	}
-	fields, err := rawBodyFields(ctx)
+	p, err := patchBody(ctx, "UpdateMedicineCatalogueEntry")
 	if err != nil {
 		return nil, err
 	}
-	if fields == nil {
-		return nil, errNoRequestBody("UpdateMedicineCatalogueEntry")
-	}
-	nameSet, nameVal, err := patchField[string](fields, "name")
-	if err != nil {
-		return nil, err
-	}
+	nameSet, nameVal := patchField[string](p, "name")
 	if nameSet {
 		if nameVal == nil || strings.TrimSpace(*nameVal) == "" {
 			return gen.UpdateMedicineCatalogueEntry400JSONResponse{Error: "A medicine needs a name", Code: "VALIDATION"}, nil
@@ -115,24 +109,12 @@ func (d Deps) UpdateMedicineCatalogueEntry(ctx context.Context, req gen.UpdateMe
 		v := strings.TrimSpace(*nameVal)
 		nameVal = &v
 	}
-	amountSet, amountVal, err := patchField[float64](fields, "defaultAmount")
-	if err != nil {
-		return nil, err
-	}
-	unitSet, unitVal, err := patchField[string](fields, "unit")
-	if err != nil {
-		return nil, err
-	}
-	intervalSet, intervalVal, err := patchField[int32](fields, "minIntervalMin")
-	if err != nil {
-		return nil, err
-	}
-	supplementSet, supplementVal, err := patchField[bool](fields, "isSupplement")
-	if err != nil {
-		return nil, err
-	}
-	archivedSet, archivedVal, err := patchField[bool](fields, "archived")
-	if err != nil {
+	amountSet, amountVal := patchField[float64](p, "defaultAmount")
+	unitSet, unitVal := patchField[string](p, "unit")
+	intervalSet, intervalVal := patchField[int32](p, "minIntervalMin")
+	supplementSet, supplementVal := patchField[bool](p, "isSupplement")
+	archivedSet, archivedVal := patchField[bool](p, "archived")
+	if err := p.Err(); err != nil {
 		return nil, err
 	}
 	var archivedAt pgtype.Timestamptz

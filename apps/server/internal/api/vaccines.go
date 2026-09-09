@@ -22,7 +22,7 @@ import (
 // moot point today regardless). See other_logs.go's package doc comment
 // for the shared createLog/updateLog/deleteLog engine CreateVaccine and
 // UpdateVaccine below use, and feeds.go's package doc comment for the PATCH
-// tri-state (patchField/rawBodyFields) pattern.
+// tri-state (patchBody/patchField) pattern.
 //
 // # Divergence: hydrated documents
 //
@@ -193,41 +193,25 @@ func (d Deps) CreateVaccine(ctx context.Context, req gen.CreateVaccineRequestObj
 func (d Deps) UpdateVaccine(ctx context.Context, req gen.UpdateVaccineRequestObject) (gen.UpdateVaccineResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
-	fields, err := rawBodyFields(ctx)
+	p, err := patchBody(ctx, "UpdateVaccine")
 	if err != nil {
 		return nil, err
-	}
-	if fields == nil {
-		return nil, errNoRequestBody("UpdateVaccine")
 	}
 
-	timeSet, timeVal, err := patchField[time.Time](fields, "time")
-	if err != nil {
+	timeSet, timeVal := patchField[time.Time](p, "time")
+	nameSet, nameVal := patchField[string](p, "name")
+	doseNumberSet, doseNumberVal := patchField[int32](p, "doseNumber")
+	scheduleSlotSet, scheduleSlotVal := patchField[string](p, "scheduleSlot")
+	notesSet, notesVal := patchField[string](p, "notes")
+	if err := p.Err(); err != nil {
 		return nil, err
 	}
-	nameSet, nameVal, err := patchField[string](fields, "name")
-	if err != nil {
-		return nil, err
-	}
-	doseNumberSet, doseNumberVal, err := patchField[int32](fields, "doseNumber")
-	if err != nil {
-		return nil, err
-	}
-	scheduleSlotSet, scheduleSlotVal, err := patchField[string](fields, "scheduleSlot")
-	if err != nil {
-		return nil, err
-	}
-	notesSet, notesVal, err := patchField[string](fields, "notes")
-	if err != nil {
-		return nil, err
-	}
-	anySet := timeSet || nameSet || doseNumberSet || scheduleSlotSet || notesSet
 
 	row, found, err := updateLog(ctx,
 		func(ctx context.Context) (gen.VaccineLog, error) {
 			return d.getVaccineWithDocuments(ctx, fam.FamilyID, req.Id)
 		},
-		anySet,
+		p.Any(),
 		func(ctx context.Context) error {
 			_, err := d.Q.UpdateVaccine(ctx, dbgen.UpdateVaccineParams{
 				FamilyID:        fam.FamilyID,

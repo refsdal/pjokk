@@ -97,41 +97,25 @@ func (d Deps) CreatePump(ctx context.Context, req gen.CreatePumpRequestObject) (
 func (d Deps) UpdatePump(ctx context.Context, req gen.UpdatePumpRequestObject) (gen.UpdatePumpResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
-	fields, err := rawBodyFields(ctx)
+	p, err := patchBody(ctx, "UpdatePump")
 	if err != nil {
 		return nil, err
-	}
-	if fields == nil {
-		return nil, errNoRequestBody("UpdatePump")
 	}
 
-	timeSet, timeVal, err := patchField[time.Time](fields, "time")
-	if err != nil {
+	timeSet, timeVal := patchField[time.Time](p, "time")
+	sideSet, sideVal := patchField[string](p, "side")
+	amountSet, amountVal := patchField[int32](p, "amountMl")
+	durationSet, durationVal := patchField[int32](p, "durationMin")
+	notesSet, notesVal := patchField[string](p, "notes")
+	if err := p.Err(); err != nil {
 		return nil, err
 	}
-	sideSet, sideVal, err := patchField[string](fields, "side")
-	if err != nil {
-		return nil, err
-	}
-	amountSet, amountVal, err := patchField[int32](fields, "amountMl")
-	if err != nil {
-		return nil, err
-	}
-	durationSet, durationVal, err := patchField[int32](fields, "durationMin")
-	if err != nil {
-		return nil, err
-	}
-	notesSet, notesVal, err := patchField[string](fields, "notes")
-	if err != nil {
-		return nil, err
-	}
-	anySet := timeSet || sideSet || amountSet || durationSet || notesSet
 
 	row, found, err := updateLog(ctx,
 		func(ctx context.Context) (dbgen.GetPumpRow, error) {
 			return d.Q.GetPump(ctx, dbgen.GetPumpParams{FamilyID: fam.FamilyID, ID: req.Id})
 		},
-		anySet,
+		p.Any(),
 		func(ctx context.Context) error {
 			_, err := d.Q.UpdatePump(ctx, dbgen.UpdatePumpParams{
 				FamilyID:       fam.FamilyID,
