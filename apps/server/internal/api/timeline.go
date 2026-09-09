@@ -272,7 +272,7 @@ func (d Deps) ListTimeline(ctx context.Context, req gen.ListTimelineRequestObjec
 
 	if _, err := d.Q.GetBaby(ctx, dbgen.GetBabyParams{FamilyID: fam.FamilyID, ID: babyID}); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return gen.ListTimeline404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
+			return gen.ListTimeline404JSONResponse(unknownBabyErr()), nil
 		}
 		return nil, err
 	}

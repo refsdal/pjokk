@@ -98,15 +98,10 @@ func serActiveSleepRow(row dbgen.ActiveSleepRow) gen.SleepLog {
 func (d Deps) ListSleeps(ctx context.Context, req gen.ListSleepsRequestObject) (gen.ListSleepsResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
-	limit := int32(listFeedsDefaultLimit)
-	if req.Params.Limit != nil {
-		limit = int32(*req.Params.Limit)
-	}
-
 	rows, err := d.Q.ListSleeps(ctx, dbgen.ListSleepsParams{
 		FamilyID: fam.FamilyID,
 		BabyID:   req.Params.BabyId,
-		Lim:      limit,
+		Lim:      listLimit(req.Params.Limit),
 	})
 	if err != nil {
 		return nil, err
@@ -130,11 +125,16 @@ func (d Deps) CreateSleep(ctx context.Context, req gen.CreateSleepRequestObject)
 	}
 	body := req.Body
 
-	if _, err := d.Q.GetBaby(ctx, dbgen.GetBabyParams{FamilyID: fam.FamilyID, ID: body.BabyId}); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return gen.CreateSleep404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
-		}
+	// Not createLog: this handler has an ALREADY_ACTIVE pre-check between
+	// the baby check and the insert, and maps a unique violation from the
+	// insert to a 409 — neither of which fits an engine whose create closure
+	// can only answer (id, error). The baby check itself is still shared.
+	known, err := babyExists(ctx, d, fam.FamilyID, body.BabyId)
+	if err != nil {
 		return nil, err
+	}
+	if !known {
+		return gen.CreateSleep404JSONResponse(unknownBabyErr()), nil
 	}
 
 	startingActive := body.EndTime == nil
@@ -234,14 +234,6 @@ func (d Deps) WakeSleep(ctx context.Context, req gen.WakeSleepRequestObject) (ge
 func (d Deps) UpdateSleep(ctx context.Context, req gen.UpdateSleepRequestObject) (gen.UpdateSleepResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
-	existing, err := d.Q.GetSleep(ctx, dbgen.GetSleepParams{FamilyID: fam.FamilyID, ID: req.Id})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return gen.UpdateSleep404JSONResponse(notFound()), nil
-		}
-		return nil, err
-	}
-
 	p, err := patchBody(ctx, "UpdateSleep")
 	if err != nil {
 		return nil, err
@@ -256,50 +248,59 @@ func (d Deps) UpdateSleep(ctx context.Context, req gen.UpdateSleepRequestObject)
 	if err := p.Err(); err != nil {
 		return nil, err
 	}
-	if !p.Any() {
-		return gen.UpdateSleep200JSONResponse(serSleep(existing)), nil
-	}
 
 	// reopening is "endTime present and explicitly null" — the one write
 	// this endpoint makes that can collide with the partial unique index
 	// (see this file's doc comment, divergence 1).
 	reopening := endSet && endVal == nil
 
-	if _, err := d.Q.UpdateSleep(ctx, dbgen.UpdateSleepParams{
-		FamilyID:     fam.FamilyID,
-		ID:           req.Id,
-		StartTimeSet: startSet,
-		StartTimeVal: tsFrom(startVal),
-		EndTimeSet:   endSet,
-		EndTimeVal:   tsFrom(endVal),
-		LocationSet:  locationSet,
-		LocationVal:  locationVal,
-		TypeSet:      typeSet,
-		TypeVal:      typeVal,
-		NotesSet:     notesSet,
-		NotesVal:     notesVal,
-	}); err != nil {
+	row, found, err := updateLog(ctx,
+		func(ctx context.Context) (dbgen.GetSleepRow, error) {
+			return d.Q.GetSleep(ctx, dbgen.GetSleepParams{FamilyID: fam.FamilyID, ID: req.Id})
+		},
+		p.Any(),
+		func(ctx context.Context) error {
+			_, err := d.Q.UpdateSleep(ctx, dbgen.UpdateSleepParams{
+				FamilyID:     fam.FamilyID,
+				ID:           req.Id,
+				StartTimeSet: startSet,
+				StartTimeVal: tsFrom(startVal),
+				EndTimeSet:   endSet,
+				EndTimeVal:   tsFrom(endVal),
+				LocationSet:  locationSet,
+				LocationVal:  locationVal,
+				TypeSet:      typeSet,
+				TypeVal:      typeVal,
+				NotesSet:     notesSet,
+				NotesVal:     notesVal,
+			})
+			return err
+		},
+	)
+	if err != nil {
+		// updateLog hands back the update closure's error untouched, so the
+		// index collision is still distinguishable here.
 		if reopening && db.IsUniqueViolation(err) {
 			return gen.UpdateSleep409JSONResponse(alreadyActive()), nil
 		}
 		return nil, err
 	}
-
-	updated, err := d.Q.GetSleep(ctx, dbgen.GetSleepParams{FamilyID: fam.FamilyID, ID: req.Id})
-	if err != nil {
-		return nil, err
+	if !found {
+		return gen.UpdateSleep404JSONResponse(notFound()), nil
 	}
-	return gen.UpdateSleep200JSONResponse(serSleep(updated)), nil
+	return gen.UpdateSleep200JSONResponse(serSleep(row)), nil
 }
 
 // DeleteSleep implements DELETE /api/sleep/{id}. REF: "{ok:true} / 404".
 func (d Deps) DeleteSleep(ctx context.Context, req gen.DeleteSleepRequestObject) (gen.DeleteSleepResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
-	n, err := d.Q.DeleteSleep(ctx, dbgen.DeleteSleepParams{FamilyID: fam.FamilyID, ID: req.Id})
+	ok, err := deleteLog(ctx, func(ctx context.Context) (int64, error) {
+		return d.Q.DeleteSleep(ctx, dbgen.DeleteSleepParams{FamilyID: fam.FamilyID, ID: req.Id})
+	})
 	if err != nil {
 		return nil, err
 	}
-	if n == 0 {
+	if !ok {
 		return gen.DeleteSleep404JSONResponse(notFound()), nil
 	}
 	return gen.DeleteSleep200JSONResponse{Ok: gen.OkOkTrue}, nil

@@ -110,15 +110,10 @@ func serActivePlayRow(row dbgen.ActivePlayRow) gen.PlayLog {
 func (d Deps) ListPlays(ctx context.Context, req gen.ListPlaysRequestObject) (gen.ListPlaysResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
-	limit := int32(listFeedsDefaultLimit)
-	if req.Params.Limit != nil {
-		limit = int32(*req.Params.Limit)
-	}
-
 	rows, err := d.Q.ListPlays(ctx, dbgen.ListPlaysParams{
 		FamilyID: fam.FamilyID,
 		BabyID:   req.Params.BabyId,
-		Lim:      limit,
+		Lim:      listLimit(req.Params.Limit),
 	})
 	if err != nil {
 		return nil, err
@@ -142,11 +137,15 @@ func (d Deps) CreatePlay(ctx context.Context, req gen.CreatePlayRequestObject) (
 	}
 	body := req.Body
 
-	if _, err := d.Q.GetBaby(ctx, dbgen.GetBabyParams{FamilyID: fam.FamilyID, ID: body.BabyId}); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return gen.CreatePlay404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
-		}
+	// Not createLog, for the reason CreateSleep gives: the ALREADY_ACTIVE
+	// pre-check and the 23505 mapping do not fit a create closure that can
+	// only answer (id, error). The baby check itself is still shared.
+	known, err := babyExists(ctx, d, fam.FamilyID, body.BabyId)
+	if err != nil {
 		return nil, err
+	}
+	if !known {
+		return gen.CreatePlay404JSONResponse(unknownBabyErr()), nil
 	}
 
 	startingActive := body.EndTime == nil
@@ -245,14 +244,6 @@ func (d Deps) StopPlay(ctx context.Context, req gen.StopPlayRequestObject) (gen.
 func (d Deps) UpdatePlay(ctx context.Context, req gen.UpdatePlayRequestObject) (gen.UpdatePlayResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
-	existing, err := d.Q.GetPlay(ctx, dbgen.GetPlayParams{FamilyID: fam.FamilyID, ID: req.Id})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return gen.UpdatePlay404JSONResponse(notFound()), nil
-		}
-		return nil, err
-	}
-
 	p, err := patchBody(ctx, "UpdatePlay")
 	if err != nil {
 		return nil, err
@@ -266,48 +257,57 @@ func (d Deps) UpdatePlay(ctx context.Context, req gen.UpdatePlayRequestObject) (
 	if err := p.Err(); err != nil {
 		return nil, err
 	}
-	if !p.Any() {
-		return gen.UpdatePlay200JSONResponse(serPlay(existing)), nil
-	}
 
 	// reopening is "endTime present and explicitly null" — the one write
 	// this endpoint makes that can collide with the partial unique index
 	// (see this file's doc comment, divergence 1).
 	reopening := endSet && endVal == nil
 
-	if _, err := d.Q.UpdatePlay(ctx, dbgen.UpdatePlayParams{
-		FamilyID:     fam.FamilyID,
-		ID:           req.Id,
-		TypeSet:      typeSet,
-		TypeVal:      typeVal,
-		StartTimeSet: startSet,
-		StartTimeVal: tsFrom(startVal),
-		EndTimeSet:   endSet,
-		EndTimeVal:   tsFrom(endVal),
-		NotesSet:     notesSet,
-		NotesVal:     notesVal,
-	}); err != nil {
+	row, found, err := updateLog(ctx,
+		func(ctx context.Context) (dbgen.GetPlayRow, error) {
+			return d.Q.GetPlay(ctx, dbgen.GetPlayParams{FamilyID: fam.FamilyID, ID: req.Id})
+		},
+		p.Any(),
+		func(ctx context.Context) error {
+			_, err := d.Q.UpdatePlay(ctx, dbgen.UpdatePlayParams{
+				FamilyID:     fam.FamilyID,
+				ID:           req.Id,
+				TypeSet:      typeSet,
+				TypeVal:      typeVal,
+				StartTimeSet: startSet,
+				StartTimeVal: tsFrom(startVal),
+				EndTimeSet:   endSet,
+				EndTimeVal:   tsFrom(endVal),
+				NotesSet:     notesSet,
+				NotesVal:     notesVal,
+			})
+			return err
+		},
+	)
+	if err != nil {
+		// updateLog hands back the update closure's error untouched, so the
+		// index collision is still distinguishable here.
 		if reopening && db.IsUniqueViolation(err) {
 			return gen.UpdatePlay409JSONResponse(alreadyActivePlay()), nil
 		}
 		return nil, err
 	}
-
-	updated, err := d.Q.GetPlay(ctx, dbgen.GetPlayParams{FamilyID: fam.FamilyID, ID: req.Id})
-	if err != nil {
-		return nil, err
+	if !found {
+		return gen.UpdatePlay404JSONResponse(notFound()), nil
 	}
-	return gen.UpdatePlay200JSONResponse(serPlay(updated)), nil
+	return gen.UpdatePlay200JSONResponse(serPlay(row)), nil
 }
 
 // DeletePlay implements DELETE /api/play/{id}. REF: "{ok:true} / 404".
 func (d Deps) DeletePlay(ctx context.Context, req gen.DeletePlayRequestObject) (gen.DeletePlayResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
-	n, err := d.Q.DeletePlay(ctx, dbgen.DeletePlayParams{FamilyID: fam.FamilyID, ID: req.Id})
+	ok, err := deleteLog(ctx, func(ctx context.Context) (int64, error) {
+		return d.Q.DeletePlay(ctx, dbgen.DeletePlayParams{FamilyID: fam.FamilyID, ID: req.Id})
+	})
 	if err != nil {
 		return nil, err
 	}
-	if n == 0 {
+	if !ok {
 		return gen.DeletePlay404JSONResponse(notFound()), nil
 	}
 	return gen.DeletePlay200JSONResponse{Ok: gen.OkOkTrue}, nil

@@ -60,12 +60,6 @@ func (d Deps) CreatePump(ctx context.Context, req gen.CreatePumpRequestObject) (
 	}
 	body := req.Body
 
-	var side *string
-	if body.Side != nil {
-		v := string(*body.Side)
-		side = &v
-	}
-
 	row, unknownBaby, err := createLog(ctx, d, fam.FamilyID, body.BabyId,
 		func(ctx context.Context) (string, error) {
 			return d.Q.CreatePump(ctx, dbgen.CreatePumpParams{
@@ -73,7 +67,7 @@ func (d Deps) CreatePump(ctx context.Context, req gen.CreatePumpRequestObject) (
 				BabyID:      body.BabyId,
 				CaretakerID: fam.UserID,
 				Time:        ts(body.Time),
-				Side:        side,
+				Side:        enumStr(body.Side),
 				AmountMl:    body.AmountMl,
 				DurationMin: body.DurationMin,
 				Notes:       body.Notes,
@@ -87,7 +81,7 @@ func (d Deps) CreatePump(ctx context.Context, req gen.CreatePumpRequestObject) (
 		return nil, err
 	}
 	if unknownBaby {
-		return gen.CreatePump404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
+		return gen.CreatePump404JSONResponse(unknownBabyErr()), nil
 	}
 	return gen.CreatePump201JSONResponse(serPump(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Side, row.AmountMl, row.DurationMin, row.Notes)), nil
 }

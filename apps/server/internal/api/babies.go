@@ -42,6 +42,15 @@ func notFound() gen.Error {
 	return gen.Error{Error: "Not found", Code: "NOT_FOUND"}
 }
 
+// unknownBabyErr is notFound's sibling for the other 404 every log route can
+// answer: the caller named a baby that is not in their family. A distinct
+// message because the two are distinguishable and worth distinguishing —
+// "the entry you asked to edit is gone" and "there is no such baby" send a
+// client to different places.
+func unknownBabyErr() gen.Error {
+	return gen.Error{Error: "Unknown baby", Code: "NOT_FOUND"}
+}
+
 func serBaby(b dbgen.Baby) gen.Baby {
 	return gen.Baby{
 		Id:        b.ID,

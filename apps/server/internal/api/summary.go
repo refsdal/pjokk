@@ -61,7 +61,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 
 	if _, err := d.Q.GetBaby(ctx, dbgen.GetBabyParams{FamilyID: fam.FamilyID, ID: babyID}); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return gen.GetSummary404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
+			return gen.GetSummary404JSONResponse(unknownBabyErr()), nil
 		}
 		return nil, err
 	}

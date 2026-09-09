@@ -74,7 +74,7 @@ func (d Deps) CreateBath(ctx context.Context, req gen.CreateBathRequestObject) (
 		return nil, err
 	}
 	if unknownBaby {
-		return gen.CreateBath404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
+		return gen.CreateBath404JSONResponse(unknownBabyErr()), nil
 	}
 	return gen.CreateBath201JSONResponse(serBath(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Notes)), nil
 }

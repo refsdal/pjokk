@@ -106,7 +106,7 @@ func (d Deps) CreateMeasurement(ctx context.Context, req gen.CreateMeasurementRe
 		return nil, err
 	}
 	if unknownBaby {
-		return gen.CreateMeasurement404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
+		return gen.CreateMeasurement404JSONResponse(unknownBabyErr()), nil
 	}
 	return gen.CreateMeasurement201JSONResponse(serMeasurement(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Type, row.Value, row.Notes)), nil
 }

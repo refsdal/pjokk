@@ -60,7 +60,7 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 
 	if _, err := d.Q.GetBaby(ctx, dbgen.GetBabyParams{FamilyID: fam.FamilyID, ID: babyID}); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return gen.GetStats404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
+			return gen.GetStats404JSONResponse(unknownBabyErr()), nil
 		}
 		return nil, err
 	}
