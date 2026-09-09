@@ -25,6 +25,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -288,12 +289,18 @@ func RequireAdmin() func(http.Handler) http.Handler {
 // audit insert that fails must not turn a legitimate action into an error the
 // operator cannot get past; the alternative is an admin console that stops
 // working whenever its own bookkeeping does.
+//
+// Best-effort is not the same as silent, though: an append-only trail that
+// quietly grows holes is worse than one that visibly stops, so a failed
+// insert is logged. The caller still carries on.
 func Audit(ctx context.Context, q *gen.Queries, adminID, action, target, detail string) {
 	params := gen.InsertAdminAuditParams{AdminID: adminID, Action: action, Target: target}
 	if detail != "" {
 		params.Detail = &detail
 	}
-	_ = q.InsertAdminAudit(ctx, params)
+	if err := q.InsertAdminAudit(ctx, params); err != nil {
+		log.Printf("middleware: audit insert failed (action=%s target=%s): %v", action, target, err)
+	}
 }
 
 // roleOwner is Limen's default creator role. Pjokk configures "admin"
@@ -435,11 +442,14 @@ func APIKeyAuth(d Deps) func(http.Handler) http.Handler {
 
 			if !key.LastUsedAt.Valid || now.Sub(key.LastUsedAt.Time) > lastUsedInterval {
 				// Best-effort: a failed bookkeeping write must not deny a
-				// working key.
-				_ = d.Q.TouchAPIKey(r.Context(), gen.TouchAPIKeyParams{
+				// working key — but logged, so "this key says it was never
+				// used" has somewhere to be answered from.
+				if err := d.Q.TouchAPIKey(r.Context(), gen.TouchAPIKeyParams{
 					ID:         key.ID,
 					LastUsedAt: pgtype.Timestamptz{Time: now, Valid: true},
-				})
+				}); err != nil {
+					log.Printf("middleware: api key last_used_at update failed (key=%s): %v", key.ID, err)
+				}
 			}
 
 			next.ServeHTTP(w, withIdentity(r, identity{session: session, isAPIKey: true}))
