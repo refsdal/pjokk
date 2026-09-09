@@ -253,32 +253,20 @@ func (d Deps) UpdatePlay(ctx context.Context, req gen.UpdatePlayRequestObject) (
 		return nil, err
 	}
 
-	fields, err := rawBodyFields(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if fields == nil {
-		return nil, errNoRequestBody("UpdatePlay")
-	}
-
-	typeSet, typeVal, err := patchField[string](fields, "type")
-	if err != nil {
-		return nil, err
-	}
-	startSet, startVal, err := patchField[time.Time](fields, "startTime")
-	if err != nil {
-		return nil, err
-	}
-	endSet, endVal, err := patchField[time.Time](fields, "endTime")
-	if err != nil {
-		return nil, err
-	}
-	notesSet, notesVal, err := patchField[string](fields, "notes")
+	p, err := patchBody(ctx, "UpdatePlay")
 	if err != nil {
 		return nil, err
 	}
 
-	if !typeSet && !startSet && !endSet && !notesSet {
+	typeSet, typeVal := patchField[string](p, "type")
+	startSet, startVal := patchField[time.Time](p, "startTime")
+	endSet, endVal := patchField[time.Time](p, "endTime")
+	notesSet, notesVal := patchField[string](p, "notes")
+
+	if err := p.Err(); err != nil {
+		return nil, err
+	}
+	if !p.Any() {
 		return gen.UpdatePlay200JSONResponse(serPlay(existing)), nil
 	}
 

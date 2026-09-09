@@ -16,7 +16,7 @@ import (
 // This file ports apps/api/src/routes/diapers.ts (REF §A1: "same skeleton"
 // as feeds.ts, minus the feed-only columns). Read feeds.go first — its
 // package doc comment documents, in full, the PATCH tri-state pattern
-// (patch.go's withRawBody/rawBodyFields/patchField) this file reuses
+// (patch.go's withRawBody/patchBody/patchField) this file reuses
 // verbatim for `notes`, the one clearable field diaper_log has.
 
 func serDiaperRow(id, babyID, caretakerID, caretakerName string, t pgtype.Timestamptz, typ string, color, consistency, notes *string) gen.DiaperLog {
@@ -116,36 +116,21 @@ func (d Deps) UpdateDiaper(ctx context.Context, req gen.UpdateDiaperRequestObjec
 		return nil, err
 	}
 
-	fields, err := rawBodyFields(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if fields == nil {
-		return nil, errNoRequestBody("UpdateDiaper")
-	}
-
-	timeSet, timeVal, err := patchField[time.Time](fields, "time")
-	if err != nil {
-		return nil, err
-	}
-	typeSet, typeVal, err := patchField[string](fields, "type")
-	if err != nil {
-		return nil, err
-	}
-	colorSet, colorVal, err := patchField[string](fields, "color")
-	if err != nil {
-		return nil, err
-	}
-	consistencySet, consistencyVal, err := patchField[string](fields, "consistency")
-	if err != nil {
-		return nil, err
-	}
-	notesSet, notesVal, err := patchField[string](fields, "notes")
+	p, err := patchBody(ctx, "UpdateDiaper")
 	if err != nil {
 		return nil, err
 	}
 
-	if !timeSet && !typeSet && !colorSet && !consistencySet && !notesSet {
+	timeSet, timeVal := patchField[time.Time](p, "time")
+	typeSet, typeVal := patchField[string](p, "type")
+	colorSet, colorVal := patchField[string](p, "color")
+	consistencySet, consistencyVal := patchField[string](p, "consistency")
+	notesSet, notesVal := patchField[string](p, "notes")
+
+	if err := p.Err(); err != nil {
+		return nil, err
+	}
+	if !p.Any() {
 		return gen.UpdateDiaper200JSONResponse(serDiaper(existing)), nil
 	}
 

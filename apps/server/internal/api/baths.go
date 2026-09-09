@@ -84,29 +84,22 @@ func (d Deps) CreateBath(ctx context.Context, req gen.CreateBathRequestObject) (
 func (d Deps) UpdateBath(ctx context.Context, req gen.UpdateBathRequestObject) (gen.UpdateBathResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
-	fields, err := rawBodyFields(ctx)
+	p, err := patchBody(ctx, "UpdateBath")
 	if err != nil {
 		return nil, err
-	}
-	if fields == nil {
-		return nil, errNoRequestBody("UpdateBath")
 	}
 
-	timeSet, timeVal, err := patchField[time.Time](fields, "time")
-	if err != nil {
+	timeSet, timeVal := patchField[time.Time](p, "time")
+	notesSet, notesVal := patchField[string](p, "notes")
+	if err := p.Err(); err != nil {
 		return nil, err
 	}
-	notesSet, notesVal, err := patchField[string](fields, "notes")
-	if err != nil {
-		return nil, err
-	}
-	anySet := timeSet || notesSet
 
 	row, found, err := updateLog(ctx,
 		func(ctx context.Context) (dbgen.GetBathRow, error) {
 			return d.Q.GetBath(ctx, dbgen.GetBathParams{FamilyID: fam.FamilyID, ID: req.Id})
 		},
-		anySet,
+		p.Any(),
 		func(ctx context.Context) error {
 			_, err := d.Q.UpdateBath(ctx, dbgen.UpdateBathParams{
 				FamilyID: fam.FamilyID,

@@ -97,33 +97,23 @@ func (d Deps) CreateMilestone(ctx context.Context, req gen.CreateMilestoneReques
 func (d Deps) UpdateMilestone(ctx context.Context, req gen.UpdateMilestoneRequestObject) (gen.UpdateMilestoneResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
-	fields, err := rawBodyFields(ctx)
+	p, err := patchBody(ctx, "UpdateMilestone")
 	if err != nil {
 		return nil, err
-	}
-	if fields == nil {
-		return nil, errNoRequestBody("UpdateMilestone")
 	}
 
-	timeSet, timeVal, err := patchField[time.Time](fields, "time")
-	if err != nil {
+	timeSet, timeVal := patchField[time.Time](p, "time")
+	titleSet, titleVal := patchField[string](p, "title")
+	notesSet, notesVal := patchField[string](p, "notes")
+	if err := p.Err(); err != nil {
 		return nil, err
 	}
-	titleSet, titleVal, err := patchField[string](fields, "title")
-	if err != nil {
-		return nil, err
-	}
-	notesSet, notesVal, err := patchField[string](fields, "notes")
-	if err != nil {
-		return nil, err
-	}
-	anySet := timeSet || titleSet || notesSet
 
 	row, found, err := updateLog(ctx,
 		func(ctx context.Context) (dbgen.GetMilestoneRow, error) {
 			return d.Q.GetMilestone(ctx, dbgen.GetMilestoneParams{FamilyID: fam.FamilyID, ID: req.Id})
 		},
-		anySet,
+		p.Any(),
 		func(ctx context.Context) error {
 			_, err := d.Q.UpdateMilestone(ctx, dbgen.UpdateMilestoneParams{
 				FamilyID: fam.FamilyID,

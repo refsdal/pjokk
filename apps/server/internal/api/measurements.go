@@ -116,37 +116,24 @@ func (d Deps) CreateMeasurement(ctx context.Context, req gen.CreateMeasurementRe
 func (d Deps) UpdateMeasurement(ctx context.Context, req gen.UpdateMeasurementRequestObject) (gen.UpdateMeasurementResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
-	fields, err := rawBodyFields(ctx)
+	p, err := patchBody(ctx, "UpdateMeasurement")
 	if err != nil {
 		return nil, err
-	}
-	if fields == nil {
-		return nil, errNoRequestBody("UpdateMeasurement")
 	}
 
-	timeSet, timeVal, err := patchField[time.Time](fields, "time")
-	if err != nil {
+	timeSet, timeVal := patchField[time.Time](p, "time")
+	typeSet, typeVal := patchField[string](p, "type")
+	valueSet, valueVal := patchField[float64](p, "value")
+	notesSet, notesVal := patchField[string](p, "notes")
+	if err := p.Err(); err != nil {
 		return nil, err
 	}
-	typeSet, typeVal, err := patchField[string](fields, "type")
-	if err != nil {
-		return nil, err
-	}
-	valueSet, valueVal, err := patchField[float64](fields, "value")
-	if err != nil {
-		return nil, err
-	}
-	notesSet, notesVal, err := patchField[string](fields, "notes")
-	if err != nil {
-		return nil, err
-	}
-	anySet := timeSet || typeSet || valueSet || notesSet
 
 	row, found, err := updateLog(ctx,
 		func(ctx context.Context) (dbgen.GetMeasurementRow, error) {
 			return d.Q.GetMeasurement(ctx, dbgen.GetMeasurementParams{FamilyID: fam.FamilyID, ID: req.Id})
 		},
-		anySet,
+		p.Any(),
 		func(ctx context.Context) error {
 			_, err := d.Q.UpdateMeasurement(ctx, dbgen.UpdateMeasurementParams{
 				FamilyID: fam.FamilyID,

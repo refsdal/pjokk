@@ -48,8 +48,13 @@ import (
 // including kin-openapi's spec validation, which still runs against
 // UpdateFeed's nullable-typed schema and rejects a malformed or
 // out-of-range body before this handler ever sees it. patch.go's
-// patchField[T] turns one map lookup into (present bool, value *T, err
-// error) for a single field.
+// patchBody collects that map into a patchSet, and patchField[T] turns one
+// lookup on it into (set bool, value *T) for a single field — with the
+// decode error latched on the set rather than returned per field, so a
+// handler reads eleven fields in eleven lines and checks p.Err() once.
+// p.Any() is then the empty-patch test, which cannot fall out of step with
+// the fields above it the way a hand-written `!aSet && !bSet && …` chain
+// could.
 //
 // Considered and rejected:
 //   - Registering PATCH as a non-strict custom mux handler outside the
@@ -195,7 +200,7 @@ func (d Deps) CreateFeed(ctx context.Context, req gen.CreateFeedRequestObject) (
 // UpdateFeed implements PATCH /api/feeds/{id}. REF: "partial (nullable
 // clears) → FeedLog / 404". See this file's package doc comment for the
 // presence-detection pattern below — req.Body (the generated strict type)
-// is deliberately UNUSED here; rawBodyFields/patchField read the same
+// is deliberately UNUSED here; patchBody/patchField read the same
 // request body a second time, from the copy withRawBody stashed in ctx,
 // because only that raw form can tell "omitted" from "explicit null" apart.
 func (d Deps) UpdateFeed(ctx context.Context, req gen.UpdateFeedRequestObject) (gen.UpdateFeedResponseObject, error) {
@@ -209,60 +214,27 @@ func (d Deps) UpdateFeed(ctx context.Context, req gen.UpdateFeedRequestObject) (
 		return nil, err
 	}
 
-	fields, err := rawBodyFields(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if fields == nil {
-		return nil, errNoRequestBody("UpdateFeed")
-	}
-
-	timeSet, timeVal, err := patchField[time.Time](fields, "time")
-	if err != nil {
-		return nil, err
-	}
-	typeSet, typeVal, err := patchField[string](fields, "type")
-	if err != nil {
-		return nil, err
-	}
-	amountSet, amountVal, err := patchField[int32](fields, "amountMl")
-	if err != nil {
-		return nil, err
-	}
-	sideSet, sideVal, err := patchField[string](fields, "side")
-	if err != nil {
-		return nil, err
-	}
-	durationSet, durationVal, err := patchField[int32](fields, "durationMin")
-	if err != nil {
-		return nil, err
-	}
-	leftSet, leftVal, err := patchField[int32](fields, "leftMin")
-	if err != nil {
-		return nil, err
-	}
-	rightSet, rightVal, err := patchField[int32](fields, "rightMin")
-	if err != nil {
-		return nil, err
-	}
-	contentsSet, contentsVal, err := patchField[string](fields, "contents")
-	if err != nil {
-		return nil, err
-	}
-	foodSet, foodVal, err := patchField[string](fields, "food")
-	if err != nil {
-		return nil, err
-	}
-	reactionSet, reactionVal, err := patchField[bool](fields, "reaction")
-	if err != nil {
-		return nil, err
-	}
-	notesSet, notesVal, err := patchField[string](fields, "notes")
+	p, err := patchBody(ctx, "UpdateFeed")
 	if err != nil {
 		return nil, err
 	}
 
-	if !timeSet && !typeSet && !amountSet && !sideSet && !durationSet && !leftSet && !rightSet && !contentsSet && !foodSet && !reactionSet && !notesSet {
+	timeSet, timeVal := patchField[time.Time](p, "time")
+	typeSet, typeVal := patchField[string](p, "type")
+	amountSet, amountVal := patchField[int32](p, "amountMl")
+	sideSet, sideVal := patchField[string](p, "side")
+	durationSet, durationVal := patchField[int32](p, "durationMin")
+	leftSet, leftVal := patchField[int32](p, "leftMin")
+	rightSet, rightVal := patchField[int32](p, "rightMin")
+	contentsSet, contentsVal := patchField[string](p, "contents")
+	foodSet, foodVal := patchField[string](p, "food")
+	reactionSet, reactionVal := patchField[bool](p, "reaction")
+	notesSet, notesVal := patchField[string](p, "notes")
+
+	if err := p.Err(); err != nil {
+		return nil, err
+	}
+	if !p.Any() {
 		return gen.UpdateFeed200JSONResponse(serFeed(existing)), nil
 	}
 

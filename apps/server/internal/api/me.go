@@ -62,27 +62,15 @@ func (d Deps) UpdateMe(ctx context.Context, _ gen.UpdateMeRequestObject) (gen.Up
 		return nil, fmt.Errorf("api: UpdateMe reached with no session (RequireSession not wired?)")
 	}
 
-	fields, err := rawBodyFields(ctx)
+	p, err := patchBody(ctx, "UpdateMe")
 	if err != nil {
 		return nil, err
 	}
-	if fields == nil {
-		return nil, errNoRequestBody("UpdateMe")
-	}
-	nameSet, nameVal, err := patchField[string](fields, "name")
-	if err != nil {
-		return nil, err
-	}
-	nickSet, nickVal, err := patchField[string](fields, "nickname")
-	if err != nil {
-		return nil, err
-	}
-	phoneSet, phoneVal, err := patchField[string](fields, "phone")
-	if err != nil {
-		return nil, err
-	}
-	unitsSet, unitsVal, err := patchField[string](fields, "units")
-	if err != nil {
+	nameSet, nameVal := patchField[string](p, "name")
+	nickSet, nickVal := patchField[string](p, "nickname")
+	phoneSet, phoneVal := patchField[string](p, "phone")
+	unitsSet, unitsVal := patchField[string](p, "units")
+	if err := p.Err(); err != nil {
 		return nil, err
 	}
 

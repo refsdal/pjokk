@@ -242,36 +242,21 @@ func (d Deps) UpdateSleep(ctx context.Context, req gen.UpdateSleepRequestObject)
 		return nil, err
 	}
 
-	fields, err := rawBodyFields(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if fields == nil {
-		return nil, errNoRequestBody("UpdateSleep")
-	}
-
-	startSet, startVal, err := patchField[time.Time](fields, "startTime")
-	if err != nil {
-		return nil, err
-	}
-	endSet, endVal, err := patchField[time.Time](fields, "endTime")
-	if err != nil {
-		return nil, err
-	}
-	locationSet, locationVal, err := patchField[string](fields, "location")
-	if err != nil {
-		return nil, err
-	}
-	typeSet, typeVal, err := patchField[string](fields, "type")
-	if err != nil {
-		return nil, err
-	}
-	notesSet, notesVal, err := patchField[string](fields, "notes")
+	p, err := patchBody(ctx, "UpdateSleep")
 	if err != nil {
 		return nil, err
 	}
 
-	if !startSet && !endSet && !locationSet && !typeSet && !notesSet {
+	startSet, startVal := patchField[time.Time](p, "startTime")
+	endSet, endVal := patchField[time.Time](p, "endTime")
+	locationSet, locationVal := patchField[string](p, "location")
+	typeSet, typeVal := patchField[string](p, "type")
+	notesSet, notesVal := patchField[string](p, "notes")
+
+	if err := p.Err(); err != nil {
+		return nil, err
+	}
+	if !p.Any() {
 		return gen.UpdateSleep200JSONResponse(serSleep(existing)), nil
 	}
 
