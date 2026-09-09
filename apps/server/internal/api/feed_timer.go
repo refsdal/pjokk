@@ -127,7 +127,7 @@ func (d Deps) GetFeedTimer(ctx context.Context, req gen.GetFeedTimerRequestObjec
 	fam := middleware.FamilyFromContext(ctx)
 	if _, err := d.Q.GetBaby(ctx, dbgen.GetBabyParams{FamilyID: fam.FamilyID, ID: req.Params.BabyId}); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return gen.GetFeedTimer404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
+			return gen.GetFeedTimer404JSONResponse(unknownBabyErr()), nil
 		}
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func (d Deps) StartFeedTimer(ctx context.Context, req gen.StartFeedTimerRequestO
 
 	if _, err := d.Q.GetBaby(ctx, dbgen.GetBabyParams{FamilyID: fam.FamilyID, ID: body.BabyId}); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return gen.StartFeedTimer404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
+			return gen.StartFeedTimer404JSONResponse(unknownBabyErr()), nil
 		}
 		return nil, err
 	}

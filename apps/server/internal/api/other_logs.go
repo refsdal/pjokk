@@ -46,9 +46,16 @@ import (
 // serialize the row and wrap the (Row, ok, err) result in its own concrete
 // gen.XxxResponseObject — the "thin instantiations" the brief asks for,
 // just built from closures over named sqlc funcs rather than from sqlc funcs
-// as literal type parameters. listLimit below is the same "genuinely
-// reusable" default-limit-resolution feeds.go/diapers.go already share
-// (listFeedsDefaultLimit).
+// as literal type parameters. listLimit below is the default-limit
+// resolution every list route in the package shares.
+//
+// The engine is no longer "the six Phase 3 kinds only": feeds, diapers,
+// sleep and play were written before it and have since been moved onto it
+// too, so this file is where a reader should start for ANY log route.
+// CreateSleep and CreatePlay are the two deliberate exceptions — each has an
+// ALREADY_ACTIVE pre-check between the baby check and the insert, and maps a
+// partial-unique-index violation to a 409, neither of which fits a create
+// closure that can only answer (id, error). They still share babyExists.
 //
 // PATCH's per-field patchField[T] calls (patch.go, Task 10) stay in each
 // per-kind file: the field SET differs by kind (medicine has
@@ -68,15 +75,19 @@ func babyExists(ctx context.Context, d Deps, familyID, babyID string) (bool, err
 	return true, nil
 }
 
-// listLimit resolves the standard 1..200/default-50 limit convention
-// feeds.go's listFeedsDefaultLimit established; req.Params.Limit is nil when
-// the query parameter was omitted (spec validation already enforces the
-// 1..200 bound when it IS present).
+// listDefaultLimit mirrors apps/api/src/db/scoped.ts's `opts.limit ?? 50`:
+// the spec's limitQuery parameter bounds an explicit value (1..200) but has
+// no OpenAPI "default", so an omitted limit is resolved here.
+const listDefaultLimit = 50
+
+// listLimit resolves that convention for one request. req.Params.Limit is
+// nil when the query parameter was omitted; spec validation already enforces
+// the 1..200 bound when it IS present.
 func listLimit(limit *int) int32 {
 	if limit != nil {
 		return int32(*limit)
 	}
-	return int32(listFeedsDefaultLimit)
+	return listDefaultLimit
 }
 
 // createLog is the generic engine for POST /api/{base}: verify the baby

@@ -103,7 +103,7 @@ func (d Deps) CreateMedicine(ctx context.Context, req gen.CreateMedicineRequestO
 		return nil, err
 	}
 	if unknownBaby {
-		return gen.CreateMedicine404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
+		return gen.CreateMedicine404JSONResponse(unknownBabyErr()), nil
 	}
 	return gen.CreateMedicine201JSONResponse(serMedicine(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Name, row.Amount, row.Unit, row.MedicineID, row.Notes)), nil
 }

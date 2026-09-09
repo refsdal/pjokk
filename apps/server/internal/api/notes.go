@@ -76,7 +76,7 @@ func (d Deps) CreateNote(ctx context.Context, req gen.CreateNoteRequestObject) (
 		return nil, err
 	}
 	if unknownBaby {
-		return gen.CreateNote404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
+		return gen.CreateNote404JSONResponse(unknownBabyErr()), nil
 	}
 	return gen.CreateNote201JSONResponse(serNote(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Content, row.Notes)), nil
 }

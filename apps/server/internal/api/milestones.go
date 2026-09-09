@@ -87,7 +87,7 @@ func (d Deps) CreateMilestone(ctx context.Context, req gen.CreateMilestoneReques
 		return nil, err
 	}
 	if unknownBaby {
-		return gen.CreateMilestone404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
+		return gen.CreateMilestone404JSONResponse(unknownBabyErr()), nil
 	}
 	return gen.CreateMilestone201JSONResponse(serMilestone(row.ID, row.BabyID, row.CaretakerID, row.CaretakerName, row.Time, row.Title, row.Notes, nil)), nil
 }

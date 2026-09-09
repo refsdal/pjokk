@@ -181,7 +181,7 @@ func (d Deps) CreateVaccine(ctx context.Context, req gen.CreateVaccineRequestObj
 		return nil, err
 	}
 	if unknownBaby {
-		return gen.CreateVaccine404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
+		return gen.CreateVaccine404JSONResponse(unknownBabyErr()), nil
 	}
 	return gen.CreateVaccine201JSONResponse(row), nil
 }
@@ -314,7 +314,7 @@ func (d Deps) CreateVaccineDismissal(ctx context.Context, req gen.CreateVaccineD
 		return nil, err
 	}
 	if !ok {
-		return gen.CreateVaccineDismissal404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
+		return gen.CreateVaccineDismissal404JSONResponse(unknownBabyErr()), nil
 	}
 
 	row, err := d.Q.CreateVaccineDismissal(ctx, dbgen.CreateVaccineDismissalParams{

@@ -97,7 +97,7 @@ func (d Deps) CreateReminder(ctx context.Context, req gen.CreateReminderRequestO
 	if body.BabyId != nil {
 		if _, err := d.Q.GetBaby(ctx, dbgen.GetBabyParams{FamilyID: fam.FamilyID, ID: *body.BabyId}); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return gen.CreateReminder404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
+				return gen.CreateReminder404JSONResponse(unknownBabyErr()), nil
 			}
 			return nil, err
 		}

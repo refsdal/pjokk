@@ -2,10 +2,8 @@ package api
 
 import (
 	"context"
-	"errors"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/refsdal/pjokk/server/internal/api/gen"
@@ -45,15 +43,10 @@ func serDiaperListRow(row dbgen.ListDiapersRow) gen.DiaperLog {
 func (d Deps) ListDiapers(ctx context.Context, req gen.ListDiapersRequestObject) (gen.ListDiapersResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
-	limit := int32(listFeedsDefaultLimit)
-	if req.Params.Limit != nil {
-		limit = int32(*req.Params.Limit)
-	}
-
 	rows, err := d.Q.ListDiapers(ctx, dbgen.ListDiapersParams{
 		FamilyID: fam.FamilyID,
 		BabyID:   req.Params.BabyId,
-		Lim:      limit,
+		Lim:      listLimit(req.Params.Limit),
 	})
 	if err != nil {
 		return nil, err
@@ -74,32 +67,30 @@ func (d Deps) CreateDiaper(ctx context.Context, req gen.CreateDiaperRequestObjec
 	}
 	body := req.Body
 
-	if _, err := d.Q.GetBaby(ctx, dbgen.GetBabyParams{FamilyID: fam.FamilyID, ID: body.BabyId}); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return gen.CreateDiaper404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
-		}
-		return nil, err
-	}
-
-	id, err := d.Q.CreateDiaper(ctx, dbgen.CreateDiaperParams{
-		FamilyID:    fam.FamilyID,
-		BabyID:      body.BabyId,
-		CaretakerID: fam.UserID,
-		Time:        ts(body.Time),
-		Type:        string(body.Type),
-		Color:       enumStr(body.Color),
-		Consistency: enumStr(body.Consistency),
-		Notes:       body.Notes,
-	})
+	row, unknownBaby, err := createLog(ctx, d, fam.FamilyID, body.BabyId,
+		func(ctx context.Context) (string, error) {
+			return d.Q.CreateDiaper(ctx, dbgen.CreateDiaperParams{
+				FamilyID:    fam.FamilyID,
+				BabyID:      body.BabyId,
+				CaretakerID: fam.UserID,
+				Time:        ts(body.Time),
+				Type:        string(body.Type),
+				Color:       enumStr(body.Color),
+				Consistency: enumStr(body.Consistency),
+				Notes:       body.Notes,
+			})
+		},
+		func(ctx context.Context, id string) (dbgen.GetDiaperRow, error) {
+			return d.Q.GetDiaper(ctx, dbgen.GetDiaperParams{FamilyID: fam.FamilyID, ID: id})
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
-
-	created, err := d.Q.GetDiaper(ctx, dbgen.GetDiaperParams{FamilyID: fam.FamilyID, ID: id})
-	if err != nil {
-		return nil, err
+	if unknownBaby {
+		return gen.CreateDiaper404JSONResponse(unknownBabyErr()), nil
 	}
-	return gen.CreateDiaper201JSONResponse(serDiaper(created)), nil
+	return gen.CreateDiaper201JSONResponse(serDiaper(row)), nil
 }
 
 // UpdateDiaper implements PATCH /api/diapers/{id}. REF: "partial (nullable
@@ -107,14 +98,6 @@ func (d Deps) CreateDiaper(ctx context.Context, req gen.CreateDiaperRequestObjec
 // presence-detection pattern below.
 func (d Deps) UpdateDiaper(ctx context.Context, req gen.UpdateDiaperRequestObject) (gen.UpdateDiaperResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
-
-	existing, err := d.Q.GetDiaper(ctx, dbgen.GetDiaperParams{FamilyID: fam.FamilyID, ID: req.Id})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return gen.UpdateDiaper404JSONResponse(notFound()), nil
-		}
-		return nil, err
-	}
 
 	p, err := patchBody(ctx, "UpdateDiaper")
 	if err != nil {
@@ -130,42 +113,49 @@ func (d Deps) UpdateDiaper(ctx context.Context, req gen.UpdateDiaperRequestObjec
 	if err := p.Err(); err != nil {
 		return nil, err
 	}
-	if !p.Any() {
-		return gen.UpdateDiaper200JSONResponse(serDiaper(existing)), nil
-	}
 
-	if _, err := d.Q.UpdateDiaper(ctx, dbgen.UpdateDiaperParams{
-		FamilyID:       fam.FamilyID,
-		ID:             req.Id,
-		TimeSet:        timeSet,
-		TimeVal:        tsFrom(timeVal),
-		TypeSet:        typeSet,
-		TypeVal:        typeVal,
-		ColorSet:       colorSet,
-		ColorVal:       colorVal,
-		ConsistencySet: consistencySet,
-		ConsistencyVal: consistencyVal,
-		NotesSet:       notesSet,
-		NotesVal:       notesVal,
-	}); err != nil {
-		return nil, err
-	}
-
-	updated, err := d.Q.GetDiaper(ctx, dbgen.GetDiaperParams{FamilyID: fam.FamilyID, ID: req.Id})
+	row, found, err := updateLog(ctx,
+		func(ctx context.Context) (dbgen.GetDiaperRow, error) {
+			return d.Q.GetDiaper(ctx, dbgen.GetDiaperParams{FamilyID: fam.FamilyID, ID: req.Id})
+		},
+		p.Any(),
+		func(ctx context.Context) error {
+			_, err := d.Q.UpdateDiaper(ctx, dbgen.UpdateDiaperParams{
+				FamilyID:       fam.FamilyID,
+				ID:             req.Id,
+				TimeSet:        timeSet,
+				TimeVal:        tsFrom(timeVal),
+				TypeSet:        typeSet,
+				TypeVal:        typeVal,
+				ColorSet:       colorSet,
+				ColorVal:       colorVal,
+				ConsistencySet: consistencySet,
+				ConsistencyVal: consistencyVal,
+				NotesSet:       notesSet,
+				NotesVal:       notesVal,
+			})
+			return err
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
-	return gen.UpdateDiaper200JSONResponse(serDiaper(updated)), nil
+	if !found {
+		return gen.UpdateDiaper404JSONResponse(notFound()), nil
+	}
+	return gen.UpdateDiaper200JSONResponse(serDiaper(row)), nil
 }
 
 // DeleteDiaper implements DELETE /api/diapers/{id}. REF: "{ok:true} / 404".
 func (d Deps) DeleteDiaper(ctx context.Context, req gen.DeleteDiaperRequestObject) (gen.DeleteDiaperResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
-	n, err := d.Q.DeleteDiaper(ctx, dbgen.DeleteDiaperParams{FamilyID: fam.FamilyID, ID: req.Id})
+	ok, err := deleteLog(ctx, func(ctx context.Context) (int64, error) {
+		return d.Q.DeleteDiaper(ctx, dbgen.DeleteDiaperParams{FamilyID: fam.FamilyID, ID: req.Id})
+	})
 	if err != nil {
 		return nil, err
 	}
-	if n == 0 {
+	if !ok {
 		return gen.DeleteDiaper404JSONResponse(notFound()), nil
 	}
 	return gen.DeleteDiaper200JSONResponse{Ok: gen.OkOkTrue}, nil

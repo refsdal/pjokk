@@ -2,10 +2,8 @@ package api
 
 import (
 	"context"
-	"errors"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/refsdal/pjokk/server/internal/api/gen"
@@ -118,24 +116,14 @@ func serFeedListRow(row dbgen.ListFeedsRow) gen.FeedLog {
 		row.AmountMl, row.Side, row.DurationMin, row.LeftMin, row.RightMin, row.Contents, row.Food, row.Reaction, row.Notes)
 }
 
-// listFeedsDefaultLimit mirrors apps/api/src/db/scoped.ts's `opts.limit ??
-// 50` — the spec's limitQuery parameter bounds an explicit value (1..200)
-// but has no OpenAPI "default", so an omitted limit is resolved here.
-const listFeedsDefaultLimit = 50
-
 // ListFeeds implements GET /api/feeds. REF: "FeedLog[] newest first".
 func (d Deps) ListFeeds(ctx context.Context, req gen.ListFeedsRequestObject) (gen.ListFeedsResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
-	limit := int32(listFeedsDefaultLimit)
-	if req.Params.Limit != nil {
-		limit = int32(*req.Params.Limit)
-	}
-
 	rows, err := d.Q.ListFeeds(ctx, dbgen.ListFeedsParams{
 		FamilyID: fam.FamilyID,
 		BabyID:   req.Params.BabyId,
-		Lim:      limit,
+		Lim:      listLimit(req.Params.Limit),
 	})
 	if err != nil {
 		return nil, err
@@ -157,44 +145,36 @@ func (d Deps) CreateFeed(ctx context.Context, req gen.CreateFeedRequestObject) (
 	}
 	body := req.Body
 
-	if _, err := d.Q.GetBaby(ctx, dbgen.GetBabyParams{FamilyID: fam.FamilyID, ID: body.BabyId}); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return gen.CreateFeed404JSONResponse{Error: "Unknown baby", Code: "NOT_FOUND"}, nil
-		}
-		return nil, err
-	}
-
-	var side *string
-	if body.Side != nil {
-		v := string(*body.Side)
-		side = &v
-	}
-
-	id, err := d.Q.CreateFeed(ctx, dbgen.CreateFeedParams{
-		FamilyID:    fam.FamilyID,
-		BabyID:      body.BabyId,
-		CaretakerID: fam.UserID,
-		Time:        ts(body.Time),
-		Type:        string(body.Type),
-		AmountMl:    body.AmountMl,
-		Side:        side,
-		DurationMin: body.DurationMin,
-		LeftMin:     body.LeftMin,
-		RightMin:    body.RightMin,
-		Contents:    enumStr(body.Contents),
-		Food:        body.Food,
-		Reaction:    body.Reaction,
-		Notes:       body.Notes,
-	})
+	row, unknownBaby, err := createLog(ctx, d, fam.FamilyID, body.BabyId,
+		func(ctx context.Context) (string, error) {
+			return d.Q.CreateFeed(ctx, dbgen.CreateFeedParams{
+				FamilyID:    fam.FamilyID,
+				BabyID:      body.BabyId,
+				CaretakerID: fam.UserID,
+				Time:        ts(body.Time),
+				Type:        string(body.Type),
+				AmountMl:    body.AmountMl,
+				Side:        enumStr(body.Side),
+				DurationMin: body.DurationMin,
+				LeftMin:     body.LeftMin,
+				RightMin:    body.RightMin,
+				Contents:    enumStr(body.Contents),
+				Food:        body.Food,
+				Reaction:    body.Reaction,
+				Notes:       body.Notes,
+			})
+		},
+		func(ctx context.Context, id string) (dbgen.GetFeedRow, error) {
+			return d.Q.GetFeed(ctx, dbgen.GetFeedParams{FamilyID: fam.FamilyID, ID: id})
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
-
-	created, err := d.Q.GetFeed(ctx, dbgen.GetFeedParams{FamilyID: fam.FamilyID, ID: id})
-	if err != nil {
-		return nil, err
+	if unknownBaby {
+		return gen.CreateFeed404JSONResponse(unknownBabyErr()), nil
 	}
-	return gen.CreateFeed201JSONResponse(serFeed(created)), nil
+	return gen.CreateFeed201JSONResponse(serFeed(row)), nil
 }
 
 // UpdateFeed implements PATCH /api/feeds/{id}. REF: "partial (nullable
@@ -205,14 +185,6 @@ func (d Deps) CreateFeed(ctx context.Context, req gen.CreateFeedRequestObject) (
 // because only that raw form can tell "omitted" from "explicit null" apart.
 func (d Deps) UpdateFeed(ctx context.Context, req gen.UpdateFeedRequestObject) (gen.UpdateFeedResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
-
-	existing, err := d.Q.GetFeed(ctx, dbgen.GetFeedParams{FamilyID: fam.FamilyID, ID: req.Id})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return gen.UpdateFeed404JSONResponse(notFound()), nil
-		}
-		return nil, err
-	}
 
 	p, err := patchBody(ctx, "UpdateFeed")
 	if err != nil {
@@ -234,54 +206,61 @@ func (d Deps) UpdateFeed(ctx context.Context, req gen.UpdateFeedRequestObject) (
 	if err := p.Err(); err != nil {
 		return nil, err
 	}
-	if !p.Any() {
-		return gen.UpdateFeed200JSONResponse(serFeed(existing)), nil
-	}
 
-	if _, err := d.Q.UpdateFeed(ctx, dbgen.UpdateFeedParams{
-		FamilyID:       fam.FamilyID,
-		ID:             req.Id,
-		TimeSet:        timeSet,
-		TimeVal:        tsFrom(timeVal),
-		TypeSet:        typeSet,
-		TypeVal:        typeVal,
-		AmountMlSet:    amountSet,
-		AmountMlVal:    amountVal,
-		SideSet:        sideSet,
-		SideVal:        sideVal,
-		DurationMinSet: durationSet,
-		DurationMinVal: durationVal,
-		LeftMinSet:     leftSet,
-		LeftMinVal:     leftVal,
-		RightMinSet:    rightSet,
-		RightMinVal:    rightVal,
-		ContentsSet:    contentsSet,
-		ContentsVal:    contentsVal,
-		FoodSet:        foodSet,
-		FoodVal:        foodVal,
-		ReactionSet:    reactionSet,
-		ReactionVal:    reactionVal,
-		NotesSet:       notesSet,
-		NotesVal:       notesVal,
-	}); err != nil {
-		return nil, err
-	}
-
-	updated, err := d.Q.GetFeed(ctx, dbgen.GetFeedParams{FamilyID: fam.FamilyID, ID: req.Id})
+	row, found, err := updateLog(ctx,
+		func(ctx context.Context) (dbgen.GetFeedRow, error) {
+			return d.Q.GetFeed(ctx, dbgen.GetFeedParams{FamilyID: fam.FamilyID, ID: req.Id})
+		},
+		p.Any(),
+		func(ctx context.Context) error {
+			_, err := d.Q.UpdateFeed(ctx, dbgen.UpdateFeedParams{
+				FamilyID:       fam.FamilyID,
+				ID:             req.Id,
+				TimeSet:        timeSet,
+				TimeVal:        tsFrom(timeVal),
+				TypeSet:        typeSet,
+				TypeVal:        typeVal,
+				AmountMlSet:    amountSet,
+				AmountMlVal:    amountVal,
+				SideSet:        sideSet,
+				SideVal:        sideVal,
+				DurationMinSet: durationSet,
+				DurationMinVal: durationVal,
+				LeftMinSet:     leftSet,
+				LeftMinVal:     leftVal,
+				RightMinSet:    rightSet,
+				RightMinVal:    rightVal,
+				ContentsSet:    contentsSet,
+				ContentsVal:    contentsVal,
+				FoodSet:        foodSet,
+				FoodVal:        foodVal,
+				ReactionSet:    reactionSet,
+				ReactionVal:    reactionVal,
+				NotesSet:       notesSet,
+				NotesVal:       notesVal,
+			})
+			return err
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
-	return gen.UpdateFeed200JSONResponse(serFeed(updated)), nil
+	if !found {
+		return gen.UpdateFeed404JSONResponse(notFound()), nil
+	}
+	return gen.UpdateFeed200JSONResponse(serFeed(row)), nil
 }
 
 // DeleteFeed implements DELETE /api/feeds/{id}. REF: "{ok:true} / 404".
 func (d Deps) DeleteFeed(ctx context.Context, req gen.DeleteFeedRequestObject) (gen.DeleteFeedResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
-	n, err := d.Q.DeleteFeed(ctx, dbgen.DeleteFeedParams{FamilyID: fam.FamilyID, ID: req.Id})
+	ok, err := deleteLog(ctx, func(ctx context.Context) (int64, error) {
+		return d.Q.DeleteFeed(ctx, dbgen.DeleteFeedParams{FamilyID: fam.FamilyID, ID: req.Id})
+	})
 	if err != nil {
 		return nil, err
 	}
-	if n == 0 {
+	if !ok {
 		return gen.DeleteFeed404JSONResponse(notFound()), nil
 	}
 	return gen.DeleteFeed200JSONResponse{Ok: gen.OkOkTrue}, nil
