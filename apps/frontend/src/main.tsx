@@ -7,7 +7,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { registerMutationDefaults } from "@/lib/data";
 import { initInstallPrompt } from "@/lib/install";
 import { announceUpdate } from "@/lib/pwa";
-import { persistOptions, queryClient } from "@/lib/query";
+import { afterRestore, persistOptions, queryClient } from "@/lib/query";
 import { router } from "@/router";
 import "./styles.css";
 
@@ -29,10 +29,8 @@ createRoot(document.getElementById("root")!).render(
       <PersistQueryClientProvider
         client={queryClient}
         persistOptions={persistOptions}
-        onSuccess={() => {
-          // Mutations queued offline resume as soon as the cache is restored.
-          void queryClient.resumePausedMutations();
-        }}
+        // Queued offline mutations resume, then the snapshot is revalidated.
+        onSuccess={() => void afterRestore(queryClient)}
       >
         <RouterProvider router={router} />
       </PersistQueryClientProvider>
