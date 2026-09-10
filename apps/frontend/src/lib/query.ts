@@ -1,14 +1,36 @@
-import { QueryClient } from "@tanstack/react-query";
+import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { del, get, set } from "idb-keyval";
 import { clearFence } from "./family-fence";
+import { ApiError } from "./api";
 
 const DAY = 24 * 3600_000;
+
+// A kiosk device revoked by an admin (or un-enrolled elsewhere) finds out on
+// its next request: 401 DEVICE_REVOKED, from whichever query or mutation got
+// there first. One place hears them all and tells the kiosk's DeviceGate,
+// which clears the tablet and goes to sign-in (spec 2026-09-10 §6).
+const revokedListeners = new Set<() => void>();
+
+export function onDeviceRevoked(listener: () => void): () => void {
+  revokedListeners.add(listener);
+  return () => {
+    revokedListeners.delete(listener);
+  };
+}
+
+export function reportIfDeviceRevoked(err: unknown): void {
+  if (err instanceof ApiError && err.code === "DEVICE_REVOKED") {
+    for (const listener of revokedListeners) listener();
+  }
+}
 
 // Cached data must outlive reloads: the timeline/home render instantly from
 // IndexedDB while the network catches up. Logging while offline pauses the
 // mutation; it resumes automatically when the connection returns.
 export const queryClient = new QueryClient({
+  queryCache: new QueryCache({ onError: reportIfDeviceRevoked }),
+  mutationCache: new MutationCache({ onError: reportIfDeviceRevoked }),
   defaultOptions: {
     queries: {
       staleTime: 15_000,

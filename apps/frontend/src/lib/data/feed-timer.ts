@@ -1,6 +1,6 @@
 import { useMutation, type QueryClient } from "@tanstack/react-query";
 import type { FeedLog, FeedTimer, PumpLog, Summary } from "@pjokk/shared";
-import { client, unwrap } from "../api";
+import { caretakerInit, client, unwrap } from "../api";
 import { sideSeconds } from "../feed-timer-ui";
 import { t } from "../i18n";
 import { toast } from "../toast";
@@ -16,18 +16,22 @@ import { invalidateLogs } from "./keys";
 
 const OPTIMISTIC_ID = "optimistic";
 
+// caretakerId: who is logging on a kiosk (lib/api.ts's caretakerInit).
 export type StartFeedTimerVars = {
+  caretakerId?: string;
   babyId: string;
   kind: "breast" | "pump";
   side?: "left" | "right" | "both";
   startTime: string;
 };
 export type SetFeedTimerSideVars = {
+  caretakerId?: string;
   id: string;
   babyId: string;
   side: "left" | "right" | "both" | null;
 };
 export type StopFeedTimerVars = {
+  caretakerId?: string;
   id: string;
   babyId: string;
   kind: "breast" | "pump";
@@ -87,8 +91,13 @@ const fail = (what: string) => (err: Error) =>
 
 export function registerFeedTimerMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["startFeedTimer"], {
-    mutationFn: async (vars: StartFeedTimerVars) =>
-      unwrap<FeedTimer>(client.POST("/api/feeds/timer", { body: vars })),
+    mutationFn: async ({ caretakerId, ...body }: StartFeedTimerVars) =>
+      unwrap<FeedTimer>(
+        client.POST("/api/feeds/timer", {
+          body,
+          ...caretakerInit(caretakerId),
+        }),
+      ),
     onMutate: (vars: StartFeedTimerVars) =>
       patchTimer(qc, vars.babyId, vars.kind, {
         id: OPTIMISTIC_ID,
@@ -110,11 +119,12 @@ export function registerFeedTimerMutationDefaults(qc: QueryClient) {
   });
 
   qc.setMutationDefaults(["setFeedTimerSide"], {
-    mutationFn: async ({ id, side }: SetFeedTimerSideVars) =>
+    mutationFn: async ({ id, side, caretakerId }: SetFeedTimerSideVars) =>
       unwrap<FeedTimer>(
         client.POST("/api/feeds/timer/{id}/side", {
           params: { path: { id } },
           body: { side },
+          ...caretakerInit(caretakerId),
         }),
       ),
     // Bank the running stretch locally the way the server will, so the
@@ -141,12 +151,14 @@ export function registerFeedTimerMutationDefaults(qc: QueryClient) {
       id,
       babyId: _b,
       kind: _k,
+      caretakerId,
       ...body
     }: StopFeedTimerVars) =>
       unwrap<FeedTimerStopped>(
         client.POST("/api/feeds/timer/{id}/stop", {
           params: { path: { id } },
           body,
+          ...caretakerInit(caretakerId),
         }),
       ),
     onMutate: (vars: StopFeedTimerVars) =>

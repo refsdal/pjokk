@@ -1,7 +1,7 @@
 import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
 import type { DiaperLog, FeedLog, SleepLog, Summary } from "@pjokk/shared";
 import type { components } from "../api-schema";
-import { client, unwrap } from "../api";
+import { caretakerInit, client, unwrap } from "../api";
 import { t } from "../i18n";
 import { toast } from "../toast";
 import { invalidateLogs } from "./keys";
@@ -96,15 +96,21 @@ export function useDiapers(babyId: string | undefined, limit = 25) {
 // and not here.
 type Schemas = components["schemas"];
 
-export type LogFeedVars = Schemas["CreateFeed"];
-export type LogDiaperVars = Schemas["CreateDiaper"];
+// A kiosk write names who is logging (lib/api.ts's caretakerInit); Home
+// leaves it out. It travels in the variables — so a paused mutation keeps
+// it — and each request function strips it from the body into a header.
+type Caretaker = { caretakerId?: string };
+
+export type LogFeedVars = Schemas["CreateFeed"] & Caretaker;
+export type LogDiaperVars = Schemas["CreateDiaper"] & Caretaker;
 
 // POST /api/sleep starts a RUNNING session when endTime is absent and logs a
 // finished one when it is present. This mutation is the former, so the field
 // is omitted deliberately rather than left to the caller.
-export type StartSleepVars = Omit<Schemas["CreateSleep"], "endTime">;
+export type StartSleepVars = Omit<Schemas["CreateSleep"], "endTime"> &
+  Caretaker;
 
-export interface WakeSleepVars {
+export interface WakeSleepVars extends Caretaker {
   id: string;
   endTime?: string;
 }
@@ -123,7 +129,7 @@ export interface UpdateDiaperVars {
 
 // Reopens a finished sleep (lib/sleep-resume.ts). babyId is for the
 // optimistic summary patch; the server needs only the id.
-export interface ResumeSleepVars {
+export interface ResumeSleepVars extends Caretaker {
   id: string;
   babyId: string;
 }
@@ -133,7 +139,7 @@ export interface UpdateSleepVars {
   patch: Schemas["UpdateSleep"];
 }
 
-export interface DeleteVars {
+export interface DeleteVars extends Caretaker {
   id: string;
 }
 
@@ -141,8 +147,10 @@ export interface DeleteVars {
 // resume after a reload (persistQueryClient restores them by mutationKey).
 export function registerLogMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["logFeed"], {
-    mutationFn: async (vars: LogFeedVars) =>
-      unwrap<FeedLog>(client.POST("/api/feeds", { body: vars })),
+    mutationFn: async ({ caretakerId, ...body }: LogFeedVars) =>
+      unwrap<FeedLog>(
+        client.POST("/api/feeds", { body, ...caretakerInit(caretakerId) }),
+      ),
     onMutate: (vars: LogFeedVars) => {
       const snap = snapshotSummary(qc, vars.babyId);
       patchSummary(qc, vars.babyId, (old) =>
@@ -178,8 +186,10 @@ export function registerLogMutationDefaults(qc: QueryClient) {
     onSettled: () => invalidateLogs(qc),
   });
   qc.setMutationDefaults(["logDiaper"], {
-    mutationFn: async (vars: LogDiaperVars) =>
-      unwrap<DiaperLog>(client.POST("/api/diapers", { body: vars })),
+    mutationFn: async ({ caretakerId, ...body }: LogDiaperVars) =>
+      unwrap<DiaperLog>(
+        client.POST("/api/diapers", { body, ...caretakerInit(caretakerId) }),
+      ),
     onMutate: (vars: LogDiaperVars) => {
       const snap = snapshotSummary(qc, vars.babyId);
       patchSummary(qc, vars.babyId, (old) =>
@@ -209,8 +219,10 @@ export function registerLogMutationDefaults(qc: QueryClient) {
     onSettled: () => invalidateLogs(qc),
   });
   qc.setMutationDefaults(["startSleep"], {
-    mutationFn: async (vars: StartSleepVars) =>
-      unwrap<SleepLog>(client.POST("/api/sleep", { body: vars })),
+    mutationFn: async ({ caretakerId, ...body }: StartSleepVars) =>
+      unwrap<SleepLog>(
+        client.POST("/api/sleep", { body, ...caretakerInit(caretakerId) }),
+      ),
     onMutate: (vars: StartSleepVars) => {
       const snap = snapshotSummary(qc, vars.babyId);
       patchSummary(qc, vars.babyId, (old) => ({
@@ -236,11 +248,12 @@ export function registerLogMutationDefaults(qc: QueryClient) {
     onSettled: () => invalidateLogs(qc),
   });
   qc.setMutationDefaults(["wakeSleep"], {
-    mutationFn: async ({ id, ...body }: WakeSleepVars) =>
+    mutationFn: async ({ id, caretakerId, ...body }: WakeSleepVars) =>
       unwrap<SleepLog>(
         client.POST("/api/sleep/{id}/wake", {
           params: { path: { id } },
           body,
+          ...caretakerInit(caretakerId),
         }),
       ),
     onError: (err: Error) =>
@@ -252,11 +265,12 @@ export function registerLogMutationDefaults(qc: QueryClient) {
   // banner is back at once (and offline, where the mutation pauses): the
   // last sleep becomes the active one, still counting from its start.
   qc.setMutationDefaults(["resumeSleep"], {
-    mutationFn: async ({ id }: ResumeSleepVars) =>
+    mutationFn: async ({ id, caretakerId }: ResumeSleepVars) =>
       unwrap<SleepLog>(
         client.PATCH("/api/sleep/{id}", {
           params: { path: { id } },
           body: { endTime: null },
+          ...caretakerInit(caretakerId),
         }),
       ),
     onMutate: (vars: ResumeSleepVars) => {
@@ -308,22 +322,37 @@ export function registerLogMutationDefaults(qc: QueryClient) {
     onSettled: () => invalidateLogs(qc),
   });
   qc.setMutationDefaults(["deleteFeed"], {
-    mutationFn: async ({ id }: DeleteVars) =>
-      unwrap(client.DELETE("/api/feeds/{id}", { params: { path: { id } } })),
+    mutationFn: async ({ id, caretakerId }: DeleteVars) =>
+      unwrap(
+        client.DELETE("/api/feeds/{id}", {
+          params: { path: { id } },
+          ...caretakerInit(caretakerId),
+        }),
+      ),
     onError: (err: Error) =>
       toast(t("Could not delete: ") + err.message, "error"),
     onSettled: () => invalidateLogs(qc),
   });
   qc.setMutationDefaults(["deleteDiaper"], {
-    mutationFn: async ({ id }: DeleteVars) =>
-      unwrap(client.DELETE("/api/diapers/{id}", { params: { path: { id } } })),
+    mutationFn: async ({ id, caretakerId }: DeleteVars) =>
+      unwrap(
+        client.DELETE("/api/diapers/{id}", {
+          params: { path: { id } },
+          ...caretakerInit(caretakerId),
+        }),
+      ),
     onError: (err: Error) =>
       toast(t("Could not delete: ") + err.message, "error"),
     onSettled: () => invalidateLogs(qc),
   });
   qc.setMutationDefaults(["deleteSleep"], {
-    mutationFn: async ({ id }: DeleteVars) =>
-      unwrap(client.DELETE("/api/sleep/{id}", { params: { path: { id } } })),
+    mutationFn: async ({ id, caretakerId }: DeleteVars) =>
+      unwrap(
+        client.DELETE("/api/sleep/{id}", {
+          params: { path: { id } },
+          ...caretakerInit(caretakerId),
+        }),
+      ),
     onError: (err: Error) =>
       toast(t("Could not delete: ") + err.message, "error"),
     onSettled: () => invalidateLogs(qc),
