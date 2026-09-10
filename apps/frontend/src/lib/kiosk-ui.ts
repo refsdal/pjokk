@@ -5,8 +5,10 @@ import type {
   SleepLog,
   Summary,
 } from "@pjokk/shared";
+import type { DeviceThreshold } from "./data/devices";
 import { clock, totalSeconds } from "./feed-timer-ui";
 import { t } from "./i18n";
+import type { IdleState } from "./kiosk-screen";
 import { nextDoseFrom } from "./medicine-ui";
 import { formatClock } from "./time";
 import { sleepNoun } from "./sleep-ui";
@@ -41,9 +43,11 @@ export type ReminderLike = {
   babyId: string | null;
 };
 
-// Amber when the signed-in user's own since_last reminder for this kind
-// has elapsed — the family's threshold, exactly as the push nudge uses it.
-// No reminder, no amber.
+// Amber when a since_last reminder for this kind has elapsed — the family's
+// threshold, exactly as the push nudge uses it. On a kiosk device these are
+// every caretaker's (GET /api/device/thresholds, via thresholdsToReminders):
+// whoever set the tightest interval is the one the card answers to. No
+// reminder, no amber.
 export function cautionFor(
   kind: "feed" | "diaper",
   lastAt: Date | null,
@@ -61,6 +65,29 @@ export function cautionFor(
       (r.babyId == null || r.babyId === babyId) &&
       elapsedMin > r.intervalMin,
   );
+}
+
+// The family's thresholds (spec 2026-09-10-kiosk-devices §5) in the shape
+// cautionFor reads: a device gets intervals only, all of them since_last.
+export function thresholdsToReminders(
+  thresholds: DeviceThreshold[],
+): ReminderLike[] {
+  return thresholds.map((th) => ({
+    kind: th.kind,
+    mode: "since_last",
+    intervalMin: th.intervalMin,
+    babyId: th.babyId ?? null,
+  }));
+}
+
+// Who is logging lasts until the kiosk dims (spec 2026-09-10 §6): two
+// minutes without a touch means nobody is standing there, and the next
+// person should say who they are rather than inherit a name.
+export function caretakerAfterIdle(
+  state: IdleState,
+  current: string | null,
+): string | null {
+  return state === "dim" ? null : current;
 }
 
 export function totalsLines(

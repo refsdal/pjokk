@@ -4,24 +4,31 @@ import { useCallback, useEffect, useState } from "react";
 import { KioskAction } from "@/components/kiosk/KioskAction";
 import { KioskBand } from "@/components/kiosk/KioskBand";
 import { KioskCard } from "@/components/kiosk/KioskCard";
+import {
+  KioskCaretakers,
+  KioskWhoPrompt,
+} from "@/components/kiosk/KioskCaretakers";
 import { KioskIdleOverlay } from "@/components/kiosk/KioskIdleOverlay";
 import { KioskMedicineStrip } from "@/components/kiosk/KioskMedicineStrip";
 import { KioskPinPad } from "@/components/kiosk/KioskPinPad";
 import { KioskUndo, UNDO_MS } from "@/components/kiosk/KioskUndo";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { Button } from "@/components/ui/button";
+import { ApiError } from "@/lib/api";
 import { useAppearance } from "@/lib/appearance";
 import {
+  unenrolDevice,
   useCreateOther,
   useDeleteDiaper,
   useDeleteFeed,
   useDeleteOther,
   useDeleteSleep,
+  useDeviceMembers,
+  useDeviceThresholds,
   useFeeds,
   useLogDiaper,
   useLogFeed,
   useMedicineCatalogue,
-  useReminders,
   useResumeSleep,
   useSetFeedTimerSide,
   useSleepLocations,
@@ -30,12 +37,12 @@ import {
   useStopFeedTimer,
   useSummary,
   useWakeSleep,
-  unenrolDevice,
 } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { leaveKiosk, storedPinLength } from "@/lib/kiosk";
 import { useIdle, useWakeLock } from "@/lib/kiosk-screen";
 import {
+  caretakerAfterIdle,
   cautionFor,
   durationShort,
   elapsedShort,
@@ -43,6 +50,7 @@ import {
   lastBottle,
   PIN_LOCKOUT_MS,
   sleepCardView,
+  thresholdsToReminders,
   totalsLines,
   type UndoKind,
   undoText,
@@ -52,12 +60,13 @@ import { useResumableSleep } from "@/lib/sleep-resume";
 import { napsLine } from "@/lib/sleep-ui";
 import { sleepTypeAt } from "@/lib/night";
 import { useSelectedBaby } from "@/lib/selected-baby";
-import { formatVolume, useUnits } from "@/lib/units";
+import { formatVolume, type Units } from "@/lib/units";
 import { DeviceGate } from "@/screens/kiosk/DeviceGate";
 
-// The care station (spec: kiosk mode). Everything here already exists in
-// the API: the screen is Home's data with one-tap actions on the cards and
-// an Undo instead of a sheet.
+// The care station (spec: kiosk mode), run by an enrolled family device
+// (spec 2026-09-10-kiosk-devices): the screen is Home's data with one-tap
+// actions on the cards and an Undo instead of a sheet, and every write
+// names who is logging.
 export function KioskRoute() {
   return (
     <DeviceGate>
@@ -66,7 +75,14 @@ export function KioskRoute() {
   );
 }
 
-type Undo = { kind: UndoKind; id: string; text: string };
+// The Undo remembers who logged the entry: the delete is a write too, and
+// is credited to the same person.
+type Undo = { kind: UndoKind; id: string; text: string; caretakerId: string };
+
+// A device is not a person, so it has no display-unit preference (users.units
+// is per person, on /api/me, which a device cannot read). The kiosk shows the
+// stored unit — a known v1 limitation (spec §6).
+const KIOSK_UNITS: Units = "metric";
 
 function useNow(intervalMs: number): Date {
   const [now, setNow] = useState(() => new Date());
@@ -82,9 +98,10 @@ export function KioskScreen() {
   const summary = useSummary(baby?.id);
   const feeds = useFeeds(baby?.id);
   const locations = useSleepLocations();
-  const reminders = useReminders();
+  const thresholds = useDeviceThresholds();
+  const members = useDeviceMembers();
   const catalogue = useMedicineCatalogue(baby?.id, !!baby);
-  const units = useUnits();
+  const units = KIOSK_UNITS;
   const { night } = useAppearance();
   const napGuide = useNapGuide();
   // A second tick while a nursing timer runs, half a minute otherwise.
@@ -94,6 +111,39 @@ export function KioskScreen() {
 
   useWakeLock();
   const [idle, wake] = useIdle();
+
+  // Who is logging (spec 2026-09-10 §6): chosen on the row, forgotten when
+  // the kiosk dims. An action with nobody chosen waits in `pending` until
+  // the prompt names someone, then runs as them.
+  const [caretaker, setCaretaker] = useState<string | null>(null);
+  const [pending, setPending] = useState<((id: string) => void) | null>(null);
+  useEffect(() => {
+    setCaretaker((current) => caretakerAfterIdle(idle, current));
+    if (idle === "dim") setPending(null);
+  }, [idle]);
+  const act = (run: (caretakerId: string) => void) => {
+    if (caretaker) run(caretaker);
+    else setPending(() => run);
+  };
+  const choose = (userId: string) => {
+    setCaretaker(userId);
+    const run = pending;
+    setPending(null);
+    run?.(userId);
+  };
+  // Someone removed from the family since the row loaded: the server says
+  // NOT_MEMBER. Forget the choice and reload the faces; the mutation's own
+  // toast says why the entry did not save.
+  const refetchMembers = members.refetch;
+  const onWriteError = useCallback(
+    (err: Error) => {
+      if (err instanceof ApiError && err.code === "NOT_MEMBER") {
+        setCaretaker(null);
+        void refetchMembers();
+      }
+    },
+    [refetchMembers],
+  );
 
   const logFeed = useLogFeed();
   const logDiaper = useLogDiaper();
@@ -117,11 +167,13 @@ export function KioskScreen() {
   }, [undo]);
   const doUndo = () => {
     if (!undo) return;
-    if (undo.kind === "feed") delFeed.mutate({ id: undo.id });
-    if (undo.kind === "diaper") delDiaper.mutate({ id: undo.id });
-    if (undo.kind === "sleep") delSleep.mutate({ id: undo.id });
-    if (undo.kind === "medicine")
-      delOther.mutate({ kind: "medicine", id: undo.id });
+    const { kind, id, caretakerId } = undo;
+    const options = { onError: onWriteError };
+    if (kind === "feed") delFeed.mutate({ id, caretakerId }, options);
+    if (kind === "diaper") delDiaper.mutate({ id, caretakerId }, options);
+    if (kind === "sleep") delSleep.mutate({ id, caretakerId }, options);
+    if (kind === "medicine")
+      delOther.mutate({ kind: "medicine", id, caretakerId }, options);
     setUndo(null);
   };
 
@@ -177,7 +229,8 @@ export function KioskScreen() {
   const s = summary.data;
   const babyId = baby.id;
   const iso = () => new Date().toISOString();
-  const rem = reminders.data ?? [];
+  const rem = thresholdsToReminders(thresholds.data ?? []);
+  const faces = members.data ?? [];
   const sleepView = sleepCardView(
     { activeSleep: s?.activeSleep ?? null, lastSleep: s?.lastSleep ?? null },
     now,
@@ -226,9 +279,10 @@ export function KioskScreen() {
   const activeSleep = s?.activeSleep ?? null;
   const activeFeed = s?.activeFeed ?? null;
 
-  const startSleepAt = (location: string | null) =>
+  const startSleepAt = (location: string | null, caretakerId: string) =>
     startSleep.mutate(
       {
+        caretakerId,
         babyId,
         startTime: iso(),
         location: location ?? undefined,
@@ -236,7 +290,13 @@ export function KioskScreen() {
       },
       {
         onSuccess: (row) =>
-          setUndo({ kind: "sleep", id: row.id, text: undoText("sleep") }),
+          setUndo({
+            kind: "sleep",
+            id: row.id,
+            text: undoText("sleep"),
+            caretakerId,
+          }),
+        onError: onWriteError,
       },
     );
 
@@ -248,6 +308,11 @@ export function KioskScreen() {
         totals={night || !s ? null : totalsLines(s.today, units)}
         onHold={() => setPad(true)}
         holdDisabled={Date.now() < lockedUntil}
+      />
+      <KioskCaretakers
+        members={faces}
+        selected={caretaker}
+        onSelect={setCaretaker}
       />
       {!night && nap && (
         <p
@@ -280,7 +345,12 @@ export function KioskScreen() {
               label={t("Wake")}
               primary
               onClick={() =>
-                wakeSleep.mutate({ id: activeSleep.id, endTime: iso() })
+                act((caretakerId) =>
+                  wakeSleep.mutate(
+                    { id: activeSleep.id, endTime: iso(), caretakerId },
+                    { onError: onWriteError },
+                  ),
+                )
               }
             />
           ) : (
@@ -289,7 +359,12 @@ export function KioskScreen() {
                 <KioskAction
                   label={t("Resume")}
                   onClick={() =>
-                    resumeSleep.mutate({ id: resumable.id, babyId })
+                    act((caretakerId) =>
+                      resumeSleep.mutate(
+                        { id: resumable.id, babyId, caretakerId },
+                        { onError: onWriteError },
+                      ),
+                    )
                   }
                 />
               )}
@@ -297,13 +372,13 @@ export function KioskScreen() {
                 label={t("Sleep")}
                 hint={lastLocation ?? undefined}
                 primary
-                onClick={() => startSleepAt(lastLocation)}
+                onClick={() => act((c) => startSleepAt(lastLocation, c))}
               />
               {otherLocations.map((name) => (
                 <KioskAction
                   key={name}
                   label={name}
-                  onClick={() => startSleepAt(name)}
+                  onClick={() => act((c) => startSleepAt(name, c))}
                 />
               ))}
             </>
@@ -329,23 +404,36 @@ export function KioskScreen() {
               <KioskAction
                 label={t("Switch")}
                 onClick={() =>
-                  switchSide.mutate({
-                    id: activeFeed.id,
-                    babyId,
-                    side: activeFeed.runningSide === "left" ? "right" : "left",
-                  })
+                  act((caretakerId) =>
+                    switchSide.mutate(
+                      {
+                        caretakerId,
+                        id: activeFeed.id,
+                        babyId,
+                        side:
+                          activeFeed.runningSide === "left" ? "right" : "left",
+                      },
+                      { onError: onWriteError },
+                    ),
+                  )
                 }
               />
               <KioskAction
                 label={t("Stop")}
                 primary
                 onClick={() =>
-                  stopTimer.mutate({
-                    id: activeFeed.id,
-                    babyId,
-                    kind: "breast",
-                    time: iso(),
-                  })
+                  act((caretakerId) =>
+                    stopTimer.mutate(
+                      {
+                        caretakerId,
+                        id: activeFeed.id,
+                        babyId,
+                        kind: "breast",
+                        time: iso(),
+                      },
+                      { onError: onWriteError },
+                    ),
+                  )
                 }
               />
             </>
@@ -356,47 +444,50 @@ export function KioskScreen() {
                 hint={bottleLabel}
                 primary
                 onClick={() =>
-                  logFeed.mutate(
-                    {
-                      babyId,
-                      time: iso(),
-                      type: "bottle",
-                      amountMl: bottle.amountMl,
-                      contents: bottle.contents ?? undefined,
-                    },
-                    {
-                      onSuccess: (row) =>
-                        setUndo({
-                          kind: "feed",
-                          id: row.id,
-                          text: undoText("feed", bottleLabel),
-                        }),
-                    },
+                  act((caretakerId) =>
+                    logFeed.mutate(
+                      {
+                        caretakerId,
+                        babyId,
+                        time: iso(),
+                        type: "bottle",
+                        amountMl: bottle.amountMl,
+                        contents: bottle.contents ?? undefined,
+                      },
+                      {
+                        onSuccess: (row) =>
+                          setUndo({
+                            kind: "feed",
+                            id: row.id,
+                            text: undoText("feed", bottleLabel),
+                            caretakerId,
+                          }),
+                        onError: onWriteError,
+                      },
+                    ),
                   )
                 }
               />
-              <KioskAction
-                label={t("Breast L")}
-                onClick={() =>
-                  startTimer.mutate({
-                    babyId,
-                    kind: "breast",
-                    side: "left",
-                    startTime: iso(),
-                  })
-                }
-              />
-              <KioskAction
-                label={t("Breast R")}
-                onClick={() =>
-                  startTimer.mutate({
-                    babyId,
-                    kind: "breast",
-                    side: "right",
-                    startTime: iso(),
-                  })
-                }
-              />
+              {(["left", "right"] as const).map((side) => (
+                <KioskAction
+                  key={side}
+                  label={side === "left" ? t("Breast L") : t("Breast R")}
+                  onClick={() =>
+                    act((caretakerId) =>
+                      startTimer.mutate(
+                        {
+                          caretakerId,
+                          babyId,
+                          kind: "breast",
+                          side,
+                          startTime: iso(),
+                        },
+                        { onError: onWriteError },
+                      ),
+                    )
+                  }
+                />
+              ))}
             </>
           )}
         </KioskCard>
@@ -428,16 +519,20 @@ export function KioskScreen() {
                 type === "wet" ? "Wet" : type === "dirty" ? "Dirty" : "Both",
               )}
               onClick={() =>
-                logDiaper.mutate(
-                  { babyId, time: iso(), type },
-                  {
-                    onSuccess: (row) =>
-                      setUndo({
-                        kind: "diaper",
-                        id: row.id,
-                        text: undoText("diaper", type),
-                      }),
-                  },
+                act((caretakerId) =>
+                  logDiaper.mutate(
+                    { caretakerId, babyId, time: iso(), type },
+                    {
+                      onSuccess: (row) =>
+                        setUndo({
+                          kind: "diaper",
+                          id: row.id,
+                          text: undoText("diaper", type),
+                          caretakerId,
+                        }),
+                      onError: onWriteError,
+                    },
+                  ),
                 )
               }
             />
@@ -453,27 +548,32 @@ export function KioskScreen() {
               entry={m}
               now={now}
               onLog={() =>
-                createOther.mutate(
-                  {
-                    kind: "medicine",
-                    babyId,
-                    time: iso(),
-                    medicineId: m.id,
-                    name: m.name,
-                    amount: m.defaultAmount ?? undefined,
-                    unit: m.unit ?? undefined,
-                  },
-                  {
-                    onSuccess: (row) => {
-                      const id = (row as { id?: string } | null)?.id;
-                      if (id)
-                        setUndo({
-                          kind: "medicine",
-                          id,
-                          text: undoText("medicine", m.name),
-                        });
+                act((caretakerId) =>
+                  createOther.mutate(
+                    {
+                      caretakerId,
+                      kind: "medicine",
+                      babyId,
+                      time: iso(),
+                      medicineId: m.id,
+                      name: m.name,
+                      amount: m.defaultAmount ?? undefined,
+                      unit: m.unit ?? undefined,
                     },
-                  },
+                    {
+                      onSuccess: (row) => {
+                        const id = (row as { id?: string } | null)?.id;
+                        if (id)
+                          setUndo({
+                            kind: "medicine",
+                            id,
+                            text: undoText("medicine", m.name),
+                            caretakerId,
+                          });
+                      },
+                      onError: onWriteError,
+                    },
+                  ),
                 )
               }
             />
@@ -485,6 +585,13 @@ export function KioskScreen() {
         {t("Hold the name to leave kiosk")}
       </p>
       {undo && <KioskUndo text={undo.text} onUndo={doUndo} />}
+      {pending && (
+        <KioskWhoPrompt
+          members={faces}
+          onSelect={choose}
+          onCancel={() => setPending(null)}
+        />
+      )}
       <KioskIdleOverlay state={idle} onWake={wake} />
       {pinPad}
     </div>
