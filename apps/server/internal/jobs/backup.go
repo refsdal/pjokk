@@ -60,7 +60,6 @@ var BackupTables = []string{
 	"vaccine_log",
 	"vaccine_document",
 	"vaccine_dismissal",
-	"family_invite",
 	"sleep_location",
 	"contact",
 	"contact_baby",
@@ -92,11 +91,18 @@ var BackupTables = []string{
 //     session and hand out sysadmin-level access from a 30-day-old JSON
 //     file. Nulling columns is the right redaction for a table worth
 //     keeping (accounts, sessions); this table isn't worth keeping at all.
+//   - family_invite: every row's primary key is a live credential. An
+//     invite code grants family membership to whoever types it, and one
+//     can be issued for up to 720 hours — the whole retention window — so
+//     a snapshot could hold a code that still works. A primary key cannot
+//     be nulled the way accounts' tokens are, and a pending invite is not
+//     worth restoring: after a restore a family admin issues a fresh link.
 var DeliberatelyExcluded = map[string]bool{
 	"rate_limit":       true,
 	"rate_limits":      true,
 	"goose_db_version": true,
 	"impersonation":    true,
+	"family_invite":    true,
 }
 
 // backupRetentionDays is BACKUP_RETENTION_DAYS: backups hold every table,

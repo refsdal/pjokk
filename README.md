@@ -222,7 +222,7 @@ whatever runs the database.
 The table list is checked against the live schema by a test, in both
 directions, so "every table" stays true as the schema grows.
 
-Three things to know before you rely on it:
+Four things to know before you rely on it:
 
 - **Restores are manual.** There is no restore command. The snapshot is
   `{ exportedAt, tables: { <table>: [rows...] } }` — readable, and insertable
@@ -233,10 +233,12 @@ Three things to know before you rely on it:
   backups must not amount to thirty days of usable session cookies. A restore
   therefore loses email/password logins and signs everyone out; Google users
   just re-authorize.
-- **The `impersonation` table is skipped entirely**, along with the
-  rate-limit counters and the migration bookkeeping. Its rows are pairs of
-  live session tokens, and restoring them would be actively wrong rather than
-  merely incomplete.
+- **Two credential tables are skipped entirely**, along with the rate-limit
+  counters and the migration bookkeeping: `impersonation`, whose rows are
+  pairs of live session tokens, and `family_invite`, whose primary key is the
+  invite code itself (an invite can be valid for up to 30 days, as long as a
+  snapshot is kept). Restoring either would be actively wrong rather than
+  merely incomplete; after a restore, family admins create new invite links.
 - **Milestone photos are copied, not dumped.** The snapshot holds their rows
   (object key, size); the bytes get one copy each under
   `photo-backups/current/` the night after upload, and a deleted photo's copy
