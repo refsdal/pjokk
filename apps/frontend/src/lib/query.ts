@@ -56,6 +56,21 @@ export const persistOptions = {
   },
 };
 
+// Runs once the snapshot is restored (main.tsx). The snapshot renders at
+// once, but a restored query keeps its original fetch time, so under
+// staleTime it counts as fresh and a reload would trust it — hiding another
+// caretaker's change, or your own last log (the persister throttles its
+// writes), until the 60 s poll. So: resume the mutations queued offline
+// FIRST, so the refetch includes them instead of briefly reverting their
+// optimistic entries, THEN mark everything stale — active queries refetch
+// now, the rest on their next mount. Offline, a queued mutation keeps the
+// first step pending until it can run and the refetch waits with it; the
+// snapshot stays on screen meanwhile.
+export async function afterRestore(qc: QueryClient): Promise<void> {
+  await qc.resumePausedMutations();
+  await qc.invalidateQueries();
+}
+
 // Forget everything, in memory AND on disk. Needed wherever the identity
 // behind the cache changes — sign in, sign out, start/stop impersonating —
 // because the cache outlives the page: without the persister half, a reload

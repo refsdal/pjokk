@@ -37,15 +37,12 @@ function helpCard(page: Page, label: "Help requested" | "On the way"): Locator {
   return page.getByText(label, { exact: true }).locator("xpath=../..");
 }
 
-// Home's /api/summary is persisted to IndexedDB and stale-after 15 s
-// (lib/query.ts), so a plain reload inside that window re-renders the
-// snapshot and does NOT hit the network — the other caretaker's request is
-// invisible until the 60 s poll. Waiting the window out first makes the
-// reload a real refetch. In production this gap is what web push covers;
-// the e2e stack has no VAPID keys, so the test does it by hand.
-const SUMMARY_STALE_MS = 15_000;
+// A reload stands in for "the other phone looks again": the restored
+// IndexedDB snapshot is revalidated straight away (lib/query.ts
+// afterRestore), so the other caretaker's request shows without waiting
+// out staleTime. Until someone looks, web push covers the gap in
+// production; the e2e stack has no VAPID keys.
 async function refetchHome(page: Page): Promise<void> {
-  await page.waitForTimeout(SUMMARY_STALE_MS + 1_000);
   await page.reload();
 }
 
@@ -54,8 +51,6 @@ test("a caretaker asks another for help and gets an answer", async ({
   page,
   request,
 }, testInfo) => {
-  // Two 16 s cache waits (see refetchHome) put this well past the 30 s default.
-  test.setTimeout(120_000);
   // ---- 1. Sender: a fresh family, on Home ------------------------------
   await freshFamily(page, request, "helper");
 
