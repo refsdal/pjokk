@@ -196,6 +196,8 @@ const nb: Record<string, string> = {
   "Could not start sleep: ": "Kunne ikke starte søvn: ",
   "Could not update sleep: ": "Kunne ikke oppdatere søvn: ",
   "Could not wake: ": "Kunne ikke avslutte søvn: ",
+  "Resume sleep": "Fortsett søvn",
+  "Could not resume: ": "Kunne ikke fortsette søvn: ",
 
   // Play sheet
   "Tummy time": "Mageleie",

@@ -50,6 +50,18 @@ test("sleep and wake from the card", async ({ page, request }) => {
   await expect(card.getByText(/^1 nap/)).toBeVisible();
 });
 
+test("resume from the card after a mistaken wake", async ({ page, request }) => {
+  await freshFamily(page, request, "kiosk-resume", /\/kiosk/);
+  const card = page.getByTestId("kiosk-sleep");
+  await card.getByRole("button", { name: "Sleep" }).click();
+  await expect(card).toHaveAttribute("data-tone", "live", { timeout: 10_000 });
+  await card.getByRole("button", { name: "Wake" }).click();
+  await expect(card).toHaveAttribute("data-tone", "normal", { timeout: 10_000 });
+  await card.getByRole("button", { name: "Resume" }).click();
+  await expect(card).toHaveAttribute("data-tone", "live", { timeout: 10_000 });
+  await expect(card.getByRole("button", { name: "Wake" })).toBeVisible();
+});
+
 test("nursing timer from the card", async ({ page, request }) => {
   await freshFamily(page, request, "kiosk-breast", /\/kiosk/);
   const card = page.getByTestId("kiosk-feed");

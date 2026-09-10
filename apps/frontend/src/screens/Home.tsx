@@ -52,12 +52,14 @@ import {
   prefetchOtherLists,
   useFeeds,
   useMe,
+  useResumeSleep,
   useSummary,
   useWakeSleep,
   type OtherKind,
 } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { describeNapWindow, napWindow, useNapGuide } from "@/lib/nap-window";
+import { useResumableSleep } from "@/lib/sleep-resume";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import { formatDuration, formatElapsed } from "@/lib/time";
 import { useAppearance } from "@/lib/appearance";
@@ -184,6 +186,9 @@ export function HomeScreen() {
   // the banner's button does, because the Sleep button is disabled then.
   const wakeSleep = useWakeSleep();
   const activeSleepId = summary.data?.activeSleep?.id ?? null;
+  // Resume, for a Wake tapped too soon (lib/sleep-resume.ts).
+  const resumeSleep = useResumeSleep();
+  const resumable = useResumableSleep(summary.data);
   useHotkeys(
     {
       f: () => setSheet("feed"),
@@ -277,6 +282,7 @@ export function HomeScreen() {
         sheet={sheet}
         setSheet={setSheet}
         activeSleepId={active?.id ?? null}
+        resumableSleepId={resumable?.id ?? null}
         recentFeeds={feeds.data ?? []}
         activeFeed={activeFeed}
         lastDiaper={s?.lastDiaper ?? null}
@@ -388,6 +394,18 @@ export function HomeScreen() {
                 note={nap ? describeNapWindow(nap) : undefined}
                 tintClass="text-sleep"
                 onClick={() => setSheet("sleep")}
+                action={
+                  resumable
+                    ? {
+                        label: t("Resume"),
+                        onClick: () =>
+                          resumeSleep.mutate({
+                            id: resumable.id,
+                            babyId: baby.id,
+                          }),
+                      }
+                    : undefined
+                }
               />
             )}
             {/* Only while it is still a live question — see
@@ -520,6 +538,7 @@ function NightHome({
   sheet,
   setSheet,
   activeSleepId,
+  resumableSleepId,
   recentFeeds,
   activeFeed,
   lastDiaper,
@@ -529,26 +548,36 @@ function NightHome({
   sheet: OpenSheet;
   setSheet: (s: OpenSheet) => void;
   activeSleepId: string | null;
+  resumableSleepId: string | null;
   recentFeeds: Parameters<typeof FeedSheet>[0]["recentFeeds"];
   activeFeed: Parameters<typeof FeedSheet>[0]["activeFeed"];
   lastDiaper: Parameters<typeof DiaperSheet>[0]["lastDiaper"];
   openHelp: HelpRequest | null;
 }) {
   const wakeSleep = useWakeSleep();
+  const resumeSleep = useResumeSleep();
+  // `half`: one of two buttons sharing a row, tighter so a 360 px phone
+  // still fits the label beside the icon.
   const nightAction = (
     label: string,
     icon: typeof IconMoon,
     onClick: () => void,
+    half = false,
   ) => {
     const Icon = icon;
     return (
       <button
         type="button"
         onClick={onClick}
-        className="flex h-20 w-full items-center gap-4 rounded-xl2 border border-line bg-surface px-6 text-xl font-bold text-ink active:bg-surface-2"
+        className={cn(
+          "flex h-20 w-full min-w-0 items-center rounded-xl2 border border-line bg-surface font-bold text-ink active:bg-surface-2",
+          half ? "gap-2 px-4 text-lg" : "gap-4 px-6 text-xl",
+        )}
       >
-        <Icon className="h-7 w-7 text-accent" />
-        {label}
+        <Icon
+          className={cn("shrink-0 text-accent", half ? "h-6 w-6" : "h-7 w-7")}
+        />
+        <span className="truncate">{label}</span>
       </button>
     );
   };
@@ -560,11 +589,25 @@ function NightHome({
       <div className="space-y-3 pb-4">
         <IconBabyCarriage className="mx-auto h-6 w-6 text-muted" />
         {openHelp && <HelpCard request={openHelp} />}
-        {activeSleepId
-          ? nightAction(t("Wake"), IconMoon, () =>
-              wakeSleep.mutate({ id: activeSleepId }),
-            )
-          : nightAction(t("Sleep"), IconMoon, () => setSheet("sleep"))}
+        {/* Just after a wake the Sleep row splits in two rather than adding
+            a fourth action: still three rows (CLAUDE.md §6). */}
+        {activeSleepId ? (
+          nightAction(t("Wake"), IconMoon, () =>
+            wakeSleep.mutate({ id: activeSleepId }),
+          )
+        ) : resumableSleepId ? (
+          <div className="grid grid-cols-2 gap-3">
+            {nightAction(
+              t("Resume"),
+              IconMoon,
+              () => resumeSleep.mutate({ id: resumableSleepId, babyId }),
+              true,
+            )}
+            {nightAction(t("Sleep"), IconMoon, () => setSheet("sleep"), true)}
+          </div>
+        ) : (
+          nightAction(t("Sleep"), IconMoon, () => setSheet("sleep"))
+        )}
         {nightAction(t("Feed"), IconBabyBottle, () => setSheet("feed"))}
         {nightAction(t("Diaper"), IconDiaper, () => setSheet("diaper"))}
       </div>

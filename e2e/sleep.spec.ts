@@ -58,3 +58,102 @@ test("tapping the sleep banner opens the edit sheet for the running session", as
   });
   await expect(page.getByPlaceholder("Note (optional)")).toHaveValue("nap after lunch");
 });
+
+async function firstBabyId(page: import("@playwright/test").Page): Promise<string> {
+  const babies = await (await page.request.get("/api/babies")).json();
+  return babies[0].id as string;
+}
+
+async function logSleep(
+  page: import("@playwright/test").Page,
+  babyId: string,
+  endMinutesAgo: number,
+  type: "nap" | "night",
+) {
+  const end = new Date(Date.now() - endMinutesAgo * 60_000);
+  const start = new Date(end.getTime() - 60 * 60_000);
+  const res = await page.request.post("/api/sleep", {
+    data: { babyId, startTime: start.toISOString(), endTime: end.toISOString(), type },
+  });
+  expect(res.status(), await res.text()).toBe(201);
+}
+
+test("Resume on the awake card reopens a sleep ended by mistake, as one session", async ({
+  page,
+  request,
+}) => {
+  await freshFamily(page, request, "sleep-resume");
+
+  await page.getByRole("button", { name: "Sleep", exact: true }).click();
+  await page.getByRole("button", { name: "Start sleep" }).click();
+  await expect(page.getByText("Sleeping").first()).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("button", { name: "Wake" }).click();
+  await expect(page.getByText("Awake", { exact: true })).toBeVisible({ timeout: 10_000 });
+
+  // Straight after a wake the awake card offers Resume.
+  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await expect(page.getByText("Sleeping").first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("button", { name: "Resume", exact: true })).toHaveCount(0);
+
+  // One session, not two: Resume cleared the end time of the same row.
+  const babyId = await firstBabyId(page);
+  await expect
+    .poll(async () => {
+      const sleeps = await (await page.request.get(`/api/sleep?babyId=${babyId}`)).json();
+      return sleeps.map((s: { endTime: string | null }) => s.endTime);
+    })
+    .toEqual([null]);
+});
+
+test("past the window, only the newest sleep's edit sheet offers Resume", async ({
+  page,
+  request,
+}) => {
+  await freshFamily(page, request, "sleep-resume-edit");
+  const babyId = await firstBabyId(page);
+  await logSleep(page, babyId, 120, "nap");
+  await page.reload();
+
+  // Two hours on, the awake card no longer offers it...
+  await expect(page.getByText("Awake", { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("button", { name: "Resume", exact: true })).toHaveCount(0);
+
+  // ...but the edit sheet of the newest sleep does.
+  await page.goto("/timeline");
+  await page.getByRole("button", { name: /^Nap · / }).first().click();
+  await expect(page.getByRole("heading", { name: "Edit sleep" })).toBeVisible({
+    timeout: 10_000,
+  });
+  await page.getByRole("button", { name: "Resume sleep" }).click();
+  await expect(page.getByRole("heading", { name: "Edit sleep" })).toHaveCount(0);
+
+  await page.goto("/home");
+  await expect(page.getByText("Sleeping").first()).toBeVisible({ timeout: 10_000 });
+});
+
+test("in night mode, the Sleep row splits into Resume and Sleep after a wake", async ({
+  page,
+  request,
+  context,
+}) => {
+  await freshFamily(page, request, "sleep-resume-night");
+  const babyId = await firstBabyId(page);
+  await logSleep(page, babyId, 5, "night");
+  // Added after the fixture's day-mode seed, so it runs later and wins.
+  await context.addInitScript(() => {
+    try {
+      localStorage.setItem("pjokk.night.mode", "on");
+    } catch {
+      // storage unavailable
+    }
+  });
+  await page.reload();
+
+  await expect(page.getByRole("button", { name: "Resume", exact: true })).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.getByRole("button", { name: "Sleep", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Wake" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("button", { name: "Resume", exact: true })).toHaveCount(0);
+});

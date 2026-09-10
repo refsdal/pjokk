@@ -8,12 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   useDeleteSleep,
+  useResumeSleep,
   useSleepLocations,
   useStartSleep,
+  useSummary,
   useUpdateSleep,
 } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { sleepTypeAt } from "@/lib/night";
+import { canResumeEdit } from "@/lib/sleep-resume";
 import { toast } from "@/lib/toast";
 
 // ONE component for create and edit. Create starts a session (waking happens
@@ -59,7 +62,13 @@ export function SleepSheet({
   const startSleep = useStartSleep();
   const updateSleep = useUpdateSleep();
   const deleteSleep = useDeleteSleep();
+  const resumeSleep = useResumeSleep();
   const isActiveEdit = !!edit && edit.endTime === null;
+  // Resume is offered on the newest sleep only, which takes the summary to
+  // know. Queried only while an edit is open: the sheet stays mounted on the
+  // Timeline, and the summary polls.
+  const summary = useSummary(open && edit ? edit.babyId : undefined);
+  const resumable = !!edit && canResumeEdit(edit, summary.data);
 
   const custom = useSleepLocations().data ?? [];
   const locationOptions = [
@@ -98,6 +107,14 @@ export function SleepSheet({
         ...(type ? { type } : {}),
       });
     }
+    if (!navigator.onLine) toast(t("Saved offline — will sync"));
+    onOpenChange(false);
+  };
+
+  // Only the end time: anything else changed in the sheet is not saved.
+  const resume = () => {
+    if (!edit) return;
+    resumeSleep.mutate({ id: edit.id, babyId: edit.babyId });
     if (!navigator.onLine) toast(t("Saved offline — will sync"));
     onOpenChange(false);
   };
@@ -152,6 +169,11 @@ export function SleepSheet({
                 value={endTime}
                 onChange={setEndTime}
               />
+              {resumable && (
+                <Button variant="secondary" size="full" onClick={resume}>
+                  {t("Resume sleep")}
+                </Button>
+              )}
             </>
           ))}
 
