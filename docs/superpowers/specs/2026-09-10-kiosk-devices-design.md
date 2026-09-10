@@ -99,7 +99,9 @@ query.
 
 Chosen on the tablet during enrolment and sent **with** the code, so no
 device is ever enrolled without one. 4–6 digits. Stored as
-HMAC-SHA-256(key, `device-pin:` + device id + `:` + pin), where the key is
+HMAC-SHA-256(key, `device-pin:` + token hash + `:` + pin) — the token hash
+is unique per device, never changes, and exists before the one-statement
+enrolment, where the device id does not — and the key is
 derived from `AUTH_SECRET` with its own domain separator in `cmd/pjokk`
 and reaches the API through `Deps` — an unkeyed hash of a 6-digit PIN is
 reversible instantly. Checked server-side on un-enrol only.
