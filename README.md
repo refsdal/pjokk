@@ -222,7 +222,7 @@ whatever runs the database.
 The table list is checked against the live schema by a test, in both
 directions, so "every table" stays true as the schema grows.
 
-Four things to know before you rely on it:
+Five things to know before you rely on it:
 
 - **Restores are manual.** There is no restore command. The snapshot is
   `{ exportedAt, tables: { <table>: [rows...] } }` — readable, and insertable
@@ -239,6 +239,9 @@ Four things to know before you rely on it:
   invite code itself (an invite can be valid for up to 30 days, as long as a
   snapshot is kept). Restoring either would be actively wrong rather than
   merely incomplete; after a restore, family admins create new invite links.
+- **Kiosk devices are kept.** The `device` table holds only hashes — of the
+  one-time set-up code, the device token and the PIN (an HMAC keyed from
+  `AUTH_SECRET`) — so, like API keys, a restored kiosk keeps working.
 - **Milestone photos are copied, not dumped.** The snapshot holds their rows
   (object key, size); the bytes get one copy each under
   `photo-backups/current/` the night after upload, and a deleted photo's copy

@@ -216,6 +216,17 @@ separate test deploy).
   (`pjk_` bearer tokens, SHA-256 at rest, read-only flag, family-scoped) for
   Home Assistant / Grafana. Cookies for web, bearer keys for integrations, and
   a future Capacitor shell reuses the same header path.
+- **Kiosk devices are our own table too** (`device`, spec
+  `docs/superpowers/specs/2026-09-10-kiosk-devices-design.md`): a
+  family-scoped credential in an HttpOnly `pjokk_device` cookie (SHA-256 at
+  rest; a cookie because avatars load through `<img src>`), enrolled with a
+  one-time code and un-enrolled by a PIN stored as an HMAC keyed from
+  `AUTH_SECRET`. `middleware.DeviceAuth` resolves it; `RequireFamily`
+  credits a device's writes to the member named in `X-Pjokk-Caretaker`
+  (role always `member` — choosing yourself grants nothing).
+  **`deviceOperations` in `internal/api/api.go` is an ALLOWLIST** of what a
+  kiosk may call: a kiosk feature that needs a new operation adds a line
+  there, and anything else answers `403 NOT_FOR_DEVICES`.
 
 **Tenancy discipline (non-negotiable)**
 - Every domain table carries `family_id` referencing the organization.
@@ -277,15 +288,23 @@ separate test deploy).
   side of the tier and exists for exactly what CSS cannot do. Desktop is
   the tablet tier plus F / D / S hotkeys (`lib/hotkeys.ts`) — never
   density or hover UI.
-- Kiosk mode (spec `docs/superpowers/specs/2026-09-08-kiosk-mode-design.md`):
-  a per-device switch (`lib/kiosk.ts`, localStorage + a local PIN hash)
-  that routes every app screen to `/kiosk`, the care station
-  (`screens/Kiosk.tsx`, `components/kiosk/*`): its own `.kiosk` palette
-  (night still wins), three cards that log with one tap and an Undo
-  through the ordinary mutations, a medicine strip, wake lock and idle dim
-  (`lib/kiosk-screen.ts`). Pure view logic in `lib/kiosk-ui.ts`. No server
-  change; the kiosk logs as the signed-in user until the device
-  credential + caretaker selector (spec 3) ships.
+- Kiosk mode (specs `docs/superpowers/specs/2026-09-08-kiosk-mode-design.md`
+  and `2026-09-10-kiosk-devices-design.md`): a tablet ENROLLED as a family
+  device — never a person's session — routes every app screen to `/kiosk`,
+  the care station (`screens/Kiosk.tsx`, `components/kiosk/*`): its own
+  `.kiosk` palette (night still wins), three cards that log with one tap
+  and an Undo through the ordinary mutations, a medicine strip, wake lock
+  and idle dim (`lib/kiosk-screen.ts`). An admin adds a device in Settings →
+  Family → Devices and gets a one-time code the tablet redeems on
+  `/kiosk/setup`; `DeviceGate` (not `AuthGate`) guards `/kiosk`, and
+  `AppShell` sends an enrolled browser there before its session gate runs.
+  A caretaker row says who is logging (attribution only, cleared on dim):
+  the kiosk's mutations carry `caretakerId` in their VARIABLES — so a
+  paused one keeps it — and send it as `X-Pjokk-Caretaker`. Leaving is the
+  device PIN, checked by the server, which un-enrols the tablet.
+  `lib/kiosk.ts` keeps only a routing flag and the PIN's length; pure view
+  logic in `lib/kiosk-ui.ts`. The kiosk shows metric (a device has no unit
+  preference).
 - Push subscription logic behind a small interface (web push now; native push
   token later is a second implementation of the same interface).
 

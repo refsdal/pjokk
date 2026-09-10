@@ -2379,3 +2379,51 @@ is audited and shows the family a banner. A structural test
   to 720 hours, the whole 30-day retention window, so a snapshot could hold
   a code that still works. Like `impersonation`, the table is not worth
   restoring: after a restore a family admin issues a fresh link.
+
+## 2026-09-10 — kiosk devices and the caretaker selector (spec 3)
+
+- **A tablet is the family's, not a parent's.** Spec 2's kiosk held the
+  signed-in person's session: every entry was "by" them, and past the PIN
+  the tablet could reach settings, invites and keys. A kiosk is now a
+  `device` row with its own credential; the tablet holds no person's
+  session at all.
+- **A cookie, not a bearer token.** The kiosk loads avatars through
+  `<img src>`, which cannot send an `Authorization` header, and page script
+  cannot read an HttpOnly cookie. `pjokk_device`: SameSite=Lax, Secure when
+  `APP_URL` is https, 400 days (the browser ceiling), re-issued on the first
+  use of each UTC day.
+- **The code is typed on the tablet.** The request that sets the cookie
+  must be the tablet's own: an iPad home-screen app does not share Safari's
+  cookies, so a QR opened by the camera would enrol the wrong browser. The
+  Settings QR still exists for Android, where the jar is shared.
+- **The PIN lives on the server and un-enrols.** Chosen with the code, so
+  no device is ever enrolled without one; stored as an HMAC keyed from
+  `AUTH_SECRET` and salted with the token hash (known before the
+  one-statement enrolment, where the device id is not). Five attempts per
+  device per ten minutes, answered with the existing `RATE_LIMITED` code.
+- **An allowlist of operations**, for the reason Limen's routes are one: a
+  new operation is closed to devices until someone decides otherwise.
+- **Attribution rides in the mutation variables.** Read from a global at
+  send time, a feed queued offline and replayed after the kiosk dimmed
+  would go out as nobody, or the wrong person. `FamilyCtx.UserName` is
+  left empty for a device: no handler reads it — a log's caretaker name
+  comes from its own join.
+- **The amber card gets thresholds, not reminders.** Reminders are a
+  person's; a device gets only every caretaker's since-last feed/diaper
+  intervals (`GET /api/device/thresholds`) — no labels, schedules or quiet
+  hours.
+- **Members under `["device", "members"]`.** The shared `["members"]` key
+  is never persisted (on a person's session it is identity); on a kiosk it
+  is content, and a kiosk that reloads offline must still show who can log.
+- **NOT_A_DEVICE is ambiguous, and the cache tells it apart.** A revoked
+  tablet's first 401 clears its cookie, so sibling requests sent after it
+  answer NOT_A_DEVICE — the same as a tablet made a kiosk the old way. Only
+  the revoked one has a cached device, so that is the tell
+  (`deviceGateVerdict` in `lib/kiosk-ui.ts`), and a leave in progress
+  silences the gate entirely. Found by the two-browser E2E, not by review.
+- **The kiosk flag is checked before `AuthGate`.** With a person's session
+  gone, the shell's session gate would send an enrolled tablet to sign-in
+  before the kiosk redirect ran.
+- **Metric on the kiosk.** Display units are a person's preference on
+  `/api/me`; a device is not a person. A known v1 limitation.
+
