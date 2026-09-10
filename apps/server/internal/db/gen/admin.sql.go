@@ -538,6 +538,9 @@ WITH
         SET "created_by" = $1, "revoked_at" = COALESCE("revoked_at", $3::timestamptz)
         WHERE "api_key"."created_by" = $2
     ),
+    -- A kiosk device belongs to the family, not to the admin who enrolled it:
+    -- it keeps working after its creator's account is gone.
+    device AS (UPDATE "device" SET "created_by" = $1 WHERE "device"."created_by" = $2),
     audit AS (UPDATE "admin_audit" SET "admin_id" = $1 WHERE "admin_audit"."admin_id" = $2),
     event AS (UPDATE "calendar_event" SET "created_by" = $1 WHERE "calendar_event"."created_by" = $2)
 SELECT 1

@@ -286,6 +286,9 @@ WITH
         SET "created_by" = @tombstone_id, "revoked_at" = COALESCE("revoked_at", @now::timestamptz)
         WHERE "api_key"."created_by" = @user_id
     ),
+    -- A kiosk device belongs to the family, not to the admin who enrolled it:
+    -- it keeps working after its creator's account is gone.
+    device AS (UPDATE "device" SET "created_by" = @tombstone_id WHERE "device"."created_by" = @user_id),
     audit AS (UPDATE "admin_audit" SET "admin_id" = @tombstone_id WHERE "admin_audit"."admin_id" = @user_id),
     event AS (UPDATE "calendar_event" SET "created_by" = @tombstone_id WHERE "calendar_event"."created_by" = @user_id)
 SELECT 1;

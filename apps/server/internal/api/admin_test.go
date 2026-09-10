@@ -1175,6 +1175,7 @@ var reassignedUserReferences = map[string]bool{
 	"vaccine_dismissal.dismissed_by": true,
 	"family_invite.created_by":       true,
 	"api_key.created_by":             true,
+	"device.created_by":              true,
 	"admin_audit.admin_id":           true,
 	"calendar_event.created_by":      true,
 	"calendar_assignee.user_id":      true,
