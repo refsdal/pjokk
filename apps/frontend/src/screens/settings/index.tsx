@@ -13,6 +13,7 @@ import { AppearanceSection } from "./AppearanceSection";
 import { BabiesSection } from "./BabiesSection";
 import { CalendarFeedCard } from "./CalendarFeedCard";
 import { ContactsSection } from "./ContactsSection";
+import { DevicesSection } from "./DevicesSection";
 import { FamilySection } from "./FamilySection";
 import { InstallSection } from "./InstallSection";
 import { MedicinesSection } from "./MedicinesSection";
@@ -37,6 +38,7 @@ export function SettingsScreen() {
       <h1 className="py-4 text-2xl font-extrabold text-ink">{t("Settings")}</h1>
       <div className="pb-tabbar">
         <FamilySection isAdmin={isAdmin} />
+        {isAdmin && <DevicesSection />}
         <BabiesSection isAdmin={isAdmin} />
         <ContactsSection />
         <MedicinesSection />

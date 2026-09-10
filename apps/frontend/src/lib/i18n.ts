@@ -662,6 +662,25 @@ const nb: Record<string, string> = {
   "Leave kiosk mode": "Forlat kioskmodus",
   // Kiosk devices (spec 2026-09-10-kiosk-devices)
   "Set up as kiosk": "Sett opp som kiosk",
+  "Who's logging?": "Hvem logger?",
+  Devices: "Enheter",
+  "Add device": "Legg til enhet",
+  Kiosk: "Kiosk",
+  "Device name": "Navn på enheten",
+  "Create device": "Opprett enhet",
+  "Use this device": "Bruk denne enheten",
+  "New code": "Ny kode",
+  "Device revoked": "Enheten er trukket tilbake",
+  "Set up": "Satt opp",
+  "Last used": "Sist brukt",
+  "Waiting for set-up": "Venter på oppsett",
+  "code expires in": "koden utløper om",
+  "Code expired — make a new one": "Koden er utløpt — lag en ny",
+  "A family can have at most 10 devices": "En familie kan ha maks 10 enheter",
+  "On the tablet, open Pjokk and tap Set up as kiosk on the sign-in screen. The code works once, for 15 minutes.":
+    "Åpne Pjokk på nettbrettet og trykk Sett opp som kiosk på innloggingssiden. Koden virker én gang, i 15 minutter.",
+  "A tablet on the changing table can be the family's kiosk: a big clock, the last feed, diaper and sleep, and one-tap logging by whoever is there.":
+    "Et nettbrett ved stellebordet kan være familiens kiosk: en stor klokke, siste måltid, bleie og søvn, og logging med ett trykk av den som er der.",
   "This tablet is no longer a kiosk":
     "Dette nettbrettet er ikke lenger en kiosk",
   "Kiosk mode now needs a device — Settings → Family → Devices":
