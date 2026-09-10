@@ -172,3 +172,69 @@ export async function makeSysadmin(email: string): Promise<void> {
     );
   }
 }
+
+// --- Kiosk devices (docs/superpowers/specs/2026-09-10-kiosk-devices-design.md)
+
+export const KIOSK_PIN = "2580";
+
+/**
+ * The tablet's half of enrolment: /kiosk/setup with a one-time code and a
+ * PIN, landing on the care station. A browser that is signed in is signed
+ * out by the set-up, exactly as a real one is.
+ */
+export async function redeemKioskCode(
+  page: Page,
+  code: string,
+  pin = KIOSK_PIN,
+): Promise<void> {
+  await page.goto(`/kiosk/setup?code=${code}`);
+  await page.getByLabel("PIN", { exact: true }).fill(pin);
+  await page.getByLabel("Repeat PIN").fill(pin);
+  await page.getByRole("button", { name: "Start kiosk" }).click();
+  await expect(page).toHaveURL(/\/kiosk$/, { timeout: 10_000 });
+}
+
+/**
+ * Turns the page's own browser into a kiosk device of the family it is
+ * signed in to: mints a one-time code as that family's admin (page.request
+ * shares the page's cookies), then redeems it here.
+ */
+export async function enrolKiosk(page: Page, pin = KIOSK_PIN): Promise<void> {
+  const res = await page.request.post("/api/devices", {
+    data: { name: "Kitchen tablet" },
+  });
+  expect(res.ok(), `create device: ${res.status()}`).toBeTruthy();
+  const { code } = (await res.json()) as { code: string };
+  await redeemKioskCode(page, code, pin);
+}
+
+/** Says who is logging on the kiosk's caretaker row (the first face by default). */
+export async function chooseCaretaker(page: Page, name?: string): Promise<void> {
+  const row = page.getByTestId("kiosk-caretakers");
+  const face = name
+    ? row.getByRole("button", { name })
+    : row.getByRole("button").first();
+  await face.click();
+  await expect(face).toHaveAttribute("aria-pressed", "true");
+}
+
+/** Press-and-hold the baby's name until the leave pad opens; returns the pad. */
+export async function holdToLeave(page: Page) {
+  // A page behind another has its timers throttled, and the hold is a
+  // 1.5 s timer: bring the tablet forward first (devices.spec.ts drives two).
+  await page.bringToFront();
+  const name = page.getByRole("button", { name: "Hold to leave kiosk mode" });
+  // A tap on a lower card scrolls a phone-sized kiosk; the band scrolls with
+  // it, and a raw mouse press at an off-screen box lands on nothing.
+  await name.scrollIntoViewIfNeeded();
+  const box = await name.boundingBox();
+  if (!box) throw new Error("the baby's name is not on screen");
+  await page.mouse.move(box.x + 10, box.y + box.height / 2);
+  // Hold until the pad is up rather than for a fixed time: the hold is a
+  // 1.5 s timer, and a throttled timer can fire after a fixed release.
+  await page.mouse.down();
+  const pad = page.getByRole("dialog", { name: "Leave kiosk mode" });
+  await expect(pad).toBeVisible({ timeout: 5000 });
+  await page.mouse.up();
+  return pad;
+}
