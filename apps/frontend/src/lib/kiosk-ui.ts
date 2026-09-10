@@ -90,6 +90,27 @@ export function caretakerAfterIdle(
   return state === "dim" ? null : current;
 }
 
+// What the kiosk's DeviceGate makes of GET /api/device (spec 2026-09-10-
+// kiosk-devices §6). NOT_A_DEVICE is ambiguous: a tablet made a kiosk the
+// old way has never had a device, but a revoked one answers the same once a
+// sibling request's 401 has already cleared its cookie — and that one HAS
+// had a device (its answer is cached). Only the first is an old-style kiosk.
+// While leaving is under way the gate says nothing at all.
+export type DeviceGateVerdict = "ok" | "revoked" | "not-a-device" | "leaving";
+
+export function deviceGateVerdict(s: {
+  code: string | null;
+  hadDevice: boolean;
+  revoked: boolean;
+  leaving: boolean;
+}): DeviceGateVerdict {
+  if (s.leaving) return "leaving";
+  if (s.revoked || s.code === "DEVICE_REVOKED") return "revoked";
+  if (s.code === "NOT_A_DEVICE")
+    return s.hadDevice ? "revoked" : "not-a-device";
+  return "ok";
+}
+
 export function totalsLines(
   today: Summary["today"],
   units: Units,

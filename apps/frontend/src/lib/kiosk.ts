@@ -94,10 +94,22 @@ export function clearKioskFlags(storage: StorageLike = defaultStorage()): void {
   notify();
 }
 
+// Set for the rest of the page's life once leaving starts — the full load
+// that follows wipes it. It keeps DeviceGate quiet while the cache it
+// watches is torn down under it: the refetches that follow answer
+// NOT_A_DEVICE (the cookie is already gone), which would otherwise read as
+// "a kiosk set up the old way" and race the load to /login.
+let leaving = false;
+
+export function isLeavingKiosk(): boolean {
+  return leaving;
+}
+
 // Leaving, or being revoked: the flags AND everything cached, in memory and
 // on disk. One family's data does not stay on a tablet that is no longer
-// theirs.
+// theirs. Callers follow it with a full page load.
 export async function leaveKiosk(): Promise<void> {
+  leaving = true;
   clearKioskFlags();
   await resetCache();
 }

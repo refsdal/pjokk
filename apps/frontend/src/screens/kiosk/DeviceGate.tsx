@@ -4,7 +4,8 @@ import { ErrorState } from "@/components/QueryStates";
 import { ApiError } from "@/lib/api";
 import { useDeviceSelf } from "@/lib/data";
 import { t } from "@/lib/i18n";
-import { clearKioskFlags, leaveKiosk } from "@/lib/kiosk";
+import { clearKioskFlags, isLeavingKiosk, leaveKiosk } from "@/lib/kiosk";
+import { deviceGateVerdict } from "@/lib/kiosk-ui";
 import { onDeviceRevoked } from "@/lib/query";
 import { toast } from "@/lib/toast";
 
@@ -18,34 +19,38 @@ export function DeviceGate({ children }: { children: ReactNode }) {
   const [revoked, setRevoked] = useState(false);
   useEffect(() => onDeviceRevoked(() => setRevoked(true)), []);
 
-  const code = device.error instanceof ApiError ? device.error.code : null;
-  const gone = revoked || code === "DEVICE_REVOKED";
-  const notADevice = code === "NOT_A_DEVICE";
+  const verdict = deviceGateVerdict({
+    code: device.error instanceof ApiError ? (device.error.code ?? null) : null,
+    hadDevice: device.data !== undefined,
+    revoked,
+    leaving: isLeavingKiosk(),
+  });
 
   // Revoked by an admin, or un-enrolled elsewhere: forget everything and
   // land on sign-in with a word about why. A full load, so nothing of the
-  // family survives in memory either.
+  // family survives in memory either. leaveKiosk marks the page as leaving,
+  // so this runs once.
   useEffect(() => {
-    if (!gone) return;
+    if (verdict !== "revoked") return;
     void leaveKiosk().then(() =>
       window.location.assign("/login?notice=revoked"),
     );
-  }, [gone]);
+  }, [verdict]);
 
   // A tablet made a kiosk the old way (spec 2's local PIN): the flag is set
-  // but there is no device behind it. Drop the old state and carry on in the
-  // normal app. The flags are cleared BEFORE navigating, in this effect,
-  // so the shell cannot see them and send the tablet straight back here.
+  // but there has never been a device behind it. Drop the old state and
+  // carry on in the normal app. The flags are cleared BEFORE navigating, in
+  // this effect, so the shell cannot see them and send the tablet back.
   const handled = useRef(false);
   useEffect(() => {
-    if (!notADevice || handled.current) return;
+    if (verdict !== "not-a-device" || handled.current) return;
     handled.current = true;
     clearKioskFlags();
     toast(t("Kiosk mode now needs a device — Settings → Family → Devices"));
     void navigate({ to: "/home", replace: true });
-  }, [notADevice, navigate]);
+  }, [verdict, navigate]);
 
-  if (gone || notADevice || device.isPending) {
+  if (verdict !== "ok" || device.isPending) {
     return <div className="min-h-dvh bg-bg" />;
   }
   if (!device.data) {
