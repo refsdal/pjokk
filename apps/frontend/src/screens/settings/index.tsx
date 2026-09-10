@@ -15,7 +15,6 @@ import { CalendarFeedCard } from "./CalendarFeedCard";
 import { ContactsSection } from "./ContactsSection";
 import { FamilySection } from "./FamilySection";
 import { InstallSection } from "./InstallSection";
-import { KioskSection } from "./KioskSection";
 import { MedicinesSection } from "./MedicinesSection";
 import { NapGuideSection } from "./NapGuideSection";
 import { PhotoUsageLine } from "./PhotoUsageLine";
@@ -55,7 +54,6 @@ export function SettingsScreen() {
         <NotificationsSection />
 
         <AppearanceSection />
-        <KioskSection />
 
         {isAdmin && (
           <>

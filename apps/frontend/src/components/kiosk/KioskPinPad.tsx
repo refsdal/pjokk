@@ -1,7 +1,7 @@
 import { IconBackspace, IconLock } from "@tabler/icons-react";
 import { useEffect, useReducer } from "react";
 import { t } from "@/lib/i18n";
-import { verifyPin } from "@/lib/kiosk";
+import type { UnenrolResult } from "@/lib/data";
 import {
   PIN_MAX_WRONG,
   type PinPadEvent,
@@ -12,15 +12,19 @@ import { cn, focusRing } from "@/lib/utils";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
-// Leaving kiosk (spec §6): dots, a 3×4 keypad, Cancel. Verifies on the
-// stored PIN's length; three wrong in a row hands a lockout to the screen.
+// Leaving kiosk (spec §6): dots, a 3×4 keypad, Cancel. Submits on the
+// stored PIN's length to `verify` — the server, which un-enrols the device on
+// the right PIN (spec 2026-09-10-kiosk-devices §6). Three wrong in a row hand
+// a lockout to the screen; the server keeps its own count as well.
 export function KioskPinPad({
   length,
+  verify,
   onSuccess,
   onCancel,
   onLockout,
 }: {
   length: number;
+  verify: (pin: string) => Promise<UnenrolResult>;
   onSuccess: () => void;
   onCancel: () => void;
   onLockout: () => void;
@@ -32,16 +36,26 @@ export function KioskPinPad({
   useEffect(() => {
     if (s.digits.length !== length) return;
     let cancelled = false;
-    void verifyPin(s.digits).then((ok) => {
+    void verify(s.digits).then((result) => {
       if (cancelled) return;
-      if (ok) onSuccess();
-      else if (s.wrong + 1 >= PIN_MAX_WRONG) onLockout();
-      else dispatch({ type: "wrong" });
+      if (result === "ok") onSuccess();
+      else if (result === "wrong") {
+        if (s.wrong + 1 >= PIN_MAX_WRONG) onLockout();
+        else dispatch({ type: "wrong" });
+      } else {
+        const text =
+          result === "limited"
+            ? t("Too many tries — wait a few minutes")
+            : result === "offline"
+              ? t("Leaving needs a connection")
+              : t("Could not leave kiosk mode");
+        dispatch({ type: "message", text });
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [s.digits, s.wrong, length, onSuccess, onLockout]);
+  }, [s.digits, s.wrong, length, verify, onSuccess, onLockout]);
 
   const key = (k: string) => (
     <button
