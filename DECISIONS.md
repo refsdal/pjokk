@@ -2354,3 +2354,28 @@ unchanged. Impersonation remains the only route to a family's entries, and it
 is audited and shows the family a banner. A structural test
 (`apps/frontend/test/admin-family-ui.test.ts`) fails if a screen under
 `screens/admin/` ever reads a log endpoint.
+
+## 2026-09-10 — cache headers for the SPA, invite codes out of the backup
+
+- **Content-hashed files are immutable; everything else revalidates.** The
+  Go server sent no `Cache-Control` on the SPA at all, so every cold load
+  re-downloaded the bundles and any caching proxy in front applied its own
+  defaults (Cloudflare, for one, caches `.js` by extension), which could
+  hand out a previous build's `push-sw.js` or `theme-init.js` after a
+  deploy. Now `assets/*` — Vite names every file there by content hash,
+  and `public/` has no `assets/` directory to put an unhashed one there —
+  is `public, max-age=31536000, immutable`, and index.html, the service
+  workers, the manifest and the icons are `no-cache`. A request for a chunk
+  that no longer exists falls back to index.html and gets `no-cache`, never
+  the immutable header, so an old tab cannot pin HTML at an asset URL.
+- **`no-cache` without a validator is a full re-download.** Embedded files
+  have no modification time, so `http.FileServer` sends no `Last-Modified`,
+  and nothing computes an ETag. That was already true before this change;
+  the files are small and the service worker precaches them. An ETag is the
+  upgrade if it ever matters.
+- **`family_invite` is left out of the nightly backup.** An invite code is
+  a credential and it is the table's primary key, so it cannot be nulled
+  the way session and OAuth tokens are; and an invite can be issued for up
+  to 720 hours, the whole 30-day retention window, so a snapshot could hold
+  a code that still works. Like `impersonation`, the table is not worth
+  restoring: after a restore a family admin issues a fresh link.

@@ -158,7 +158,7 @@ separate test deploy).
   not a bare digest: the IPv4 space is small enough that an unkeyed hash of
   an address is reversible in seconds and would not be pseudonymisation at
   all. Keep it that way.
-- The privacy policy (`apps/frontend/src/screens/legal/privacy.tsx`) names the
+- The privacy policy (`apps/landing/src/legal/privacy.tsx`) names the
   processors and promises EU storage. **It must be kept in step with where the
   container is actually deployed** — it is a legal statement, not decoration.
 
@@ -456,10 +456,11 @@ sheet pattern — build the pattern well once.
   subtractions: **live credential columns are nulled before the dump**
   (`users.password`, `accounts.access_token`/`refresh_token`/`id_token`,
   `sessions.token`) — thirty days of retained snapshots must not amount to
-  thirty days of valid session cookies — and the `impersonation` table is
-  excluded outright, because every one of its rows is a pair of live session
-  tokens and there is nothing else in it worth restoring.
-  `jobs.DeliberatelyExcluded` names it alongside the two rate-limit tables
+  thirty days of valid session cookies — and two tables are excluded
+  outright: `impersonation`, because every one of its rows is a pair of live
+  session tokens, and `family_invite`, because its primary key IS the invite
+  code, a credential that can be issued for the whole 30-day window.
+  `jobs.DeliberatelyExcluded` names both alongside the two rate-limit tables
   and goose's bookkeeping, and `backup_tables_test.go` checks the list
   against the live schema **in both directions**, so "every table" stays
   true as the schema grows.
@@ -493,7 +494,9 @@ sheet pattern — build the pattern well once.
 > client-side math), Norwegian translation (auto-from-device + manual
 > toggle; dictionary in lib/i18n.ts), and read+write API keys for
 > HA/Grafana (pjk_ bearer keys, Settings → API keys). Still on the
-> Phase 7 backlog: PDF report, kiosk/PIN mode, Capacitor shell.
+> Phase 7 backlog at the time: PDF report, kiosk/PIN mode, Capacitor
+> shell. Since then the PDF report shipped in #53 and kiosk mode in
+> PR #71, leaving only the Capacitor shell.
 > Phase 8 delivered the system-admin console at /admin (better-auth admin
 > plugin; user.role === "admin" ≠ family roles): platform stats, family
 > overview + cascade delete, user support (sessions/password/ban/delete),
@@ -613,6 +616,7 @@ sheet pattern — build the pattern well once.
 7. **Nice-to-haves:** WHO growth curves, client-side PDF report (jsPDF — never
    server-side), API keys for Home Assistant/Grafana, kiosk/PIN mode for a
    shared nursery tablet, Norwegian translation, Capacitor shell if ever needed.
+   All shipped except the Capacitor shell.
 
 ## Engineering conventions
 
