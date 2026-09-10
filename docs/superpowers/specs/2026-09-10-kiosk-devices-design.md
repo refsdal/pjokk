@@ -127,7 +127,7 @@ builds `FamilyCtx` from the device instead of a session:
 | field | value |
 |---|---|
 | `FamilyID` | the device's family |
-| `UserID`, `UserName` | the caretaker from `X-Pjokk-Caretaker`, or `""` on a read without one |
+| `UserID` | the caretaker from `X-Pjokk-Caretaker`, or `""` on a read without one (`UserName` stays empty: no handler reads it) |
 | `MemberRole` | always `"member"` — choosing yourself grants nothing |
 | `IsDevice`, `DeviceID` | new fields |
 
@@ -207,7 +207,9 @@ send every app route to `/kiosk` without a network round-trip; the
 server's answer is the authority.
 
 **Caretaker row.** In the kiosk's top band: every family member's avatar
-(initials fallback) and display name, from `ListFamilyMembers`. The
+(initials fallback) and display name, from `ListFamilyMembers` — read under
+the persisted `["device", "members"]` key, since the shared `["members"]`
+is never persisted and an offline reload must still show who can log. The
 chosen one carries the accent ring. With nobody chosen the row reads
 "Who's logging?", and tapping any action opens a "Who's logging?" prompt
 with large avatars; choosing completes the pending action — still one
