@@ -59,3 +59,14 @@ WHERE u."id" = @target_id
       WHERE a."user_id" = @viewer_id AND b."user_id" = @target_id
     )
   );
+
+-- name: GetAvatarForFamilyMember :one
+-- GetAvatarForViewer for a kiosk device (spec 2026-09-10-kiosk-devices
+-- §4): the target's photo when they are a member of the device's family.
+-- Same 404-either-way contract — no row for a stranger or a missing photo.
+SELECT u."avatar_key"
+FROM "users" u
+JOIN "organization_members" om ON om."user_id" = u."id"
+WHERE u."id" = @target_id
+  AND om."organization_id" = @family_id
+  AND u."avatar_key" IS NOT NULL;

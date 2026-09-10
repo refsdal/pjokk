@@ -400,6 +400,28 @@ func (a *AppRig) CreateAPIKey(familyID, userID string) string {
 	return token
 }
 
+// CreateDevice inserts an ACTIVE kiosk device for familyID, enrolled by
+// createdBy, and returns a ready-to-use Cookie header value
+// ("pjokk_device=<token>"; only the token's SHA-256 is stored, as
+// middleware.DeviceAuth expects). For route tests of what a device may and
+// may not call — the enrolment flow itself is exercised through its own
+// routes in device_self_test.go.
+func (a *AppRig) CreateDevice(familyID, createdBy string) string {
+	a.t.Helper()
+	token := "pjd_" + familyID + "-" + createdBy
+	sum := sha256.Sum256([]byte(token))
+	_, err := a.Rig.Pool.Exec(context.Background(), `
+		INSERT INTO "device"
+			("family_id", "name", "created_by", "token_hash", "pin_hash", "enrolled_at", "last_used_at")
+		VALUES ($1, 'Test kiosk', $2, $3, 'x', now(), now())`,
+		familyID, createdBy, hex.EncodeToString(sum[:]),
+	)
+	if err != nil {
+		a.t.Fatalf("testrig: CreateDevice(%q, %q): %v", familyID, createdBy, err)
+	}
+	return "pjokk_device=" + token
+}
+
 // Result is one HTTP response, decoded eagerly so assertions read like plain
 // Go values instead of every test re-parsing a body. JSON is nil when Raw
 // is empty or is not a JSON object (e.g. an array body — see DoArray, or a

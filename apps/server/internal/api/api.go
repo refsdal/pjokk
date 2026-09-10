@@ -462,6 +462,71 @@ var tierPublicAPIAllowlist = map[string]bool{
 	"GetConfig":     true,
 }
 
+// deviceOperations is the ALLOWLIST of operations a kiosk device may call
+// (docs/superpowers/specs/2026-09-10-kiosk-devices-design.md §4): exactly
+// what screens/Kiosk.tsx reads and writes. Anything else answers 403
+// NOT_FOR_DEVICES from deviceGate, whatever its tier. It is an allowlist for
+// the reason internal/auth's Limen route list is one: a new operation is
+// closed to devices until someone decides otherwise, rather than open until
+// someone remembers. assertDeviceOperationCoverage keeps every entry honest.
+var deviceOperations = map[string]bool{
+	// Reads.
+	"ListBabies":            true,
+	"ListFamilyMembers":     true, // the caretaker row
+	"GetSummary":            true,
+	"ListFeeds":             true, // the last bottle's amount
+	"ListSleepLocations":    true,
+	"ListMedicineCatalogue": true,
+	"GetFeedTimer":          true,
+	// Writes: the cards' one-tap actions and their Undo.
+	"CreateFeed":       true,
+	"DeleteFeed":       true,
+	"CreateDiaper":     true,
+	"DeleteDiaper":     true,
+	"CreateSleep":      true,
+	"WakeSleep":        true,
+	"UpdateSleep":      true, // resume after a mistaken wake (endTime: null)
+	"DeleteSleep":      true,
+	"StartFeedTimer":   true,
+	"SetFeedTimerSide": true,
+	"StopFeedTimer":    true,
+	"CreateMedicine":   true, // the medicine strip's default dose
+	"DeleteMedicine":   true,
+}
+
+// deviceGate refuses a device identity on any operation outside
+// deviceOperations. Mounted directly after DeviceAuth so a refused device
+// gets NOT_FOR_DEVICES rather than whatever the tier's own gates would say
+// about a caller with no session.
+func deviceGate(operationID string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if middleware.IsDevice(r) && !deviceOperations[operationID] {
+				respond.Error(w, http.StatusForbidden, "Not available to kiosk devices", "NOT_FOR_DEVICES")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// assertDeviceOperationCoverage panics if deviceOperations names an
+// operation the spec does not have — a rename would otherwise silently take
+// a kiosk action away. Called next to assertOperationAuthCoverage.
+func assertDeviceOperationCoverage(spec *openapi3.T) {
+	known := make(map[string]bool)
+	for _, path := range spec.Paths.InMatchingOrder() {
+		for _, op := range spec.Paths.Find(path).Operations() {
+			known[strings.ToUpper(op.OperationID[:1])+op.OperationID[1:]] = true
+		}
+	}
+	for name := range deviceOperations {
+		if !known[name] {
+			panic(fmt.Sprintf("api: deviceOperations names %q, which is not an operation in the spec", name))
+		}
+	}
+}
+
 // assertOperationAuthCoverage panics unless operationAuthTiers has exactly
 // one entry per operationId in spec — no fewer (a new route task that forgot
 // to classify its operation) and no more (a stale entry left behind by a
@@ -550,11 +615,12 @@ func (d Deps) mwDeps() middleware.Deps {
 
 // authChain is the one gen.StrictMiddlewareFunc passed to gen.NewStrictHandler:
 // it looks up operationID in operationAuthTiers and wraps the call in the
-// matching middleware chain (REF §A5's order: APIKeyAuth, Session,
-// RequireFamily/RequireSession, RequireAdmin).
+// matching middleware chain (REF §A5's order: APIKeyAuth, then DeviceAuth and
+// the device allowlist, Session, RequireFamily/RequireSession, RequireAdmin).
 func authChain(d Deps) gen.StrictMiddlewareFunc {
 	mwDeps := d.mwDeps()
 	apiKey := middleware.APIKeyAuth(mwDeps)
+	device := middleware.DeviceAuth(mwDeps)
 	session := middleware.Session(mwDeps)
 	requireSession := middleware.RequireSession()
 	family := middleware.RequireFamily(mwDeps)
@@ -574,20 +640,26 @@ func authChain(d Deps) gen.StrictMiddlewareFunc {
 			panic("api: no authTier for operation " + operationID)
 		}
 
+		// Every non-public tier resolves a kiosk device right after an API key
+		// and refuses it on anything outside deviceOperations before the
+		// tier's own gates run.
+		gate := deviceGate(operationID)
+		identify := func(h http.Handler) http.Handler { return apiKey(device(gate(session(h)))) }
+
 		var chain func(http.Handler) http.Handler
 		switch tier {
 		case tierPublic:
 			return f
 		case tierSession:
-			chain = func(h http.Handler) http.Handler { return apiKey(session(requireSession(captureHTTP(h)))) }
+			chain = func(h http.Handler) http.Handler { return identify(requireSession(captureHTTP(h))) }
 		case tierFamily:
-			chain = func(h http.Handler) http.Handler { return apiKey(session(family(h))) }
+			chain = func(h http.Handler) http.Handler { return identify(family(h)) }
 		case tierAdmin:
-			chain = func(h http.Handler) http.Handler { return apiKey(session(family(admin(h)))) }
+			chain = func(h http.Handler) http.Handler { return identify(family(admin(h))) }
 		case tierSysadmin:
-			chain = func(h http.Handler) http.Handler { return apiKey(session(sysadmin(captureHTTP(h)))) }
+			chain = func(h http.Handler) http.Handler { return identify(sysadmin(captureHTTP(h))) }
 		case tierFamilyNoAPIKey:
-			chain = func(h http.Handler) http.Handler { return apiKey(session(family(rejectAPIKey(h)))) }
+			chain = func(h http.Handler) http.Handler { return identify(family(rejectAPIKey(h))) }
 		default:
 			panic(fmt.Sprintf("api: unknown authTier %d for operation %q", tier, operationID))
 		}
@@ -653,6 +725,11 @@ func rateLimitChain(d Deps) gen.StrictMiddlewareFunc {
 // http.Handler wrapper, for the hand-routed routes in internal/api/files.go
 // that sit outside gen.StrictServerInterface entirely and therefore never
 // go through authChain's operationID-keyed dispatch.
+//
+// No DeviceAuth here, deliberately: none of these routes (file and photo
+// streams, the CSV export, the ICS feed) is on the kiosk's allowlist, so a
+// device cookie resolves nothing and the request answers 401 like any other
+// caller without a session.
 func familyChain(d Deps) func(http.Handler) http.Handler {
 	mwDeps := d.mwDeps()
 	apiKey := middleware.APIKeyAuth(mwDeps)
@@ -772,6 +849,7 @@ func NewHandler(d Deps) http.Handler {
 		panic(fmt.Sprintf("api: marshal embedded spec: %v", err))
 	}
 	assertOperationAuthCoverage(spec)
+	assertDeviceOperationCoverage(spec)
 
 	if d.RateLimit == nil {
 		// One mistake, one failure mode: middleware.RateLimit panics on a nil
@@ -828,7 +906,7 @@ func NewHandler(d Deps) http.Handler {
 	// Avatars (internal/api/avatar.go): multipart in, JPEG out — hand-routed
 	// for the same reason as the files routes, but session tier (a profile
 	// is global) and never an API key.
-	d.mountAvatarRoutes(mux, sessionChain(d))
+	d.mountAvatarRoutes(mux, sessionChain(d), avatarReadChain(d))
 
 	// CSV export (internal/api/export.go's package doc comment): same
 	// reasoning as the files routes above — a text/csv streamed body has
