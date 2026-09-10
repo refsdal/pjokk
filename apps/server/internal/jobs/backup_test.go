@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -159,6 +160,47 @@ func TestRunBackupNullsSecretsButKeepsOtherColumns(t *testing.T) {
 
 	if _, ok := snap.Tables["impersonation"]; ok {
 		t.Errorf("tables contains \"impersonation\", want it excluded entirely")
+	}
+}
+
+// TestRunBackupLeavesOutInviteCodes: an invite code is a credential (it
+// grants family membership to whoever types it), it is the table's primary
+// key so it cannot be nulled like the columns above, and an invite may live
+// up to 720 hours — the full 30-day retention window. The whole table is
+// therefore left out, the way impersonation is.
+func TestRunBackupLeavesOutInviteCodes(t *testing.T) {
+	a := testrig.App(t)
+	ctx := context.Background()
+
+	_, cookie := a.NewFamily("Hansen", "invites@example.com")
+	res := a.Do(http.MethodPost, "/api/invites", cookie, map[string]any{"expiresInHours": 720})
+	if res.Status != http.StatusCreated {
+		t.Fatalf("create invite status = %d, body %s", res.Status, res.Raw)
+	}
+	code, _ := res.JSON["code"].(string)
+	if code == "" {
+		t.Fatalf("code missing from %v", res.JSON)
+	}
+
+	d := depsFor(a)
+	key, err := jobs.RunBackup(ctx, d, time.Now())
+	if err != nil {
+		t.Fatalf("RunBackup: %v", err)
+	}
+	raw, ok := d.Storage.(*storage.Memory).Read(key)
+	if !ok {
+		t.Fatalf("no object written at %q", key)
+	}
+	var snap backupSnapshot
+	if err := json.Unmarshal(raw, &snap); err != nil {
+		t.Fatalf("unmarshal snapshot: %v", err)
+	}
+
+	if _, ok := snap.Tables["family_invite"]; ok {
+		t.Errorf("tables contains \"family_invite\", want it excluded entirely")
+	}
+	if strings.Contains(string(raw), code) {
+		t.Errorf("snapshot contains the live invite code %q", code)
 	}
 }
 
