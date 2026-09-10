@@ -121,6 +121,13 @@ export interface UpdateDiaperVars {
   patch: Schemas["UpdateDiaper"];
 }
 
+// Reopens a finished sleep (lib/sleep-resume.ts). babyId is for the
+// optimistic summary patch; the server needs only the id.
+export interface ResumeSleepVars {
+  id: string;
+  babyId: string;
+}
+
 export interface UpdateSleepVars {
   id: string;
   patch: Schemas["UpdateSleep"];
@@ -240,6 +247,33 @@ export function registerLogMutationDefaults(qc: QueryClient) {
       toast(`${t("Could not wake: ")}${err.message}`, "error"),
     onSettled: () => invalidateLogs(qc),
   });
+  // PATCH endTime: null — the one UpdateSleep write that can 409, when a
+  // newer session is already running. Optimistic like startSleep, so the
+  // banner is back at once (and offline, where the mutation pauses): the
+  // last sleep becomes the active one, still counting from its start.
+  qc.setMutationDefaults(["resumeSleep"], {
+    mutationFn: async ({ id }: ResumeSleepVars) =>
+      unwrap<SleepLog>(
+        client.PATCH("/api/sleep/{id}", {
+          params: { path: { id } },
+          body: { endTime: null },
+        }),
+      ),
+    onMutate: (vars: ResumeSleepVars) => {
+      const snap = snapshotSummary(qc, vars.babyId);
+      patchSummary(qc, vars.babyId, (old) =>
+        !old.activeSleep && old.lastSleep?.id === vars.id
+          ? { ...old, activeSleep: { ...old.lastSleep, endTime: null } }
+          : old,
+      );
+      return snap;
+    },
+    onError: (err: Error, _vars: ResumeSleepVars, ctx: unknown) => {
+      restoreSummary(qc, ctx);
+      toast(`${t("Could not resume: ")}${err.message}`, "error");
+    },
+    onSettled: () => invalidateLogs(qc),
+  });
   qc.setMutationDefaults(["updateFeed"], {
     mutationFn: async ({ id, patch }: UpdateFeedVars) =>
       unwrap<FeedLog>(
@@ -315,6 +349,12 @@ export function useStartSleep() {
 export function useWakeSleep() {
   return useMutation<SleepLog, Error, WakeSleepVars>({
     mutationKey: ["wakeSleep"],
+  });
+}
+
+export function useResumeSleep() {
+  return useMutation<SleepLog, Error, ResumeSleepVars>({
+    mutationKey: ["resumeSleep"],
   });
 }
 

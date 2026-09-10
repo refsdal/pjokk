@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { Icon as TablerIcon } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { formatRelative } from "@/lib/time";
 import { cn, focusRing } from "@/lib/utils";
 
@@ -17,6 +18,7 @@ export function StatusCard({
   tintClass,
   onClick,
   accessory,
+  action,
 }: {
   icon: TablerIcon;
   label: string;
@@ -37,6 +39,11 @@ export function StatusCard({
   // Optional trailing slot, pushed to the right edge. The temperature card
   // puts its three-day sparkline here; nothing else uses it yet.
   accessory?: ReactNode;
+  // Optional button at the right edge (the awake card's Resume). It sits
+  // BESIDE the card's own button, never inside it — nested buttons are
+  // invalid HTML and read as one control to assistive tech — so with an
+  // action the border moves to a wrapper around the two.
+  action?: { label: string; onClick: () => void };
 }) {
   // Re-render each minute so "5 m ago" stays honest.
   const [, tick] = useState(0);
@@ -45,12 +52,13 @@ export function StatusCard({
     return () => clearInterval(timer);
   }, []);
 
-  return (
+  const card = (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "flex w-full items-center gap-3 rounded-xl2 border border-line bg-surface p-4 text-left active:bg-surface-2",
+        "flex items-center gap-3 rounded-xl2 bg-surface p-4 text-left active:bg-surface-2",
+        action ? "min-w-0 flex-1" : "w-full border border-line",
         focusRing,
       )}
     >
@@ -81,5 +89,19 @@ export function StatusCard({
         <div className="ml-auto shrink-0 pl-2">{accessory}</div>
       ) : null}
     </button>
+  );
+  if (!action) return card;
+  return (
+    <div className="flex w-full items-center rounded-xl2 border border-line bg-surface pr-3">
+      {card}
+      <Button
+        variant="secondary"
+        size="sm"
+        className="shrink-0"
+        onClick={action.onClick}
+      >
+        {action.label}
+      </Button>
+    </div>
   );
 }

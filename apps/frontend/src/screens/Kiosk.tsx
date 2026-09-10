@@ -23,6 +23,7 @@ import {
   useLogFeed,
   useMedicineCatalogue,
   useReminders,
+  useResumeSleep,
   useSetFeedTimerSide,
   useSleepLocations,
   useStartFeedTimer,
@@ -46,6 +47,7 @@ import {
   undoText,
 } from "@/lib/kiosk-ui";
 import { describeNapWindow, napWindow, useNapGuide } from "@/lib/nap-window";
+import { useResumableSleep } from "@/lib/sleep-resume";
 import { sleepTypeAt } from "@/lib/night";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import { formatVolume, useUnits } from "@/lib/units";
@@ -86,6 +88,8 @@ export function KioskScreen() {
   const napGuide = useNapGuide();
   // A second tick while a nursing timer runs, half a minute otherwise.
   const now = useNow(summary.data?.activeFeed ? 1000 : 30_000);
+  // Resume, for a Wake tapped too soon (lib/sleep-resume.ts).
+  const resumable = useResumableSleep(summary.data);
 
   useWakeLock();
   const [idle, wake] = useIdle();
@@ -94,6 +98,7 @@ export function KioskScreen() {
   const logDiaper = useLogDiaper();
   const startSleep = useStartSleep();
   const wakeSleep = useWakeSleep();
+  const resumeSleep = useResumeSleep();
   const startTimer = useStartFeedTimer();
   const switchSide = useSetFeedTimerSide();
   const stopTimer = useStopFeedTimer();
@@ -209,7 +214,8 @@ export function KioskScreen() {
   const otherLocations = (locations.data ?? [])
     .map((l) => l.name)
     .filter((n) => n !== lastLocation)
-    .slice(0, 2);
+    // One fewer while Resume takes a slot, so the row still fits the card.
+    .slice(0, resumable ? 1 : 2);
   const medicines: MedicineCatalogueEntry[] = (catalogue.data ?? []).filter(
     (m) => !m.archived,
   );
@@ -273,6 +279,14 @@ export function KioskScreen() {
             />
           ) : (
             <>
+              {resumable && (
+                <KioskAction
+                  label={t("Resume")}
+                  onClick={() =>
+                    resumeSleep.mutate({ id: resumable.id, babyId })
+                  }
+                />
+              )}
               <KioskAction
                 label={t("Sleep")}
                 hint={lastLocation ?? undefined}
