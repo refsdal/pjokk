@@ -127,7 +127,11 @@ test("past the window, only the newest sleep's edit sheet offers Resume", async 
   await page.getByRole("button", { name: "Resume sleep" }).click();
   await expect(page.getByRole("heading", { name: "Edit sleep" })).toHaveCount(0);
 
-  await page.goto("/home");
+  // Back to Home through the tab bar, as a parent would. Not page.goto: a
+  // full reload tens of milliseconds after the mutation restores the
+  // IndexedDB snapshot the persister has not yet rewritten, which is about
+  // the persister's throttle, not about Resume.
+  await page.getByRole("link", { name: "Home" }).click();
   await expect(page.getByText("Sleeping").first()).toBeVisible({ timeout: 10_000 });
 });
 
