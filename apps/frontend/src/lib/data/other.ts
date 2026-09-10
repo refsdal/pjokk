@@ -1,7 +1,7 @@
 import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
 import type { MeasurementType } from "@pjokk/shared";
 import type { components } from "../api-schema";
-import { client, unwrap } from "../api";
+import { caretakerInit, client, unwrap } from "../api";
 import { t } from "../i18n";
 import { toast } from "../toast";
 import { invalidateLogs } from "./keys";
@@ -50,8 +50,11 @@ function otherGet(kind: OtherKind, babyId: string, limit: number) {
     } as never,
   );
 }
-function otherPost(kind: OtherKind, body: unknown) {
-  return client.POST(otherListPath[kind] as never, { body } as never);
+function otherPost(kind: OtherKind, body: unknown, caretakerId?: string) {
+  return client.POST(
+    otherListPath[kind] as never,
+    { body, ...caretakerInit(caretakerId) } as never,
+  );
 }
 function otherPatch(kind: OtherKind, id: string, body: unknown) {
   return client.PATCH(
@@ -62,11 +65,12 @@ function otherPatch(kind: OtherKind, id: string, body: unknown) {
     } as never,
   );
 }
-function otherDelete(kind: OtherKind, id: string) {
+function otherDelete(kind: OtherKind, id: string, caretakerId?: string) {
   return client.DELETE(
     otherItemPath[kind] as never,
     {
       params: { path: { id } },
+      ...caretakerInit(caretakerId),
     } as never,
   );
 }
@@ -78,13 +82,15 @@ function otherDelete(kind: OtherKind, id: string) {
 // path above and is stripped before the body is sent.
 type Schemas = components["schemas"];
 
-export type CreateOtherVars =
+// caretakerId: who is logging on a kiosk (lib/api.ts's caretakerInit).
+export type CreateOtherVars = { caretakerId?: string } & (
   | ({ kind: "medicine" } & Schemas["CreateMedicine"])
   | ({ kind: "bath" } & Schemas["CreateBath"])
   | ({ kind: "note" } & Schemas["CreateNote"])
   | ({ kind: "milestone" } & Schemas["CreateMilestone"])
   | ({ kind: "measurement" } & Schemas["CreateMeasurement"])
-  | ({ kind: "pump" } & Schemas["CreatePump"]);
+  | ({ kind: "pump" } & Schemas["CreatePump"])
+);
 
 export interface UpdateOtherVars {
   kind: OtherKind;
@@ -97,6 +103,7 @@ export interface UpdateOtherVars {
 export interface DeleteOtherVars {
   kind: OtherKind;
   id: string;
+  caretakerId?: string;
 }
 
 // Warm the per-kind prefill caches when the More picker opens, so the
@@ -139,8 +146,8 @@ export function useMeasurements(babyId: string | undefined) {
 
 export function registerOtherMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["createOther"], {
-    mutationFn: async ({ kind, ...body }: CreateOtherVars) =>
-      unwrap(otherPost(kind, body)),
+    mutationFn: async ({ kind, caretakerId, ...body }: CreateOtherVars) =>
+      unwrap(otherPost(kind, body, caretakerId)),
     onError: (err: Error) => toastMutationError(t("Could not save: "), err),
     onSettled: () => invalidateLogs(qc),
   });
@@ -152,8 +159,8 @@ export function registerOtherMutationDefaults(qc: QueryClient) {
     onSettled: () => invalidateLogs(qc),
   });
   qc.setMutationDefaults(["deleteOther"], {
-    mutationFn: async ({ kind, id }: DeleteOtherVars) =>
-      unwrap(otherDelete(kind, id)),
+    mutationFn: async ({ kind, id, caretakerId }: DeleteOtherVars) =>
+      unwrap(otherDelete(kind, id, caretakerId)),
     onError: (err: Error) =>
       toast(t("Could not delete: ") + err.message, "error"),
     onSettled: () => invalidateLogs(qc),

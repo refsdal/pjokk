@@ -11,6 +11,19 @@ export const client = createClient<paths>({
   credentials: "include",
 });
 
+// Who is logging on a kiosk (docs/superpowers/specs/2026-09-10-kiosk-devices-
+// design.md §6). A device holds no person's session, so every write it makes
+// names the caretaker the avatar row chose; the server checks they belong to
+// the device's family and credits the entry to them. Attribution only.
+export const CARETAKER_HEADER = "X-Pjokk-Caretaker";
+
+/** Extra request init for a write made on someone's behalf; `{}` otherwise. */
+export function caretakerInit(caretakerId?: string): {
+  headers?: Record<string, string>;
+} {
+  return caretakerId ? { headers: { [CARETAKER_HEADER]: caretakerId } } : {};
+}
+
 export class ApiError extends Error {
   status: number;
   code?: string;
