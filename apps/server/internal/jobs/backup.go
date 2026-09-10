@@ -69,6 +69,9 @@ var BackupTables = []string{
 	"push_subscription",
 	"reminder",
 	"api_key",
+	// Kiosk devices hold only hashes (code, token, PIN HMAC); a restored
+	// kiosk keeps working, exactly like a restored api_key row.
+	"device",
 	"admin_audit",
 	"help_request",
 }

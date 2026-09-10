@@ -111,6 +111,21 @@ type ContactBaby struct {
 	BabyID    string
 }
 
+type Device struct {
+	ID             string
+	FamilyID       string
+	Name           string
+	CreatedBy      string
+	CreatedAt      pgtype.Timestamptz
+	EnrolCodeHash  *string
+	EnrolExpiresAt pgtype.Timestamptz
+	TokenHash      *string
+	PinHash        *string
+	EnrolledAt     pgtype.Timestamptz
+	LastUsedAt     pgtype.Timestamptz
+	RevokedAt      pgtype.Timestamptz
+}
+
 type DiaperLog struct {
 	ID          string
 	FamilyID    string
