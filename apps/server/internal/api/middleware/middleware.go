@@ -11,6 +11,9 @@
 //     session-address digest both read.
 //   - APIKeyAuth runs before Session so a pjk_ bearer resolves to a synthetic
 //     identity and Session skips its cookie lookup.
+//   - DeviceAuth (device.go) runs between them: a kiosk's pjokk_device
+//     cookie resolves to a device identity, a pjk_ bearer still wins over it,
+//     and Session never runs for a device.
 //   - RequireFamily runs after both, so a key and a cookie get exactly the
 //     same tenancy check — a key whose creator was removed from the family
 //     stops working, like their session does.
@@ -51,6 +54,11 @@ type Deps struct {
 
 	// Now is the clock, injectable for tests. nil means time.Now.
 	Now func() time.Time
+
+	// SecureCookies marks the cookies this package writes (the kiosk device
+	// credential) Secure — true exactly when APP_URL is https, the same rule
+	// Limen's session cookie follows.
+	SecureCookies bool
 }
 
 func (d Deps) now() time.Time {
@@ -78,6 +86,13 @@ type FamilyCtx struct {
 
 	// ImpersonatedBy is the system admin driving this session, or "".
 	ImpersonatedBy string
+
+	// IsDevice marks a request from an enrolled kiosk (device.go). UserID is
+	// then the caretaker named in X-Pjokk-Caretaker ("" on a read without
+	// one), MemberRole is always "member", and UserName is left empty — no
+	// handler reads it; a log's caretaker name comes from its own join.
+	IsDevice bool
+	DeviceID string
 }
 
 // contextKey keeps this package's context values from colliding with anyone
@@ -97,6 +112,7 @@ const (
 type identity struct {
 	session  *auth.Session
 	isAPIKey bool
+	device   *Device
 }
 
 func identityFrom(r *http.Request) (identity, bool) {
@@ -204,6 +220,10 @@ func RequireFamily(d Deps) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			id, _ := identityFrom(r)
+			if id.device != nil {
+				deviceFamily(d, w, r, id.device, next)
+				return
+			}
 			session := id.session
 			if session == nil {
 				respond.Error(w, http.StatusUnauthorized, "Not signed in", "UNAUTHENTICATED")
@@ -246,6 +266,42 @@ func RequireFamily(d Deps) func(http.Handler) http.Handler {
 	}
 }
 
+// deviceFamily is RequireFamily for a kiosk device (spec §4): the family is
+// the device's own, and the caretaker header names who gets the credit. A
+// write must name someone; whoever is named must be a member of that family
+// (a member removed since the kiosk loaded its list gets NOT_MEMBER). The
+// role is "member" even when the caretaker is a family admin — choosing
+// yourself on the kiosk grants nothing.
+func deviceFamily(d Deps, w http.ResponseWriter, r *http.Request, dev *Device, next http.Handler) {
+	caretaker := strings.TrimSpace(r.Header.Get(CaretakerHeader))
+	if caretaker == "" && !isRead(r.Method) {
+		respond.Error(w, http.StatusBadRequest, "Choose who is logging", "CARETAKER_REQUIRED")
+		return
+	}
+	if caretaker != "" {
+		_, err := d.Q.GetFamilyMembershipRole(r.Context(), gen.GetFamilyMembershipRoleParams{
+			OrganizationID: dev.FamilyID,
+			UserID:         caretaker,
+		})
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			respond.Error(w, http.StatusForbidden, "Not a member of this family", "NOT_MEMBER")
+			return
+		case err != nil:
+			respond.Error(w, http.StatusInternalServerError, "membership lookup failed", "INTERNAL")
+			return
+		}
+	}
+	family := FamilyCtx{
+		UserID:     caretaker,
+		FamilyID:   dev.FamilyID,
+		MemberRole: auth.RoleMember,
+		IsDevice:   true,
+		DeviceID:   dev.ID,
+	}
+	next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), familyKey, family)))
+}
+
 // IsAdminRole reports whether role is a family-administration role. "owner"
 // is accepted alongside "admin" for the reason RequireAdmin's comment gives.
 // Exported for handlers that gate ONE branch on the role (a help request
@@ -268,6 +324,13 @@ func RequireAdmin() func(http.Handler) http.Handler {
 			family := Family(r)
 			if family.IsAPIKey {
 				respond.Error(w, http.StatusForbidden, "Not available to API keys", "FORBIDDEN")
+				return
+			}
+			// A second guard: the device operation allowlist (internal/api)
+			// already keeps a kiosk off every admin route, and a device's
+			// role is "member" regardless of who is logging.
+			if family.IsDevice {
+				respond.Error(w, http.StatusForbidden, "Not available to devices", "FORBIDDEN")
 				return
 			}
 			if !IsAdminRole(family.MemberRole) {

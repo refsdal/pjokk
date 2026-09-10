@@ -539,7 +539,13 @@ func adaptMiddleware(mw func(http.Handler) http.Handler) gen.StrictMiddlewareFun
 // field added to middleware.Deps should be a compile error in one place, not
 // a silent nil in three.
 func (d Deps) mwDeps() middleware.Deps {
-	return middleware.Deps{Auth: d.Auth, Q: d.Q, RateLimit: d.RateLimit, Now: d.Now}
+	return middleware.Deps{
+		Auth:          d.Auth,
+		Q:             d.Q,
+		RateLimit:     d.RateLimit,
+		Now:           d.Now,
+		SecureCookies: strings.HasPrefix(d.AppURL, "https://"),
+	}
 }
 
 // authChain is the one gen.StrictMiddlewareFunc passed to gen.NewStrictHandler:
