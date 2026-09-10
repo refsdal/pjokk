@@ -54,12 +54,18 @@ function dayLabel(d: Date, now = new Date()): string {
 
 export function daySummary(entries: TimelineEntry[]): string {
   const feeds = entries.filter((e) => e.kind === "feed").length;
-  const naps = entries.filter((e) => e.kind === "sleep").length;
+  const sleeps = entries.filter((e) => e.kind === "sleep").length;
+  // A night is its own part, never a nap (lib/sleep-ui.ts has the split).
+  const nights = entries.filter(
+    (e) => e.kind === "sleep" && e.type === "night",
+  ).length;
+  const naps = sleeps - nights;
   const diapers = entries.filter((e) => e.kind === "diaper").length;
-  const other = entries.length - feeds - naps - diapers;
+  const other = entries.length - feeds - sleeps - diapers;
   const parts = [
     feeds > 0 ? `${feeds} ${feeds === 1 ? t("feed") : t("feeds")}` : null,
     naps > 0 ? `${naps} ${naps === 1 ? t("nap") : t("naps")}` : null,
+    nights > 0 ? `${nights} ${nights === 1 ? t("night") : t("nights")}` : null,
     diapers > 0
       ? `${diapers} ${diapers === 1 ? t("diaper") : t("diapers")}`
       : null,

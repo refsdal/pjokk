@@ -75,6 +75,8 @@ const nb: Record<string, string> = {
   Night: "Natt",
   "Night sleep": "Nattesøvn",
   night: "natt",
+  nights: "netter",
+  "night sleep": "nattesøvn",
   bottle: "flaske",
   breast: "bryst",
   "Longest stretch": "Lengste strekk",

@@ -2083,6 +2083,11 @@ export interface components {
             lastDiaper: components["schemas"]["DiaperLog"] | null;
             activeSleep: components["schemas"]["SleepLog"] | null;
             lastSleep: components["schemas"]["SleepLog"] | null;
+            /**
+             * Format: int32
+             * @description Minutes asleep last night: every completed `night` session of the newest completed night, where a night runs from local noon to noon and a session belongs to the night it started in (the rule StatsNight uses), so a real waking does not shrink the night to its last stretch. Null when there is no completed night session, or the newest one ended more than 24 hours ago. A running night has no length yet and is ignored.
+             */
+            lastNightMin: number | null;
             activePlay: components["schemas"]["PlayLog"] | null;
             /** @description The running nursing timer, or null (issue */
             activeFeed: components["schemas"]["FeedTimer"] | null;
@@ -2114,6 +2119,16 @@ export interface components {
                  * @description Sleep sessions with any part inside today's window, on the same rule sleepMin uses for minutes — an overnight sleep that ended this morning counts, a running one counts already.
                  */
                 sleeps: number;
+                /**
+                 * Format: int32
+                 * @description Of `sleeps`, the sessions NOT typed `night` — naps and untyped sessions (the two-tap happy path), the same split /api/stats uses for avgNaps. Backs the Home screen's "2 naps · 1:45 today".
+                 */
+                naps: number;
+                /**
+                 * Format: int32
+                 * @description Of `sleepMin`, the minutes of those same sessions, clipped to today's window on the same rule.
+                 */
+                napMin: number;
             };
         };
         MedicineCatalogueEntry: {

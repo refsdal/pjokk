@@ -9,6 +9,7 @@ import { clock, totalSeconds } from "./feed-timer-ui";
 import { t } from "./i18n";
 import { nextDoseFrom } from "./medicine-ui";
 import { formatClock } from "./time";
+import { sleepNoun } from "./sleep-ui";
 import { formatVolume, type Units } from "./units";
 
 // Pure view logic for the care station (spec §4–§6): what each card and
@@ -98,7 +99,7 @@ export function sleepCardView(
       state: "awake",
       headline: elapsedShort(end, now),
       detail: [
-        `${t("after a")} ${durationShort(end.getTime() - start.getTime())} ${t("nap")}`,
+        `${t("after a")} ${durationShort(end.getTime() - start.getTime())} ${sleepNoun(s.lastSleep.type)}`,
         s.lastSleep.location,
       ]
         .filter(Boolean)
