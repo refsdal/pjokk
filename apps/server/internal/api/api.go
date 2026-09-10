@@ -386,6 +386,13 @@ var operationAuthTiers = map[string]authTier{
 	"CreateApiKey": tierAdmin,
 	"RevokeApiKey": tierAdmin,
 
+	// Kiosk devices (devices.go): family administration, like the keys
+	// above — admins add and revoke the family's care stations.
+	"ListDevices":     tierAdmin,
+	"CreateDevice":    tierAdmin,
+	"RenewDeviceCode": tierAdmin,
+	"RevokeDevice":    tierAdmin,
+
 	// Invites (Task 20; REF §A1 invites.ts). ListInvites/CreateInvite/
 	// RevokeInvite are the family-admin management surface, same tier as
 	// API keys above. GetInviteInfo is tierPublic — the /join page's

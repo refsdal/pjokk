@@ -124,7 +124,10 @@ func (q *Queries) EnrolDevice(ctx context.Context, arg EnrolDeviceParams) (Enrol
 }
 
 const getDevice = `-- name: GetDevice :one
-SELECT id, family_id, name, created_by, created_at, enrol_code_hash, enrol_expires_at, token_hash, pin_hash, enrolled_at, last_used_at, revoked_at FROM "device" WHERE "id" = $1 AND "family_id" = $2
+SELECT d.id, d.family_id, d.name, d.created_by, d.created_at, d.enrol_code_hash, d.enrol_expires_at, d.token_hash, d.pin_hash, d.enrolled_at, d.last_used_at, d.revoked_at, COALESCE(u."display_name", u."name", '')::text AS created_by_name
+FROM "device" d
+JOIN "users" u ON u."id" = d."created_by"
+WHERE d."id" = $1 AND d."family_id" = $2
 `
 
 type GetDeviceParams struct {
@@ -132,9 +135,27 @@ type GetDeviceParams struct {
 	FamilyID string
 }
 
-func (q *Queries) GetDevice(ctx context.Context, arg GetDeviceParams) (Device, error) {
+type GetDeviceRow struct {
+	ID             string
+	FamilyID       string
+	Name           string
+	CreatedBy      string
+	CreatedAt      pgtype.Timestamptz
+	EnrolCodeHash  *string
+	EnrolExpiresAt pgtype.Timestamptz
+	TokenHash      *string
+	PinHash        *string
+	EnrolledAt     pgtype.Timestamptz
+	LastUsedAt     pgtype.Timestamptz
+	RevokedAt      pgtype.Timestamptz
+	CreatedByName  string
+}
+
+// The same shape as ListDevices' rows (so the handler converts one to the
+// other), for the create and renew responses.
+func (q *Queries) GetDevice(ctx context.Context, arg GetDeviceParams) (GetDeviceRow, error) {
 	row := q.db.QueryRow(ctx, getDevice, arg.ID, arg.FamilyID)
-	var i Device
+	var i GetDeviceRow
 	err := row.Scan(
 		&i.ID,
 		&i.FamilyID,
@@ -148,6 +169,7 @@ func (q *Queries) GetDevice(ctx context.Context, arg GetDeviceParams) (Device, e
 		&i.EnrolledAt,
 		&i.LastUsedAt,
 		&i.RevokedAt,
+		&i.CreatedByName,
 	)
 	return i, err
 }

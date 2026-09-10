@@ -28,7 +28,12 @@ WHERE d."family_id" = $1 AND d."revoked_at" IS NULL
 ORDER BY d."created_at" DESC;
 
 -- name: GetDevice :one
-SELECT * FROM "device" WHERE "id" = $1 AND "family_id" = $2;
+-- The same shape as ListDevices' rows (so the handler converts one to the
+-- other), for the create and renew responses.
+SELECT d.*, COALESCE(u."display_name", u."name", '')::text AS created_by_name
+FROM "device" d
+JOIN "users" u ON u."id" = d."created_by"
+WHERE d."id" = $1 AND d."family_id" = $2;
 
 -- name: RenewDeviceCode :execrows
 -- A new code for a device still waiting to be set up. Zero rows means
