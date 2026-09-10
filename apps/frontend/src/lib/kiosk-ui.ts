@@ -215,7 +215,10 @@ export type PinPadEvent =
   | { type: "digit"; d: string }
   | { type: "backspace" }
   | { type: "clear" }
-  | { type: "wrong" };
+  | { type: "wrong" }
+  // A server answer that is not "wrong PIN" (too many tries, no
+  // connection): shown, but not counted towards the pad's own lockout.
+  | { type: "message"; text: string };
 
 export function pinPadReducer(
   s: PinPadState,
@@ -232,5 +235,7 @@ export function pinPadReducer(
       return { ...s, digits: "", error: null };
     case "wrong":
       return { digits: "", wrong: s.wrong + 1, error: t("Wrong PIN") };
+    case "message":
+      return { ...s, digits: "", error: e.text };
   }
 }

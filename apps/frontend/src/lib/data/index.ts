@@ -8,6 +8,7 @@ import { registerPlayMutationDefaults } from "./play";
 export * from "./calendar";
 export * from "./config";
 export * from "./contacts";
+export * from "./devices";
 export * from "./family";
 export * from "./feed-timer";
 export * from "./help";

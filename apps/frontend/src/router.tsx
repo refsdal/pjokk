@@ -14,6 +14,7 @@ import { AppearanceProvider } from "@/lib/appearance";
 import { t } from "@/lib/i18n";
 import { HomeScreen } from "@/screens/Home";
 import { JoinScreen } from "@/screens/Join";
+import { KioskSetupScreen } from "@/screens/KioskSetup";
 import { LoginScreen } from "@/screens/Login";
 import { ProfileScreen } from "@/screens/Profile";
 import { SettingsScreen } from "@/screens/settings";
@@ -101,14 +102,21 @@ const profileRoute = createRoute({
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
-  validateSearch: (search: Record<string, unknown>): { redirect?: string } =>
-    typeof search.redirect === "string" ? { redirect: search.redirect } : {},
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { redirect?: string; notice?: string } => ({
+    ...(typeof search.redirect === "string"
+      ? { redirect: search.redirect }
+      : {}),
+    // "revoked": a kiosk tablet that lost its device (DeviceGate).
+    ...(typeof search.notice === "string" ? { notice: search.notice } : {}),
+  }),
   component: LoginRoute,
 });
 
 function LoginRoute() {
-  const { redirect } = loginRoute.useSearch();
-  return <LoginScreen redirectTo={redirect ?? "/home"} />;
+  const { redirect, notice } = loginRoute.useSearch();
+  return <LoginScreen redirectTo={redirect ?? "/home"} notice={notice} />;
 }
 
 const joinRoute = createRoute({
@@ -211,6 +219,22 @@ const kioskRoute = createRoute({
   component: lazyRouteComponent(() => import("@/screens/Kiosk"), "KioskRoute"),
 });
 
+// Enrolling a tablet as the family's kiosk (spec 2026-09-10-kiosk-devices
+// §7): outside every gate — the tablet has neither a session nor a device
+// yet. ?code= arrives from the Settings QR.
+const kioskSetupRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/kiosk/setup",
+  validateSearch: (search: Record<string, unknown>): { code?: string } =>
+    typeof search.code === "string" ? { code: search.code } : {},
+  component: KioskSetupRoute,
+});
+
+function KioskSetupRoute() {
+  const { code } = kioskSetupRoute.useSearch();
+  return <KioskSetupScreen initialCode={code} />;
+}
+
 export const routeTree = rootRoute.addChildren([
   rootIndexRoute,
   appRoute.addChildren([
@@ -226,6 +250,7 @@ export const routeTree = rootRoute.addChildren([
   joinRoute,
   welcomeRoute,
   kioskRoute,
+  kioskSetupRoute,
   adminRoute.addChildren([
     adminOverviewRoute,
     adminFamiliesRoute,

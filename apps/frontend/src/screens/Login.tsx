@@ -1,4 +1,4 @@
-import { Navigate, useNavigate } from "@tanstack/react-router";
+import { Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,13 @@ import { toast } from "@/lib/toast";
 
 // The provider list is a stacked column on purpose: a third button (Apple)
 // drops in without rework if a store build ever ships.
-export function LoginScreen({ redirectTo = "/home" }: { redirectTo?: string }) {
+export function LoginScreen({
+  redirectTo = "/home",
+  notice,
+}: {
+  redirectTo?: string;
+  notice?: string;
+}) {
   const { data: session, isPending } = useSession();
   const config = useConfig();
   const navigate = useNavigate();
@@ -71,6 +77,15 @@ export function LoginScreen({ redirectTo = "/home" }: { redirectTo?: string }) {
         <h1 className="mt-3 text-3xl font-extrabold text-ink">Pjokk</h1>
         <p className="mt-1 text-sm text-muted">{t("Family baby tracker")}</p>
       </div>
+
+      {notice === "revoked" && (
+        <p
+          role="status"
+          className="rounded-2xl bg-surface-2 px-4 py-3 text-center text-sm text-ink"
+        >
+          {t("This tablet is no longer a kiosk")}
+        </p>
+      )}
 
       {providers.length > 0 && (
         <div className="space-y-3">
@@ -146,6 +161,14 @@ export function LoginScreen({ redirectTo = "/home" }: { redirectTo?: string }) {
 
       <p className="text-center text-xs text-muted">
         {t("Pjokk is invite-only. Ask a family admin for an invite link.")}
+      </p>
+
+      {/* A shared tablet becomes the family's kiosk with a code from a
+          family admin's Settings (spec 2026-09-10-kiosk-devices §7). */}
+      <p className="text-center text-xs">
+        <Link to="/kiosk/setup" className="font-semibold text-accent">
+          {t("Set up as kiosk")}
+        </Link>
       </p>
 
       {/* Plain anchors, not <Link>: these pages left the SPA in the landing

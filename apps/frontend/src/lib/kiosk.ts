@@ -1,11 +1,13 @@
 import { useSyncExternalStore } from "react";
+import { resetCache } from "./query";
 
-// Kiosk mode's device state (spec §1): a flag and a PIN hash in
-// localStorage, like night mode and the nap guide. The PIN is a convenience
-// lock against toddlers and guests, not a security boundary — the tablet
-// holds a full session cookie regardless, and spec 3 replaces this with a
-// device credential. A tiny external store so the shell can redirect and
-// the AppearanceProvider can toggle the `kiosk` class.
+// Kiosk mode's device-side state (spec 2026-09-10-kiosk-devices §6). The
+// tablet's credential is the HttpOnly pjokk_device cookie, which script
+// cannot see, so what lives here is only what the SPA needs before the
+// server has answered: a routing flag, so every app route lands on /kiosk
+// at once (AppShell), and the PIN's length, so the pad knows when the last
+// digit is in. The PIN itself is checked by the server
+// (POST /api/device/unenrol) — it is no longer stored on the device.
 
 export type StorageLike = {
   getItem(k: string): string | null;
@@ -14,8 +16,10 @@ export type StorageLike = {
 };
 
 export const ON_KEY = "pjokk.kiosk.on";
-export const PIN_KEY = "pjokk.kiosk.pin";
 export const PIN_LEN_KEY = "pjokk.kiosk.pinlen";
+// Spec 2's local PIN hash. Nothing writes it any more; clearKioskFlags
+// removes it from a tablet that was a kiosk the old way.
+export const LEGACY_PIN_KEY = "pjokk.kiosk.pin";
 export const PIN_MIN = 4;
 export const PIN_MAX = 6;
 
@@ -35,15 +39,6 @@ function defaultStorage(): StorageLike {
 
 export function isValidPin(pin: string): boolean {
   return new RegExp(`^\\d{${PIN_MIN},${PIN_MAX}}$`).test(pin);
-}
-
-// Domain-separated so the stored value is never sha256(pin) itself.
-export async function hashPin(pin: string): Promise<string> {
-  const data = new TextEncoder().encode(`pjokk-kiosk:${pin}`);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return [...new Uint8Array(digest)]
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
 }
 
 export function isKioskOn(storage: StorageLike = defaultStorage()): boolean {
@@ -72,34 +67,39 @@ function notify() {
   for (const fn of listeners) fn();
 }
 
-export async function enableKiosk(
-  pin: string,
+/** Enrolment succeeded: this browser is now the family's kiosk. */
+export function markEnrolled(
+  pinLength: number,
   storage: StorageLike = defaultStorage(),
-): Promise<void> {
-  if (!isValidPin(pin)) throw new Error("PIN must be 4–6 digits");
-  const hash = await hashPin(pin);
-  storage.setItem(PIN_KEY, hash);
-  storage.setItem(PIN_LEN_KEY, String(pin.length));
+): void {
+  if (
+    !Number.isInteger(pinLength) ||
+    pinLength < PIN_MIN ||
+    pinLength > PIN_MAX
+  ) {
+    throw new Error("PIN must be 4–6 digits");
+  }
+  storage.setItem(PIN_LEN_KEY, String(pinLength));
   storage.setItem(ON_KEY, "1");
   on = true;
   notify();
 }
 
-export function disableKiosk(storage: StorageLike = defaultStorage()): void {
+/** Forget that this browser is a kiosk (including a spec-2 local PIN). */
+export function clearKioskFlags(storage: StorageLike = defaultStorage()): void {
   storage.removeItem(ON_KEY);
-  storage.removeItem(PIN_KEY);
   storage.removeItem(PIN_LEN_KEY);
+  storage.removeItem(LEGACY_PIN_KEY);
   on = false;
   notify();
 }
 
-export async function verifyPin(
-  pin: string,
-  storage: StorageLike = defaultStorage(),
-): Promise<boolean> {
-  const stored = storage.getItem(PIN_KEY);
-  if (!stored) return true; // no PIN recorded: nothing to guard
-  return (await hashPin(pin)) === stored;
+// Leaving, or being revoked: the flags AND everything cached, in memory and
+// on disk. One family's data does not stay on a tablet that is no longer
+// theirs.
+export async function leaveKiosk(): Promise<void> {
+  clearKioskFlags();
+  await resetCache();
 }
 
 function subscribe(fn: () => void) {

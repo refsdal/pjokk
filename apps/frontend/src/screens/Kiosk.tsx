@@ -1,6 +1,5 @@
 import type { MedicineCatalogueEntry } from "@pjokk/shared";
 import { IconBabyBottle, IconDiaper, IconMoon } from "@tabler/icons-react";
-import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { KioskAction } from "@/components/kiosk/KioskAction";
 import { KioskBand } from "@/components/kiosk/KioskBand";
@@ -31,9 +30,10 @@ import {
   useStopFeedTimer,
   useSummary,
   useWakeSleep,
+  unenrolDevice,
 } from "@/lib/data";
 import { t } from "@/lib/i18n";
-import { disableKiosk, storedPinLength } from "@/lib/kiosk";
+import { leaveKiosk, storedPinLength } from "@/lib/kiosk";
 import { useIdle, useWakeLock } from "@/lib/kiosk-screen";
 import {
   cautionFor,
@@ -53,16 +53,16 @@ import { napsLine } from "@/lib/sleep-ui";
 import { sleepTypeAt } from "@/lib/night";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import { formatVolume, useUnits } from "@/lib/units";
-import { AuthGate } from "@/screens/shell";
+import { DeviceGate } from "@/screens/kiosk/DeviceGate";
 
 // The care station (spec: kiosk mode). Everything here already exists in
 // the API: the screen is Home's data with one-tap actions on the cards and
 // an Undo instead of a sheet.
 export function KioskRoute() {
   return (
-    <AuthGate>
+    <DeviceGate>
       <KioskScreen />
-    </AuthGate>
+    </DeviceGate>
   );
 }
 
@@ -78,7 +78,6 @@ function useNow(intervalMs: number): Date {
 }
 
 export function KioskScreen() {
-  const navigate = useNavigate();
   const { babies, baby } = useSelectedBaby();
   const summary = useSummary(baby?.id);
   const feeds = useFeeds(baby?.id);
@@ -128,10 +127,12 @@ export function KioskScreen() {
 
   const [pad, setPad] = useState(false);
   const [lockedUntil, setLockedUntil] = useState(0);
+  // The server has un-enrolled the device (the pad's verify): forget
+  // everything and go to sign-in — a full load, so no family data survives
+  // in memory either.
   const leave = useCallback(() => {
-    disableKiosk();
-    void navigate({ to: "/home" });
-  }, [navigate]);
+    void leaveKiosk().then(() => window.location.assign("/login"));
+  }, []);
   const lockout = useCallback(() => {
     setPad(false);
     setLockedUntil(Date.now() + PIN_LOCKOUT_MS);
@@ -140,6 +141,7 @@ export function KioskScreen() {
   const pinPad = pad && (
     <KioskPinPad
       length={storedPinLength() ?? 4}
+      verify={unenrolDevice}
       onSuccess={leave}
       onCancel={closePad}
       onLockout={lockout}

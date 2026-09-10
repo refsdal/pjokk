@@ -660,6 +660,24 @@ const nb: Record<string, string> = {
   "last dose": "siste dose",
   "Log dose": "Logg dose",
   "Leave kiosk mode": "Forlat kioskmodus",
+  // Kiosk devices (spec 2026-09-10-kiosk-devices)
+  "Set up as kiosk": "Sett opp som kiosk",
+  "This tablet is no longer a kiosk":
+    "Dette nettbrettet er ikke lenger en kiosk",
+  "Kiosk mode now needs a device — Settings → Family → Devices":
+    "Kioskmodus krever nå en enhet — Innstillinger → Familie → Enheter",
+  "Enter the code from Settings → Family → Devices on a family admin's phone, then choose a PIN. The PIN is asked for when leaving kiosk mode.":
+    "Skriv inn koden fra Innstillinger → Familie → Enheter på telefonen til en familieadministrator, og velg en PIN. PIN-en trengs for å forlate kioskmodus.",
+  Code: "Kode",
+  "That code is not valid. Ask for a new one.":
+    "Koden er ikke gyldig. Be om en ny.",
+  "Too many tries — wait a few minutes":
+    "For mange forsøk — vent noen minutter",
+  "Setting up needs a connection": "Oppsettet trenger nettforbindelse",
+  "Leaving needs a connection":
+    "Du trenger nettforbindelse for å forlate kioskmodus",
+  "Could not leave kiosk mode": "Kunne ikke forlate kioskmodus",
+  "Back to sign-in": "Tilbake til innlogging",
   "Enter the kiosk PIN": "Skriv inn kiosk-PIN",
   PIN: "PIN",
   Backspace: "Slett",
