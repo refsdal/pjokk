@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { signIn, signUp, useSession } from "@/lib/auth-client";
 import { useConfig } from "@/lib/data";
+import { useKiosk } from "@/lib/kiosk";
 import { t } from "@/lib/i18n";
 import { oauthProviderLabels } from "@/lib/oauth";
 import { legalUrl } from "@/lib/site";
@@ -25,7 +26,11 @@ export function LoginScreen({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const kiosk = useKiosk();
 
+  // An enrolled kiosk tablet never offers sign-in (spec 2026-09-10-kiosk-
+  // devices §4); leaving or being revoked clears the flag before landing here.
+  if (kiosk) return <Navigate to="/kiosk" />;
   if (!isPending && session) {
     return <Navigate to={redirectTo} />;
   }

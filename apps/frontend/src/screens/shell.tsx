@@ -96,7 +96,15 @@ export function AuthGate({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+// While kiosk is on, the device IS the kiosk: every app route lands on the
+// care station (a reload, a manifest shortcut, a push action). Checked
+// BEFORE AuthGate: an enrolled tablet holds no person's session (spec
+// 2026-09-10-kiosk-devices), so the session gate would otherwise send it to
+// sign-in first. /login redirects it too; /join, /welcome and /admin are
+// outside this shell and untouched.
 export function AppShell() {
+  const kiosk = useKiosk();
+  if (kiosk) return <Navigate to="/kiosk" />;
   return (
     <AuthGate>
       <AppChrome />
@@ -104,13 +112,8 @@ export function AppShell() {
   );
 }
 
-// While kiosk is on, the device IS the kiosk: every app route lands on the
-// care station (a reload, a manifest shortcut, a push action). /login,
-// /join, /welcome and /admin are outside this shell and untouched.
 function AppChrome() {
   const me = useMe();
-  const kiosk = useKiosk();
-  if (kiosk) return <Navigate to="/kiosk" />;
 
   const { impersonatedBy, name } = me.data ?? {};
 
