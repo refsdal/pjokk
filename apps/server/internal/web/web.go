@@ -100,6 +100,13 @@ func Handler(apiHandler http.Handler) http.Handler {
 		// beats serving 500s for every request with no explanation.
 		panic(fmt.Sprintf("web: dist embed is broken: %v", err))
 	}
+	return handler(assets, apiHandler)
+}
+
+// handler is Handler over any asset tree. The embedded one is a placeholder
+// holding only index.html until the image build overlays the real SPA, so
+// tests pass a fixture shaped like `vite build` output instead.
+func handler(assets fs.FS, apiHandler http.Handler) http.Handler {
 	assetServer := http.FileServer(http.FS(assets))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -140,8 +147,25 @@ func servedAsFile(assets fs.FS, assetServer http.Handler, w http.ResponseWriter,
 	if err != nil || info.IsDir() {
 		return false
 	}
+	w.Header().Set("Cache-Control", cacheControl(name))
 	assetServer.ServeHTTP(w, r)
 	return true
+}
+
+// cacheControl is the Cache-Control header for a file in the asset tree.
+// Vite names everything it emits under assets/ by content hash (and public/
+// has no assets/ directory to put an unhashed file there), so a new build
+// is a new URL and the old one can be cached forever. Everything else —
+// index.html, sw.js, push-sw.js, theme-init.js, the manifest, the icons —
+// keeps its name across deploys and must be revalidated, or a proxy that
+// caches by file extension could serve the previous build's copy after a
+// deploy. A chunk that no longer exists never gets here: it falls back to
+// index.html, which is no-cache, so HTML is never pinned at an asset URL.
+func cacheControl(name string) string {
+	if strings.HasPrefix(name, "assets/") {
+		return "public, max-age=31536000, immutable"
+	}
+	return "no-cache"
 }
 
 func serveIndex(assets fs.FS, w http.ResponseWriter) {
@@ -153,6 +177,7 @@ func serveIndex(assets fs.FS, w http.ResponseWriter) {
 		http.Error(w, "index.html missing from embedded build", http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(data)
