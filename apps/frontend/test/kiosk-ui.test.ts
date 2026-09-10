@@ -68,6 +68,8 @@ describe("totalsLines", () => {
           dry: 0,
           sleepMin: 125,
           sleeps: 2,
+          naps: 2,
+          napMin: 125,
         },
         "metric",
       ),
@@ -79,6 +81,7 @@ const sleep = (
   startTime: string,
   endTime: string | null,
   location = "crib",
+  type: "nap" | "night" = "nap",
 ): SleepLog =>
   ({
     id: "s1",
@@ -88,7 +91,7 @@ const sleep = (
     startTime,
     endTime,
     location,
-    type: "nap",
+    type,
     notes: null,
   }) as unknown as SleepLog;
 
@@ -105,6 +108,22 @@ describe("sleepCardView", () => {
     expect(v.headline).toBe("1 h 10 min");
     expect(v.detail).toContain("45 min");
     expect(v.detail).toContain("crib");
+  });
+  it("names a night sleep as one, not as a nap", () => {
+    const v = sleepCardView(
+      {
+        activeSleep: null,
+        lastSleep: sleep(
+          "2026-09-07T19:30:00",
+          "2026-09-08T06:30:00",
+          "crib",
+          "night",
+        ),
+      },
+      NOW,
+    );
+    expect(v.detail).toContain("night sleep");
+    expect(v.detail).not.toContain(" nap");
   });
   it("reads the running session while sleeping", () => {
     const v = sleepCardView(

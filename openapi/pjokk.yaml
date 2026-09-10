@@ -4590,6 +4590,7 @@ components:
         - lastDiaper
         - activeSleep
         - lastSleep
+        - lastNightMin
         - activePlay
         - activeFeed
         - activePump
@@ -4613,6 +4614,18 @@ components:
           allOf:
             - $ref: "#/components/schemas/SleepLog"
           nullable: true
+        lastNightMin:
+          type: integer
+          format: int32
+          nullable: true
+          description: >-
+            Minutes asleep last night: every completed `night` session of
+            the newest completed night, where a night runs from local noon
+            to noon and a session belongs to the night it started in (the
+            rule StatsNight uses), so a real waking does not shrink the
+            night to its last stretch. Null when there is no completed
+            night session, or the newest one ended more than 24 hours ago.
+            A running night has no length yet and is ignored.
         activePlay:
           allOf:
             - $ref: "#/components/schemas/PlayLog"
@@ -4646,7 +4659,7 @@ components:
           nullable: true
         today:
           type: object
-          required: [feeds, intakeMl, solidsG, wet, dirty, both, dry, sleepMin, sleeps]
+          required: [feeds, intakeMl, solidsG, wet, dirty, both, dry, sleepMin, sleeps, naps, napMin]
           properties:
             feeds:
               type: integer
@@ -4679,6 +4692,20 @@ components:
                 Sleep sessions with any part inside today's window, on the
                 same rule sleepMin uses for minutes — an overnight sleep that
                 ended this morning counts, a running one counts already.
+            naps:
+              type: integer
+              format: int32
+              description: >-
+                Of `sleeps`, the sessions NOT typed `night` — naps and
+                untyped sessions (the two-tap happy path), the same split
+                /api/stats uses for avgNaps. Backs the Home screen's
+                "2 naps · 1:45 today".
+            napMin:
+              type: integer
+              format: int32
+              description: >-
+                Of `sleepMin`, the minutes of those same sessions, clipped to
+                today's window on the same rule.
     MedicineCatalogueEntry:
       type: object
       required: [id, name, defaultAmount, unit, minIntervalMin, isSupplement, archived, lastDoseAt]

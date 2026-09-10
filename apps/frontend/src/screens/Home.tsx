@@ -60,6 +60,7 @@ import {
 import { t } from "@/lib/i18n";
 import { describeNapWindow, napWindow, useNapGuide } from "@/lib/nap-window";
 import { useResumableSleep } from "@/lib/sleep-resume";
+import { napsLine, sleepNoun } from "@/lib/sleep-ui";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import { formatDuration, formatElapsed } from "@/lib/time";
 import { useAppearance } from "@/lib/appearance";
@@ -389,8 +390,10 @@ export function HomeScreen() {
                 detail={`${formatDuration(
                   new Date(s.lastSleep.endTime).getTime() -
                     new Date(s.lastSleep.startTime).getTime(),
-                )} ${t("nap")}`}
-                sub={`${s.today.sleeps} ${s.today.sleeps === 1 ? t("nap") : t("naps")} · ${formatDuration(s.today.sleepMin * 60_000)} ${t("today")}`}
+                )} ${sleepNoun(s.lastSleep.type)}`}
+                sub={napsLine(s.today, s.lastNightMin, (min) =>
+                  formatDuration(min * 60_000),
+                )}
                 note={nap ? describeNapWindow(nap) : undefined}
                 tintClass="text-sleep"
                 onClick={() => setSheet("sleep")}

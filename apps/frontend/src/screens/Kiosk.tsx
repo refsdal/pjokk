@@ -37,6 +37,7 @@ import { disableKiosk, storedPinLength } from "@/lib/kiosk";
 import { useIdle, useWakeLock } from "@/lib/kiosk-screen";
 import {
   cautionFor,
+  durationShort,
   elapsedShort,
   feedCardView,
   lastBottle,
@@ -48,6 +49,7 @@ import {
 } from "@/lib/kiosk-ui";
 import { describeNapWindow, napWindow, useNapGuide } from "@/lib/nap-window";
 import { useResumableSleep } from "@/lib/sleep-resume";
+import { napsLine } from "@/lib/sleep-ui";
 import { sleepTypeAt } from "@/lib/night";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import { formatVolume, useUnits } from "@/lib/units";
@@ -265,7 +267,9 @@ export function KioskScreen() {
           sub={
             night || !s
               ? null
-              : `${s.today.sleeps} ${s.today.sleeps === 1 ? t("nap") : t("naps")} ${t("today")}`
+              : napsLine(s.today, s.lastNightMin, (min) =>
+                  durationShort(min * 60_000),
+                )
           }
           tone={sleepView.state === "sleeping" ? "live" : "normal"}
         >

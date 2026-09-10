@@ -2793,7 +2793,10 @@ type Summary struct {
 	ActiveSleep *SleepLog  `json:"activeSleep"`
 	LastDiaper  *DiaperLog `json:"lastDiaper"`
 	LastFeed    *FeedLog   `json:"lastFeed"`
-	LastSleep   *SleepLog  `json:"lastSleep"`
+
+	// LastNightMin Minutes asleep last night: every completed `night` session of the newest completed night, where a night runs from local noon to noon and a session belongs to the night it started in (the rule StatsNight uses), so a real waking does not shrink the night to its last stretch. Null when there is no completed night session, or the newest one ended more than 24 hours ago. A running night has no length yet and is ignored.
+	LastNightMin *int32    `json:"lastNightMin"`
+	LastSleep    *SleepLog `json:"lastSleep"`
 
 	// LastTemperature The newest `temperature` measurement, or null. Specifically the newest of that TYPE, not the newest measurement — a weight taken after a temperature must not displace it. Backs the Home screen's temperature card.
 	LastTemperature *MeasurementLog `json:"lastTemperature"`
@@ -2806,6 +2809,12 @@ type Summary struct {
 		Dry      int32 `json:"dry"`
 		Feeds    int32 `json:"feeds"`
 		IntakeMl int32 `json:"intakeMl"`
+
+		// NapMin Of `sleepMin`, the minutes of those same sessions, clipped to today's window on the same rule.
+		NapMin int32 `json:"napMin"`
+
+		// Naps Of `sleeps`, the sessions NOT typed `night` — naps and untyped sessions (the two-tap happy path), the same split /api/stats uses for avgNaps. Backs the Home screen's "2 naps · 1:45 today".
+		Naps     int32 `json:"naps"`
 		SleepMin int32 `json:"sleepMin"`
 
 		// Sleeps Sleep sessions with any part inside today's window, on the same rule sleepMin uses for minutes — an overnight sleep that ended this morning counts, a running one counts already.

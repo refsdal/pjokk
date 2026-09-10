@@ -21,14 +21,18 @@ const feed = (time: string): TimelineEntry =>
     caretakerId: "u1",
     caretakerName: "Anders",
   }) as unknown as TimelineEntry;
-const sleep = (startTime: string, endTime: string | null): TimelineEntry =>
+const sleep = (
+  startTime: string,
+  endTime: string | null,
+  type: "nap" | "night" | null = "nap",
+): TimelineEntry =>
   ({
     kind: "sleep",
     id: `s-${startTime}`,
     startTime,
     endTime,
     location: null,
-    type: "nap",
+    type,
     notes: null,
     caretakerId: "u1",
     caretakerName: "Anders",
@@ -56,5 +60,16 @@ describe("daySummary", () => {
         sleep("2026-09-08T10:52:00", "2026-09-08T11:37:00"),
       ]),
     ).toBe("2 feeds · 1 nap");
+  });
+
+  it("gives a night its own part, never counting it as a nap or as other", () => {
+    expect(
+      daySummary([
+        feed("2026-09-08T12:48:00"),
+        sleep("2026-09-08T10:52:00", "2026-09-08T11:37:00"),
+        sleep("2026-09-08T08:00:00", "2026-09-08T08:30:00", null),
+        sleep("2026-09-07T19:30:00", "2026-09-08T06:30:00", "night"),
+      ]),
+    ).toBe("1 feed · 2 naps · 1 night");
   });
 });

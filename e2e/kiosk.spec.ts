@@ -41,6 +41,15 @@ test("a kiosk device lands on the care station and logs a diaper with undo", asy
 });
 
 test("sleep and wake from the card", async ({ page, request }) => {
+  // The card types a sleep from the night-mode schedule (#43), and only a
+  // nap is counted below: a schedule with no night keeps it one at any hour.
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem("pjokk.night.schedule", JSON.stringify({ startHour: 0, endHour: 0 }));
+    } catch {
+      // storage unavailable
+    }
+  });
   await freshFamily(page, request, "kiosk-sleep", /\/kiosk/);
   const card = page.getByTestId("kiosk-sleep");
   await card.getByRole("button", { name: "Sleep" }).click();

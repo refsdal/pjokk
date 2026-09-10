@@ -54,7 +54,7 @@ func floorDivInt64(a, b int64) int64 {
 
 // GetSummary implements GET /api/summary. REF: "{lastFeed, lastDiaper,
 // activeSleep, lastSleep, activePlay, lastTemperature, openHelp, today} /
-// 404 unknown baby".
+// 404 unknown baby", plus lastNightMin (not in the TS route).
 func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (gen.GetSummaryResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	babyID := req.Params.BabyId
@@ -176,7 +176,12 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 	if err != nil {
 		return nil, err
 	}
-	sleeps, err := d.Q.SleepsInRange(ctx, dbgen.SleepsInRangeParams{FamilyID: fam.FamilyID, BabyID: babyID, FromTs: fromTS, ToTs: toTS})
+	// Read from three days back, not from today's start: lastNightMin needs
+	// the newest night (ended up to a day ago) and every session of its
+	// noon-to-noon night. The today loop below clips to [rangeFrom, now]
+	// and skips anything that ends before it, so the extra rows never leak
+	// into today's counts.
+	sleeps, err := d.Q.SleepsInRange(ctx, dbgen.SleepsInRangeParams{FamilyID: fam.FamilyID, BabyID: babyID, FromTs: ts(time.UnixMilli(now - 3*summaryDayMs)), ToTs: toTS})
 	if err != nil {
 		return nil, err
 	}
@@ -187,6 +192,8 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		Dry      int32
 		Feeds    int32
 		IntakeMl int32
+		NapMin   int32
+		Naps     int32
 		SleepMin int32
 		Sleeps   int32
 		SolidsG  int32
@@ -237,7 +244,41 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		if to > from {
 			today.SleepMin += int32(roundDiv(to-from, 60_000))
 			today.Sleeps++
+			// A nap is any session not typed night — untyped sessions are
+			// the two-tap happy path — the split stats.go uses for avgNaps.
+			if sl.Type == nil || *sl.Type != "night" {
+				today.NapMin += int32(roundDiv(to-from, 60_000))
+				today.Naps++
+			}
 		}
+	}
+
+	// Last night: the newest COMPLETED night session, if it ended within the
+	// last day, and every completed night session of the same night — a
+	// night runs from local noon to noon and a session belongs to the night
+	// it started in (stats.go's nightIndex), so a real 3 am waking does not
+	// shrink the night to its last stretch.
+	nightIndex := func(utcMs int64) int64 { return floorDivInt64(utcMs-tzMs-summaryDayMs/2, summaryDayMs) }
+	isCompletedNight := func(sl dbgen.SleepsInRangeRow) bool {
+		return sl.Type != nil && *sl.Type == "night" && sl.EndTime.Valid
+	}
+	var newestNight *dbgen.SleepsInRangeRow
+	for i, sl := range sleeps {
+		if isCompletedNight(sl) && (newestNight == nil || sl.StartTime.Time.After(newestNight.StartTime.Time)) {
+			newestNight = &sleeps[i]
+		}
+	}
+	var lastNightMin *int32
+	if newestNight != nil && now-newestNight.EndTime.Time.UnixMilli() <= summaryDayMs {
+		idx := nightIndex(newestNight.StartTime.Time.UnixMilli())
+		var ms int64
+		for _, sl := range sleeps {
+			if isCompletedNight(sl) && nightIndex(sl.StartTime.Time.UnixMilli()) == idx {
+				ms += sl.EndTime.Time.UnixMilli() - sl.StartTime.Time.UnixMilli()
+			}
+		}
+		v := int32(roundDiv(ms, 60_000))
+		lastNightMin = &v
 	}
 
 	return gen.GetSummary200JSONResponse{
@@ -245,6 +286,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		LastDiaper:      lastDiaper,
 		ActiveSleep:     activeSleep,
 		LastSleep:       lastSleep,
+		LastNightMin:    lastNightMin,
 		ActivePlay:      activePlay,
 		ActiveFeed:      activeFeed,
 		ActivePump:      activePump,
@@ -256,6 +298,8 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 			Dry      int32 `json:"dry"`
 			Feeds    int32 `json:"feeds"`
 			IntakeMl int32 `json:"intakeMl"`
+			NapMin   int32 `json:"napMin"`
+			Naps     int32 `json:"naps"`
 			SleepMin int32 `json:"sleepMin"`
 			Sleeps   int32 `json:"sleeps"`
 			SolidsG  int32 `json:"solidsG"`
@@ -266,6 +310,8 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 			Dry:      today.Dry,
 			Feeds:    today.Feeds,
 			IntakeMl: today.IntakeMl,
+			NapMin:   today.NapMin,
+			Naps:     today.Naps,
 			SleepMin: today.SleepMin,
 			Sleeps:   today.Sleeps,
 			SolidsG:  today.SolidsG,

@@ -5,6 +5,9 @@ test("starts a sleep session, sees the banner, wakes", async ({ page, request })
   await freshFamily(page, request, "sleep");
 
   await page.getByRole("button", { name: "Sleep", exact: true }).click();
+  // A nap whatever the clock: the sheet defaults the type from the
+  // night-mode schedule (#43), and a night sleep is not one of today's naps.
+  await page.getByRole("button", { name: "Nap", exact: true }).click();
   // Starting a session is "Start sleep"; "Save" belongs to the edit sheet.
   await page.getByRole("button", { name: "Start sleep" }).click();
 
@@ -160,4 +163,26 @@ test("in night mode, the Sleep row splits into Resume and Sleep after a wake", a
   await page.getByRole("button", { name: "Resume", exact: true }).click();
   await expect(page.getByRole("button", { name: "Wake" })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByRole("button", { name: "Resume", exact: true })).toHaveCount(0);
+});
+
+test("the awake card counts naps only and adds last night; the timeline gives the night its own part", async ({
+  page,
+  request,
+}) => {
+  await freshFamily(page, request, "sleep-naps");
+  const babyId = await firstBabyId(page);
+  // An hour-long night that ended three hours ago, then an hour-long nap
+  // that ended two minutes ago (so it is today's unless run in the first two
+  // minutes after midnight).
+  await logSleep(page, babyId, 180, "night");
+  await logSleep(page, babyId, 2, "nap");
+  await page.reload();
+
+  // The night is last night's hour, not one of today's naps.
+  await expect(page.getByText(/^1 nap · \d+:\d\d today · night 1:00$/)).toBeVisible({
+    timeout: 10_000,
+  });
+
+  await page.goto("/timeline");
+  await expect(page.getByText(/\b1 night\b/)).toBeVisible({ timeout: 10_000 });
 });

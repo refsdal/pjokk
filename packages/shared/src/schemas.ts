@@ -504,6 +504,9 @@ export const SummarySchema = z.object({
   lastDiaper: DiaperLogSchema.nullable(),
   activeSleep: SleepLogSchema.nullable(),
   lastSleep: SleepLogSchema.nullable(),
+  // Minutes asleep last night (every completed night session of the newest
+  // night, noon to noon), or null when none ended in the last 24 hours.
+  lastNightMin: z.number().int().nullable(),
   // The running timed activity (tummy time, a walk), or null.
   activePlay: PlayLogSchema.nullable(),
   // The running nursing / pump timers, or null (issue #44).
@@ -527,6 +530,10 @@ export const SummarySchema = z.object({
     sleepMin: z.number().int(),
     // Sessions with any part inside today, on the same rule as sleepMin.
     sleeps: z.number().int(),
+    // Of those, the ones not typed night (untyped counts as a nap), and
+    // their minutes — the awake card's "2 naps · 1:45 today".
+    naps: z.number().int(),
+    napMin: z.number().int(),
   }),
 });
 
