@@ -194,10 +194,17 @@ func (d Deps) deleteAvatar(w http.ResponseWriter, r *http.Request) {
 
 func (d Deps) getUserAvatar(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	viewer := middleware.SessionFromContext(ctx)
 	target := r.PathValue("id")
 
-	key, err := d.Q.GetAvatarForViewer(ctx, dbgen.GetAvatarForViewerParams{TargetID: target, ViewerID: viewer.UserID})
+	var key *string
+	var err error
+	if dev := middleware.DeviceFromContext(ctx); dev != nil {
+		// A kiosk sees the faces of its own family's members, nobody else's.
+		key, err = d.Q.GetAvatarForFamilyMember(ctx, dbgen.GetAvatarForFamilyMemberParams{TargetID: target, FamilyID: dev.FamilyID})
+	} else {
+		viewer := middleware.SessionFromContext(ctx)
+		key, err = d.Q.GetAvatarForViewer(ctx, dbgen.GetAvatarForViewerParams{TargetID: target, ViewerID: viewer.UserID})
+	}
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && key == nil) {
 		respond.Error(w, http.StatusNotFound, "Not found", "NOT_FOUND")
 		return
@@ -248,9 +255,36 @@ func sessionChain(d Deps) func(http.Handler) http.Handler {
 	}
 }
 
-// mountAvatarRoutes registers the three avatar handlers on mux behind chain.
-func (d Deps) mountAvatarRoutes(mux *http.ServeMux, chain func(http.Handler) http.Handler) {
+// avatarReadChain is sessionChain for the avatar READ only, which a kiosk
+// device also needs: its caretaker row shows the family's faces
+// (docs/superpowers/specs/2026-09-10-kiosk-devices-design.md §4). A device
+// has no session, so the gate accepts either; getUserAvatar then scopes a
+// device to members of its own family. Upload and delete stay on
+// sessionChain — they are a person's, not the family's.
+func avatarReadChain(d Deps) func(http.Handler) http.Handler {
+	mwDeps := d.mwDeps()
+	apiKey := middleware.APIKeyAuth(mwDeps)
+	device := middleware.DeviceAuth(mwDeps)
+	session := middleware.Session(mwDeps)
+	rejectAPIKey := middleware.RejectAPIKey()
+	sessionOrDevice := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if middleware.SessionFrom(r) == nil && !middleware.IsDevice(r) {
+				respond.Error(w, http.StatusUnauthorized, "Not signed in", "UNAUTHENTICATED")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+	return func(h http.Handler) http.Handler {
+		return apiKey(device(session(sessionOrDevice(rejectAPIKey(h)))))
+	}
+}
+
+// mountAvatarRoutes registers the three avatar handlers on mux: the upload
+// and delete behind chain, the read behind readChain.
+func (d Deps) mountAvatarRoutes(mux *http.ServeMux, chain, readChain func(http.Handler) http.Handler) {
 	mux.Handle("PUT /api/me/avatar", chain(http.HandlerFunc(d.putAvatar)))
 	mux.Handle("DELETE /api/me/avatar", chain(http.HandlerFunc(d.deleteAvatar)))
-	mux.Handle("GET /api/users/{id}/avatar", chain(http.HandlerFunc(d.getUserAvatar)))
+	mux.Handle("GET /api/users/{id}/avatar", readChain(http.HandlerFunc(d.getUserAvatar)))
 }

@@ -11,6 +11,30 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getAvatarForFamilyMember = `-- name: GetAvatarForFamilyMember :one
+SELECT u."avatar_key"
+FROM "users" u
+JOIN "organization_members" om ON om."user_id" = u."id"
+WHERE u."id" = $1
+  AND om."organization_id" = $2
+  AND u."avatar_key" IS NOT NULL
+`
+
+type GetAvatarForFamilyMemberParams struct {
+	TargetID string
+	FamilyID string
+}
+
+// GetAvatarForViewer for a kiosk device (spec 2026-09-10-kiosk-devices
+// §4): the target's photo when they are a member of the device's family.
+// Same 404-either-way contract — no row for a stranger or a missing photo.
+func (q *Queries) GetAvatarForFamilyMember(ctx context.Context, arg GetAvatarForFamilyMemberParams) (*string, error) {
+	row := q.db.QueryRow(ctx, getAvatarForFamilyMember, arg.TargetID, arg.FamilyID)
+	var avatar_key *string
+	err := row.Scan(&avatar_key)
+	return avatar_key, err
+}
+
 const getAvatarForViewer = `-- name: GetAvatarForViewer :one
 SELECT u."avatar_key"
 FROM "users" u
