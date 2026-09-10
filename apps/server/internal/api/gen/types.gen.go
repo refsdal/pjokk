@@ -596,6 +596,24 @@ func (e CreateSleepType) Valid() bool {
 	}
 }
 
+// Defines values for DeviceStatus.
+const (
+	Active  DeviceStatus = "active"
+	Pending DeviceStatus = "pending"
+)
+
+// Valid indicates whether the value is a known member of the DeviceStatus enum.
+func (e DeviceStatus) Valid() bool {
+	switch e {
+	case Active:
+		return true
+	case Pending:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DiaperLogColor.
 const (
 	DiaperLogColorBlack  DiaperLogColor = "black"
@@ -2013,6 +2031,11 @@ type CreateContact struct {
 // CreateContactIcon defines model for CreateContact.Icon.
 type CreateContactIcon string
 
+// CreateDevice defines model for CreateDevice.
+type CreateDevice struct {
+	Name string `json:"name"`
+}
+
 // CreateDiaper defines model for CreateDiaper.
 type CreateDiaper struct {
 	BabyId      string                   `json:"babyId"`
@@ -2209,6 +2232,37 @@ type CreateVaccine struct {
 type CreateVaccineDismissal struct {
 	BabyId  string `json:"babyId"`
 	SlotKey string `json:"slotKey"`
+}
+
+// Device A kiosk device. Pending until a tablet redeems its one-time code, active after. Key material (code, token, PIN) is never included.
+type Device struct {
+	// CodeExpiresAt When a pending device's current code stops working; null once set up.
+	CodeExpiresAt *time.Time `json:"codeExpiresAt"`
+	CreatedAt     time.Time  `json:"createdAt"`
+
+	// CreatedByName Display name of the admin who added the device.
+	CreatedByName string       `json:"createdByName"`
+	EnrolledAt    *time.Time   `json:"enrolledAt"`
+	Id            string       `json:"id"`
+	LastUsedAt    *time.Time   `json:"lastUsedAt"`
+	Name          string       `json:"name"`
+	Status        DeviceStatus `json:"status"`
+}
+
+// DeviceStatus defines model for Device.Status.
+type DeviceStatus string
+
+// DeviceCode A device's one-time set-up code, returned exactly once.
+type DeviceCode struct {
+	// Code 8 characters from the invite-code alphabet.
+	Code string `json:"code"`
+
+	// Device A kiosk device. Pending until a tablet redeems its one-time code, active after. Key material (code, token, PIN) is never included.
+	Device    Device    `json:"device"`
+	ExpiresAt time.Time `json:"expiresAt"`
+
+	// SetupUrl APP_URL/kiosk/setup?code=… — what the Settings QR encodes.
+	SetupUrl string `json:"setupUrl"`
 }
 
 // DiaperLog defines model for DiaperLog.
@@ -3355,6 +3409,9 @@ type CreateContactJSONRequestBody = CreateContact
 
 // UpdateContactJSONRequestBody defines body for UpdateContact for application/json ContentType.
 type UpdateContactJSONRequestBody = UpdateContact
+
+// CreateDeviceJSONRequestBody defines body for CreateDevice for application/json ContentType.
+type CreateDeviceJSONRequestBody = CreateDevice
 
 // CreateDiaperJSONRequestBody defines body for CreateDiaper for application/json ContentType.
 type CreateDiaperJSONRequestBody = CreateDiaper

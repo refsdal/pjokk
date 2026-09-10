@@ -137,6 +137,18 @@ type ServerInterface interface {
 	// UpdateContact Partial update. `role`/`icon`/`phone`/`email`/`website`/`notes` may be sent as `null` to CLEAR that column; `name` is not nullable — only settable or omitted. `babyIds`, when present, REPLACES the link set; omitted leaves it untouched.
 	// (PATCH /api/contacts/{id})
 	UpdateContact(w http.ResponseWriter, r *http.Request, id IdPath)
+	// ListDevices The family's kiosk devices that are waiting to be set up or active, newest first; revoked devices are not listed. Family admin only; refused for API keys and devices.
+	// (GET /api/devices)
+	ListDevices(w http.ResponseWriter, r *http.Request)
+	// CreateDevice Add a kiosk device (docs/superpowers/specs/2026-09-10-kiosk-devices- design.md). Returns a one-time code — 8 characters, valid 15 minutes, shown once and stored only as a hash — that a tablet enters on /kiosk/setup. At most 10 devices per family that are not revoked. Family admin only; refused for API keys and devices.
+	// (POST /api/devices)
+	CreateDevice(w http.ResponseWriter, r *http.Request)
+	// RevokeDevice Revoke a device, pending or active. Its cookie stops working on the tablet's next request. Family admin only; refused for API keys and devices.
+	// (DELETE /api/devices/{id})
+	RevokeDevice(w http.ResponseWriter, r *http.Request, id IdPath)
+	// RenewDeviceCode A new one-time code for a device that has not been set up yet; the previous code stops working. Family admin only; refused for API keys and devices.
+	// (POST /api/devices/{id}/code)
+	RenewDeviceCode(w http.ResponseWriter, r *http.Request, id IdPath)
 	// ListDiapers Diaper logs in the caller's active family, newest first.
 	// (GET /api/diapers)
 	ListDiapers(w http.ResponseWriter, r *http.Request, params ListDiapersParams)
@@ -1376,6 +1388,86 @@ func (siw *ServerInterfaceWrapper) UpdateContact(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateContact(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDevices operation middleware
+func (siw *ServerInterfaceWrapper) ListDevices(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDevices(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateDevice operation middleware
+func (siw *ServerInterfaceWrapper) CreateDevice(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateDevice(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeDevice operation middleware
+func (siw *ServerInterfaceWrapper) RevokeDevice(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeDevice(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RenewDeviceCode operation middleware
+func (siw *ServerInterfaceWrapper) RenewDeviceCode(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RenewDeviceCode(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3844,6 +3936,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/keys", wrapper.ListApiKeys)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/keys", wrapper.CreateApiKey)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/keys/{id}", wrapper.RevokeApiKey)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/devices", wrapper.ListDevices)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/devices", wrapper.CreateDevice)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/devices/{id}", wrapper.RevokeDevice)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/devices/{id}/code", wrapper.RenewDeviceCode)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/invites", wrapper.ListInvites)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/invites", wrapper.CreateInvite)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/invites/{code}", wrapper.RevokeInvite)
@@ -5300,6 +5396,157 @@ func (response UpdateContact404JSONResponse) VisitUpdateContactResponse(w http.R
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDevicesRequestObject struct {
+}
+
+type ListDevicesResponseObject interface {
+	VisitListDevicesResponse(w http.ResponseWriter) error
+}
+
+type ListDevices200JSONResponse []Device
+
+func (response ListDevices200JSONResponse) VisitListDevicesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDeviceRequestObject struct {
+	Body *CreateDeviceJSONRequestBody
+}
+
+type CreateDeviceResponseObject interface {
+	VisitCreateDeviceResponse(w http.ResponseWriter) error
+}
+
+type CreateDevice201JSONResponse DeviceCode
+
+func (response CreateDevice201JSONResponse) VisitCreateDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDevice400JSONResponse Error
+
+func (response CreateDevice400JSONResponse) VisitCreateDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDevice409JSONResponse Error
+
+func (response CreateDevice409JSONResponse) VisitCreateDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeDeviceRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type RevokeDeviceResponseObject interface {
+	VisitRevokeDeviceResponse(w http.ResponseWriter) error
+}
+
+type RevokeDevice204Response struct {
+}
+
+func (response RevokeDevice204Response) VisitRevokeDeviceResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeDevice404JSONResponse Error
+
+func (response RevokeDevice404JSONResponse) VisitRevokeDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RenewDeviceCodeRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type RenewDeviceCodeResponseObject interface {
+	VisitRenewDeviceCodeResponse(w http.ResponseWriter) error
+}
+
+type RenewDeviceCode200JSONResponse DeviceCode
+
+func (response RenewDeviceCode200JSONResponse) VisitRenewDeviceCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RenewDeviceCode404JSONResponse Error
+
+func (response RenewDeviceCode404JSONResponse) VisitRenewDeviceCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RenewDeviceCode409JSONResponse Error
+
+func (response RenewDeviceCode409JSONResponse) VisitRenewDeviceCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -8492,6 +8739,18 @@ type StrictServerInterface interface {
 	// UpdateContact Partial update. `role`/`icon`/`phone`/`email`/`website`/`notes` may be sent as `null` to CLEAR that column; `name` is not nullable — only settable or omitted. `babyIds`, when present, REPLACES the link set; omitted leaves it untouched.
 	// (PATCH /api/contacts/{id})
 	UpdateContact(ctx context.Context, request UpdateContactRequestObject) (UpdateContactResponseObject, error)
+	// ListDevices The family's kiosk devices that are waiting to be set up or active, newest first; revoked devices are not listed. Family admin only; refused for API keys and devices.
+	// (GET /api/devices)
+	ListDevices(ctx context.Context, request ListDevicesRequestObject) (ListDevicesResponseObject, error)
+	// CreateDevice Add a kiosk device (docs/superpowers/specs/2026-09-10-kiosk-devices- design.md). Returns a one-time code — 8 characters, valid 15 minutes, shown once and stored only as a hash — that a tablet enters on /kiosk/setup. At most 10 devices per family that are not revoked. Family admin only; refused for API keys and devices.
+	// (POST /api/devices)
+	CreateDevice(ctx context.Context, request CreateDeviceRequestObject) (CreateDeviceResponseObject, error)
+	// RevokeDevice Revoke a device, pending or active. Its cookie stops working on the tablet's next request. Family admin only; refused for API keys and devices.
+	// (DELETE /api/devices/{id})
+	RevokeDevice(ctx context.Context, request RevokeDeviceRequestObject) (RevokeDeviceResponseObject, error)
+	// RenewDeviceCode A new one-time code for a device that has not been set up yet; the previous code stops working. Family admin only; refused for API keys and devices.
+	// (POST /api/devices/{id}/code)
+	RenewDeviceCode(ctx context.Context, request RenewDeviceCodeRequestObject) (RenewDeviceCodeResponseObject, error)
 	// ListDiapers Diaper logs in the caller's active family, newest first.
 	// (GET /api/diapers)
 	ListDiapers(ctx context.Context, request ListDiapersRequestObject) (ListDiapersResponseObject, error)
@@ -9902,6 +10161,113 @@ func (sh *strictHandler) UpdateContact(w http.ResponseWriter, r *http.Request, i
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateContactResponseObject); ok {
 		if err := validResponse.VisitUpdateContactResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDevices operation middleware
+func (sh *strictHandler) ListDevices(w http.ResponseWriter, r *http.Request) {
+	var request ListDevicesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDevices(ctx, request.(ListDevicesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDevices")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDevicesResponseObject); ok {
+		if err := validResponse.VisitListDevicesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateDevice operation middleware
+func (sh *strictHandler) CreateDevice(w http.ResponseWriter, r *http.Request) {
+	var request CreateDeviceRequestObject
+
+	var body CreateDeviceJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateDevice(ctx, request.(CreateDeviceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateDevice")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateDeviceResponseObject); ok {
+		if err := validResponse.VisitCreateDeviceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeDevice operation middleware
+func (sh *strictHandler) RevokeDevice(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request RevokeDeviceRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeDevice(ctx, request.(RevokeDeviceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeDevice")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeDeviceResponseObject); ok {
+		if err := validResponse.VisitRevokeDeviceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RenewDeviceCode operation middleware
+func (sh *strictHandler) RenewDeviceCode(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request RenewDeviceCodeRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RenewDeviceCode(ctx, request.(RenewDeviceCodeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RenewDeviceCode")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RenewDeviceCodeResponseObject); ok {
+		if err := validResponse.VisitRenewDeviceCodeResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

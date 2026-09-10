@@ -2548,6 +2548,105 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/devices:
+    get:
+      operationId: listDevices
+      summary: >-
+        The family's kiosk devices that are waiting to be set up or active,
+        newest first; revoked devices are not listed. Family admin only;
+        refused for API keys and devices.
+      tags: [devices]
+      responses:
+        "200":
+          description: Pending and active devices, key material omitted.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Device"
+    post:
+      operationId: createDevice
+      summary: >-
+        Add a kiosk device (docs/superpowers/specs/2026-09-10-kiosk-devices-
+        design.md). Returns a one-time code — 8 characters, valid 15
+        minutes, shown once and stored only as a hash — that a tablet enters
+        on /kiosk/setup. At most 10 devices per family that are not revoked.
+        Family admin only; refused for API keys and devices.
+      tags: [devices]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDevice"
+      responses:
+        "201":
+          description: Created, waiting for set-up.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceCode"
+        "400":
+          description: A name that is blank once trimmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: The family already has 10 devices (DEVICE_LIMIT).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/devices/{id}:
+    delete:
+      operationId: revokeDevice
+      summary: >-
+        Revoke a device, pending or active. Its cookie stops working on the
+        tablet's next request. Family admin only; refused for API keys and
+        devices.
+      tags: [devices]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "204":
+          description: Revoked.
+        "404":
+          description: No such device in the caller's family, or already revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/devices/{id}/code:
+    post:
+      operationId: renewDeviceCode
+      summary: >-
+        A new one-time code for a device that has not been set up yet; the
+        previous code stops working. Family admin only; refused for API keys
+        and devices.
+      tags: [devices]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: A new code.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceCode"
+        "404":
+          description: No such device in the caller's family, or revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: The device is already set up (ALREADY_ENROLLED).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/invites:
     get:
       operationId: listInvites
@@ -5821,6 +5920,71 @@ components:
               description: >-
                 The full bearer token (`pjk_…`). Shown exactly once — this
                 response is the only place it ever appears.
+    Device:
+      type: object
+      description: >-
+        A kiosk device. Pending until a tablet redeems its one-time code,
+        active after. Key material (code, token, PIN) is never included.
+      required:
+        - id
+        - name
+        - status
+        - createdAt
+        - createdByName
+        - enrolledAt
+        - lastUsedAt
+        - codeExpiresAt
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [pending, active]
+        createdAt:
+          type: string
+          format: date-time
+        createdByName:
+          type: string
+          description: Display name of the admin who added the device.
+        enrolledAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+        codeExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When a pending device's current code stops working; null once set up.
+    CreateDevice:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+    DeviceCode:
+      type: object
+      description: A device's one-time set-up code, returned exactly once.
+      required: [device, code, expiresAt, setupUrl]
+      properties:
+        device:
+          $ref: "#/components/schemas/Device"
+        code:
+          type: string
+          description: 8 characters from the invite-code alphabet.
+        expiresAt:
+          type: string
+          format: date-time
+        setupUrl:
+          type: string
+          description: APP_URL/kiosk/setup?code=… — what the Settings QR encodes.
     Invite:
       type: object
       required:
