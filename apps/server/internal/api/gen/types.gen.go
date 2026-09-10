@@ -614,6 +614,24 @@ func (e DeviceStatus) Valid() bool {
 	}
 }
 
+// Defines values for DeviceThresholdKind.
+const (
+	DeviceThresholdKindDiaper DeviceThresholdKind = "diaper"
+	DeviceThresholdKindFeed   DeviceThresholdKind = "feed"
+)
+
+// Valid indicates whether the value is a known member of the DeviceThresholdKind enum.
+func (e DeviceThresholdKind) Valid() bool {
+	switch e {
+	case DeviceThresholdKindDiaper:
+		return true
+	case DeviceThresholdKindFeed:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DiaperLogColor.
 const (
 	DiaperLogColorBlack  DiaperLogColor = "black"
@@ -2265,6 +2283,25 @@ type DeviceCode struct {
 	SetupUrl string `json:"setupUrl"`
 }
 
+// DeviceSelf The kiosk device making the request.
+type DeviceSelf struct {
+	FamilyId   string `json:"familyId"`
+	FamilyName string `json:"familyName"`
+	Id         string `json:"id"`
+	Name       string `json:"name"`
+}
+
+// DeviceThreshold defines model for DeviceThreshold.
+type DeviceThreshold struct {
+	// BabyId The reminder's baby, or null for every baby.
+	BabyId      *string             `json:"babyId"`
+	IntervalMin int32               `json:"intervalMin"`
+	Kind        DeviceThresholdKind `json:"kind"`
+}
+
+// DeviceThresholdKind defines model for DeviceThreshold.Kind.
+type DeviceThresholdKind string
+
 // DiaperLog defines model for DiaperLog.
 type DiaperLog struct {
 	BabyId        string `json:"babyId"`
@@ -2292,6 +2329,15 @@ type DiaperLogConsistency string
 
 // DiaperLogType `dry` is a checked-and-clean diaper; it is counted separately so a dry check never inflates the wet count.
 type DiaperLogType string
+
+// EnrolDevice defines model for EnrolDevice.
+type EnrolDevice struct {
+	// Code The one-time code from Settings → Family → Devices, any case.
+	Code string `json:"code"`
+
+	// Pin 4–6 digits; asked for when leaving kiosk mode.
+	Pin string `json:"pin"`
+}
 
 // Error The error envelope used by every non-2xx JSON response in the API (CLAUDE.md: "{error: string, code: string}" everywhere).
 type Error struct {
@@ -2900,6 +2946,11 @@ type TimelineEntry struct {
 // TimelineEntryKind defines model for TimelineEntry.Kind.
 type TimelineEntryKind string
 
+// Unenrol defines model for Unenrol.
+type Unenrol struct {
+	Pin string `json:"pin"`
+}
+
 // Unsubscribe defines model for Unsubscribe.
 type Unsubscribe struct {
 	Endpoint string `json:"endpoint"`
@@ -3409,6 +3460,12 @@ type CreateContactJSONRequestBody = CreateContact
 
 // UpdateContactJSONRequestBody defines body for UpdateContact for application/json ContentType.
 type UpdateContactJSONRequestBody = UpdateContact
+
+// EnrolDeviceJSONRequestBody defines body for EnrolDevice for application/json ContentType.
+type EnrolDeviceJSONRequestBody = EnrolDevice
+
+// UnenrolDeviceJSONRequestBody defines body for UnenrolDevice for application/json ContentType.
+type UnenrolDeviceJSONRequestBody = Unenrol
 
 // CreateDeviceJSONRequestBody defines body for CreateDevice for application/json ContentType.
 type CreateDeviceJSONRequestBody = CreateDevice
