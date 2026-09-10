@@ -108,6 +108,12 @@ type Deps struct {
 	// 0 means no quota. From PHOTO_QUOTA_MB in the composition root.
 	PhotoQuotaBytes int64
 
+	// DevicePINKey keys the HMAC a kiosk device's PIN is stored as
+	// (device_self.go's devicePINHash). Derived from AUTH_SECRET with its own
+	// domain separator in cmd/pjokk — a 4–6 digit PIN hashed without a key
+	// would be reversible by enumeration in moments.
+	DevicePINKey [32]byte
+
 	// Version is internal/buildinfo.Version as the composition root read
 	// it — passed in rather than imported here so the handlers stay
 	// dependency-free and the test rig can pin a known value. Surfaces on
@@ -202,6 +208,10 @@ const (
 	// tierAdmin: RejectAPIKey has nothing to do with the caller's role,
 	// only how they authenticated.
 	tierFamilyNoAPIKey
+	// tierDevice is a kiosk device's own routes (device_self.go): an
+	// enrolled device is required, and anyone else — a person's session
+	// included — gets 401 NOT_A_DEVICE. The device allowlist still applies.
+	tierDevice
 )
 
 // operationAuthTiers maps every generated operationID (== the
@@ -392,6 +402,13 @@ var operationAuthTiers = map[string]authTier{
 	"CreateDevice":    tierAdmin,
 	"RenewDeviceCode": tierAdmin,
 	"RevokeDevice":    tierAdmin,
+	// The tablet's side (device_self.go). Enrolling needs no caller at all
+	// — the one-time code is the credential — so it is tierPublic, on the
+	// allowlist below, and rate-limited in rateLimitChain.
+	"EnrolDevice":          tierPublic,
+	"GetDevice":            tierDevice,
+	"UnenrolDevice":        tierDevice,
+	"ListDeviceThresholds": tierDevice,
 
 	// Invites (Task 20; REF §A1 invites.ts). ListInvites/CreateInvite/
 	// RevokeInvite are the family-admin management surface, same tier as
@@ -467,6 +484,9 @@ var operationAuthTiers = map[string]authTier{
 var tierPublicAPIAllowlist = map[string]bool{
 	"GetInviteInfo": true,
 	"GetConfig":     true,
+	// EnrolDevice (device_self.go): a tablet redeeming its one-time code
+	// has no session and no device yet — the code is what it holds.
+	"EnrolDevice": true,
 }
 
 // deviceOperations is the ALLOWLIST of operations a kiosk device may call
@@ -499,6 +519,10 @@ var deviceOperations = map[string]bool{
 	"StopFeedTimer":    true,
 	"CreateMedicine":   true, // the medicine strip's default dose
 	"DeleteMedicine":   true,
+	// The device's own routes (tierDevice).
+	"GetDevice":            true,
+	"UnenrolDevice":        true,
+	"ListDeviceThresholds": true,
 }
 
 // deviceGate refuses a device identity on any operation outside
@@ -532,6 +556,13 @@ func assertDeviceOperationCoverage(spec *openapi3.T) {
 			panic(fmt.Sprintf("api: deviceOperations names %q, which is not an operation in the spec", name))
 		}
 	}
+}
+
+// publicNeedsHTTP names the tierPublic operations whose handler writes a
+// cookie and so needs middleware.CaptureHTTP's ResponseWriter: enrolment
+// sets the kiosk's device cookie. Every other public operation runs bare.
+var publicNeedsHTTP = map[string]bool{
+	"EnrolDevice": true,
 }
 
 // assertOperationAuthCoverage panics unless operationAuthTiers has exactly
@@ -637,6 +668,7 @@ func authChain(d Deps) gen.StrictMiddlewareFunc {
 	// Only the two tiers carrying a cookie-writing operation get this; see
 	// middleware.CaptureHTTP's doc comment.
 	captureHTTP := middleware.CaptureHTTP()
+	requireDevice := middleware.RequireDevice()
 
 	return func(f gen.StrictHandlerFunc, operationID string) gen.StrictHandlerFunc {
 		tier, ok := operationAuthTiers[operationID]
@@ -656,7 +688,10 @@ func authChain(d Deps) gen.StrictMiddlewareFunc {
 		var chain func(http.Handler) http.Handler
 		switch tier {
 		case tierPublic:
-			return f
+			if !publicNeedsHTTP[operationID] {
+				return f
+			}
+			chain = captureHTTP
 		case tierSession:
 			chain = func(h http.Handler) http.Handler { return identify(requireSession(captureHTTP(h))) }
 		case tierFamily:
@@ -667,6 +702,8 @@ func authChain(d Deps) gen.StrictMiddlewareFunc {
 			chain = func(h http.Handler) http.Handler { return identify(sysadmin(captureHTTP(h))) }
 		case tierFamilyNoAPIKey:
 			chain = func(h http.Handler) http.Handler { return identify(family(rejectAPIKey(h))) }
+		case tierDevice:
+			chain = func(h http.Handler) http.Handler { return identify(requireDevice(captureHTTP(h))) }
 		default:
 			panic(fmt.Sprintf("api: unknown authTier %d for operation %q", tier, operationID))
 		}
@@ -712,6 +749,10 @@ func rateLimitChain(d Deps) gen.StrictMiddlewareFunc {
 	inviteInfoGlobal := middleware.RateLimit(d.RateLimit, "invite-info-global", 500, 600, true, d.TrustedProxyHops)
 	inviteRedeemIP := middleware.RateLimit(d.RateLimit, "invite-redeem", 10, 600, false, d.TrustedProxyHops)
 	inviteRedeemGlobal := middleware.RateLimit(d.RateLimit, "invite-redeem-global", 200, 600, true, d.TrustedProxyHops)
+	// A kiosk set-up code is a credential too, with invite redemption's
+	// limits (spec 2026-09-10-kiosk-devices §5).
+	deviceEnrolIP := middleware.RateLimit(d.RateLimit, "device-enrol", 10, 600, false, d.TrustedProxyHops)
+	deviceEnrolGlobal := middleware.RateLimit(d.RateLimit, "device-enrol-global", 200, 600, true, d.TrustedProxyHops)
 
 	return func(f gen.StrictHandlerFunc, operationID string) gen.StrictHandlerFunc {
 		var chain func(http.Handler) http.Handler
@@ -720,6 +761,8 @@ func rateLimitChain(d Deps) gen.StrictMiddlewareFunc {
 			chain = func(h http.Handler) http.Handler { return inviteInfoIP(inviteInfoGlobal(h)) }
 		case "RedeemInvite":
 			chain = func(h http.Handler) http.Handler { return inviteRedeemIP(inviteRedeemGlobal(h)) }
+		case "EnrolDevice":
+			chain = func(h http.Handler) http.Handler { return deviceEnrolIP(deviceEnrolGlobal(h)) }
 		default:
 			return f
 		}

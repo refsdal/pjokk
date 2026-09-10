@@ -1128,6 +1128,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The family's kiosk devices that are waiting to be set up or active, newest first; revoked devices are not listed. Family admin only; refused for API keys and devices. */
+        get: operations["listDevices"];
+        put?: never;
+        /** Add a kiosk device (docs/superpowers/specs/2026-09-10-kiosk-devices- design.md). Returns a one-time code — 8 characters, valid 15 minutes, shown once and stored only as a hash — that a tablet enters on /kiosk/setup. At most 10 devices per family that are not revoked. Family admin only; refused for API keys and devices. */
+        post: operations["createDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/devices/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke a device, pending or active. Its cookie stops working on the tablet's next request. Family admin only; refused for API keys and devices. */
+        delete: operations["revokeDevice"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/devices/{id}/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A new one-time code for a device that has not been set up yet; the previous code stops working. Family admin only; refused for API keys and devices. */
+        post: operations["renewDeviceCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/device/enrol": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn this browser into the kiosk device a family admin added: redeem its one-time code and choose the PIN that later un-enrols it. No sign-in — the code is the credential. Sets the httpOnly pjokk_device cookie. Unknown, expired and already-used codes are one answer. Rate-limited: 10/10min per client plus a 200/10min global backstop. */
+        post: operations["enrolDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/device": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The kiosk device behind this request's pjokk_device cookie. Anyone who is not an enrolled device gets 401 NOT_A_DEVICE. */
+        get: operations["getDevice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/device/unenrol": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Leave kiosk mode on this tablet: with the device PIN, revoke the device and clear its cookie. Five attempts per device per ten minutes, whichever client sends them. */
+        post: operations["unenrolDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/device/thresholds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The kiosk's amber card: every caretaker's since-last feed and diaper reminder interval in the device's family. The intervals only — no labels, schedules or quiet hours leave the server. */
+        get: operations["listDeviceThresholds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/invites": {
         parameters: {
             query?: never;
@@ -2613,6 +2733,63 @@ export interface components {
         ApiKeyCreated: components["schemas"]["ApiKey"] & {
             /** @description The full bearer token (`pjk_…`). Shown exactly once — this response is the only place it ever appears. */
             key: string;
+        };
+        /** @description A kiosk device. Pending until a tablet redeems its one-time code, active after. Key material (code, token, PIN) is never included. */
+        Device: {
+            id: string;
+            name: string;
+            /** @enum {string} */
+            status: "pending" | "active";
+            /** Format: date-time */
+            createdAt: string;
+            /** @description Display name of the admin who added the device. */
+            createdByName: string;
+            /** Format: date-time */
+            enrolledAt: string | null;
+            /** Format: date-time */
+            lastUsedAt: string | null;
+            /**
+             * Format: date-time
+             * @description When a pending device's current code stops working; null once set up.
+             */
+            codeExpiresAt: string | null;
+        };
+        CreateDevice: {
+            name: string;
+        };
+        /** @description A device's one-time set-up code, returned exactly once. */
+        DeviceCode: {
+            device: components["schemas"]["Device"];
+            /** @description 8 characters from the invite-code alphabet. */
+            code: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** @description APP_URL/kiosk/setup?code=… — what the Settings QR encodes. */
+            setupUrl: string;
+        };
+        EnrolDevice: {
+            /** @description The one-time code from Settings → Family → Devices, any case. */
+            code: string;
+            /** @description 4–6 digits; asked for when leaving kiosk mode. */
+            pin: string;
+        };
+        /** @description The kiosk device making the request. */
+        DeviceSelf: {
+            id: string;
+            name: string;
+            familyId: string;
+            familyName: string;
+        };
+        Unenrol: {
+            pin: string;
+        };
+        DeviceThreshold: {
+            /** @enum {string} */
+            kind: "feed" | "diaper";
+            /** @description The reminder's baby, or null for every baby. */
+            babyId: string | null;
+            /** Format: int32 */
+            intervalMin: number;
         };
         Invite: {
             code: string;
@@ -6041,6 +6218,288 @@ export interface operations {
             };
             /** @description No key with this id in the caller's family, or already revoked. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listDevices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pending and active devices, key material omitted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Device"][];
+                };
+            };
+        };
+    };
+    createDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDevice"];
+            };
+        };
+        responses: {
+            /** @description Created, waiting for set-up. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceCode"];
+                };
+            };
+            /** @description A name that is blank once trimmed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The family already has 10 devices (DEVICE_LIMIT). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    revokeDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such device in the caller's family, or already revoked. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    renewDeviceCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A new code. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceCode"];
+                };
+            };
+            /** @description No such device in the caller's family, or revoked. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The device is already set up (ALREADY_ENROLLED). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    enrolDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrolDevice"];
+            };
+        };
+        responses: {
+            /** @description Enrolled; the device cookie is set. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceSelf"];
+                };
+            };
+            /** @description Unknown, expired or already-used code (INVALID_CODE). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description This device. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceSelf"];
+                };
+            };
+            /** @description Not a kiosk device (NOT_A_DEVICE), or revoked (DEVICE_REVOKED). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    unenrolDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Unenrol"];
+            };
+        };
+        responses: {
+            /** @description Un-enrolled; the cookie is cleared. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not a kiosk device. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Wrong PIN (WRONG_PIN). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listDeviceThresholds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Intervals, by kind then length. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceThreshold"][];
+                };
+            };
+            /** @description Not a kiosk device. */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -2647,6 +2647,119 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/device/enrol:
+    post:
+      operationId: enrolDevice
+      summary: >-
+        Turn this browser into the kiosk device a family admin added: redeem
+        its one-time code and choose the PIN that later un-enrols it. No
+        sign-in — the code is the credential. Sets the httpOnly pjokk_device
+        cookie. Unknown, expired and already-used codes are one answer.
+        Rate-limited: 10/10min per client plus a 200/10min global backstop.
+      tags: [devices]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrolDevice"
+      responses:
+        "200":
+          description: Enrolled; the device cookie is set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceSelf"
+        "400":
+          description: Unknown, expired or already-used code (INVALID_CODE).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Too many attempts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/device:
+    get:
+      operationId: getDevice
+      summary: >-
+        The kiosk device behind this request's pjokk_device cookie. Anyone
+        who is not an enrolled device gets 401 NOT_A_DEVICE.
+      tags: [devices]
+      responses:
+        "200":
+          description: This device.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceSelf"
+        "401":
+          description: Not a kiosk device (NOT_A_DEVICE), or revoked (DEVICE_REVOKED).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/device/unenrol:
+    post:
+      operationId: unenrolDevice
+      summary: >-
+        Leave kiosk mode on this tablet: with the device PIN, revoke the
+        device and clear its cookie. Five attempts per device per ten
+        minutes, whichever client sends them.
+      tags: [devices]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Unenrol"
+      responses:
+        "204":
+          description: Un-enrolled; the cookie is cleared.
+        "401":
+          description: Not a kiosk device.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Wrong PIN (WRONG_PIN).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Too many attempts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/device/thresholds:
+    get:
+      operationId: listDeviceThresholds
+      summary: >-
+        The kiosk's amber card: every caretaker's since-last feed and diaper
+        reminder interval in the device's family. The intervals only — no
+        labels, schedules or quiet hours leave the server.
+      tags: [devices]
+      responses:
+        "200":
+          description: Intervals, by kind then length.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeviceThreshold"
+        "401":
+          description: Not a kiosk device.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/invites:
     get:
       operationId: listInvites
@@ -5985,6 +6098,53 @@ components:
         setupUrl:
           type: string
           description: APP_URL/kiosk/setup?code=… — what the Settings QR encodes.
+    EnrolDevice:
+      type: object
+      required: [code, pin]
+      properties:
+        code:
+          type: string
+          minLength: 8
+          maxLength: 8
+          description: The one-time code from Settings → Family → Devices, any case.
+        pin:
+          type: string
+          pattern: "^[0-9]{4,6}$"
+          description: 4–6 digits; asked for when leaving kiosk mode.
+    DeviceSelf:
+      type: object
+      description: The kiosk device making the request.
+      required: [id, name, familyId, familyName]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        familyId:
+          type: string
+        familyName:
+          type: string
+    Unenrol:
+      type: object
+      required: [pin]
+      properties:
+        pin:
+          type: string
+          pattern: "^[0-9]{4,6}$"
+    DeviceThreshold:
+      type: object
+      required: [kind, babyId, intervalMin]
+      properties:
+        kind:
+          type: string
+          enum: [feed, diaper]
+        babyId:
+          type: string
+          nullable: true
+          description: The reminder's baby, or null for every baby.
+        intervalMin:
+          type: integer
+          format: int32
     Invite:
       type: object
       required:

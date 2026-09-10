@@ -137,6 +137,18 @@ type ServerInterface interface {
 	// UpdateContact Partial update. `role`/`icon`/`phone`/`email`/`website`/`notes` may be sent as `null` to CLEAR that column; `name` is not nullable — only settable or omitted. `babyIds`, when present, REPLACES the link set; omitted leaves it untouched.
 	// (PATCH /api/contacts/{id})
 	UpdateContact(w http.ResponseWriter, r *http.Request, id IdPath)
+	// GetDevice The kiosk device behind this request's pjokk_device cookie. Anyone who is not an enrolled device gets 401 NOT_A_DEVICE.
+	// (GET /api/device)
+	GetDevice(w http.ResponseWriter, r *http.Request)
+	// EnrolDevice Turn this browser into the kiosk device a family admin added: redeem its one-time code and choose the PIN that later un-enrols it. No sign-in — the code is the credential. Sets the httpOnly pjokk_device cookie. Unknown, expired and already-used codes are one answer. Rate-limited: 10/10min per client plus a 200/10min global backstop.
+	// (POST /api/device/enrol)
+	EnrolDevice(w http.ResponseWriter, r *http.Request)
+	// ListDeviceThresholds The kiosk's amber card: every caretaker's since-last feed and diaper reminder interval in the device's family. The intervals only — no labels, schedules or quiet hours leave the server.
+	// (GET /api/device/thresholds)
+	ListDeviceThresholds(w http.ResponseWriter, r *http.Request)
+	// UnenrolDevice Leave kiosk mode on this tablet: with the device PIN, revoke the device and clear its cookie. Five attempts per device per ten minutes, whichever client sends them.
+	// (POST /api/device/unenrol)
+	UnenrolDevice(w http.ResponseWriter, r *http.Request)
 	// ListDevices The family's kiosk devices that are waiting to be set up or active, newest first; revoked devices are not listed. Family admin only; refused for API keys and devices.
 	// (GET /api/devices)
 	ListDevices(w http.ResponseWriter, r *http.Request)
@@ -1388,6 +1400,62 @@ func (siw *ServerInterfaceWrapper) UpdateContact(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateContact(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDevice operation middleware
+func (siw *ServerInterfaceWrapper) GetDevice(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDevice(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EnrolDevice operation middleware
+func (siw *ServerInterfaceWrapper) EnrolDevice(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EnrolDevice(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDeviceThresholds operation middleware
+func (siw *ServerInterfaceWrapper) ListDeviceThresholds(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDeviceThresholds(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnenrolDevice operation middleware
+func (siw *ServerInterfaceWrapper) UnenrolDevice(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnenrolDevice(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3940,6 +4008,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/devices", wrapper.CreateDevice)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/devices/{id}", wrapper.RevokeDevice)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/devices/{id}/code", wrapper.RenewDeviceCode)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/device/enrol", wrapper.EnrolDevice)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/device", wrapper.GetDevice)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/device/unenrol", wrapper.UnenrolDevice)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/device/thresholds", wrapper.ListDeviceThresholds)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/invites", wrapper.ListInvites)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/invites", wrapper.CreateInvite)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/invites/{code}", wrapper.RevokeInvite)
@@ -5396,6 +5468,184 @@ func (response UpdateContact404JSONResponse) VisitUpdateContactResponse(w http.R
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDeviceRequestObject struct {
+}
+
+type GetDeviceResponseObject interface {
+	VisitGetDeviceResponse(w http.ResponseWriter) error
+}
+
+type GetDevice200JSONResponse DeviceSelf
+
+func (response GetDevice200JSONResponse) VisitGetDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDevice401JSONResponse Error
+
+func (response GetDevice401JSONResponse) VisitGetDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnrolDeviceRequestObject struct {
+	Body *EnrolDeviceJSONRequestBody
+}
+
+type EnrolDeviceResponseObject interface {
+	VisitEnrolDeviceResponse(w http.ResponseWriter) error
+}
+
+type EnrolDevice200JSONResponse DeviceSelf
+
+func (response EnrolDevice200JSONResponse) VisitEnrolDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnrolDevice400JSONResponse Error
+
+func (response EnrolDevice400JSONResponse) VisitEnrolDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnrolDevice429JSONResponse Error
+
+func (response EnrolDevice429JSONResponse) VisitEnrolDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeviceThresholdsRequestObject struct {
+}
+
+type ListDeviceThresholdsResponseObject interface {
+	VisitListDeviceThresholdsResponse(w http.ResponseWriter) error
+}
+
+type ListDeviceThresholds200JSONResponse []DeviceThreshold
+
+func (response ListDeviceThresholds200JSONResponse) VisitListDeviceThresholdsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeviceThresholds401JSONResponse Error
+
+func (response ListDeviceThresholds401JSONResponse) VisitListDeviceThresholdsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnenrolDeviceRequestObject struct {
+	Body *UnenrolDeviceJSONRequestBody
+}
+
+type UnenrolDeviceResponseObject interface {
+	VisitUnenrolDeviceResponse(w http.ResponseWriter) error
+}
+
+type UnenrolDevice204Response struct {
+}
+
+func (response UnenrolDevice204Response) VisitUnenrolDeviceResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type UnenrolDevice401JSONResponse Error
+
+func (response UnenrolDevice401JSONResponse) VisitUnenrolDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnenrolDevice403JSONResponse Error
+
+func (response UnenrolDevice403JSONResponse) VisitUnenrolDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnenrolDevice429JSONResponse Error
+
+func (response UnenrolDevice429JSONResponse) VisitUnenrolDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(429)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -8739,6 +8989,18 @@ type StrictServerInterface interface {
 	// UpdateContact Partial update. `role`/`icon`/`phone`/`email`/`website`/`notes` may be sent as `null` to CLEAR that column; `name` is not nullable — only settable or omitted. `babyIds`, when present, REPLACES the link set; omitted leaves it untouched.
 	// (PATCH /api/contacts/{id})
 	UpdateContact(ctx context.Context, request UpdateContactRequestObject) (UpdateContactResponseObject, error)
+	// GetDevice The kiosk device behind this request's pjokk_device cookie. Anyone who is not an enrolled device gets 401 NOT_A_DEVICE.
+	// (GET /api/device)
+	GetDevice(ctx context.Context, request GetDeviceRequestObject) (GetDeviceResponseObject, error)
+	// EnrolDevice Turn this browser into the kiosk device a family admin added: redeem its one-time code and choose the PIN that later un-enrols it. No sign-in — the code is the credential. Sets the httpOnly pjokk_device cookie. Unknown, expired and already-used codes are one answer. Rate-limited: 10/10min per client plus a 200/10min global backstop.
+	// (POST /api/device/enrol)
+	EnrolDevice(ctx context.Context, request EnrolDeviceRequestObject) (EnrolDeviceResponseObject, error)
+	// ListDeviceThresholds The kiosk's amber card: every caretaker's since-last feed and diaper reminder interval in the device's family. The intervals only — no labels, schedules or quiet hours leave the server.
+	// (GET /api/device/thresholds)
+	ListDeviceThresholds(ctx context.Context, request ListDeviceThresholdsRequestObject) (ListDeviceThresholdsResponseObject, error)
+	// UnenrolDevice Leave kiosk mode on this tablet: with the device PIN, revoke the device and clear its cookie. Five attempts per device per ten minutes, whichever client sends them.
+	// (POST /api/device/unenrol)
+	UnenrolDevice(ctx context.Context, request UnenrolDeviceRequestObject) (UnenrolDeviceResponseObject, error)
 	// ListDevices The family's kiosk devices that are waiting to be set up or active, newest first; revoked devices are not listed. Family admin only; refused for API keys and devices.
 	// (GET /api/devices)
 	ListDevices(ctx context.Context, request ListDevicesRequestObject) (ListDevicesResponseObject, error)
@@ -10161,6 +10423,116 @@ func (sh *strictHandler) UpdateContact(w http.ResponseWriter, r *http.Request, i
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateContactResponseObject); ok {
 		if err := validResponse.VisitUpdateContactResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDevice operation middleware
+func (sh *strictHandler) GetDevice(w http.ResponseWriter, r *http.Request) {
+	var request GetDeviceRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDevice(ctx, request.(GetDeviceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDevice")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDeviceResponseObject); ok {
+		if err := validResponse.VisitGetDeviceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// EnrolDevice operation middleware
+func (sh *strictHandler) EnrolDevice(w http.ResponseWriter, r *http.Request) {
+	var request EnrolDeviceRequestObject
+
+	var body EnrolDeviceJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.EnrolDevice(ctx, request.(EnrolDeviceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "EnrolDevice")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(EnrolDeviceResponseObject); ok {
+		if err := validResponse.VisitEnrolDeviceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDeviceThresholds operation middleware
+func (sh *strictHandler) ListDeviceThresholds(w http.ResponseWriter, r *http.Request) {
+	var request ListDeviceThresholdsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDeviceThresholds(ctx, request.(ListDeviceThresholdsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDeviceThresholds")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDeviceThresholdsResponseObject); ok {
+		if err := validResponse.VisitListDeviceThresholdsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UnenrolDevice operation middleware
+func (sh *strictHandler) UnenrolDevice(w http.ResponseWriter, r *http.Request) {
+	var request UnenrolDeviceRequestObject
+
+	var body UnenrolDeviceJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UnenrolDevice(ctx, request.(UnenrolDeviceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnenrolDevice")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UnenrolDeviceResponseObject); ok {
+		if err := validResponse.VisitUnenrolDeviceResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

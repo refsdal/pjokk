@@ -21,6 +21,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -597,7 +598,10 @@ func buildDeps(ctx context.Context, cfg *config.Config) (api.Deps, func(), error
 		VAPIDPublicKey:   cfg.VAPIDPublicKey,
 		TrustedProxyHops: cfg.TrustedProxyHops,
 		PhotoQuotaBytes:  int64(cfg.PhotoQuotaMB) << 20,
-		Version:          buildinfo.Version,
+		// Its own domain separator, so the kiosk PIN key and Limen's keys can
+		// never be the same bytes even though all derive from AUTH_SECRET.
+		DevicePINKey: sha256.Sum256([]byte(cfg.AuthSecret + ":device-pin")),
+		Version:      buildinfo.Version,
 
 		OpenSignup:     cfg.OpenSignup,
 		OAuthProviders: oauthProviders(cfg),

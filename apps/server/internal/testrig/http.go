@@ -178,6 +178,7 @@ func App(t *testing.T) *AppRig {
 		VAPIDPublicKey:   vapidPublic,
 		TrustedProxyHops: 0,
 		PhotoQuotaBytes:  500 << 20,
+		DevicePINKey:     sha256.Sum256([]byte("pjokk-test-device-pin-key")),
 		Version:          Version,
 	}
 
