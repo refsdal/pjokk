@@ -1,34 +1,25 @@
-import { createHash } from "node:crypto";
 import { expect, test } from "./fixtures";
-import { freshFamily } from "./helpers";
+import {
+  chooseCaretaker,
+  enrolKiosk,
+  freshFamily,
+  holdToLeave,
+  KIOSK_PIN,
+} from "./helpers";
 
-// Kiosk mode (docs/superpowers/specs/2026-09-08-kiosk-mode-design.md).
-// Runs on the mobile and tablet projects. The flag and the PIN hash are
-// seeded the way lib/kiosk.ts stores them, so the app boots straight into
-// the care station.
-const PIN = "2580";
-const HASH = createHash("sha256").update(`pjokk-kiosk:${PIN}`).digest("hex");
-
-test.beforeEach(async ({ context }) => {
-  await context.addInitScript(
-    ({ hash, len }) => {
-      try {
-        localStorage.setItem("pjokk.kiosk.on", "1");
-        localStorage.setItem("pjokk.kiosk.pin", hash);
-        localStorage.setItem("pjokk.kiosk.pinlen", String(len));
-      } catch {
-        // storage unavailable
-      }
-    },
-    { hash: HASH, len: PIN.length },
-  );
-});
+// Kiosk mode on an enrolled family device (docs/superpowers/specs/
+// 2026-09-08-kiosk-mode-design.md and 2026-09-10-kiosk-devices-design.md).
+// Runs on the mobile and tablet projects. Each test founds a family, then
+// turns its own browser into that family's kiosk with a one-time code —
+// which signs the founder out of it, as a real set-up does — and says who
+// is logging before it logs.
 
 test("a kiosk device lands on the care station and logs a diaper with undo", async ({ page, request }) => {
-  await freshFamily(page, request, "kiosk-diaper", /\/kiosk/);
-  await expect(page).toHaveURL(/\/kiosk/);
+  await freshFamily(page, request, "kiosk-diaper");
+  await enrolKiosk(page);
   await expect(page.getByTestId("kiosk-clock")).toBeVisible();
   await expect(page.getByRole("navigation")).toHaveCount(0);
+  await chooseCaretaker(page);
 
   const diaper = page.getByTestId("kiosk-diaper");
   await diaper.getByRole("button", { name: "Wet" }).click();
@@ -38,6 +29,21 @@ test("a kiosk device lands on the care station and logs a diaper with undo", asy
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(page.getByText("Wet diaper logged")).toBeHidden();
   await expect(diaper.getByText(/^0 wet/)).toBeVisible({ timeout: 10_000 });
+});
+
+test("an action with nobody chosen asks who is logging", async ({ page, request }) => {
+  await freshFamily(page, request, "kiosk-who");
+  await enrolKiosk(page);
+  await expect(page.getByTestId("kiosk-caretakers").getByText("Who's logging?")).toBeVisible();
+
+  await page.getByTestId("kiosk-diaper").getByRole("button", { name: "Wet" }).click();
+  const prompt = page.getByRole("dialog", { name: "Who's logging?" });
+  await expect(prompt).toBeVisible();
+  await prompt.getByRole("button").first().click();
+  await expect(page.getByText("Wet diaper logged")).toBeVisible();
+  await expect(
+    page.getByTestId("kiosk-caretakers").getByRole("button", { pressed: true }),
+  ).toHaveCount(1);
 });
 
 test("sleep and wake from the card", async ({ page, request }) => {
@@ -50,7 +56,9 @@ test("sleep and wake from the card", async ({ page, request }) => {
       // storage unavailable
     }
   });
-  await freshFamily(page, request, "kiosk-sleep", /\/kiosk/);
+  await freshFamily(page, request, "kiosk-sleep");
+  await enrolKiosk(page);
+  await chooseCaretaker(page);
   const card = page.getByTestId("kiosk-sleep");
   await card.getByRole("button", { name: "Sleep" }).click();
   await expect(card).toHaveAttribute("data-tone", "live", { timeout: 10_000 });
@@ -60,7 +68,9 @@ test("sleep and wake from the card", async ({ page, request }) => {
 });
 
 test("resume from the card after a mistaken wake", async ({ page, request }) => {
-  await freshFamily(page, request, "kiosk-resume", /\/kiosk/);
+  await freshFamily(page, request, "kiosk-resume");
+  await enrolKiosk(page);
+  await chooseCaretaker(page);
   const card = page.getByTestId("kiosk-sleep");
   await card.getByRole("button", { name: "Sleep" }).click();
   await expect(card).toHaveAttribute("data-tone", "live", { timeout: 10_000 });
@@ -72,7 +82,9 @@ test("resume from the card after a mistaken wake", async ({ page, request }) => 
 });
 
 test("nursing timer from the card", async ({ page, request }) => {
-  await freshFamily(page, request, "kiosk-breast", /\/kiosk/);
+  await freshFamily(page, request, "kiosk-breast");
+  await enrolKiosk(page);
+  await chooseCaretaker(page);
   const card = page.getByTestId("kiosk-feed");
   await card.getByRole("button", { name: "Breast L" }).click();
   await expect(card).toHaveAttribute("data-tone", "live", { timeout: 10_000 });
@@ -81,24 +93,21 @@ test("nursing timer from the card", async ({ page, request }) => {
   await expect(card.getByText("under a minute")).toBeVisible();
 });
 
-test("/home redirects to /kiosk while the flag is on; the PIN leaves", async ({ page, request }) => {
-  await freshFamily(page, request, "kiosk-leave", /\/kiosk/);
+test("/home redirects to /kiosk on a device; the PIN un-enrols it", async ({ page, request }) => {
+  await freshFamily(page, request, "kiosk-leave");
+  await enrolKiosk(page);
   await page.goto("/home");
   await expect(page).toHaveURL(/\/kiosk/);
 
-  const name = page.getByRole("button", { name: "Hold to leave kiosk mode" });
-  const box = (await name.boundingBox())!;
-  await page.mouse.move(box.x + 10, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.waitForTimeout(1700);
-  await page.mouse.up();
-  const pad = page.getByRole("dialog", { name: "Leave kiosk mode" });
-  await expect(pad).toBeVisible();
+  const pad = await holdToLeave(page);
   for (const d of "1111") await pad.getByRole("button", { name: d, exact: true }).click();
   await expect(pad.getByText("Wrong PIN")).toBeVisible();
-  for (const d of PIN) await pad.getByRole("button", { name: d, exact: true }).click();
-  await expect(page).toHaveURL(/\/home/, { timeout: 10_000 });
-  await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
+  for (const d of KIOSK_PIN) await pad.getByRole("button", { name: d, exact: true }).click();
+  await expect(page).toHaveURL(/\/login/, { timeout: 10_000 });
+
+  // Un-enrolled, and nobody's session is left behind: the app is signed out.
+  await page.goto("/home");
+  await expect(page).toHaveURL(/\/login/, { timeout: 10_000 });
 });
 
 test("night keeps the cards on the amber palette without totals", async ({ page, request, context }) => {
@@ -109,28 +118,10 @@ test("night keeps the cards on the amber palette without totals", async ({ page,
       // storage unavailable
     }
   });
-  await freshFamily(page, request, "kiosk-night", /\/kiosk/);
+  await freshFamily(page, request, "kiosk-night");
+  await enrolKiosk(page);
   await expect(page.locator("html")).toHaveClass(/kiosk/);
   await expect(page.locator("html")).toHaveClass(/night/);
   await expect(page.getByTestId("kiosk-sleep")).toBeVisible();
   await expect(page.getByText(/feeds · .* ml$/)).toHaveCount(0);
-});
-
-test("Settings turns kiosk on with a PIN", async ({ page, request, context }) => {
-  await context.addInitScript(() => {
-    try {
-      localStorage.removeItem("pjokk.kiosk.on");
-      localStorage.removeItem("pjokk.kiosk.pin");
-      localStorage.removeItem("pjokk.kiosk.pinlen");
-    } catch {
-      // storage unavailable
-    }
-  });
-  await freshFamily(page, request, "kiosk-settings");
-  await page.goto("/settings");
-  await page.getByRole("button", { name: "Turn on kiosk mode" }).click();
-  await page.getByLabel("PIN", { exact: true }).fill("1234");
-  await page.getByLabel("Repeat PIN").fill("1234");
-  await page.getByRole("button", { name: "Start kiosk" }).click();
-  await expect(page).toHaveURL(/\/kiosk/);
 });
