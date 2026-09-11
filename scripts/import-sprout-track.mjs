@@ -114,6 +114,17 @@ const ms = (v) => {
   return Number.isNaN(t) ? null : t;
 };
 
+// A numeric cell as a finite number, or null. SQLite does not enforce a
+// column's type and node:sqlite hands a TEXT-stored cell back as a string,
+// so a REAL or INTEGER column holds whatever the export's author put there
+// (issue #94). The same rule as the Baby Buddy reader's num().
+const num = (v) => {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v !== "string" || v.trim() === "") return null;
+  const n = Number(v.replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+};
+
 if (args.includes("--inspect")) {
   console.log("== Babies ==");
   for (const b of rows(
@@ -238,6 +249,14 @@ const toCelsius = (v, unit) => {
 // with every other importer (issue #54). This file is the sprout READER.
 const writer = createWriter({ resolveEmail, familyId });
 const { skip, now, familyExpr, insert } = writer;
+// A cell that should be a number and is not imports as NULL, and the
+// summary says so rather than dropping it silently.
+const numCell = (v, what) => {
+  const n = num(v);
+  if (n === null && v !== null && v !== undefined && v !== "")
+    skip(`non-numeric ${what} imported as NULL`);
+  return n;
+};
 
 const base = (r, timeMs) => {
   const babyId = babyMap.get(r.babyId);
@@ -608,7 +627,7 @@ for (const r of rows(`SELECT * FROM PumpLog WHERE deletedAt IS NULL`)) {
       ...b,
       side ? esc(side) : "NULL",
       total != null ? toMl(total, r.unitAbbr) : "NULL",
-      r.duration ?? "NULL",
+      numCell(r.duration, "pump duration") ?? "NULL",
       escOrNull(r.notes),
       now,
     ],
@@ -715,7 +734,7 @@ for (const m of rows(`SELECT * FROM Medicine`)) {
       esc(id),
       familyExpr(),
       esc(m.name ?? "Medicine"),
-      mappedUnit && m.typicalDoseSize != null ? m.typicalDoseSize : "NULL",
+      (mappedUnit ? numCell(m.typicalDoseSize, "medicine default dose") : null) ?? "NULL",
       mappedUnit ? esc(mappedUnit) : "NULL",
       minInterval && minInterval > 0 ? minInterval : "NULL",
       false,
@@ -758,7 +777,7 @@ for (const r of rows(`SELECT * FROM MedicineLog WHERE deletedAt IS NULL`)) {
     [
       ...b,
       esc(medicineNames.get(r.medicineId) ?? "Medicine"),
-      r.doseAmount ?? "NULL",
+      numCell(r.doseAmount, "medicine dose") ?? "NULL",
       mappedUnit ? esc(mappedUnit) : "NULL",
       medicineIds.has(r.medicineId) ? esc(medicineIds.get(r.medicineId)) : "NULL",
       escOrNull(medicineNotes),
@@ -792,7 +811,7 @@ for (const r of rows(`SELECT * FROM VaccineLog WHERE deletedAt IS NULL`)) {
     [
       ...b,
       esc(r.vaccineName ?? "Vaccine"),
-      r.doseNumber ?? "NULL",
+      numCell(r.doseNumber, "vaccine dose number") ?? "NULL",
       "NULL",
       escOrNull(r.notes),
       now,
@@ -940,7 +959,7 @@ for (const r of rows(`SELECT * FROM CalendarEvent WHERE deletedAt IS NULL`)) {
       startMs,
       r.allDay ? 1 : 0,
       durationMin ?? "NULL",
-      r.reminderTime ?? "NULL",
+      numCell(r.reminderTime, "calendar reminder") ?? "NULL",
       // Latch past reminders shut; future ones stay armed.
       startMs < now ? now : "NULL",
       now,
