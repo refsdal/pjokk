@@ -2491,6 +2491,22 @@ type CreateVaccineDismissal struct {
 	SlotKey string `json:"slotKey"`
 }
 
+// DeletedFamily A family in a snapshot that does not exist now.
+type DeletedFamily struct {
+	Babies    int        `json:"babies"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
+
+	// DeletedAt From the family.delete audit row, when there is one.
+	DeletedAt *time.Time `json:"deletedAt,omitempty"`
+
+	// DeletedBy The operator who deleted it, from the same row.
+	DeletedBy *string `json:"deletedBy,omitempty"`
+	Id        string  `json:"id"`
+	Members   int     `json:"members"`
+	Name      string  `json:"name"`
+	Slug      string  `json:"slug"`
+}
+
 // Device A kiosk device. Pending until a tablet redeems its one-time code, active after. Key material (code, token, PIN) is never included.
 type Device struct {
 	// CodeExpiresAt When a pending device's current code stops working; null once set up.
@@ -2596,6 +2612,29 @@ type Family struct {
 	Name string `json:"name"`
 	Plan string `json:"plan"`
 	Slug string `json:"slug"`
+}
+
+// FamilyRestoreReport defines model for FamilyRestoreReport.
+type FamilyRestoreReport struct {
+	FamilyId string `json:"familyId"`
+
+	// HasAdmin False when every admin's account has gone.
+	HasAdmin bool `json:"hasAdmin"`
+
+	// MembersDropped Memberships of accounts deleted since the snapshot.
+	MembersDropped  int      `json:"membersDropped"`
+	MembersRejoined int      `json:"membersRejoined"`
+	Name            string   `json:"name"`
+	PhotosMissing   []string `json:"photosMissing"`
+	PhotosRestored  int      `json:"photosRestored"`
+
+	// PreviousSlug Set when the slug had been taken and the family came back under a new one.
+	PreviousSlug *string `json:"previousSlug,omitempty"`
+
+	// Rows Rows restored per table.
+	Rows     map[string]int64 `json:"rows"`
+	Slug     string           `json:"slug"`
+	Warnings []string         `json:"warnings"`
 }
 
 // FeedLog defines model for FeedLog.
@@ -3458,6 +3497,9 @@ type LimitQuery = int
 
 // MemberIdPath defines model for memberIdPath.
 type MemberIdPath = string
+
+// SnapshotDatePath defines model for snapshotDatePath.
+type SnapshotDatePath = string
 
 // ListAdminAuditParams defines parameters for ListAdminAudit.
 type ListAdminAuditParams struct {
