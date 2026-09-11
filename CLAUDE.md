@@ -374,8 +374,12 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   clamping the day for monthly/yearly), the list returns one entry per
   occurrence sharing the id with `seriesStart`, the reminder job reminds
   per occurrence (`reminded_at` = the occurrence start for a series), and
-  the ICS feed emits an RRULE instead of expanding. Editing an occurrence
-  edits the series; no per-occurrence exceptions in v1.
+  the ICS feed emits an RRULE instead of expanding. "This event" (the
+  sheet's default for a tapped occurrence) deletes it as a skip
+  (`calendar_event_skip`, an EXDATE in the feed) or, for an edit, detaches
+  it into a standalone event carrying the change; "All events" edits the
+  series, and a real change to its start or rule clears its skips (spec
+  `docs/superpowers/specs/2026-09-11-calendar-occurrence-exceptions-design.md`).
 - **Profile (`/profile`):** the person, not the family — full name,
   nickname (shown instead of the name everywhere, via the users
   `display_name` generated column), phone (private), photo, display
