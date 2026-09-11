@@ -58,7 +58,7 @@ func RunReminders(ctx context.Context, d Deps, now time.Time) (int, error) {
 		}
 
 		var fire bool
-		var body string
+		var gap time.Duration
 		switch r.Mode {
 		case "since_last":
 			last, err := d.lastLogTime(ctx, r)
@@ -68,7 +68,7 @@ func RunReminders(ctx context.Context, d Deps, now time.Time) (int, error) {
 			if !last.Valid {
 				continue // never logged: nothing to gap against
 			}
-			gap := now.Sub(last.Time)
+			gap = now.Sub(last.Time)
 			if gap < time.Duration(*r.IntervalMin)*time.Minute {
 				continue
 			}
@@ -76,7 +76,6 @@ func RunReminders(ctx context.Context, d Deps, now time.Time) (int, error) {
 				continue // already nudged for this gap
 			}
 			fire = true
-			body = gapBody(r, gap)
 		case "at_time":
 			slot := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc).Add(time.Duration(*r.AtMinute) * time.Minute)
 			if now.Before(slot) {
@@ -93,12 +92,20 @@ func RunReminders(ctx context.Context, d Deps, now time.Time) (int, error) {
 				continue
 			}
 			fire = true
-			body = slotBody(r)
 		}
 		if !fire {
 			continue
 		}
 
+		// Written in the person's language (internal/push/text.go).
+		lang, err := d.languageOf(ctx, r.UserID)
+		if err != nil {
+			return sent, err
+		}
+		body := slotBody(r, lang)
+		if r.Mode == "since_last" {
+			body = gapBody(r, gap, lang)
+		}
 		name, err := d.babyName(ctx, r)
 		if err != nil {
 			return sent, err
@@ -110,7 +117,7 @@ func RunReminders(ctx context.Context, d Deps, now time.Time) (int, error) {
 			Title: "Pjokk",
 			Body:  body,
 			URL:   "/home",
-			Actions: append(reminderActions(r.Kind), push.SnoozeAction(d.SnoozeKey, push.SnoozeClaims{
+			Actions: append(reminderActions(r.Kind, lang), push.SnoozeAction(d.SnoozeKey, lang, push.SnoozeClaims{
 				Source: push.SnoozeReminder, ID: r.ID, UserID: r.UserID, FamilyID: r.FamilyID, SentAt: now,
 			})),
 		})
@@ -185,56 +192,72 @@ func (d Deps) babyName(ctx context.Context, r dbgen.Reminder) (string, error) {
 	return baby.Name, nil
 }
 
-func gapBody(r dbgen.Reminder, gap time.Duration) string {
+func gapBody(r dbgen.Reminder, gap time.Duration, lang string) string {
 	hours := int(gap / time.Hour)
 	mins := int(gap/time.Minute) % 60
-	since := fmt.Sprintf("%d h", hours)
+	since := push.T(lang, "%d h", hours)
 	if hours == 0 {
-		since = fmt.Sprintf("%d min", mins)
+		since = push.T(lang, "%d min", mins)
 	}
 	switch r.Kind {
 	case "diaper":
-		return fmt.Sprintf("No diaper change logged for %s", since)
+		return push.T(lang, "No diaper change logged for %s", since)
 	case "pump":
-		return fmt.Sprintf("No pump logged for %s", since)
+		return push.T(lang, "No pump logged for %s", since)
 	case "medicine":
 		if r.Label != nil {
-			return fmt.Sprintf("%s: %s since the last dose", *r.Label, since)
+			return push.T(lang, "%s: %s since the last dose", *r.Label, since)
 		}
-		return fmt.Sprintf("No medicine logged for %s", since)
+		return push.T(lang, "No medicine logged for %s", since)
 	}
-	return fmt.Sprintf("No feed logged for %s", since)
+	return push.T(lang, "No feed logged for %s", since)
 }
 
-func slotBody(r dbgen.Reminder) string {
+// slotBody is a fixed-time reminder's text: the person's own label, which
+// is theirs and never translated, else the kind's.
+func slotBody(r dbgen.Reminder, lang string) string {
 	if r.Label != nil {
 		return *r.Label
 	}
 	switch r.Kind {
 	case "diaper":
-		return "Diaper reminder"
+		return push.T(lang, "Diaper reminder")
 	case "pump":
-		return "Time to pump"
+		return push.T(lang, "Time to pump")
 	case "medicine":
-		return "Medicine reminder"
+		return push.T(lang, "Medicine reminder")
 	}
-	return "Feed reminder"
+	return push.T(lang, "Feed reminder")
 }
 
 // reminderActions is the notification's "log it now" button (issue #51):
 // the deep link Home understands (screens/Home.tsx reads ?log=), which
 // opens the matching sheet with the time at now. A custom reminder has no
 // sheet to open.
-func reminderActions(kind string) []push.PushAction {
+func reminderActions(kind, lang string) []push.PushAction {
 	switch kind {
 	case "feed":
-		return []push.PushAction{{Action: "log", Title: "Log feed", URL: "/home?log=feed"}}
+		return []push.PushAction{{Action: "log", Title: push.T(lang, "Log feed"), URL: "/home?log=feed"}}
 	case "diaper":
-		return []push.PushAction{{Action: "log", Title: "Log diaper", URL: "/home?log=diaper"}}
+		return []push.PushAction{{Action: "log", Title: push.T(lang, "Log diaper"), URL: "/home?log=diaper"}}
 	case "pump":
-		return []push.PushAction{{Action: "log", Title: "Log pump", URL: "/home?log=pump"}}
+		return []push.PushAction{{Action: "log", Title: push.T(lang, "Log pump"), URL: "/home?log=pump"}}
 	case "medicine":
-		return []push.PushAction{{Action: "log", Title: "Log dose", URL: "/home?log=medicine"}}
+		return []push.PushAction{{Action: "log", Title: push.T(lang, "Log dose"), URL: "/home?log=medicine"}}
 	}
 	return nil
+}
+
+// languageOf is the language a push to userID is written in: the one the
+// app last resolved for them (users.language, 00018). A person deleted
+// since the sweep read its rows gets English, and nothing anyway.
+func (d Deps) languageOf(ctx context.Context, userID string) (string, error) {
+	lang, err := d.Q.GetUserLanguage(ctx, userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return push.LangEN, nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("jobs: language of %s: %w", userID, err)
+	}
+	return lang, nil
 }

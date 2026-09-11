@@ -70,6 +70,10 @@ func RunSnoozes(ctx context.Context, d Deps, now time.Time) (int, error) {
 // reminder or event is now, with a fresh Snooze button of its own.
 func (d Deps) snoozedPayload(ctx context.Context, s dbgen.PushSnooze, now time.Time) (push.PushPayload, snoozeFate, error) {
 	again := push.SnoozeClaims{Source: s.Source, ID: s.SourceID, UserID: s.UserID, FamilyID: s.FamilyID, SentAt: now}
+	lang, err := d.languageOf(ctx, s.UserID)
+	if err != nil {
+		return push.PushPayload{}, snoozeDrop, err
+	}
 	switch s.Source {
 	case push.SnoozeReminder:
 		r, err := d.Q.GetReminder(ctx, dbgen.GetReminderParams{ID: s.SourceID, UserID: s.UserID, FamilyID: s.FamilyID})
@@ -90,9 +94,9 @@ func (d Deps) snoozedPayload(ctx context.Context, s dbgen.PushSnooze, now time.T
 		if answered(r, last, s.SentAt.Time, now) {
 			return push.PushPayload{}, snoozeDrop, nil
 		}
-		body := slotBody(r)
+		body := slotBody(r, lang)
 		if r.Mode == "since_last" && last.Valid {
-			body = gapBody(r, now.Sub(last.Time))
+			body = gapBody(r, now.Sub(last.Time), lang)
 		}
 		name, err := d.babyName(ctx, r)
 		if err != nil {
@@ -105,7 +109,7 @@ func (d Deps) snoozedPayload(ctx context.Context, s dbgen.PushSnooze, now time.T
 			Title:   "Pjokk",
 			Body:    body,
 			URL:     "/home",
-			Actions: append(reminderActions(r.Kind), push.SnoozeAction(d.SnoozeKey, again)),
+			Actions: append(reminderActions(r.Kind, lang), push.SnoozeAction(d.SnoozeKey, lang, again)),
 		}, snoozeSend, nil
 
 	case push.SnoozeCalendar:
@@ -128,7 +132,7 @@ func (d Deps) snoozedPayload(ctx context.Context, s dbgen.PushSnooze, now time.T
 			Title:   "Pjokk",
 			Body:    body,
 			URL:     "/calendar",
-			Actions: []push.PushAction{push.SnoozeAction(d.SnoozeKey, again)},
+			Actions: []push.PushAction{push.SnoozeAction(d.SnoozeKey, lang, again)},
 		}, snoozeSend, nil
 	}
 	return push.PushPayload{}, snoozeDrop, nil

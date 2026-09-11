@@ -137,12 +137,16 @@ func RunCalendarReminders(ctx context.Context, d Deps, now time.Time) (int, erro
 		for _, userID := range targets {
 			// A Snooze button per person: snoozing is theirs alone, and the
 			// token names them (internal/push/snooze.go).
+			lang, err := d.languageOf(ctx, userID)
+			if err != nil {
+				return sent, err
+			}
 			occ := occurrence
 			delivered, err := d.Push.ToUser(ctx, userID, push.PushPayload{
 				Title: "Pjokk",
 				Body:  body,
 				URL:   "/calendar",
-				Actions: []push.PushAction{push.SnoozeAction(d.SnoozeKey, push.SnoozeClaims{
+				Actions: []push.PushAction{push.SnoozeAction(d.SnoozeKey, lang, push.SnoozeClaims{
 					Source: push.SnoozeCalendar, ID: event.ID, UserID: userID, FamilyID: event.FamilyID,
 					Occurrence: &occ, SentAt: now,
 				})},

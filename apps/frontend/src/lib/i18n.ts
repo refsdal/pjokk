@@ -810,6 +810,11 @@ export function getLanguage(): "en" | "nb" {
   return resolve(readMode());
 }
 
+/** What `mode` means on this device: "auto" resolved against its language. */
+export function resolveLanguage(mode: LanguageMode): "en" | "nb" {
+  return resolve(mode);
+}
+
 export function setLanguageMode(mode: LanguageMode): void {
   try {
     localStorage.setItem(LANG_KEY, mode);

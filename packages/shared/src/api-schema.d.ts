@@ -1839,6 +1839,10 @@ export interface components {
             phone?: string | null;
             /** @enum {string} */
             units?: "metric" | "imperial";
+            /** @enum {string} */
+            languageMode?: "auto" | "en" | "nb";
+            /** @enum {string} */
+            language?: "en" | "nb";
         };
         Member: {
             /** @description The family-membership row id (NOT the user id). */
@@ -1871,6 +1875,16 @@ export interface components {
              * @enum {string}
              */
             units: "metric" | "imperial";
+            /**
+             * @description The language the person picked in Settings, followed by every device they sign in on; `auto` follows each device's own language. Null until an app has sent one — the SPA then uploads its device-local choice instead of adopting a default.
+             * @enum {string|null}
+             */
+            languageMode: "auto" | "en" | "nb" | null;
+            /**
+             * @description The language in effect, as the app last resolved it (`auto` resolved on the device). Server-written text — push notifications — is in this language.
+             * @enum {string}
+             */
+            language: "en" | "nb";
             /** @description Nickname when set, else name — what every other member sees (users.display_name, a generated column). */
             displayName: string;
             nickname: string | null;

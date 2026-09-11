@@ -44,11 +44,6 @@ const (
 
 	helpRateLimit         = 5
 	helpRateWindowSeconds = 300
-
-	// helpDefaultBody is the push body when the sender typed nothing.
-	helpDefaultBody = "Can you come?"
-	// helpNameless stands in for a user with no display name in push titles.
-	helpNameless = "Someone"
 )
 
 // hitUserLimit charges one request against a per-user bucket and reports
@@ -98,9 +93,11 @@ func serHelpRequest(row dbgen.GetHelpRequestRow, delivered int) gen.HelpRequest 
 	return out
 }
 
-func displayName(name string) string {
+// displayName is a push title's name for a person, standing in for one
+// with no display name in the recipient's language.
+func displayName(lang, name string) string {
 	if name == "" {
-		return helpNameless
+		return push.T(lang, "Someone")
 	}
 	return name
 }
@@ -154,12 +151,15 @@ func (d Deps) CreateHelpRequest(ctx context.Context, req gen.CreateHelpRequestRe
 		return nil, err
 	}
 
+	// In the recipient's language (internal/push/text.go); a typed
+	// message is the sender's own words and goes as written.
+	lang := d.userLanguage(ctx, toUserID)
 	pushBody := message
 	if pushBody == "" {
-		pushBody = helpDefaultBody
+		pushBody = push.T(lang, "Can you come?")
 	}
 	delivered, err := d.Push.ToUser(ctx, toUserID, push.PushPayload{
-		Title: displayName(row.FromName) + " needs a hand",
+		Title: push.T(lang, "%s needs a hand", displayName(lang, row.FromName)),
 		Body:  pushBody,
 		URL:   "/home",
 	})
@@ -201,9 +201,10 @@ func (d Deps) AcknowledgeHelpRequest(ctx context.Context, req gen.AcknowledgeHel
 	}
 
 	if changed == 1 && row.FromUserID != fam.UserID {
+		lang := d.userLanguage(ctx, row.FromUserID)
 		if _, err := d.Push.ToUser(ctx, row.FromUserID, push.PushPayload{
-			Title: displayName(row.AcknowledgedByName) + " is on the way",
-			Body:  "Answered your request",
+			Title: push.T(lang, "%s is on the way", displayName(lang, row.AcknowledgedByName)),
+			Body:  push.T(lang, "Answered your request"),
 			URL:   "/home",
 		}); err != nil {
 			log.Printf("help: push to %s failed: %v", row.FromUserID, err)

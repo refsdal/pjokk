@@ -461,6 +461,8 @@ type Users struct {
 	AvatarImportedAt pgtype.Timestamptz
 	DisplayName      *string
 	Units            string
+	LanguageMode     *string
+	Language         string
 }
 
 type VaccineDismissal struct {

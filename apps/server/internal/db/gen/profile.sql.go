@@ -67,6 +67,18 @@ func (q *Queries) GetAvatarForViewer(ctx context.Context, arg GetAvatarForViewer
 	return avatar_key, err
 }
 
+const getUserLanguage = `-- name: GetUserLanguage :one
+SELECT "language" FROM "users" WHERE "id" = $1
+`
+
+// The language a push to this person is written in (internal/push/text.go).
+func (q *Queries) GetUserLanguage(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, getUserLanguage, id)
+	var language string
+	err := row.Scan(&language)
+	return language, err
+}
+
 const getUserProfile = `-- name: GetUserProfile :one
 
 SELECT
@@ -76,6 +88,8 @@ SELECT
     "phone",
     COALESCE("display_name", '') AS display_name,
     "units",
+    "language_mode",
+    "language",
     "avatar_key",
     "avatar_imported_at",
     "image"
@@ -90,6 +104,8 @@ type GetUserProfileRow struct {
 	Phone            *string
 	DisplayName      string
 	Units            string
+	LanguageMode     *string
+	Language         string
 	AvatarKey        *string
 	AvatarImportedAt pgtype.Timestamptz
 	Image            *string
@@ -110,6 +126,8 @@ func (q *Queries) GetUserProfile(ctx context.Context, id string) (GetUserProfile
 		&i.Phone,
 		&i.DisplayName,
 		&i.Units,
+		&i.LanguageMode,
+		&i.Language,
 		&i.AvatarKey,
 		&i.AvatarImportedAt,
 		&i.Image,
@@ -160,20 +178,23 @@ func (q *Queries) SetUserAvatar(ctx context.Context, arg SetUserAvatarParams) er
 
 const updateUserProfile = `-- name: UpdateUserProfile :exec
 UPDATE "users"
-SET "name" = $2, "nickname" = $3, "phone" = $4, "units" = $5, "updated_at" = now()
+SET "name" = $2, "nickname" = $3, "phone" = $4, "units" = $5,
+    "language_mode" = $6, "language" = $7, "updated_at" = now()
 WHERE "id" = $1
 `
 
 type UpdateUserProfileParams struct {
-	ID       string
-	Name     *string
-	Nickname *string
-	Phone    *string
-	Units    string
+	ID           string
+	Name         *string
+	Nickname     *string
+	Phone        *string
+	Units        string
+	LanguageMode *string
+	Language     string
 }
 
-// Full-row write of the three editable fields; the handler resolves the
-// PATCH tri-state (absent / null / value) before calling this.
+// Full-row write of the editable fields; the handler resolves the PATCH
+// tri-state (absent / null / value) before calling this.
 func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) error {
 	_, err := q.db.Exec(ctx, updateUserProfile,
 		arg.ID,
@@ -181,6 +202,8 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		arg.Nickname,
 		arg.Phone,
 		arg.Units,
+		arg.LanguageMode,
+		arg.Language,
 	)
 	return err
 }

@@ -71,7 +71,7 @@ func TestSnoozeTokenExpiresAfterTwelveHours(t *testing.T) {
 }
 
 func TestSnoozeActionIsABackgroundPost(t *testing.T) {
-	a := SnoozeAction(testKey, reminder)
+	a := SnoozeAction(testKey, LangEN, reminder)
 	if a.Action != "snooze" || a.Title != "Snooze 15 min" || !a.Post {
 		t.Fatalf("action = %+v", a)
 	}
@@ -81,5 +81,8 @@ func TestSnoozeActionIsABackgroundPost(t *testing.T) {
 	}
 	if _, err := VerifySnooze(testKey, u.Query().Get("t"), sentAt); err != nil {
 		t.Errorf("the button's token does not verify: %v", err)
+	}
+	if nb := SnoozeAction(testKey, LangNB, reminder); nb.Title != "Utsett 15 min" {
+		t.Errorf("nb title = %q", nb.Title)
 	}
 }
