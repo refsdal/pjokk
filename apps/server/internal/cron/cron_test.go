@@ -1,10 +1,9 @@
-// The tests live in `package cron` rather than `package cron_test` (the
-// convention everywhere else in this module) for one reason: runSafely, the
-// recover-and-log wrapper that keeps a panicking job from killing the
-// process, is unexported and has no observable effect through the exported
-// surface — StartScheduler would only exercise it on a real cron tick.
-// Testing it directly is the only way to prove the guarantee REF §A4 states.
-package cron
+// External tests, like the rest of the module. They used to live in package
+// cron to reach runSafely; since internal/api imports this package (the
+// console's Run now), an in-package test importing internal/testrig would be
+// an import cycle, so runSafely and the other seams come through
+// export_test.go instead.
+package cron_test
 
 import (
 	"context"
@@ -16,13 +15,14 @@ import (
 
 	robfig "github.com/robfig/cron/v3"
 
+	"github.com/refsdal/pjokk/server/internal/cron"
 	"github.com/refsdal/pjokk/server/internal/jobs"
 	"github.com/refsdal/pjokk/server/internal/ratelimit"
 	"github.com/refsdal/pjokk/server/internal/testrig"
 )
 
 // recordingRateLimit wraps a real Store and counts Sweep calls, so a test
-// can tell which dispatch branch RunJob took without having to seed expired
+// can tell which dispatch branch cron.RunJob took without having to seed expired
 // counters and read the row count back.
 type recordingRateLimit struct {
 	inner  ratelimit.Store
@@ -43,9 +43,9 @@ func (r *recordingRateLimit) Sweep(ctx context.Context, now time.Time) (int, err
 // depsFor builds cron.Deps the same way cmd/pjokk's composition root does,
 // minus the two swaps a test wants: in-memory storage and a recording push
 // sender (both already wired by testrig.App).
-func depsFor(a *testrig.AppRig) (Deps, *recordingRateLimit) {
+func depsFor(a *testrig.AppRig) (cron.Deps, *recordingRateLimit) {
 	rl := &recordingRateLimit{inner: a.Deps.RateLimit}
-	return Deps{
+	return cron.Deps{
 		Deps: jobs.Deps{
 			Pool:    a.Deps.Pool,
 			Q:       a.Deps.Q,
@@ -58,16 +58,16 @@ func depsFor(a *testrig.AppRig) (Deps, *recordingRateLimit) {
 }
 
 func TestJobsListsBothSchedules(t *testing.T) {
-	if len(Jobs) != 2 || Jobs[0] != "nightly" || Jobs[1] != "frequent" {
-		t.Fatalf("Jobs = %v, want [nightly frequent]", Jobs)
+	if len(cron.Jobs) != 2 || cron.Jobs[0] != "nightly" || cron.Jobs[1] != "frequent" {
+		t.Fatalf("cron.Jobs = %v, want [nightly frequent]", cron.Jobs)
 	}
-	for _, job := range Jobs {
-		if _, ok := Schedules[job]; !ok {
-			t.Errorf("Schedules has no entry for %q", job)
+	for _, job := range cron.Jobs {
+		if _, ok := cron.Schedules[job]; !ok {
+			t.Errorf("cron.Schedules has no entry for %q", job)
 		}
 	}
-	if len(Schedules) != len(Jobs) {
-		t.Errorf("Schedules has %d entries, want %d", len(Schedules), len(Jobs))
+	if len(cron.Schedules) != len(cron.Jobs) {
+		t.Errorf("cron.Schedules has %d entries, want %d", len(cron.Schedules), len(cron.Jobs))
 	}
 }
 
@@ -78,7 +78,7 @@ func TestJobsListsBothSchedules(t *testing.T) {
 func TestSchedulesFireAtTheDocumentedUTCTimes(t *testing.T) {
 	parser := robfig.NewParser(robfig.Minute | robfig.Hour | robfig.Dom | robfig.Month | robfig.Dow)
 
-	nightly, err := parser.Parse(Schedules["nightly"])
+	nightly, err := parser.Parse(cron.Schedules["nightly"])
 	if err != nil {
 		t.Fatalf("parse nightly schedule: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestSchedulesFireAtTheDocumentedUTCTimes(t *testing.T) {
 		t.Errorf("nightly next = %s, want %s", got, want)
 	}
 
-	frequent, err := parser.Parse(Schedules["frequent"])
+	frequent, err := parser.Parse(cron.Schedules["frequent"])
 	if err != nil {
 		t.Fatalf("parse frequent schedule: %v", err)
 	}
@@ -105,8 +105,8 @@ func TestRunJobNightlyBacksUpAndSweeps(t *testing.T) {
 	a.SetNow(now)
 
 	d, rl := depsFor(a)
-	if err := RunJob(context.Background(), "nightly", d); err != nil {
-		t.Fatalf("RunJob(nightly): %v", err)
+	if err := cron.RunJob(context.Background(), "nightly", d); err != nil {
+		t.Fatalf("cron.RunJob(nightly): %v", err)
 	}
 
 	objects, err := a.Deps.Storage.List(context.Background(), "backups/")
@@ -151,13 +151,13 @@ func TestRunJobFrequentSendsDueReminders(t *testing.T) {
 	}
 
 	// Pin the clock AFTER the fixtures are written: the reminder sweep reads
-	// the same Deps.Now the API writes through, and a rewound clock would
+	// the same cron.Deps.Now the API writes through, and a rewound clock would
 	// make the 4-hour-old feed look like it is in the future.
 	a.SetNow(now)
 
 	d, rl := depsFor(a)
-	if err := RunJob(context.Background(), "frequent", d); err != nil {
-		t.Fatalf("RunJob(frequent): %v", err)
+	if err := cron.RunJob(context.Background(), "frequent", d); err != nil {
+		t.Fatalf("cron.RunJob(frequent): %v", err)
 	}
 
 	// Queried by email rather than LIMIT 1: db.EnsureTombstone seeds a
@@ -190,9 +190,9 @@ func TestRunJobUnknownNameErrors(t *testing.T) {
 	a := testrig.App(t)
 	d, rl := depsFor(a)
 
-	err := RunJob(context.Background(), "nightlyy", d)
+	err := cron.RunJob(context.Background(), "nightlyy", d)
 	if err == nil {
-		t.Fatal("RunJob(nightlyy) = nil, want an error")
+		t.Fatal("cron.RunJob(nightlyy) = nil, want an error")
 	}
 	if !strings.Contains(err.Error(), "nightlyy") {
 		t.Errorf("error %q does not name the bad job", err)
@@ -210,14 +210,14 @@ func TestRunJobUnknownNameErrors(t *testing.T) {
 }
 
 func TestIsJob(t *testing.T) {
-	for _, name := range Jobs {
-		if !IsJob(name) {
-			t.Errorf("IsJob(%q) = false, want true", name)
+	for _, name := range cron.Jobs {
+		if !cron.IsJob(name) {
+			t.Errorf("cron.IsJob(%q) = false, want true", name)
 		}
 	}
 	for _, name := range []string{"", "Nightly", "backup", "frequent "} {
-		if IsJob(name) {
-			t.Errorf("IsJob(%q) = true, want false", name)
+		if cron.IsJob(name) {
+			t.Errorf("cron.IsJob(%q) = true, want false", name)
 		}
 	}
 }
@@ -226,24 +226,24 @@ func TestIsJob(t *testing.T) {
 // the process." runSafely is that wrapper; a panic escaping it would take
 // down a container that is otherwise healthy.
 func TestRunSafelySwallowsPanics(t *testing.T) {
-	runSafely(context.Background(), "boom", func(context.Context) error {
+	cron.RunSafely(context.Background(), "boom", func(context.Context) error {
 		panic("job exploded")
 	})
-	runSafely(context.Background(), "sad", func(context.Context) error {
+	cron.RunSafely(context.Background(), "sad", func(context.Context) error {
 		return errors.New("job failed")
 	})
 	// Reaching here at all is the assertion: neither call unwound the stack.
 }
 
-// StartScheduler must hand back a stop function that actually stops, and it
+// cron.StartScheduler must hand back a stop function that actually stops, and it
 // must be safe to call even though no tick has fired.
 func TestStartSchedulerStops(t *testing.T) {
 	a := testrig.App(t)
 	d, _ := depsFor(a)
 
-	stop := StartScheduler(d)
+	stop := cron.StartScheduler(d)
 	if stop == nil {
-		t.Fatal("StartScheduler returned a nil stop func")
+		t.Fatal("cron.StartScheduler returned a nil stop func")
 	}
 	stop()
 }

@@ -25,6 +25,9 @@ type ServerInterface interface {
 	// CreateAdminAuditNote Append an entry to the trail by hand, for an admin action performed outside these routes. System admin only.
 	// (POST /api/admin/audit)
 	CreateAdminAuditNote(w http.ResponseWriter, r *http.Request)
+	// ListAdminBackups The nightly snapshots in storage, newest first, with their sizes, and the photo backup's object counts. Downloading one is GET /api/admin/backups/{date} — hand-routed, as a streamed body is, and audited — which is why it is not described here. System admin only.
+	// (GET /api/admin/backups)
+	ListAdminBackups(w http.ResponseWriter, r *http.Request)
 	// ListAdminFamilies Families on the platform with member and baby counts, whether each still has an admin, and the timestamp of its most recent feed (null when it has never logged one). `query` filters on name or slug (case-insensitive substring). One page at a time, newest first: pass the previous page's `nextCursor` as `cursor` (`limit` 50 by default, 200 at most); a malformed cursor is a 400. System admin only.
 	// (GET /api/admin/families)
 	ListAdminFamilies(w http.ResponseWriter, r *http.Request, params ListAdminFamiliesParams)
@@ -59,6 +62,12 @@ type ServerInterface interface {
 	// SetAdminFamilyMemberRole Change a member's role within a family. Demoting the last admin is refused for the same reason removing them is. Audited as `family.member.role`. System admin only.
 	// (POST /api/admin/families/{id}/members/{memberId}/role)
 	SetAdminFamilyMemberRole(w http.ResponseWriter, r *http.Request, id IdPath, memberId MemberIdPath)
+	// RunAdminJob Run a scheduled job now, exactly as its schedule would. Takes the job's lock and records the run, writes an audit row naming it, then answers 202 while the job carries on in the background. 409 JOB_RUNNING when it is already running anywhere. System admin only.
+	// (POST /api/admin/jobs/{job}/run)
+	RunAdminJob(w http.ResponseWriter, r *http.Request, job RunAdminJobParamsJob)
+	// GetAdminOps The operator's health page (spec 2026-09-11-admin-ops §2): the build and schema versions, where storage points, the database's size, and each scheduled job's recent runs, next due time and staleness. Never a credential. System admin only.
+	// (GET /api/admin/ops)
+	GetAdminOps(w http.ResponseWriter, r *http.Request)
 	// GetAdminStats Platform totals for the /admin dashboard. coreLogs is feeds + diapers + sleeps; usersLast7d counts accounts created in the last seven days. System admin only.
 	// (GET /api/admin/stats)
 	GetAdminStats(w http.ResponseWriter, r *http.Request)
@@ -521,6 +530,20 @@ func (siw *ServerInterfaceWrapper) CreateAdminAuditNote(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// ListAdminBackups operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminBackups(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminBackups(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminFamilies operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminFamilies(w http.ResponseWriter, r *http.Request) {
 
@@ -855,6 +878,46 @@ func (siw *ServerInterfaceWrapper) SetAdminFamilyMemberRole(w http.ResponseWrite
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetAdminFamilyMemberRole(w, r, id, memberId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RunAdminJob operation middleware
+func (siw *ServerInterfaceWrapper) RunAdminJob(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "job" -------------
+	var job RunAdminJobParamsJob
+
+	err = runtime.BindStyledParameterWithOptions("simple", "job", r.PathValue("job"), &job, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "job", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RunAdminJob(w, r, job)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminOps operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminOps(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminOps(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4252,6 +4315,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/stop-impersonating", wrapper.StopImpersonating)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/admin/audit", wrapper.ListAdminAudit)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/audit", wrapper.CreateAdminAuditNote)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/admin/ops", wrapper.GetAdminOps)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/jobs/{job}/run", wrapper.RunAdminJob)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/admin/backups", wrapper.ListAdminBackups)
 
 	return m
 }
@@ -4303,6 +4369,27 @@ type CreateAdminAuditNoteResponseObject interface {
 type CreateAdminAuditNote200JSONResponse Ok
 
 func (response CreateAdminAuditNote200JSONResponse) VisitCreateAdminAuditNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAdminBackupsRequestObject struct {
+}
+
+type ListAdminBackupsResponseObject interface {
+	VisitListAdminBackupsResponse(w http.ResponseWriter) error
+}
+
+type ListAdminBackups200JSONResponse AdminBackups
+
+func (response ListAdminBackups200JSONResponse) VisitListAdminBackupsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -4770,6 +4857,63 @@ func (response SetAdminFamilyMemberRole404JSONResponse) VisitSetAdminFamilyMembe
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RunAdminJobRequestObject struct {
+	Job RunAdminJobParamsJob `json:"job"`
+}
+
+type RunAdminJobResponseObject interface {
+	VisitRunAdminJobResponse(w http.ResponseWriter) error
+}
+
+type RunAdminJob202JSONResponse AdminJobStarted
+
+func (response RunAdminJob202JSONResponse) VisitRunAdminJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RunAdminJob409JSONResponse Error
+
+func (response RunAdminJob409JSONResponse) VisitRunAdminJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAdminOpsRequestObject struct {
+}
+
+type GetAdminOpsResponseObject interface {
+	VisitGetAdminOpsResponse(w http.ResponseWriter) error
+}
+
+type GetAdminOps200JSONResponse AdminOps
+
+func (response GetAdminOps200JSONResponse) VisitGetAdminOpsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -9323,6 +9467,9 @@ type StrictServerInterface interface {
 	// CreateAdminAuditNote Append an entry to the trail by hand, for an admin action performed outside these routes. System admin only.
 	// (POST /api/admin/audit)
 	CreateAdminAuditNote(ctx context.Context, request CreateAdminAuditNoteRequestObject) (CreateAdminAuditNoteResponseObject, error)
+	// ListAdminBackups The nightly snapshots in storage, newest first, with their sizes, and the photo backup's object counts. Downloading one is GET /api/admin/backups/{date} — hand-routed, as a streamed body is, and audited — which is why it is not described here. System admin only.
+	// (GET /api/admin/backups)
+	ListAdminBackups(ctx context.Context, request ListAdminBackupsRequestObject) (ListAdminBackupsResponseObject, error)
 	// ListAdminFamilies Families on the platform with member and baby counts, whether each still has an admin, and the timestamp of its most recent feed (null when it has never logged one). `query` filters on name or slug (case-insensitive substring). One page at a time, newest first: pass the previous page's `nextCursor` as `cursor` (`limit` 50 by default, 200 at most); a malformed cursor is a 400. System admin only.
 	// (GET /api/admin/families)
 	ListAdminFamilies(ctx context.Context, request ListAdminFamiliesRequestObject) (ListAdminFamiliesResponseObject, error)
@@ -9357,6 +9504,12 @@ type StrictServerInterface interface {
 	// SetAdminFamilyMemberRole Change a member's role within a family. Demoting the last admin is refused for the same reason removing them is. Audited as `family.member.role`. System admin only.
 	// (POST /api/admin/families/{id}/members/{memberId}/role)
 	SetAdminFamilyMemberRole(ctx context.Context, request SetAdminFamilyMemberRoleRequestObject) (SetAdminFamilyMemberRoleResponseObject, error)
+	// RunAdminJob Run a scheduled job now, exactly as its schedule would. Takes the job's lock and records the run, writes an audit row naming it, then answers 202 while the job carries on in the background. 409 JOB_RUNNING when it is already running anywhere. System admin only.
+	// (POST /api/admin/jobs/{job}/run)
+	RunAdminJob(ctx context.Context, request RunAdminJobRequestObject) (RunAdminJobResponseObject, error)
+	// GetAdminOps The operator's health page (spec 2026-09-11-admin-ops §2): the build and schema versions, where storage points, the database's size, and each scheduled job's recent runs, next due time and staleness. Never a credential. System admin only.
+	// (GET /api/admin/ops)
+	GetAdminOps(ctx context.Context, request GetAdminOpsRequestObject) (GetAdminOpsResponseObject, error)
 	// GetAdminStats Platform totals for the /admin dashboard. coreLogs is feeds + diapers + sleeps; usersLast7d counts accounts created in the last seven days. System admin only.
 	// (GET /api/admin/stats)
 	GetAdminStats(ctx context.Context, request GetAdminStatsRequestObject) (GetAdminStatsResponseObject, error)
@@ -9833,6 +9986,30 @@ func (sh *strictHandler) CreateAdminAuditNote(w http.ResponseWriter, r *http.Req
 	}
 }
 
+// ListAdminBackups operation middleware
+func (sh *strictHandler) ListAdminBackups(w http.ResponseWriter, r *http.Request) {
+	var request ListAdminBackupsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAdminBackups(ctx, request.(ListAdminBackupsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAdminBackups")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAdminBackupsResponseObject); ok {
+		if err := validResponse.VisitListAdminBackupsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListAdminFamilies operation middleware
 func (sh *strictHandler) ListAdminFamilies(w http.ResponseWriter, r *http.Request, params ListAdminFamiliesParams) {
 	var request ListAdminFamiliesRequestObject
@@ -10152,6 +10329,56 @@ func (sh *strictHandler) SetAdminFamilyMemberRole(w http.ResponseWriter, r *http
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetAdminFamilyMemberRoleResponseObject); ok {
 		if err := validResponse.VisitSetAdminFamilyMemberRoleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RunAdminJob operation middleware
+func (sh *strictHandler) RunAdminJob(w http.ResponseWriter, r *http.Request, job RunAdminJobParamsJob) {
+	var request RunAdminJobRequestObject
+
+	request.Job = job
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RunAdminJob(ctx, request.(RunAdminJobRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RunAdminJob")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RunAdminJobResponseObject); ok {
+		if err := validResponse.VisitRunAdminJobResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAdminOps operation middleware
+func (sh *strictHandler) GetAdminOps(w http.ResponseWriter, r *http.Request) {
+	var request GetAdminOpsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAdminOps(ctx, request.(GetAdminOpsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAdminOps")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAdminOpsResponseObject); ok {
+		if err := validResponse.VisitGetAdminOpsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

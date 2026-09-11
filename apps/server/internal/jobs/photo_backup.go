@@ -34,6 +34,10 @@ const (
 	photoSourcePrefix  = "milestone-photos/"
 	photoCurrentPrefix = "photo-backups/current/"
 	photoDeletedPrefix = "photo-backups/deleted/"
+
+	// Exported for the console's backup list, which counts both trees.
+	PhotoBackupCurrentPrefix = photoCurrentPrefix
+	PhotoBackupDeletedPrefix = photoDeletedPrefix
 )
 
 var photoDeletedPattern = regexp.MustCompile(`^photo-backups/deleted/(\d{4}-\d{2}-\d{2})/`)

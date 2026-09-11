@@ -119,6 +119,23 @@ var DeliberatelyExcluded = map[string]bool{
 // to for a deletion to fully take effect.
 const backupRetentionDays = 30
 
+// BackupRetentionDays is backupRetentionDays for the console's backup list,
+// which states how long a snapshot is kept.
+const BackupRetentionDays = backupRetentionDays
+
+// SnapshotDate is the date (YYYY-MM-DD) a nightly snapshot's key names, and
+// whether key is a snapshot's key at all.
+func SnapshotDate(key string) (string, bool) {
+	m := backupKeyPattern.FindStringSubmatch(key)
+	if m == nil {
+		return "", false
+	}
+	return m[1], true
+}
+
+// SnapshotKey is the object key of the snapshot RunBackup writes for date.
+func SnapshotKey(date string) string { return "backups/" + date + ".json" }
+
 // backupKeyPattern matches the date a snapshot key was written under, e.g.
 // "backups/2026-08-24.json" -> "2026-08-24".
 var backupKeyPattern = regexp.MustCompile(`^backups/(\d{4}-\d{2}-\d{2})\.json$`)

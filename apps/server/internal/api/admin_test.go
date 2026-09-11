@@ -172,6 +172,9 @@ func TestAdminRoutesRequireSysadmin(t *testing.T) {
 		{http.MethodDelete, "/api/admin/users/" + userID + "/sessions/some-session"},
 		{http.MethodGet, "/api/admin/audit"},
 		{http.MethodPost, "/api/admin/audit"},
+		{http.MethodGet, "/api/admin/ops"},
+		{http.MethodPost, "/api/admin/jobs/frequent/run"},
+		{http.MethodGet, "/api/admin/backups"},
 	}
 
 	for _, route := range routes {

@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -608,6 +609,7 @@ func buildDeps(ctx context.Context, cfg *config.Config) (api.Deps, func(), error
 		// never be the same bytes even though all derive from AUTH_SECRET.
 		DevicePINKey: sha256.Sum256([]byte(cfg.AuthSecret + ":device-pin")),
 		Version:      buildinfo.Version,
+		StorageInfo:  storageInfo(cfg),
 
 		OpenSignup:     cfg.OpenSignup,
 		OAuthProviders: oauthProviders(cfg),
@@ -626,6 +628,24 @@ func buildDeps(ctx context.Context, cfg *config.Config) (api.Deps, func(), error
 		ExtraRoutes: nil,
 	}
 	return deps, closePool, nil
+}
+
+// storageInfo describes where files live for the console's Ops page — the
+// bucket, region and endpoint host, or the path — and deliberately nothing
+// that opens it: the access keys never leave config.
+func storageInfo(cfg *config.Config) api.StorageInfo {
+	info := api.StorageInfo{Driver: cfg.StorageDriver}
+	switch cfg.StorageDriver {
+	case "s3":
+		info.Bucket = cfg.S3Bucket
+		info.Region = cfg.S3Region
+		if u, err := url.Parse(cfg.S3Endpoint); err == nil {
+			info.Endpoint = u.Host
+		}
+	case "fs":
+		info.Path = cfg.StorageFSPath
+	}
+	return info
 }
 
 // oauthProviders lists the OAuth provider ids the SPA may offer, derived
