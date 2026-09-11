@@ -41,21 +41,61 @@ export const BOOLEAN_COLS = new Set([
   "reaction",
 ]);
 
-const at = (msValue) => `'${new Date(msValue).toISOString()}'`;
+export const FAMILY_REF = "family_id";
+export const CARETAKER_REF = "caretaker_id";
+const COLUMN_REFS = new Set([FAMILY_REF, CARETAKER_REF]);
 
+// Exactly what esc() produces: one single-quoted literal with every inner
+// quote doubled. Under standard_conforming_strings (Postgres's default
+// since 9.1) nothing inside it can end it early.
+const QUOTED_LITERAL = /^'(?:[^']|'')*'$/;
+
+const refuse = (col, v, why) => {
+  const shown =
+    typeof v === "string"
+      ? JSON.stringify(v.length > 60 ? `${v.slice(0, 60)}…` : v)
+      : `${typeof v} ${String(v)}`;
+  throw new Error(
+    `import-writer: refusing to write ${shown} into ${col}: ${why}`,
+  );
+};
+
+const at = (col, msValue) => {
+  const d = new Date(msValue);
+  if (Number.isNaN(d.getTime())) refuse(col, msValue, "not a valid date");
+  return `'${d.toISOString()}'`;
+};
+
+// render() fails closed (issue #94). A reader's value reaches the SQL only
+// if it is provably one of: a finite number, NULL, TRUE / FALSE, one of the
+// writer's own column references, or a well-formed quoted literal. Anything
+// else throws, so a reader that forgets to coerce or escape a cell aborts
+// the import instead of pasting the export's text into the statement.
 export const render = (col, v) => {
   if (v === "NULL" || v === null || v === undefined) return "NULL";
-  if (TIMESTAMP_COLS.has(col) && typeof v === "number") return at(v);
   if (BOOLEAN_COLS.has(col)) {
     if (v === "TRUE" || v === "true") return "true";
     if (v === "FALSE" || v === "false") return "false";
     return v && v !== "0" ? "true" : "false";
   }
-  return v;
+  if (typeof v === "number") {
+    if (!Number.isFinite(v)) refuse(col, v, "not a finite number");
+    return TIMESTAMP_COLS.has(col) ? at(col, v) : String(v);
+  }
+  if (
+    typeof v === "string" &&
+    (v === "TRUE" ||
+      v === "FALSE" ||
+      COLUMN_REFS.has(v) ||
+      QUOTED_LITERAL.test(v))
+  )
+    return v;
+  return refuse(
+    col,
+    v,
+    "not a number, NULL, TRUE/FALSE, a column reference or a quoted literal (coerce or esc() it in the reader)",
+  );
 };
-
-export const FAMILY_REF = "family_id";
-export const CARETAKER_REF = "caretaker_id";
 
 /**
  * createWriter({ resolveEmail?, familyId?, caretakerId?, now? })
@@ -92,8 +132,21 @@ export function createWriter({
     counts[table] = (counts[table] ?? 0) + 1;
   };
 
+  // The address is also spliced into RAISE's format string inside a
+  // dollar-quoted DO body: a quote is doubled for the string literal, a
+  // percent sign for the format, and the body gets a tag of the writer's own
+  // rather than $$, which an address may legally contain and which would
+  // close the body early. An address containing that tag is refused.
+  const DO_TAG = "$pjokk_import$";
   const prelude = () => {
     if (!resolveEmail) return;
+    if (String(resolveEmail).includes(DO_TAG))
+      throw new Error(
+        `--resolve-by-email: the address may not contain ${DO_TAG}`,
+      );
+    const inRaise = String(resolveEmail)
+      .replaceAll("'", "''")
+      .replaceAll("%", "%%");
     out.push(
       "BEGIN;",
       "",
@@ -107,14 +160,14 @@ export function createWriter({
       'JOIN "organizations" o ON o.id = m.organization_id',
       `WHERE u.email = ${esc(resolveEmail)} AND u.deleted_at IS NULL;`,
       "",
-      "DO $$",
+      `DO ${DO_TAG}`,
       "DECLARE n int;",
       "BEGIN",
       "  SELECT count(*) INTO n FROM _import_target;",
       "  IF n <> 1 THEN",
-      `    RAISE EXCEPTION 'expected exactly one (user, family) for ${resolveEmail}, found %', n;`,
+      `    RAISE EXCEPTION 'expected exactly one (user, family) for ${inRaise}, found %', n;`,
       "  END IF;",
-      "END $$;",
+      `END ${DO_TAG};`,
       "",
     );
   };
