@@ -143,8 +143,13 @@ var backupKeyPattern = regexp.MustCompile(`^backups/(\d{4}-\d{2}-\d{2})\.json$`)
 // backupSnapshot is the JSON shape written to object storage:
 // {exportedAt, tables: {name: rows[]}}, matching backup.ts's dump literal.
 type backupSnapshot struct {
-	ExportedAt string                      `json:"exportedAt"`
-	Tables     map[string][]map[string]any `json:"tables"`
+	ExportedAt string `json:"exportedAt"`
+	// SchemaVersion is the applied goose version when the snapshot was
+	// taken, so a restore can tell which schema wrote it (spec
+	// 2026-09-11-admin-restore §1). Snapshots written before it existed
+	// lack it.
+	SchemaVersion int64                       `json:"schemaVersion"`
+	Tables        map[string][]map[string]any `json:"tables"`
 }
 
 // RunBackup dumps every table in BackupTables to a single dated JSON
@@ -216,10 +221,19 @@ func RunBackup(ctx context.Context, d Deps, now time.Time) (string, error) {
 		dump[table] = records
 	}
 
+	// goose's own table, which sqlc cannot see.
+	var version int64
+	if err := d.Pool.QueryRow(ctx,
+		`SELECT COALESCE(MAX("version_id"), 0) FROM "goose_db_version" WHERE "is_applied"`,
+	).Scan(&version); err != nil {
+		return "", fmt.Errorf("jobs: backup: read the schema version: %w", err)
+	}
+
 	key := fmt.Sprintf("backups/%s.json", now.UTC().Format("2006-01-02"))
 	body, err := json.Marshal(backupSnapshot{
-		ExportedAt: now.UTC().Format(time.RFC3339),
-		Tables:     dump,
+		ExportedAt:    now.UTC().Format(time.RFC3339),
+		SchemaVersion: version,
+		Tables:        dump,
 	})
 	if err != nil {
 		return "", fmt.Errorf("jobs: marshal backup snapshot: %w", err)

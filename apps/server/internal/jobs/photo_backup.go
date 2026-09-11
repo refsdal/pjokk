@@ -35,7 +35,9 @@ const (
 	photoCurrentPrefix = "photo-backups/current/"
 	photoDeletedPrefix = "photo-backups/deleted/"
 
-	// Exported for the console's backup list, which counts both trees.
+	// Exported for the console's backup list, which counts both trees, and
+	// for internal/restore, which copies photos back out of them.
+	PhotoSourcePrefix        = photoSourcePrefix
 	PhotoBackupCurrentPrefix = photoCurrentPrefix
 	PhotoBackupDeletedPrefix = photoDeletedPrefix
 )

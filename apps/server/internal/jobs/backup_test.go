@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/refsdal/pjokk/server/internal/db"
 	"github.com/refsdal/pjokk/server/internal/jobs"
 	"github.com/refsdal/pjokk/server/internal/storage"
 	"github.com/refsdal/pjokk/server/internal/testrig"
@@ -296,5 +297,30 @@ func TestPruneBackupsIsANoOpWhenEverySnapshotIsRecent(t *testing.T) {
 	}
 	if len(removed) != 0 {
 		t.Errorf("removed = %v, want none", removed)
+	}
+}
+
+// A restore needs to know which schema wrote a snapshot (spec
+// 2026-09-11-admin-restore §1).
+func TestRunBackupRecordsTheSchemaVersion(t *testing.T) {
+	a := testrig.App(t)
+	d := depsFor(a)
+	key, err := jobs.RunBackup(context.Background(), d, time.Date(2026, 9, 10, 3, 15, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("RunBackup: %v", err)
+	}
+	raw, _ := d.Storage.(*storage.Memory).Read(key)
+	var snap struct {
+		SchemaVersion int64 `json:"schemaVersion"`
+	}
+	if err := json.Unmarshal(raw, &snap); err != nil {
+		t.Fatal(err)
+	}
+	latest, err := db.LatestMigrationVersion()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snap.SchemaVersion != latest {
+		t.Errorf("schemaVersion = %d, want the rig's %d", snap.SchemaVersion, latest)
 	}
 }
