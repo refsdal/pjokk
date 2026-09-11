@@ -97,7 +97,7 @@ export function DevicesSection() {
   // The spare iPad a parent is already signed in on: this browser stops
   // being theirs and continues on the set-up screen with the code in hand.
   // Relative, not setupUrl: the tablet stays on the origin it is already on.
-  const useThisDevice = async (code: DeviceCode) => {
+  const continueOnThisDevice = async (code: DeviceCode) => {
     await signOut().catch(() => {});
     await resetCache();
     window.location.assign(
@@ -150,7 +150,7 @@ export function DevicesSection() {
               <Button
                 size="full"
                 variant="outline"
-                onClick={() => void useThisDevice(shown)}
+                onClick={() => void continueOnThisDevice(shown)}
               >
                 {t("Use this device")}
               </Button>
