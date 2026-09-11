@@ -66,6 +66,8 @@ var BackupTables = []string{
 	"calendar_event",
 	"calendar_event_baby",
 	"calendar_assignee",
+	// One occurrence taken out of a series (00016).
+	"calendar_event_skip",
 	"push_subscription",
 	"reminder",
 	"api_key",

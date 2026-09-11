@@ -93,6 +93,12 @@ func (d Deps) calendarICS(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	skips, err := d.skipsByEvent(ctx, fam.FamilyID, ids)
+	if err != nil {
+		http.Error(w, "calendar read failed", http.StatusInternalServerError)
+		return
+	}
+
 	var b strings.Builder
 	line := func(s string) { b.WriteString(foldICSLine(s) + "\r\n") }
 	line("BEGIN:VCALENDAR")
@@ -122,6 +128,18 @@ func (d Deps) calendarICS(w http.ResponseWriter, r *http.Request) {
 		}
 		if rr := seriesOf(row.StartTime, row.Recurrence, row.RecurrenceUntil).RRule(); rr != "" {
 			line("RRULE:" + rr)
+			// Occurrences taken out of the series ("this event" deleted or
+			// detached), in the same form as DTSTART.
+			exdates := skips[row.ID]
+			sort.Slice(exdates, func(i, j int) bool { return exdates[i].Before(exdates[j]) })
+			for _, skip := range exdates {
+				local := skip.In(recur.Location)
+				if row.AllDay {
+					line("EXDATE;VALUE=DATE:" + local.Format("20060102"))
+				} else {
+					line("EXDATE;TZID=Europe/Oslo:" + local.Format("20060102T150405"))
+				}
+			}
 		}
 		line("SUMMARY:" + escapeICS(row.Title))
 		var desc []string

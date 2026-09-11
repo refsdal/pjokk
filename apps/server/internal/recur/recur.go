@@ -56,6 +56,30 @@ type Series struct {
 	Start time.Time
 	Rule  Rule
 	Until *time.Time // inclusive on the occurrence's start; nil = forever
+	// Skip are occurrences taken out of the series — "this event" deleted
+	// or detached (00016_calendar_event_skip.sql) — matched on the instant.
+	Skip []time.Time
+}
+
+// skipped reports whether occ was taken out of the series.
+func (s Series) skipped(occ time.Time) bool {
+	for _, k := range s.Skip {
+		if k.Equal(occ) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsOccurrence reports whether t is the start of one of the series'
+// occurrences: on the rule, within Until, and not skipped. A one-off has
+// no occurrences to single out, so it is always false for one.
+func (s Series) IsOccurrence(t time.Time) bool {
+	if s.Rule == None {
+		return false
+	}
+	next, ok := s.NextOnOrAfter(t)
+	return ok && next.Equal(t)
 }
 
 // Nth returns the n-th occurrence (0 = Start) in Location, with day clamping
@@ -112,7 +136,7 @@ func (s Series) Between(from, to time.Time) []time.Time {
 		if !occ.Before(to) || !s.within(occ) {
 			break
 		}
-		if !occ.Before(from) {
+		if !occ.Before(from) && !s.skipped(occ) {
 			out = append(out, occ)
 		}
 	}
@@ -144,7 +168,7 @@ func (s Series) NextOnOrAfter(t time.Time) (time.Time, bool) {
 		if !s.within(occ) {
 			return time.Time{}, false
 		}
-		if !occ.Before(t) {
+		if !occ.Before(t) && !s.skipped(occ) {
 			return occ, true
 		}
 		n++

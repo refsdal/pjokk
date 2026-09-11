@@ -93,6 +93,13 @@ type CalendarEventBaby struct {
 	BabyID  string
 }
 
+type CalendarEventSkip struct {
+	FamilyID        string
+	EventID         string
+	OccurrenceStart pgtype.Timestamptz
+	CreatedAt       pgtype.Timestamptz
+}
+
 type Contact struct {
 	ID        string
 	FamilyID  string

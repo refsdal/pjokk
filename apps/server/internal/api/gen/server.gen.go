@@ -143,12 +143,12 @@ type ServerInterface interface {
 	// CreateCalendarEvent Create a family-wide (or baby-specific) event. babyIds/ assigneeUserIds must belong to the caller's family — see internal/api/calendar.go's refsValid. Duplicate ids are deduped before insert.
 	// (POST /api/calendar/events)
 	CreateCalendarEvent(w http.ResponseWriter, r *http.Request)
-	// DeleteCalendarEvent Delete an event; its link rows cascade.
+	// DeleteCalendarEvent Delete an event; its link rows cascade. With `occurrence`, only that occurrence is taken out of the series (the ICS feed lists it as an EXDATE) and the rest stays.
 	// (DELETE /api/calendar/events/{id})
-	DeleteCalendarEvent(w http.ResponseWriter, r *http.Request, id IdPath)
-	// UpdateCalendarEvent Partial update. `description`/`location`/`durationMin`/ `remindMinutesBefore` may be sent as `null` to CLEAR that column; `title`/`category`/`startTime`/`allDay` are not nullable — only settable or omitted. An event that IS (or becomes, via this same PATCH) all-day always has durationMin cleared. Changing `startTime` or `remindMinutesBefore` re-arms the reminder sweep (clears remindedAt). `babyIds`/`assigneeUserIds`, when present, REPLACE the link set; omitted leaves it untouched.
+	DeleteCalendarEvent(w http.ResponseWriter, r *http.Request, id IdPath, params DeleteCalendarEventParams)
+	// UpdateCalendarEvent Partial update. `description`/`location`/`durationMin`/ `remindMinutesBefore` may be sent as `null` to CLEAR that column; `title`/`category`/`startTime`/`allDay` are not nullable — only settable or omitted. An event that IS (or becomes, via this same PATCH) all-day always has durationMin cleared. Changing `startTime` or `remindMinutesBefore` re-arms the reminder sweep (clears remindedAt). `babyIds`/`assigneeUserIds`, when present, REPLACE the link set; omitted leaves it untouched. With `occurrence`, that one occurrence is taken out of the series and a standalone event carrying the patch (over the series' fields, links and reminder) is created in its place; the response is that NEW event, and recurrence fields in the body are ignored. An edit to the whole series that changes its start or rule clears its skipped occurrences.
 	// (PATCH /api/calendar/events/{id})
-	UpdateCalendarEvent(w http.ResponseWriter, r *http.Request, id IdPath)
+	UpdateCalendarEvent(w http.ResponseWriter, r *http.Request, id IdPath, params UpdateCalendarEventParams)
 	// GetConfig Public client configuration: which account-creation paths the /login and /join screens should offer. No session required, and no secrets in the response — just two booleans-worth of config the client could otherwise only infer indirectly (e.g. by trying a credential signup and reading the 403).
 	// (GET /api/config)
 	GetConfig(w http.ResponseWriter, r *http.Request)
@@ -1617,8 +1617,24 @@ func (siw *ServerInterfaceWrapper) DeleteCalendarEvent(w http.ResponseWriter, r 
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteCalendarEventParams
+
+	// ------------- Optional query parameter "occurrence" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "occurrence", r.URL.Query(), &params.Occurrence, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "occurrence"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "occurrence", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteCalendarEvent(w, r, id)
+		siw.Handler.DeleteCalendarEvent(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1643,8 +1659,24 @@ func (siw *ServerInterfaceWrapper) UpdateCalendarEvent(w http.ResponseWriter, r 
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateCalendarEventParams
+
+	// ------------- Optional query parameter "occurrence" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "occurrence", r.URL.Query(), &params.Occurrence, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "occurrence"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "occurrence", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateCalendarEvent(w, r, id)
+		siw.Handler.UpdateCalendarEvent(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5964,7 +5996,8 @@ func (response CreateCalendarEvent400JSONResponse) VisitCreateCalendarEventRespo
 }
 
 type DeleteCalendarEventRequestObject struct {
-	Id IdPath `json:"id"`
+	Id     IdPath `json:"id"`
+	Params DeleteCalendarEventParams
 }
 
 type DeleteCalendarEventResponseObject interface {
@@ -5985,6 +6018,20 @@ func (response DeleteCalendarEvent200JSONResponse) VisitDeleteCalendarEventRespo
 	return err
 }
 
+type DeleteCalendarEvent400JSONResponse Error
+
+func (response DeleteCalendarEvent400JSONResponse) VisitDeleteCalendarEventResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type DeleteCalendarEvent404JSONResponse Error
 
 func (response DeleteCalendarEvent404JSONResponse) VisitDeleteCalendarEventResponse(w http.ResponseWriter) error {
@@ -6000,8 +6047,9 @@ func (response DeleteCalendarEvent404JSONResponse) VisitDeleteCalendarEventRespo
 }
 
 type UpdateCalendarEventRequestObject struct {
-	Id   IdPath `json:"id"`
-	Body *UpdateCalendarEventJSONRequestBody
+	Id     IdPath `json:"id"`
+	Params UpdateCalendarEventParams
+	Body   *UpdateCalendarEventJSONRequestBody
 }
 
 type UpdateCalendarEventResponseObject interface {
@@ -9741,10 +9789,10 @@ type StrictServerInterface interface {
 	// CreateCalendarEvent Create a family-wide (or baby-specific) event. babyIds/ assigneeUserIds must belong to the caller's family — see internal/api/calendar.go's refsValid. Duplicate ids are deduped before insert.
 	// (POST /api/calendar/events)
 	CreateCalendarEvent(ctx context.Context, request CreateCalendarEventRequestObject) (CreateCalendarEventResponseObject, error)
-	// DeleteCalendarEvent Delete an event; its link rows cascade.
+	// DeleteCalendarEvent Delete an event; its link rows cascade. With `occurrence`, only that occurrence is taken out of the series (the ICS feed lists it as an EXDATE) and the rest stays.
 	// (DELETE /api/calendar/events/{id})
 	DeleteCalendarEvent(ctx context.Context, request DeleteCalendarEventRequestObject) (DeleteCalendarEventResponseObject, error)
-	// UpdateCalendarEvent Partial update. `description`/`location`/`durationMin`/ `remindMinutesBefore` may be sent as `null` to CLEAR that column; `title`/`category`/`startTime`/`allDay` are not nullable — only settable or omitted. An event that IS (or becomes, via this same PATCH) all-day always has durationMin cleared. Changing `startTime` or `remindMinutesBefore` re-arms the reminder sweep (clears remindedAt). `babyIds`/`assigneeUserIds`, when present, REPLACE the link set; omitted leaves it untouched.
+	// UpdateCalendarEvent Partial update. `description`/`location`/`durationMin`/ `remindMinutesBefore` may be sent as `null` to CLEAR that column; `title`/`category`/`startTime`/`allDay` are not nullable — only settable or omitted. An event that IS (or becomes, via this same PATCH) all-day always has durationMin cleared. Changing `startTime` or `remindMinutesBefore` re-arms the reminder sweep (clears remindedAt). `babyIds`/`assigneeUserIds`, when present, REPLACE the link set; omitted leaves it untouched. With `occurrence`, that one occurrence is taken out of the series and a standalone event carrying the patch (over the series' fields, links and reminder) is created in its place; the response is that NEW event, and recurrence fields in the body are ignored. An edit to the whole series that changes its start or rule clears its skipped occurrences.
 	// (PATCH /api/calendar/events/{id})
 	UpdateCalendarEvent(ctx context.Context, request UpdateCalendarEventRequestObject) (UpdateCalendarEventResponseObject, error)
 	// GetConfig Public client configuration: which account-creation paths the /login and /join screens should offer. No session required, and no secrets in the response — just two booleans-worth of config the client could otherwise only infer indirectly (e.g. by trying a credential signup and reading the 403).
@@ -11248,10 +11296,11 @@ func (sh *strictHandler) CreateCalendarEvent(w http.ResponseWriter, r *http.Requ
 }
 
 // DeleteCalendarEvent operation middleware
-func (sh *strictHandler) DeleteCalendarEvent(w http.ResponseWriter, r *http.Request, id IdPath) {
+func (sh *strictHandler) DeleteCalendarEvent(w http.ResponseWriter, r *http.Request, id IdPath, params DeleteCalendarEventParams) {
 	var request DeleteCalendarEventRequestObject
 
 	request.Id = id
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.DeleteCalendarEvent(ctx, request.(DeleteCalendarEventRequestObject))
@@ -11274,10 +11323,11 @@ func (sh *strictHandler) DeleteCalendarEvent(w http.ResponseWriter, r *http.Requ
 }
 
 // UpdateCalendarEvent operation middleware
-func (sh *strictHandler) UpdateCalendarEvent(w http.ResponseWriter, r *http.Request, id IdPath) {
+func (sh *strictHandler) UpdateCalendarEvent(w http.ResponseWriter, r *http.Request, id IdPath, params UpdateCalendarEventParams) {
 	var request UpdateCalendarEventRequestObject
 
 	request.Id = id
+	request.Params = params
 
 	var body UpdateCalendarEventJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

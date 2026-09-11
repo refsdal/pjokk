@@ -126,3 +126,25 @@ FROM "calendar_assignee" ca
 JOIN "users" u ON u."id" = ca."user_id"
 WHERE ca."event_id" = $1
 ORDER BY u."display_name";
+
+-- Skips: one occurrence taken out of a series (00016_calendar_event_skip.sql).
+
+-- name: CreateCalendarEventSkip :exec
+-- Skipping an occurrence twice is one skip.
+INSERT INTO "calendar_event_skip" ("family_id", "event_id", "occurrence_start")
+VALUES ($1, $2, $3)
+ON CONFLICT DO NOTHING;
+
+-- name: CalendarEventSkipsForEvents :many
+-- Batched for the list and the ICS feed, like the link hydration above.
+SELECT "event_id", "occurrence_start"
+FROM "calendar_event_skip"
+WHERE "family_id" = sqlc.arg(family_id) AND "event_id" = ANY(sqlc.arg(event_ids)::text[]);
+
+-- name: CalendarEventSkipsForEvent :many
+SELECT "occurrence_start"
+FROM "calendar_event_skip"
+WHERE "family_id" = $1 AND "event_id" = $2;
+
+-- name: DeleteCalendarEventSkips :exec
+DELETE FROM "calendar_event_skip" WHERE "family_id" = $1 AND "event_id" = $2;

@@ -3558,6 +3558,18 @@ type ListCalendarEventsParams struct {
 	To time.Time `form:"to" json:"to"`
 }
 
+// DeleteCalendarEventParams defines parameters for DeleteCalendarEvent.
+type DeleteCalendarEventParams struct {
+	// Occurrence Delete only this occurrence of a recurring event — its start, as the list gives it. Without it the delete applies to the whole series.
+	Occurrence *time.Time `form:"occurrence,omitempty" json:"occurrence,omitempty"`
+}
+
+// UpdateCalendarEventParams defines parameters for UpdateCalendarEvent.
+type UpdateCalendarEventParams struct {
+	// Occurrence Edit only this occurrence of a recurring event — its start, as the list gives it. Without it the patch applies to the whole series.
+	Occurrence *time.Time `form:"occurrence,omitempty" json:"occurrence,omitempty"`
+}
+
 // ListDiapersParams defines parameters for ListDiapers.
 type ListDiapersParams struct {
 	// BabyId Restrict the result to one baby in the caller's family.

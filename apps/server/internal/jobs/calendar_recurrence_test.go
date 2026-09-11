@@ -73,3 +73,43 @@ func TestCalendarRemindersFirePerOccurrence(t *testing.T) {
 		t.Errorf("past until = %d, want 0", got)
 	}
 }
+
+// A skipped occurrence ("this event" deleted) is never reminded; the next
+// one is (spec 2026-09-11-calendar-occurrence-exceptions).
+func TestCalendarRemindersSkipASkippedOccurrence(t *testing.T) {
+	a := testrig.App(t)
+	_, cookie := a.NewFamily("Hansen", "parent@example.com")
+	adminID := userIDByEmail(t, a, "parent@example.com")
+	subscribePush(t, a, cookie, "https://fcm.googleapis.com/rec/skip")
+
+	start := time.Date(2026, 3, 2, 8, 0, 0, 0, time.UTC)
+	id := createCalendarEvent(t, a, cookie, map[string]any{
+		"title": "Vitamin D", "startTime": start.Format(time.RFC3339),
+		"remindMinutesBefore": 15, "recurrence": "daily",
+	})
+	day2 := start.Add(24 * time.Hour)
+	if res := a.Do(http.MethodDelete, "/api/calendar/events/"+id+"?occurrence="+day2.Format("2006-01-02T15:04:05Z"), cookie, nil); res.Status != http.StatusOK {
+		t.Fatalf("skip day 2 = %d %s", res.Status, res.Raw)
+	}
+
+	d := depsFor(a)
+	ctx := context.Background()
+	for _, tc := range []struct {
+		now  time.Time
+		want int
+	}{
+		{day2.Add(-10 * time.Minute), 0},             // skipped
+		{day2.Add(24*time.Hour - 10*time.Minute), 1}, // day 3
+	} {
+		sent, err := jobs.RunCalendarReminders(ctx, d, tc.now)
+		if err != nil {
+			t.Fatalf("RunCalendarReminders at %v: %v", tc.now, err)
+		}
+		if sent != tc.want {
+			t.Errorf("at %v sent %d, want %d", tc.now, sent, tc.want)
+		}
+	}
+	if got := a.Push.Count(adminID); got != 1 {
+		t.Errorf("deliveries = %d, want day 3's alone", got)
+	}
+}
