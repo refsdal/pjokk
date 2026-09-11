@@ -283,7 +283,11 @@ separate test deploy).
   running (`lib/badge.ts`, mounted in the shell), and push notifications
   with a "log it now" button (`PushPayload.actions`, read by
   `public/push-sw.js`, which navigates the open window to the action's
-  URL). Widgets, Live Activities and Watch need a native shell and stay on
+  URL) and a **Snooze 15 min** button on every reminder: a background POST
+  (`post: true`) to `/api/push/snooze` carrying a signed token
+  (`internal/push/snooze.go`), and a `push_snooze` row the frequent job
+  sends again one tick later unless the kind was logged meanwhile
+  (`internal/jobs/snooze.go`). Widgets, Live Activities and Watch need a native shell and stay on
   the Phase 7 backlog.
 - `viewport-fit=cover` + `env(safe-area-inset-*)` padding from the start.
 - Responsive shell (spec `docs/superpowers/specs/2026-09-08-responsive-shell-design.md`):
