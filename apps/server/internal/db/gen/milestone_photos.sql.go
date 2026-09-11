@@ -207,6 +207,71 @@ func (q *Queries) ListMilestonePhotosForLogs(ctx context.Context, arg ListMilest
 	return items, nil
 }
 
+const milestonePhotoKeysForBaby = `-- name: MilestonePhotoKeysForBaby :many
+SELECT p."object_key"
+FROM "milestone_photo" p
+JOIN "milestone_log" m ON m."id" = p."milestone_log_id"
+WHERE p."family_id" = $1
+  AND m."family_id" = $1
+  AND m."baby_id" = $2
+`
+
+type MilestonePhotoKeysForBabyParams struct {
+	FamilyID string
+	BabyID   string
+}
+
+// Read BEFORE DeleteBaby (core.sql): the baby's milestones cascade away
+// with it, and their photo rows with them; the objects do not (issue #95).
+// Both sides of the join are held to the family.
+func (q *Queries) MilestonePhotoKeysForBaby(ctx context.Context, arg MilestonePhotoKeysForBabyParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, milestonePhotoKeysForBaby, arg.FamilyID, arg.BabyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var object_key string
+		if err := rows.Scan(&object_key); err != nil {
+			return nil, err
+		}
+		items = append(items, object_key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const milestonePhotoKeysForFamily = `-- name: MilestonePhotoKeysForFamily :many
+SELECT "object_key"
+FROM "milestone_photo"
+WHERE "family_id" = $1
+`
+
+// Read BEFORE DeleteOrganization (admin.sql): everything the family owns
+// cascades away with it, the objects behind its photos do not (issue #95).
+func (q *Queries) MilestonePhotoKeysForFamily(ctx context.Context, familyID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, milestonePhotoKeysForFamily, familyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var object_key string
+		if err := rows.Scan(&object_key); err != nil {
+			return nil, err
+		}
+		items = append(items, object_key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const milestonePhotoKeysForLog = `-- name: MilestonePhotoKeysForLog :many
 SELECT "object_key"
 FROM "milestone_photo"
