@@ -2427,3 +2427,41 @@ is audited and shows the family a banner. A structural test
 - **Metric on the kiosk.** Display units are a person's preference on
   `/api/me`; a device is not a person. A known v1 limitation.
 
+## 2026-09-11 — admin user support (console spec 2)
+
+Spec: `docs/superpowers/specs/2026-09-11-admin-user-support-design.md`.
+
+- **The system-admin role is revoked over HTTP, never granted.** Granting
+  stays a database act. A stolen operator session can then demote, but it
+  cannot mint more operators, and "who can be an operator" keeps an answer
+  that does not depend on the audit trail.
+- **The last-admin guard takes row locks.** Revoking checks that another
+  active system admin remains, inside a transaction that first locks every
+  active admin row (`LockActiveSystemAdmins`, `FOR UPDATE` in id order).
+  Without the lock, two operators revoking each other at the same moment
+  would both see the other still standing and leave nobody;
+  `TestTwoOperatorsRevokingEachOtherLeaveOneStanding` runs exactly that. A
+  revoke also ends the sessions that admin opened by impersonating someone.
+- **An email change changes the address and nothing else.** It clears
+  `email_verified_at`, and the person keeps their sessions and linked
+  Google account. A taken address is checked before the audit row is
+  written, so a refused change leaves no trail entry. The unique index is
+  still the authority, and a lost race answers the same 409.
+- **Session activity is recorded every five minutes.** Limen's default
+  interval is 0, which moves `last_access` only when a session's expiry is
+  extended, so a phone in daily use showed as idle for days.
+  `WithSessionActivityCheckInterval(5*time.Minute)` makes "active 5 min
+  ago" true, at the cadence API keys and kiosk devices already use. The
+  page names a session by its browser and device only; no token and no
+  address digest leave the server.
+- **The tombstone is not a person.** It is left out of the users list, and
+  its detail page is a 404.
+- **Keyset paging on all three lists.** The cursor is `(created_at, id)`,
+  and each query fetches one row beyond the limit to know whether there is
+  more. An offset would skip or repeat rows as the append-only audit table
+  grows under the operator. Search is server-side, debounced in the page.
+  This retires the "no pagination" debt spec 1 left.
+- **The console is partly translated.** The new pages use `t()` like the
+  family pages, but the i18n check skips `screens/admin/`. They stay
+  English until someone translates them, and nothing fails meanwhile.
+

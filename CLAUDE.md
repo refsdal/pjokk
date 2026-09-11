@@ -382,6 +382,13 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   schedule — built in the browser with jsPDF (lazy-loaded; `lib/report.ts`)
   from the same API reads the screens use. Never server-side. Tables, no
   charts. File name `pjokk-<baby>-<from>-<to>.pdf`.
+- **Operator console (`/admin`, system admins only):** Users, Families
+  and Audit lists (server-side search, keyset paging, Load more), a page
+  per family (spec `docs/superpowers/specs/2026-09-08-admin-family-management-design.md`)
+  and per person (spec `docs/superpowers/specs/2026-09-11-admin-user-support-design.md`:
+  families, sign-in methods, sessions with sign-out, change email, revoke
+  system admin). Metadata only — never a log entry. Every write audits
+  first; the system-admin role can be revoked over HTTP but never granted.
 - **Night mode:** scheduled + manual override; deliberate exit gesture.
 - **Active sessions are state, not screens:** one `activeSession` query,
   rendered everywhere (home banner, timeline badge, tab tint). The nursing

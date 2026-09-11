@@ -68,7 +68,7 @@ console's existing rule).
 
 | | |
 |---|---|
-| `GET /api/admin/users/{id}` | `AdminUserDetail`: the `AdminUser` fields + `hasPassword`, `families[{familyId, name, role}]`, `providers[{provider, linkedAt}]`, `sessions[{id, userAgent, createdAt, lastActiveAt, expiresAt, familyName, impersonatedByName}]`. `404` for an unknown id or the tombstone. |
+| `GET /api/admin/users/{id}` | `AdminUserDetail`: the `AdminUser` fields + `hasPassword`, `families[{familyId, name, role}]`, `providers[{provider, linkedAt}]`, `sessions[{id, userAgent, createdAt, lastActiveAt, expiresAt, familyName, impersonatedByName}]`. `404` for an unknown id or the tombstone, which the users list leaves out too: it is not a person, and a row that opens onto a 404 is a dead end. |
 | `POST /api/admin/users/{id}/email {email}` | → the updated `AdminUser`. `409 EMAIL_TAKEN`; `400 UNCHANGED`. Audit `user.email.change`, detail `old → new`. |
 | `DELETE /api/admin/users/{id}/role` | → `204`. `400 REFUSED` for yourself; `409 LAST_ADMIN`; `404` when not a system admin. Audit `user.role.revoke`. Also ends every session they are driving through impersonation. |
 | `DELETE /api/admin/users/{id}/sessions/{sessionId}` | → `204`. `404` when the session is not theirs. Audit `user.session.revoke`, detail the session's user agent. |
@@ -118,9 +118,10 @@ and kiosk devices already use.
 - **`describeDevice(userAgent)`** — a small pure function ("Chrome on
   Android", "Safari on iPhone", "Firefox on Windows", fallback "Unknown
   device"), tested against a table of real user-agent strings.
-- The console stays English-only (its strings do not go through `t()`), and
-  the existing structural test that keeps admin screens off log endpoints
-  covers the new page.
+- The console's strings go through `t()`, as the family pages' already
+  did, but `scripts/check-i18n.mjs` skips `screens/admin/`, so they stay
+  English until someone translates them. The existing structural test that
+  keeps admin screens off log endpoints covers the new page.
 
 ## Testing
 
