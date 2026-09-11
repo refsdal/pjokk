@@ -2602,3 +2602,18 @@ the calls and report them afterwards.
   reminder job steps past a skipped occurrence to the next.
 - **The new table carries `family_id`,** so the nightly backup lists it
   and a family restore brings it back with its family.
+
+## 2026-09-11 — last night's longest stretch on Home
+
+A follow-up the competitor series deferred: Stats had last night's longest
+stretch, but the glance at Home did not.
+
+- **One number, the Stats rule.** `/api/summary` gains
+  `lastNightLongestMin` beside `lastNightMin`: the longest single completed
+  `night` session of the same noon-to-noon night — what Stats calls the
+  longest stretch — and null exactly when the total is.
+- **On the awake card's sub-line, only for a broken night.** Home and the
+  kiosk read "2 naps · 1:45 today · night 10:30 · longest 6:30"; for one
+  unbroken session the longest would repeat the total, so it is left out.
+  Wakings stay on Stats — the line is one truncated line, and the E2E
+  checks the longest part still fits a phone.
