@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -188,6 +189,15 @@ type Service interface {
 	// impersonating.
 	RevokeImpersonatedSessions(ctx context.Context, adminUserID string) error
 
+	// The operator console's user page (sessions.go, spec
+	// 2026-09-11-admin-user-support §3): one person's live sessions — never
+	// a token; signing one of them out by id (ErrSessionNotFound when it is
+	// not theirs); and changing their login address (ErrEmailTaken when
+	// another account holds it).
+	UserSessions(ctx context.Context, userID string) ([]SessionInfo, error)
+	RevokeSession(ctx context.Context, userID, sessionID string) error
+	ChangeEmail(ctx context.Context, userID, email string) error
+
 	Impersonate(ctx context.Context, w http.ResponseWriter, r *http.Request, adminSession *Session, targetUserID string) error
 	StopImpersonating(ctx context.Context, w http.ResponseWriter, r *http.Request, s *Session) error
 }
@@ -313,6 +323,13 @@ func New(cfg Config) (Service, error) {
 			// a keyed digest of the address instead — enough to tell two
 			// devices apart, useless for locating anyone.
 			limen.WithSessionIPAddressExtractor(ipDigest),
+			// Record activity at most every five minutes on use, so the
+			// console's "active 5 min ago" is true. Limen's default is 0,
+			// which leaves last_access to move only when a session's expiry
+			// is extended — at most daily — and the user page would show a
+			// signed-in phone as idle for days. One write per session per
+			// five minutes: the cadence API keys and kiosk devices use.
+			limen.WithSessionActivityCheckInterval(5*time.Minute),
 		),
 		HTTP: limen.NewDefaultHTTPConfig(
 			limen.WithHTTPBasePath(BasePath),

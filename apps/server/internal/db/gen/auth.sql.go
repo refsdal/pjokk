@@ -11,6 +11,26 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const changeUserEmail = `-- name: ChangeUserEmail :exec
+UPDATE "users"
+SET "email" = $2, "email_verified_at" = NULL, "updated_at" = now()
+WHERE "id" = $1
+`
+
+type ChangeUserEmailParams struct {
+	ID    string
+	Email string
+}
+
+// An operator's change of a login address (already normalised by the
+// caller). The unique index refuses a taken one (23505 → ErrEmailTaken).
+// email_verified_at is cleared: nobody has verified the new address, and
+// nothing in the pinned Limen (v0.2.1) gates sign-in on it.
+func (q *Queries) ChangeUserEmail(ctx context.Context, arg ChangeUserEmailParams) error {
+	_, err := q.db.Exec(ctx, changeUserEmail, arg.ID, arg.Email)
+	return err
+}
+
 const clearActiveFamilyForUser = `-- name: ClearActiveFamilyForUser :exec
 UPDATE "sessions"
 SET "active_organization_id" = NULL
@@ -336,6 +356,25 @@ func (q *Queries) GetUserRole(ctx context.Context, id string) (string, error) {
 	return role, err
 }
 
+const getUserSessionToken = `-- name: GetUserSessionToken :one
+SELECT "token" FROM "sessions" WHERE "id" = $1 AND "user_id" = $2
+`
+
+type GetUserSessionTokenParams struct {
+	ID     string
+	UserID string
+}
+
+// The token behind one of a user's sessions, so it can be revoked through
+// Limen. Keyed by (id, user_id): a session id addressed under the wrong
+// person is simply not found.
+func (q *Queries) GetUserSessionToken(ctx context.Context, arg GetUserSessionTokenParams) (string, error) {
+	row := q.db.QueryRow(ctx, getUserSessionToken, arg.ID, arg.UserID)
+	var token string
+	err := row.Scan(&token)
+	return token, err
+}
+
 const insertFamilyMemberRole = `-- name: InsertFamilyMemberRole :exec
 INSERT INTO "organization_member_roles" ("member_id", "organization_id", "role")
 VALUES ($1, $2, $3)
@@ -407,6 +446,64 @@ func (q *Queries) ListImpersonatedTokensByAdmin(ctx context.Context, adminID str
 			return nil, err
 		}
 		items = append(items, impersonated_token)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUserSessions = `-- name: ListUserSessions :many
+SELECT
+    s."id",
+    s."created_at",
+    s."expires_at",
+    s."last_access",
+    COALESCE(s."metadata", '') AS metadata,
+    COALESCE(s."active_organization_id", '') AS active_family_id,
+    COALESCE(o."name", '') AS family_name
+FROM "sessions" s
+LEFT JOIN "organizations" o ON o."id" = s."active_organization_id"
+WHERE s."user_id" = $1 AND s."expires_at" > now()
+ORDER BY COALESCE(s."last_access", s."created_at") DESC, s."id" DESC
+`
+
+type ListUserSessionsRow struct {
+	ID             string
+	CreatedAt      pgtype.Timestamptz
+	ExpiresAt      pgtype.Timestamptz
+	LastAccess     pgtype.Timestamptz
+	Metadata       string
+	ActiveFamilyID string
+	FamilyName     string
+}
+
+// One person's live sessions, for the operator console's user page
+// (internal/auth/sessions.go). Never the token: the console signs a session
+// out by id (GetUserSessionToken below), and the metadata blob is decoded in
+// Go for its user agent and impersonation marker only — the address digest
+// in it goes no further. Expired rows Limen has not swept yet are left out.
+func (q *Queries) ListUserSessions(ctx context.Context, userID string) ([]ListUserSessionsRow, error) {
+	rows, err := q.db.Query(ctx, listUserSessions, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUserSessionsRow
+	for rows.Next() {
+		var i ListUserSessionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.ExpiresAt,
+			&i.LastAccess,
+			&i.Metadata,
+			&i.ActiveFamilyID,
+			&i.FamilyName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
