@@ -979,6 +979,11 @@ func NewHandler(d Deps) http.Handler {
 	d.mountExportRoutes(mux, familyChain(d))
 	d.mountICSRoutes(mux, familyChain(d))
 
+	// The backup download (internal/api/admin_backup_download.go): a
+	// streamed snapshot, hand-routed for the same reason, behind the
+	// tierSysadmin gates every generated console route runs behind.
+	d.mountAdminBackupRoutes(mux, sysadminChain(d))
+
 	if d.ExtraRoutes != nil {
 		mwDeps := d.mwDeps()
 		protect := func(h http.Handler) http.Handler {
