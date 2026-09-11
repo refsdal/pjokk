@@ -22,6 +22,11 @@ behave the same way:
 - **`--create-babies`** creates each source child under a deterministic id.
 - **Units are normalised** to Pjokk's canonical ml / kg / cm / °C on the way
   in. Display units are a per-person preference in the app, never a row.
+- **The export is untrusted input.** Every value becomes SQL at one
+  boundary that refuses anything it cannot prove is a number, NULL, a
+  boolean or a properly quoted string, so a malformed or crafted export
+  aborts the run rather than writing its own SQL. A cell that should be a
+  number and is not imports as NULL and is counted in the summary.
 - **Lossy on purpose, preserved in notes.** Anything Pjokk has no column
   for is folded into the entry's notes rather than dropped, and the summary
   printed at the end lists everything skipped, and why.
