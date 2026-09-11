@@ -41,8 +41,13 @@ test("a weekly event repeats in the calendar and the ICS feed", async ({
   await settle(page);
   await page.screenshot({ path: shot("2-calendar-upcoming-weekly.png") });
 
-  // Tapping an occurrence edits the series and says so.
+  // Tapping an occurrence edits that one by default; All events edits the
+  // series and says so.
   await rows.nth(2).click();
+  await expect(
+    sheet.getByRole("button", { name: "This event", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await sheet.getByRole("button", { name: "All events", exact: true }).click();
   await expect(
     sheet.getByText("Changes apply to every occurrence in the series."),
   ).toBeVisible();
@@ -114,4 +119,55 @@ test("the timeline search finds entries by note and by medicine name", async ({
 
   await field.fill("zzz");
   await expect(page.getByText("No entries match your search.")).toBeVisible({ timeout: 10_000 });
+});
+
+// One occurrence of a series, deleted or changed on its own
+// (docs/superpowers/specs/2026-09-11-calendar-occurrence-exceptions-design.md).
+test("one occurrence of a weekly event is deleted or changed on its own", async ({
+  page,
+  request,
+}) => {
+  await freshFamily(page, request, "occurrence");
+  const sheet = page.getByRole("dialog");
+
+  await page.goto("/calendar");
+  await page.getByRole("button", { name: "Add event" }).click();
+  await sheet.getByPlaceholder("Title").fill("Swim");
+  await sheet.getByRole("button", { name: "Weekly", exact: true }).click();
+  await sheet.getByRole("button", { name: "Save" }).click();
+  await expect(sheet).toBeHidden();
+
+  const rows = page.getByRole("button", { name: /^Swim/ });
+  await expect(rows.first()).toBeVisible({ timeout: 10_000 });
+  const before = await rows.count();
+
+  // Delete the second occurrence only.
+  await rows.nth(1).click();
+  await expect(
+    sheet.getByRole("button", { name: "This event", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await sheet.getByRole("button", { name: "Delete this event" }).click();
+  await sheet.getByRole("button", { name: "Tap again to confirm" }).click();
+  await expect(sheet).toBeHidden();
+  await expect(rows).toHaveCount(before - 1);
+
+  // Change the (new) second one only: it leaves the series as its own event.
+  await rows.nth(1).click();
+  await sheet.getByPlaceholder("Title").fill("Swim at the lake");
+  await sheet.getByRole("button", { name: "Save" }).click();
+  await expect(sheet).toBeHidden();
+  const lake = page.getByRole("button", { name: /^Swim at the lake/ });
+  await expect(lake).toHaveCount(1);
+  await expect(lake.getByLabel("Repeats")).toHaveCount(0);
+  await expect(rows).toHaveCount(before - 1);
+
+  // The feed leaves both out of the series, and lists the changed one.
+  const key = await (
+    await page.request.post("/api/keys", {
+      data: { name: "Calendar subscription", readOnly: true },
+    })
+  ).json();
+  const body = await (await page.request.get(`/api/calendar.ics?key=${key.key}`)).text();
+  expect((body.match(/^EXDATE/gm) ?? []).length).toBe(2);
+  expect(body).toContain("SUMMARY:Swim at the lake");
 });
