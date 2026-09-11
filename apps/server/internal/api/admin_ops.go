@@ -43,11 +43,12 @@ const opsRunsShown = 10
 func (d Deps) cronDeps() cron.Deps {
 	return cron.Deps{
 		Deps: jobs.Deps{
-			Pool:    d.Pool,
-			Q:       d.Q,
-			Storage: d.Storage,
-			Push:    d.Push,
-			Now:     d.Now,
+			Pool:      d.Pool,
+			Q:         d.Q,
+			Storage:   d.Storage,
+			Push:      d.Push,
+			Now:       d.Now,
+			SnoozeKey: d.SnoozeKey,
 		},
 		RateLimit: d.RateLimit,
 	}

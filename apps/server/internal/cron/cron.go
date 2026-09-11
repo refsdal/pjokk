@@ -176,6 +176,14 @@ func runFrequent(ctx context.Context, d Deps) error {
 	if calendarSent > 0 {
 		log.Printf("cron: %d calendar reminder(s) sent", calendarSent)
 	}
+
+	snoozed, err := jobs.RunSnoozes(ctx, d.Deps, now)
+	if err != nil {
+		return err
+	}
+	if snoozed > 0 {
+		log.Printf("cron: %d snoozed reminder(s) sent", snoozed)
+	}
 	return nil
 }
 

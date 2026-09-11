@@ -179,6 +179,7 @@ func App(t *testing.T) *AppRig {
 		TrustedProxyHops: 0,
 		PhotoQuotaBytes:  500 << 20,
 		DevicePINKey:     sha256.Sum256([]byte("pjokk-test-device-pin-key")),
+		SnoozeKey:        sha256.Sum256([]byte("pjokk-test-push-snooze-key")),
 		Version:          Version,
 		StorageInfo:      api.StorageInfo{Driver: "memory"},
 	}

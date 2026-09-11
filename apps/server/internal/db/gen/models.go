@@ -355,6 +355,18 @@ type PumpLog struct {
 	CreatedAt   pgtype.Timestamptz
 }
 
+type PushSnooze struct {
+	ID              string
+	FamilyID        string
+	UserID          string
+	Source          string
+	SourceID        string
+	OccurrenceStart pgtype.Timestamptz
+	SentAt          pgtype.Timestamptz
+	DueAt           pgtype.Timestamptz
+	CreatedAt       pgtype.Timestamptz
+}
+
 type PushSubscription struct {
 	ID        string
 	FamilyID  string

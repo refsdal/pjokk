@@ -114,6 +114,11 @@ type Deps struct {
 	// would be reversible by enumeration in moments.
 	DevicePINKey [32]byte
 
+	// SnoozeKey signs and checks the Snooze button on reminder
+	// notifications (internal/push/snooze.go); derived from AUTH_SECRET
+	// with its own domain separator in cmd/pjokk.
+	SnoozeKey [32]byte
+
 	// StorageInfo says where files live, for the console's Ops page (never
 	// a credential); cmd/pjokk fills it from config.
 	StorageInfo StorageInfo
@@ -231,6 +236,9 @@ var operationAuthTiers = map[string]authTier{
 	// caller exists yet. See tierPublicAPIAllowlist and config.go's doc
 	// comment.
 	"GetConfig": tierPublic,
+	// SnoozePush (push_snooze.go): the notification's Snooze button, called
+	// by the service worker with the button's signed token as credential.
+	"SnoozePush": tierPublic,
 
 	"GetMe":    tierSession,
 	"UpdateMe": tierSession,
@@ -502,6 +510,10 @@ var tierPublicAPIAllowlist = map[string]bool{
 	// EnrolDevice (device_self.go): a tablet redeeming its one-time code
 	// has no session and no device yet — the code is what it holds.
 	"EnrolDevice": true,
+	// SnoozePush (push_snooze.go): a background POST from the service
+	// worker, with no window and no reliable session — the notification's
+	// signed token is the credential.
+	"SnoozePush": true,
 }
 
 // deviceOperations is the ALLOWLIST of operations a kiosk device may call

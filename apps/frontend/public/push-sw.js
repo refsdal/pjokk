@@ -2,9 +2,10 @@
 // workbox.importScripts). Handles incoming web push + notification taps.
 //
 // The payload is internal/push's PushPayload: {title, body, url, actions?}
-// where each action is {action, title, url}. Actions become the
+// where each action is {action, title, url, post?}. Actions become the
 // notification's buttons where the platform shows them (Android, desktop
-// Chrome); elsewhere the field is ignored and a tap opens `url`.
+// Chrome); elsewhere the field is ignored and a tap opens `url`. A `post`
+// action (Snooze) is a background POST to its url that opens nothing.
 self.addEventListener("push", (event) => {
   let data = {};
   try {
@@ -22,7 +23,11 @@ self.addEventListener("push", (event) => {
       // "/" is the public landing page — a notification must open the app.
       data: {
         url: data.url || "/home",
-        actions: actions.map((a) => ({ action: a.action, url: a.url })),
+        actions: actions.map((a) => ({
+          action: a.action,
+          url: a.url,
+          post: a.post === true,
+        })),
       },
     }),
   );
@@ -32,6 +37,12 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const data = event.notification.data || {};
   const picked = (data.actions || []).find((a) => a.action === event.action);
+  // A background button (Snooze): the server is told, and nothing opens.
+  // The URL carries its own signed token, so no session is needed.
+  if (picked && picked.post) {
+    event.waitUntil(fetch(picked.url, { method: "POST" }).catch(() => {}));
+    return;
+  }
   // A button carries its own deep link (e.g. /home?log=feed); the body tap
   // keeps the notification's url.
   const url = (picked && picked.url) || data.url || "/home";

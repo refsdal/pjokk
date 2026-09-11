@@ -62,6 +62,7 @@ var userOwned = map[string]bool{
 	"reminder":             true,
 	"push_pref":            true,
 	"calendar_assignee":    true,
+	"push_snooze":          true,
 }
 
 // scopeColumns are the columns that carry a family's id.
