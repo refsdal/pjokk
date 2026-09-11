@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Member } from "@pjokk/shared";
-import type { components } from "../api-schema";
+import type { components } from "@pjokk/shared";
 import { ApiError, client, unwrap } from "../api";
 
 // Kiosk devices (docs/superpowers/specs/2026-09-10-kiosk-devices-design.md):

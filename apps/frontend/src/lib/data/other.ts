@@ -1,6 +1,6 @@
 import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
 import type { MeasurementType } from "@pjokk/shared";
-import type { components } from "../api-schema";
+import type { components } from "@pjokk/shared";
 import { caretakerInit, client, unwrap } from "../api";
 import { t } from "../i18n";
 import { toast } from "../toast";

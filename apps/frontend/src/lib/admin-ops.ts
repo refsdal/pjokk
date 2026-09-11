@@ -1,4 +1,4 @@
-import type { components } from "@/lib/api-schema";
+import type { components } from "@pjokk/shared";
 
 // The operator console's Ops tab (spec 2026-09-11-admin-ops §2, §4): the
 // view logic that can be got wrong silently, kept out of the screens.

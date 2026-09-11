@@ -4,7 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { Card } from "@/components/ui/card";
 import { type OpsSummary, opsSummary } from "@/lib/admin-ops";
 import { client, unwrap } from "@/lib/api";
-import type { components } from "@/lib/api-schema";
+import type { components } from "@pjokk/shared";
 import { t } from "@/lib/i18n";
 import { formatRelative } from "@/lib/time";
 import { jobTitle, useAdminOps } from "./useAdminOps";
