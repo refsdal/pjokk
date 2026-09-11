@@ -36,9 +36,14 @@ const (
 // RunSnoozes sends every snoozed reminder that is due and returns the
 // number of deliveries. A row is deleted before its push goes out: one
 // shot, so a failed delivery is not retried every tick. Quiet hours hold a
-// snooze rather than drop it, as they hold a reminder.
+// snooze rather than drop it, as they hold a reminder. A due snooze whose
+// person has left the family or been banned is dropped unsent (issue #92).
 func RunSnoozes(ctx context.Context, d Deps, now time.Time) (int, error) {
-	due, err := d.Q.ListDuePushSnoozes(ctx, pgtype.Timestamptz{Time: now.Add(snoozeGrace), Valid: true})
+	dueBy := pgtype.Timestamptz{Time: now.Add(snoozeGrace), Valid: true}
+	if _, err := d.Q.DeleteUndeliverablePushSnoozes(ctx, dueBy); err != nil {
+		return 0, fmt.Errorf("jobs: drop undeliverable snoozes: %w", err)
+	}
+	due, err := d.Q.ListDuePushSnoozes(ctx, dueBy)
 	if err != nil {
 		return 0, fmt.Errorf("jobs: list snoozes: %w", err)
 	}

@@ -45,11 +45,30 @@ WHERE "remind_minutes_before" IS NOT NULL
 ORDER BY "start_time" ASC;
 
 -- name: CalendarEventAssigneeUserIDs :many
-SELECT "user_id" FROM "calendar_assignee" WHERE "event_id" = $1;
+-- The event's assignees who can still be reminded: current members of the
+-- event's family, never a banned account (issue #92). Removing a member
+-- deletes their assignments (auth.Service.RemoveMember); this filter is
+-- what stops a surviving row from delivering. An event whose every
+-- assignee has gone therefore reads as unassigned, and reminds the family
+-- as one does — the same outcome the removal's own cleanup produces.
+SELECT ca."user_id" FROM "calendar_assignee" ca
+JOIN "calendar_event" e ON e."id" = ca."event_id"
+WHERE ca."event_id" = sqlc.arg(event_id)
+  AND e."family_id" = sqlc.arg(family_id)
+  AND EXISTS (
+    SELECT 1 FROM "organization_members" om
+    JOIN "users" u ON u."id" = om."user_id"
+    WHERE om."organization_id" = e."family_id"
+      AND om."user_id" = ca."user_id"
+      AND NOT u."banned"
+  );
 
 -- name: ListFamilyMemberUserIDs :many
--- The "no assignees → every family member" fallback.
-SELECT "user_id" FROM "organization_members" WHERE "organization_id" = $1;
+-- The "no assignees → every family member" fallback. A banned account is
+-- still a member row until someone removes it, and gets nothing (#92).
+SELECT om."user_id" FROM "organization_members" om
+JOIN "users" u ON u."id" = om."user_id"
+WHERE om."organization_id" = $1 AND NOT u."banned";
 
 -- name: MarkCalendarEventReminded :exec
 -- Latched even when every delivery failed (see calendar_reminders.go) —

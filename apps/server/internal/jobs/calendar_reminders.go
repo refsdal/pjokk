@@ -116,7 +116,13 @@ func RunCalendarReminders(ctx context.Context, d Deps, now time.Time) (int, erro
 			occurrence = next
 		}
 
-		assignees, err := d.Q.CalendarEventAssigneeUserIDs(ctx, event.ID)
+		// Only assignees who are still unbanned members of the family
+		// (issue #92); none left falls back to the family, as no
+		// assignees ever did.
+		assignees, err := d.Q.CalendarEventAssigneeUserIDs(ctx, dbgen.CalendarEventAssigneeUserIDsParams{
+			EventID:  event.ID,
+			FamilyID: event.FamilyID,
+		})
 		if err != nil {
 			return sent, fmt.Errorf("jobs: assignees for event %s: %w", event.ID, err)
 		}
