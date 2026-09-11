@@ -224,6 +224,14 @@ func (s *service) AddMember(ctx context.Context, familyID, userID, role string) 
 // the three writes Limen's own deleteMember performs are done directly, in
 // one transaction: clear the family off that user's sessions, drop the role
 // rows, drop the membership.
+//
+// The same transaction deletes the person's reminders, snoozes and
+// calendar assignments in that family (issue #92). Those rows reference
+// the user, not the membership, so nothing cascades — and left behind they
+// kept pushing the baby's name and the time since the last feed to someone
+// the family had removed, who could not delete them because the reminders
+// routes need membership. The frequent job also skips non-members (see
+// ListAllReminders); this is the half that leaves nothing to skip.
 func (s *service) RemoveMember(ctx context.Context, familyID, memberID string) error {
 	return s.inTx(ctx, func(q *gen.Queries) error {
 		member, err := q.GetFamilyMember(ctx, gen.GetFamilyMemberParams{
@@ -255,6 +263,24 @@ func (s *service) RemoveMember(ctx context.Context, familyID, memberID string) e
 			UserID:               member.UserID,
 		}); err != nil {
 			return fmt.Errorf("auth: clear active family: %w", err)
+		}
+		if err := q.DeleteMemberReminders(ctx, gen.DeleteMemberRemindersParams{
+			FamilyID: familyID,
+			UserID:   member.UserID,
+		}); err != nil {
+			return fmt.Errorf("auth: delete member reminders: %w", err)
+		}
+		if err := q.DeleteMemberPushSnoozes(ctx, gen.DeleteMemberPushSnoozesParams{
+			FamilyID: familyID,
+			UserID:   member.UserID,
+		}); err != nil {
+			return fmt.Errorf("auth: delete member snoozes: %w", err)
+		}
+		if err := q.DeleteMemberCalendarAssignments(ctx, gen.DeleteMemberCalendarAssignmentsParams{
+			FamilyID: familyID,
+			UserID:   member.UserID,
+		}); err != nil {
+			return fmt.Errorf("auth: delete member calendar assignments: %w", err)
 		}
 		if err := q.DeleteFamilyMemberRoles(ctx, gen.DeleteFamilyMemberRolesParams{
 			OrganizationID: familyID,

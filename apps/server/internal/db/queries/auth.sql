@@ -128,6 +128,29 @@ WHERE "organization_id" = $1 AND "member_id" = $2;
 DELETE FROM "organization_members"
 WHERE "organization_id" = $1 AND "id" = $2;
 
+-- The three deletes below are a removed member's scheduled pushes in that
+-- family (issue #92), run inside RemoveMember's transaction. None of these
+-- tables references organization_members, so nothing cascades from the
+-- membership, and a person who has left cannot reach the reminders routes
+-- to delete their own. Each is scoped to the one family: the same person's
+-- rows in another family they still belong to are theirs to keep.
+
+-- name: DeleteMemberReminders :exec
+DELETE FROM "reminder"
+WHERE "family_id" = sqlc.arg(family_id) AND "user_id" = sqlc.arg(user_id);
+
+-- name: DeleteMemberPushSnoozes :exec
+DELETE FROM "push_snooze"
+WHERE "family_id" = sqlc.arg(family_id) AND "user_id" = sqlc.arg(user_id);
+
+-- name: DeleteMemberCalendarAssignments :exec
+-- calendar_assignee has no family_id of its own; its event carries it.
+DELETE FROM "calendar_assignee" ca
+USING "calendar_event" e
+WHERE e."id" = ca."event_id"
+  AND e."family_id" = sqlc.arg(family_id)
+  AND ca."user_id" = sqlc.arg(user_id);
+
 -- name: InsertFamilyMemberRole :exec
 INSERT INTO "organization_member_roles" ("member_id", "organization_id", "role")
 VALUES ($1, $2, $3);
