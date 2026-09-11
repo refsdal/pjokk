@@ -125,7 +125,7 @@ func restoreMode(args []string) int {
 			log.Print(err)
 			return 1
 		}
-		fmt.Fprint(os.Stdout, `
+		_, _ = fmt.Fprint(os.Stdout, `
 Passwords are not in backups, so nobody can sign in with one yet. Set yours:
   pjokk set-password <your email>     (it reads the password from stdin)
 Google sign-in works as before.
@@ -156,46 +156,46 @@ func printReport(w io.Writer, rep *restore.Report) {
 	if rep.SchemaVersion > 0 {
 		version = fmt.Sprint(rep.SchemaVersion)
 	}
-	fmt.Fprintf(w, "Restored from a snapshot at schema %s (this build: %d).\n", version, rep.BuildVersion)
+	_, _ = fmt.Fprintf(w, "Restored from a snapshot at schema %s (this build: %d).\n", version, rep.BuildVersion)
 	names := make([]string, 0, len(rep.Rows))
 	for name := range rep.Rows {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		fmt.Fprintf(w, "  %-28s %d\n", name, rep.Rows[name])
+		_, _ = fmt.Fprintf(w, "  %-28s %d\n", name, rep.Rows[name])
 	}
 	if len(rep.Skipped) > 0 {
-		fmt.Fprintf(w, "Skipped, no longer in the schema: %s\n", strings.Join(rep.Skipped, ", "))
+		_, _ = fmt.Fprintf(w, "Skipped, no longer in the schema: %s\n", strings.Join(rep.Skipped, ", "))
 	}
-	fmt.Fprintf(w, "Photos: %d restored", rep.PhotosRestored)
+	_, _ = fmt.Fprintf(w, "Photos: %d restored", rep.PhotosRestored)
 	if len(rep.PhotosMissing) > 0 {
-		fmt.Fprintf(w, ", %d with no copy in the photo backup:\n", len(rep.PhotosMissing))
+		_, _ = fmt.Fprintf(w, ", %d with no copy in the photo backup:\n", len(rep.PhotosMissing))
 		for _, key := range rep.PhotosMissing {
-			fmt.Fprintf(w, "  %s\n", key)
+			_, _ = fmt.Fprintf(w, "  %s\n", key)
 		}
 	} else {
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w)
 	}
 	for _, warning := range rep.Warnings {
-		fmt.Fprintf(w, "Note: %s\n", warning)
+		_, _ = fmt.Fprintf(w, "Note: %s\n", warning)
 	}
 }
 
 func printFamilyReport(w io.Writer, rep *restore.FamilyReport) {
-	fmt.Fprintf(w, "Restored the family %q (%s).\n", rep.Name, rep.FamilyID)
+	_, _ = fmt.Fprintf(w, "Restored the family %q (%s).\n", rep.Name, rep.FamilyID)
 	if rep.PreviousSlug != "" {
-		fmt.Fprintf(w, "Its slug %q had been taken; it is now %q.\n", rep.PreviousSlug, rep.Slug)
+		_, _ = fmt.Fprintf(w, "Its slug %q had been taken; it is now %q.\n", rep.PreviousSlug, rep.Slug)
 	}
-	fmt.Fprintf(w, "Members: %d back", rep.MembersRejoined)
+	_, _ = fmt.Fprintf(w, "Members: %d back", rep.MembersRejoined)
 	if rep.MembersDropped > 0 {
-		fmt.Fprintf(w, ", %d left out (their accounts were deleted since; what they logged is the Deleted user's)", rep.MembersDropped)
+		_, _ = fmt.Fprintf(w, ", %d left out (their accounts were deleted since; what they logged is the Deleted user's)", rep.MembersDropped)
 	}
-	fmt.Fprintln(w, ".")
+	_, _ = fmt.Fprintln(w, ".")
 	if !rep.HasAdmin {
-		fmt.Fprintln(w, "Nobody left can administer it: make someone its admin on the console's family page.")
+		_, _ = fmt.Fprintln(w, "Nobody left can administer it: make someone its admin on the console's family page.")
 	}
-	fmt.Fprintln(w, "API keys, kiosk devices and push subscriptions stay gone: re-issue, re-enrol, re-subscribe.")
+	_, _ = fmt.Fprintln(w, "API keys, kiosk devices and push subscriptions stay gone: re-issue, re-enrol, re-subscribe.")
 	printReport(w, &rep.Report)
 }
 
