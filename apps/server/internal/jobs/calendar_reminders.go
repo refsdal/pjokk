@@ -93,6 +93,15 @@ func RunCalendarReminders(ctx context.Context, d Deps, now time.Time) (int, erro
 				until = &u
 			}
 			series := recur.Series{Start: event.StartTime.Time, Rule: recur.Rule(event.Recurrence), Until: until}
+			// A skipped occurrence ("this event" deleted or detached) is
+			// never reminded; the next one is.
+			skips, err := d.Q.CalendarEventSkipsForEvent(ctx, dbgen.CalendarEventSkipsForEventParams{FamilyID: event.FamilyID, EventID: event.ID})
+			if err != nil {
+				return sent, fmt.Errorf("jobs: skips for event %s: %w", event.ID, err)
+			}
+			for _, k := range skips {
+				series.Skip = append(series.Skip, k.Time)
+			}
 			next, ok := series.NextOnOrAfter(now.Add(-time.Hour))
 			if !ok {
 				continue

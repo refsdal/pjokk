@@ -149,6 +149,74 @@ func (q *Queries) CalendarEventBabiesForEvents(ctx context.Context, eventIds []s
 	return items, nil
 }
 
+const calendarEventSkipsForEvent = `-- name: CalendarEventSkipsForEvent :many
+SELECT "occurrence_start"
+FROM "calendar_event_skip"
+WHERE "family_id" = $1 AND "event_id" = $2
+`
+
+type CalendarEventSkipsForEventParams struct {
+	FamilyID string
+	EventID  string
+}
+
+func (q *Queries) CalendarEventSkipsForEvent(ctx context.Context, arg CalendarEventSkipsForEventParams) ([]pgtype.Timestamptz, error) {
+	rows, err := q.db.Query(ctx, calendarEventSkipsForEvent, arg.FamilyID, arg.EventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.Timestamptz
+	for rows.Next() {
+		var occurrence_start pgtype.Timestamptz
+		if err := rows.Scan(&occurrence_start); err != nil {
+			return nil, err
+		}
+		items = append(items, occurrence_start)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const calendarEventSkipsForEvents = `-- name: CalendarEventSkipsForEvents :many
+SELECT "event_id", "occurrence_start"
+FROM "calendar_event_skip"
+WHERE "family_id" = $1 AND "event_id" = ANY($2::text[])
+`
+
+type CalendarEventSkipsForEventsParams struct {
+	FamilyID string
+	EventIds []string
+}
+
+type CalendarEventSkipsForEventsRow struct {
+	EventID         string
+	OccurrenceStart pgtype.Timestamptz
+}
+
+// Batched for the list and the ICS feed, like the link hydration above.
+func (q *Queries) CalendarEventSkipsForEvents(ctx context.Context, arg CalendarEventSkipsForEventsParams) ([]CalendarEventSkipsForEventsRow, error) {
+	rows, err := q.db.Query(ctx, calendarEventSkipsForEvents, arg.FamilyID, arg.EventIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CalendarEventSkipsForEventsRow
+	for rows.Next() {
+		var i CalendarEventSkipsForEventsRow
+		if err := rows.Scan(&i.EventID, &i.OccurrenceStart); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createCalendarAssignee = `-- name: CreateCalendarAssignee :exec
 INSERT INTO "calendar_assignee" ("event_id", "user_id") VALUES ($1, $2)
 `
@@ -221,6 +289,26 @@ func (q *Queries) CreateCalendarEventBaby(ctx context.Context, arg CreateCalenda
 	return err
 }
 
+const createCalendarEventSkip = `-- name: CreateCalendarEventSkip :exec
+
+INSERT INTO "calendar_event_skip" ("family_id", "event_id", "occurrence_start")
+VALUES ($1, $2, $3)
+ON CONFLICT DO NOTHING
+`
+
+type CreateCalendarEventSkipParams struct {
+	FamilyID        string
+	EventID         string
+	OccurrenceStart pgtype.Timestamptz
+}
+
+// Skips: one occurrence taken out of a series (00016_calendar_event_skip.sql).
+// Skipping an occurrence twice is one skip.
+func (q *Queries) CreateCalendarEventSkip(ctx context.Context, arg CreateCalendarEventSkipParams) error {
+	_, err := q.db.Exec(ctx, createCalendarEventSkip, arg.FamilyID, arg.EventID, arg.OccurrenceStart)
+	return err
+}
+
 const deleteCalendarAssignees = `-- name: DeleteCalendarAssignees :exec
 DELETE FROM "calendar_assignee" WHERE "event_id" = $1
 `
@@ -254,6 +342,20 @@ DELETE FROM "calendar_event_baby" WHERE "event_id" = $1
 
 func (q *Queries) DeleteCalendarEventBabies(ctx context.Context, eventID string) error {
 	_, err := q.db.Exec(ctx, deleteCalendarEventBabies, eventID)
+	return err
+}
+
+const deleteCalendarEventSkips = `-- name: DeleteCalendarEventSkips :exec
+DELETE FROM "calendar_event_skip" WHERE "family_id" = $1 AND "event_id" = $2
+`
+
+type DeleteCalendarEventSkipsParams struct {
+	FamilyID string
+	EventID  string
+}
+
+func (q *Queries) DeleteCalendarEventSkips(ctx context.Context, arg DeleteCalendarEventSkipsParams) error {
+	_, err := q.db.Exec(ctx, deleteCalendarEventSkips, arg.FamilyID, arg.EventID)
 	return err
 }
 

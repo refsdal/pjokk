@@ -128,6 +128,105 @@ func seriesOf(start pgtype.Timestamptz, recurrence string, until pgtype.Timestam
 	return s
 }
 
+// skipsByEvent reads the skipped occurrences of the given events
+// (00016_calendar_event_skip.sql), keyed by event.
+func (d Deps) skipsByEvent(ctx context.Context, familyID string, ids []string) (map[string][]time.Time, error) {
+	out := map[string][]time.Time{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := d.Q.CalendarEventSkipsForEvents(ctx, dbgen.CalendarEventSkipsForEventsParams{FamilyID: familyID, EventIds: ids})
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		out[r.EventID] = append(out[r.EventID], r.OccurrenceStart.Time)
+	}
+	return out, nil
+}
+
+// storedSeries is one event's series with its skips — what an
+// "occurrence" parameter is checked against.
+func (d Deps) storedSeries(ctx context.Context, familyID string, row dbgen.GetCalendarEventRow) (recur.Series, error) {
+	s := seriesOf(row.StartTime, row.Recurrence, row.RecurrenceUntil)
+	skips, err := d.Q.CalendarEventSkipsForEvent(ctx, dbgen.CalendarEventSkipsForEventParams{FamilyID: familyID, EventID: row.ID})
+	if err != nil {
+		return s, err
+	}
+	for _, k := range skips {
+		s.Skip = append(s.Skip, k.Time)
+	}
+	return s, nil
+}
+
+func notAnOccurrence() gen.Error {
+	return gen.Error{Error: "That is not an occurrence of a recurring event", Code: "NOT_AN_OCCURRENCE"}
+}
+
+// detachedEvent is what "edit this event" turns one occurrence into: a
+// standalone event with the series' fields and the patch applied.
+type detachedEvent struct {
+	title       string
+	description *string
+	location    *string
+	category    string
+	start       time.Time
+	allDay      bool
+	durationMin *int32
+	remind      *int32
+	babyIDs     []string
+	assigneeIDs []string
+}
+
+// detachOccurrence takes one occurrence out of a series and creates the
+// standalone event that replaces it, in one transaction, and returns the
+// new event. It keeps the series' creator: the detached event is the same
+// plan, moved.
+func (d Deps) detachOccurrence(ctx context.Context, familyID string, series dbgen.GetCalendarEventRow, occurrence time.Time, e detachedEvent) (gen.CalendarEvent, error) {
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return gen.CalendarEvent{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := d.Q.WithTx(tx)
+
+	newID, err := qtx.CreateCalendarEvent(ctx, dbgen.CreateCalendarEventParams{
+		FamilyID:            familyID,
+		CreatedBy:           series.CreatedBy,
+		Title:               e.title,
+		Description:         e.description,
+		Location:            e.location,
+		Category:            e.category,
+		StartTime:           ts(e.start),
+		AllDay:              e.allDay,
+		DurationMin:         e.durationMin,
+		RemindMinutesBefore: e.remind,
+		Recurrence:          string(recur.None),
+	})
+	if err != nil {
+		return gen.CalendarEvent{}, err
+	}
+	for _, babyID := range e.babyIDs {
+		if err := qtx.CreateCalendarEventBaby(ctx, dbgen.CreateCalendarEventBabyParams{EventID: newID, BabyID: babyID}); err != nil {
+			return gen.CalendarEvent{}, err
+		}
+	}
+	for _, userID := range e.assigneeIDs {
+		if err := qtx.CreateCalendarAssignee(ctx, dbgen.CreateCalendarAssigneeParams{EventID: newID, UserID: userID}); err != nil {
+			return gen.CalendarEvent{}, err
+		}
+	}
+	if err := qtx.CreateCalendarEventSkip(ctx, dbgen.CreateCalendarEventSkipParams{
+		FamilyID: familyID, EventID: series.ID, OccurrenceStart: ts(occurrence),
+	}); err != nil {
+		return gen.CalendarEvent{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return gen.CalendarEvent{}, err
+	}
+	return d.getCalendarEventHydrated(ctx, familyID, newID)
+}
+
 // getCalendarEventHydrated re-reads one event plus both hydrated link
 // sets — the shared re-read Create/Update use after a write.
 func (d Deps) getCalendarEventHydrated(ctx context.Context, familyID, id string) (gen.CalendarEvent, error) {
@@ -192,13 +291,21 @@ func (d Deps) ListCalendarEvents(ctx context.Context, req gen.ListCalendarEvents
 		assigneesByEvent[ar.EventID] = append(assigneesByEvent[ar.EventID], dbgen.CalendarAssigneesForEventRow{UserID: ar.UserID, Name: ar.Name})
 	}
 
+	skips, err := d.skipsByEvent(ctx, fam.FamilyID, ids)
+	if err != nil {
+		return nil, err
+	}
+
 	// One entry per occurrence in the window: a one-off is its own single
-	// occurrence, a series fans out, and the merged list is re-sorted
-	// because a series row sorts by its stored start, not its occurrences.
+	// occurrence, a series fans out (less its skipped occurrences), and the
+	// merged list is re-sorted because a series row sorts by its stored
+	// start, not its occurrences.
 	out := make([]gen.CalendarEvent, 0, len(rows))
 	for _, row := range rows {
 		base := serCalendarEvent(dbgen.GetCalendarEventRow(row), babiesByEvent[row.ID], assigneesByEvent[row.ID])
-		for _, occ := range seriesOf(row.StartTime, row.Recurrence, row.RecurrenceUntil).Between(from, to) {
+		series := seriesOf(row.StartTime, row.Recurrence, row.RecurrenceUntil)
+		series.Skip = skips[row.ID]
+		for _, occ := range series.Between(from, to) {
 			e := base
 			// recur steps in Oslo; the wire is UTC like every other timestamp.
 			e.StartTime = occ.UTC()
@@ -380,6 +487,76 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 		durationSet, durationVal = true, nil
 	}
 
+	// "Edit this event": that occurrence leaves the series as a standalone
+	// event carrying the patch over the series' fields. Recurrence fields
+	// are ignored — a single occurrence does not repeat.
+	if req.Params.Occurrence != nil {
+		occurrence := *req.Params.Occurrence
+		series, err := d.storedSeries(ctx, fam.FamilyID, existing)
+		if err != nil {
+			return nil, err
+		}
+		if !series.IsOccurrence(occurrence) {
+			return gen.UpdateCalendarEvent400JSONResponse(notAnOccurrence()), nil
+		}
+		e := detachedEvent{
+			title:       existing.Title,
+			description: existing.Description,
+			location:    existing.Location,
+			category:    existing.Category,
+			start:       occurrence,
+			allDay:      effectiveAllDay,
+			durationMin: existing.DurationMin,
+			remind:      existing.RemindMinutesBefore,
+			babyIDs:     babyIDs,
+			assigneeIDs: assigneeIDs,
+		}
+		if titleSet && titleVal != nil {
+			e.title = *titleVal
+		}
+		if descSet {
+			e.description = descVal
+		}
+		if locSet {
+			e.location = locVal
+		}
+		if categorySet && categoryVal != nil {
+			e.category = *categoryVal
+		}
+		if startSet && startVal != nil {
+			e.start = *startVal
+		}
+		if durationSet {
+			e.durationMin = durationVal
+		}
+		if remindSet {
+			e.remind = remindVal
+		}
+		if !babyIdsSet {
+			rows, err := d.Q.CalendarEventBabiesForEvent(ctx, existing.ID)
+			if err != nil {
+				return nil, err
+			}
+			for _, r := range rows {
+				e.babyIDs = append(e.babyIDs, r.ID)
+			}
+		}
+		if !assigneeIdsSet {
+			rows, err := d.Q.CalendarAssigneesForEvent(ctx, existing.ID)
+			if err != nil {
+				return nil, err
+			}
+			for _, r := range rows {
+				e.assigneeIDs = append(e.assigneeIDs, r.UserID)
+			}
+		}
+		detached, err := d.detachOccurrence(ctx, fam.FamilyID, existing, occurrence, e)
+		if err != nil {
+			return nil, err
+		}
+		return gen.UpdateCalendarEvent200JSONResponse(detached), nil
+	}
+
 	// Moving the event (or its reminder, or its recurrence) re-arms the
 	// sweep latch.
 	rearm := startSet || remindSet || recurrenceSet || untilSet
@@ -434,6 +611,16 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 		if n == 0 {
 			return gen.UpdateCalendarEvent404JSONResponse(notFound()), nil
 		}
+		// A moved start or a new rule makes a different set of
+		// occurrences: the skips named the old ones, so they go. Only a
+		// real change counts — the sheet sends startTime on every save.
+		startMoved := startSet && startVal != nil && !startVal.Equal(existing.StartTime.Time)
+		ruleChanged := recurrenceSet && recurrenceStr != existing.Recurrence
+		if startMoved || ruleChanged {
+			if err := qtx.DeleteCalendarEventSkips(ctx, dbgen.DeleteCalendarEventSkipsParams{FamilyID: fam.FamilyID, EventID: req.Id}); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	if babyIdsSet {
@@ -472,6 +659,30 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 // "{ok:true} / 404". Link rows go with it via ON DELETE CASCADE.
 func (d Deps) DeleteCalendarEvent(ctx context.Context, req gen.DeleteCalendarEventRequestObject) (gen.DeleteCalendarEventResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
+
+	// "Delete this event": the occurrence is skipped; the series stays.
+	if req.Params.Occurrence != nil {
+		existing, err := d.Q.GetCalendarEvent(ctx, dbgen.GetCalendarEventParams{FamilyID: fam.FamilyID, ID: req.Id})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return gen.DeleteCalendarEvent404JSONResponse(notFound()), nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		series, err := d.storedSeries(ctx, fam.FamilyID, existing)
+		if err != nil {
+			return nil, err
+		}
+		if !series.IsOccurrence(*req.Params.Occurrence) {
+			return gen.DeleteCalendarEvent400JSONResponse(notAnOccurrence()), nil
+		}
+		if err := d.Q.CreateCalendarEventSkip(ctx, dbgen.CreateCalendarEventSkipParams{
+			FamilyID: fam.FamilyID, EventID: req.Id, OccurrenceStart: ts(*req.Params.Occurrence),
+		}); err != nil {
+			return nil, err
+		}
+		return gen.DeleteCalendarEvent200JSONResponse{Ok: gen.OkOkTrue}, nil
+	}
 	n, err := d.Q.DeleteCalendarEvent(ctx, dbgen.DeleteCalendarEventParams{FamilyID: fam.FamilyID, ID: req.Id})
 	if err != nil {
 		return nil, err

@@ -95,3 +95,40 @@ func TestRRule(t *testing.T) {
 		t.Errorf("weekly until = %q", got)
 	}
 }
+
+// Skipped occurrences ("this event" deleted or detached) are left out of
+// every expansion, and IsOccurrence names exactly the ones left.
+func TestSkippedOccurrencesAreLeftOut(t *testing.T) {
+	start := time.Date(2026, 3, 2, 9, 0, 0, 0, time.UTC) // Mondays 10:00 Oslo
+	second := time.Date(2026, 3, 9, 9, 0, 0, 0, time.UTC)
+	third := time.Date(2026, 3, 16, 9, 0, 0, 0, time.UTC)
+	until := time.Date(2026, 3, 20, 0, 0, 0, 0, time.UTC)
+	s := Series{Start: start, Rule: Weekly, Until: &until, Skip: []time.Time{second}}
+
+	got := s.Between(start, until)
+	if len(got) != 2 || !got[0].Equal(start) || !got[1].Equal(third) {
+		t.Errorf("Between = %v, want the first and third", got)
+	}
+	if next, ok := s.NextOnOrAfter(start.Add(time.Minute)); !ok || !next.Equal(third) {
+		t.Errorf("NextOnOrAfter past the first = %v %v, want the third", next, ok)
+	}
+
+	for name, tc := range map[string]struct {
+		at   time.Time
+		want bool
+	}{
+		"an occurrence":     {third, true},
+		"the first":         {start, true},
+		"a skipped one":     {second, false},
+		"off the rule":      {third.Add(time.Hour), false},
+		"past Until":        {time.Date(2026, 3, 23, 9, 0, 0, 0, time.UTC), false},
+		"before the series": {start.Add(-7 * 24 * time.Hour), false},
+	} {
+		if got := s.IsOccurrence(tc.at); got != tc.want {
+			t.Errorf("IsOccurrence(%s) = %v, want %v", name, got, tc.want)
+		}
+	}
+	if (Series{Start: start, Rule: None}).IsOccurrence(start) {
+		t.Error("a one-off has no occurrence to single out")
+	}
+}
