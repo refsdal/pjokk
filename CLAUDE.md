@@ -394,7 +394,8 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   families, sign-in methods, sessions with sign-out, change email, revoke
   system admin), and an Ops tab (spec `docs/superpowers/specs/2026-09-11-admin-ops-design.md`:
   build and schema versions, where storage points, each job's recorded runs
-  with Run now, the backup list with an audited download). Metadata only —
+  with Run now, the backup list with an audited download, and each
+  snapshot's deleted families with a restore). Metadata only —
   never a log entry; the one exception is a backup download, which the
   operator chose knowing it hands out every family's data. Every write
   audits first; the system-admin role can be revoked over HTTP but never
@@ -500,6 +501,18 @@ sheet pattern — build the pattern well once.
   and the bookkeeping tables (goose's and `job_run`), and
   `backup_tables_test.go` checks the list against the live schema **in both
   directions**, so "every table" stays true as the schema grows.
+- Restores (`internal/restore`, spec
+  `docs/superpowers/specs/2026-09-11-admin-restore-design.md`): `pjokk
+  restore --from DATE | --file PATH` loads a snapshot into an EMPTY
+  database (never over live data), and `pjokk restore family <id>` or the
+  console's Deleted families brings back one family that no longer exists.
+  Both are driven by the live schema — foreign keys set the order,
+  `json_populate_recordset` types the rows — so a new table restores
+  without touching the package. But a new table must be classifiable for
+  the family restore (a family id, a parent that has one, or an entry in
+  restore's `globalTables` / `neverForAFamily`), or
+  `TestEveryTableHasAFamilyRestoreRule` fails. `pjokk set-password <email>`
+  (stdin) is the way back in after a whole restore.
 
 ## Phased roadmap
 

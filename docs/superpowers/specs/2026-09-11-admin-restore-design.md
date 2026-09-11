@@ -59,8 +59,12 @@ still load, with a warning that their version is unknown.
    tombstone. The message says to point `DATABASE_URL` at a fresh
    database.
 3. Load every table in **one transaction**. The migration-seeded tombstone
-   is the one row that already exists: `users` loads with
-   `ON CONFLICT ("id") DO NOTHING`, and nothing else tolerates a conflict.
+   is the one row that already exists; it is deleted first in the same
+   transaction (nothing can reference it yet), so the snapshot's own
+   tombstone loads in its place and the round trip is exact. It is
+   re-seeded afterwards should a snapshot lack one. No conflict is
+   tolerated. A snapshot from a newer schema than the build is refused:
+   its extra columns would be dropped without a word.
 4. **Milestone photos:** each restored `milestone_photo` row's object is
    copied back from `photo-backups/current/<rest>`, or failing that from
    the newest `photo-backups/deleted/<date>/<rest>`. An object already in
@@ -70,14 +74,17 @@ still load, with a warning that their version is unknown.
    snapshot's schema version against the build's. It ends by saying
    passwords are gone and naming `pjokk set-password`.
 
-**`pjokk set-password <email>`** reads the new password from stdin (at
-least 8 characters, the console's rule) and calls
-`auth.Service.SetPassword`.
+**`pjokk set-password <email>`** reads the new password from stdin and
+calls `auth.Service.SetPassword`, which applies the app's password policy
+(at least 8 characters, an uppercase letter and a number).
 
 ## 2. The family restore
 
-`restore.Family(ctx, deps, snapshot, familyID)` — used by
-`pjokk restore family <id> --from DATE | --file PATH` and the console.
+`restore.Family(ctx, deps, snapshot, familyID, inTx)` — used by
+`pjokk restore family <id> --from DATE | --file PATH` and the console. The
+CLI's family restore writes no audit row — `admin_audit` names an operator
+account and a shell has none — and prints its report instead; the console's
+writes its row through `inTx`, inside the restore's transaction.
 
 - **Refuses** when the family exists now (`FAMILY_EXISTS`), or is not in
   the snapshot (`NOT_FOUND`).
@@ -161,7 +168,7 @@ import `restore`).
   sessions); photos back in storage from the backup trees, current and
   deleted.
 - **Whole restore guards:** refuses a database with a family or a real
-  user; the tombstone is the one tolerated conflict; a snapshot without
+  user; the seeded tombstone is replaced by the snapshot's; a snapshot without
   `schemaVersion` loads with a warning; `schemaVersion` is written by the
   backup.
 - **Family restore:** a deleted family comes back with its rows; a family
