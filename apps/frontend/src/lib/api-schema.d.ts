@@ -1749,6 +1749,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/backups/{date}/families": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The families in one nightly snapshot that do not exist now — the ones a family restore could bring back — with their member and baby counts from the snapshot, and who deleted each and when, from the audit trail. System admin only. */
+        get: operations["listDeletedFamilies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/backups/{date}/families/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring one deleted family back from a nightly snapshot, with its original ids (spec 2026-09-11-admin-restore §2). Members whose accounts were deleted since are left out and what they logged is credited to the Deleted user; API keys, kiosk devices and push subscriptions stay gone; a taken slug becomes <slug>-restored. The audit row is written in the restore's own transaction. 409 FAMILY_EXISTS for a family that exists. System admin only. */
+        post: operations["restoreDeletedFamily"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3038,6 +3072,42 @@ export interface components {
             currentBytes: number;
             deleted: number;
         };
+        /** @description A family in a snapshot that does not exist now. */
+        DeletedFamily: {
+            id: string;
+            name: string;
+            slug: string;
+            members: number;
+            babies: number;
+            /** Format: date-time */
+            createdAt?: string;
+            /**
+             * Format: date-time
+             * @description From the family.delete audit row, when there is one.
+             */
+            deletedAt?: string;
+            /** @description The operator who deleted it, from the same row. */
+            deletedBy?: string;
+        };
+        FamilyRestoreReport: {
+            familyId: string;
+            name: string;
+            slug: string;
+            /** @description Set when the slug had been taken and the family came back under a new one. */
+            previousSlug?: string;
+            membersRejoined: number;
+            /** @description Memberships of accounts deleted since the snapshot. */
+            membersDropped: number;
+            /** @description False when every admin's account has gone. */
+            hasAdmin: boolean;
+            /** @description Rows restored per table. */
+            rows: {
+                [key: string]: number;
+            };
+            photosRestored: number;
+            photosMissing: string[];
+            warnings: string[];
+        };
         /** @description Platform totals. Every count is a plain integer — the underlying COUNT(*) is bigint and must be cast (`::int`) in SQL, or the driver hands it back as a string (CLAUDE.md's Postgres notes). */
         AdminStats: {
             families: number;
@@ -3241,6 +3311,8 @@ export interface components {
         limitQuery: number;
         /** @description The previous page's nextCursor; omit for the first page. */
         cursorQuery: string;
+        /** @description The night a snapshot names, YYYY-MM-DD (UTC). */
+        snapshotDatePath: string;
         /** @description Resource id. */
         idPath: string;
         /** @description The family-membership row id (NOT the user id). */
@@ -7947,6 +8019,81 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminBackups"];
+                };
+            };
+        };
+    };
+    listDeletedFamilies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The night a snapshot names, YYYY-MM-DD (UTC). */
+                date: components["parameters"]["snapshotDatePath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The deleted families, by name. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedFamily"][];
+                };
+            };
+            /** @description No snapshot for that date (NOT_FOUND). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    restoreDeletedFamily: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The night a snapshot names, YYYY-MM-DD (UTC). */
+                date: components["parameters"]["snapshotDatePath"];
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Restored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FamilyRestoreReport"];
+                };
+            };
+            /** @description No snapshot for that date, or the family is not in it (NOT_FOUND). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The family exists (FAMILY_EXISTS). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };

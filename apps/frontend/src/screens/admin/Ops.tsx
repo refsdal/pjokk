@@ -1,11 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { Sheet } from "@/components/Sheet";
 import { Button } from "@/components/ui/button";
 import {
   type AdminBackups,
   type AdminJobRun,
   type AdminOps as AdminOpsData,
   type AdminOpsJob,
+  type DeletedFamily,
+  type FamilyRestoreReport,
   formatBytes,
 } from "@/lib/admin-ops";
 import { API_BASE, ApiError, client, unwrap } from "@/lib/api";
@@ -223,6 +227,178 @@ async function downloadSnapshot(date: string): Promise<void> {
 // refreshKey names the newest finished nightly run: when it changes, a new
 // snapshot may exist, so the list is asked again. Skipped on mount, where
 // the query is fetching anyway.
+// Tap twice, like the console's other consequential row actions.
+function ConfirmButton({
+  label,
+  busy,
+  onConfirm,
+}: {
+  label: string;
+  busy: boolean;
+  onConfirm: () => void;
+}) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const id = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(id);
+  }, [armed]);
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      className={
+        armed
+          ? "shrink-0 rounded-full bg-accent px-3 py-1.5 text-xs font-semibold text-on-accent"
+          : "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold text-accent"
+      }
+      onClick={() => (armed ? onConfirm() : setArmed(true))}
+    >
+      {busy ? t("Restoring…") : armed ? t("Tap again to confirm") : label}
+    </button>
+  );
+}
+
+// What a family restore did, and what the operator should know about it
+// (spec 2026-09-11-admin-restore §3).
+function RestoreResult({ report }: { report: FamilyRestoreReport }) {
+  const notes: string[] = [];
+  if (report.membersDropped > 0)
+    notes.push(
+      `${report.membersDropped} ${t("left out: their accounts were deleted since, and what they logged is the Deleted user's")}`,
+    );
+  if (!report.hasAdmin)
+    notes.push(
+      t("Nobody left can administer it — make someone admin on its page"),
+    );
+  if (report.previousSlug)
+    notes.push(`${t("Its slug had been taken; it is now")} ${report.slug}`);
+  if (report.photosMissing.length > 0)
+    notes.push(
+      `${report.photosMissing.length} ${t("photos had no copy in the photo backup")}`,
+    );
+  notes.push(...report.warnings);
+  notes.push(t("API keys, kiosk devices and push subscriptions stay gone."));
+  return (
+    <div className="space-y-2" data-testid="restore-result">
+      <p className="font-semibold text-ink">
+        {report.name} {t("is back")}
+      </p>
+      <p className="text-sm text-muted">
+        {report.membersRejoined} {t("members rejoined")} ·{" "}
+        {report.photosRestored} {t("photos restored")}
+      </p>
+      <ul className="list-disc space-y-1 pl-5 text-sm text-ink">
+        {notes.map((n) => (
+          <li key={n}>{n}</li>
+        ))}
+      </ul>
+      <Link
+        to="/admin/families/$id"
+        params={{ id: report.familyId }}
+        className="block rounded-xl bg-surface-2 px-4 py-3 text-center text-sm font-semibold text-ink"
+      >
+        {t("Open the family")}
+      </Link>
+    </div>
+  );
+}
+
+// The families a snapshot holds that no longer exist, and the undo for a
+// deletion made by mistake. Never for a family deleted at its owners'
+// request: that deletion is their right.
+function DeletedFamiliesSheet({
+  date,
+  onClose,
+}: {
+  date: string | null;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [report, setReport] = useState<FamilyRestoreReport | null>(null);
+  useEffect(() => {
+    if (date) setReport(null);
+  }, [date]);
+  const families = useQuery({
+    queryKey: ["admin", "backups", date, "families"],
+    enabled: date !== null,
+    queryFn: async () =>
+      unwrap<DeletedFamily[]>(
+        client.GET("/api/admin/backups/{date}/families", {
+          params: { path: { date: date ?? "" } },
+        }),
+      ),
+  });
+  const restoreFamily = useMutation({
+    mutationFn: async (id: string) =>
+      unwrap<FamilyRestoreReport>(
+        client.POST("/api/admin/backups/{date}/families/{id}/restore", {
+          params: { path: { date: date ?? "", id } },
+        }),
+      ),
+    onSuccess: (rep) => {
+      setReport(rep);
+      toast(t("Family restored"));
+      void queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+    onError: (err) => toast(err.message, "error"),
+  });
+
+  return (
+    <Sheet
+      open={date !== null}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+      title={`${t("Deleted families")} · ${date ?? ""}`}
+    >
+      <div className="space-y-3 pb-4">
+        {report ? (
+          <RestoreResult report={report} />
+        ) : (
+          <>
+            <p className="text-sm text-muted">
+              {t(
+                "Restore a family only to undo a mistake — never one deleted at its owners' request.",
+              )}
+            </p>
+            {families.isPending && (
+              <p className="text-sm text-muted">{t("Loading…")}</p>
+            )}
+            {families.data?.length === 0 && (
+              <p className="text-sm text-muted">
+                {t("Every family in this snapshot still exists.")}
+              </p>
+            )}
+            {families.data?.map((f) => (
+              <div
+                key={f.id}
+                className="flex items-center gap-3 rounded-xl bg-surface-2 px-3 py-2"
+                data-testid="deleted-family"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-ink">{f.name}</p>
+                  <p className="text-xs text-muted">
+                    {f.members} {t("members")} · {f.babies} {t("babies")}
+                    {f.deletedAt
+                      ? ` · ${t("deleted")} ${formatRelative(new Date(f.deletedAt))}${f.deletedBy ? ` ${t("by")} ${f.deletedBy}` : ""}`
+                      : ""}
+                  </p>
+                </div>
+                <ConfirmButton
+                  label={t("Restore")}
+                  busy={restoreFamily.isPending}
+                  onConfirm={() => restoreFamily.mutate(f.id)}
+                />
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </Sheet>
+  );
+}
+
 function Backups({ refreshKey }: { refreshKey: string }) {
   const queryClient = useQueryClient();
   const backups = useQuery({
@@ -236,6 +412,7 @@ function Backups({ refreshKey }: { refreshKey: string }) {
     void queryClient.invalidateQueries({ queryKey: ["admin", "backups"] });
   }, [refreshKey, queryClient]);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [familiesFor, setFamiliesFor] = useState<string | null>(null);
   const b = backups.data;
 
   const download = async (date: string) => {
@@ -270,14 +447,23 @@ function Backups({ refreshKey }: { refreshKey: string }) {
               {formatRelative(new Date(s.uploadedAt))}
             </p>
           </div>
-          <button
-            type="button"
-            className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold text-accent"
-            disabled={downloading !== null}
-            onClick={() => void download(s.date)}
-          >
-            {downloading === s.date ? t("Downloading…") : t("Download")}
-          </button>
+          <div className="flex shrink-0 flex-col items-end">
+            <button
+              type="button"
+              className="rounded-full px-3 py-1 text-xs font-semibold text-accent"
+              disabled={downloading !== null}
+              onClick={() => void download(s.date)}
+            >
+              {downloading === s.date ? t("Downloading…") : t("Download")}
+            </button>
+            <button
+              type="button"
+              className="rounded-full px-3 py-1 text-xs font-semibold text-muted"
+              onClick={() => setFamiliesFor(s.date)}
+            >
+              {t("Deleted families")}
+            </button>
+          </div>
         </div>
       ))}
       {b && (
@@ -287,6 +473,10 @@ function Backups({ refreshKey }: { refreshKey: string }) {
           {b.photos.deleted} {t("kept after deletion")}
         </p>
       )}
+      <DeletedFamiliesSheet
+        date={familiesFor}
+        onClose={() => setFamiliesFor(null)}
+      />
     </Section>
   );
 }

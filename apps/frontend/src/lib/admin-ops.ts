@@ -7,6 +7,8 @@ export type AdminOps = components["schemas"]["AdminOps"];
 export type AdminOpsJob = components["schemas"]["AdminJob"];
 export type AdminJobRun = components["schemas"]["AdminJobRun"];
 export type AdminBackups = components["schemas"]["AdminBackups"];
+export type DeletedFamily = components["schemas"]["DeletedFamily"];
+export type FamilyRestoreReport = components["schemas"]["FamilyRestoreReport"];
 
 // The one line Overview shows. A code rather than a sentence, so the screen
 // words it through t() — this file is not under screens/admin/, where the
