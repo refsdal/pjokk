@@ -3265,6 +3265,133 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/admin/users/{id}:
+    get:
+      operationId: getAdminUserDetail
+      summary: >-
+        One person, for the operator console's user page: their families and
+        their role in each, how they sign in, and their live sessions
+        (browser and device, when each started and was last active, which
+        family it is in, and whether an operator is driving it). Never a
+        token or an address. 404 for an unknown id or the tombstone. System
+        admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: The person.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetail"
+        "404":
+          description: No such person.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users/{id}/email:
+    post:
+      operationId: changeAdminUserEmail
+      summary: >-
+        Change a person's login address. Their sessions and a linked Google
+        account stay (Google sign-in follows the Google account's id, not the
+        address); password sign-in uses the new address from then on. Audited
+        old → new. 409 EMAIL_TAKEN when another account holds it, 400
+        UNCHANGED when it is already theirs. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminEmailChange"
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "400":
+          description: Not an address (VALIDATION), or already theirs (UNCHANGED).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such person.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Another account has this address (EMAIL_TAKEN).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users/{id}/role:
+    delete:
+      operationId: revokeAdminUserRole
+      summary: >-
+        Take the system-admin role away. Never your own (400 REFUSED), never
+        the last active admin's (409 LAST_ADMIN — two operators revoking each
+        other at once cannot leave nobody), and it ends any session they are
+        driving through impersonation. Effective on their next request.
+        There is deliberately no route that GRANTS the role. System admin
+        only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "204":
+          description: Revoked.
+        "400":
+          description: Your own role (REFUSED).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such person, or not a system admin.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: The last active system admin (LAST_ADMIN).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users/{id}/sessions/{sessionId}:
+    delete:
+      operationId: revokeAdminUserSession
+      summary: >-
+        Sign out one of a person's sessions ("I left it signed in on my
+        sister's phone"). Audited with the session's user agent. 404 when
+        the session is not theirs. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Signed out.
+        "404":
+          description: No such person, or not their session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/admin/users/{id}/delete:
     post:
       operationId: deleteAdminUser
@@ -6576,6 +6703,99 @@ components:
           type: string
           nullable: true
           description: Pass as `cursor` for the next page; null on the last one.
+    AdminUserDetail:
+      type: object
+      description: >-
+        One person for the console's user page. Metadata only: no log
+        content, no token, no address.
+      required: [id, name, email, role, banned, banReason, createdAt, hasPassword, families, providers, sessions]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          nullable: true
+          description: Ours, system-admin role. "admin" or null.
+        banned:
+          type: boolean
+        banReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        hasPassword:
+          type: boolean
+        families:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUserFamily"
+        providers:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUserProvider"
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSession"
+    AdminUserFamily:
+      type: object
+      required: [familyId, name, role]
+      properties:
+        familyId:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+    AdminUserProvider:
+      type: object
+      required: [provider, linkedAt]
+      properties:
+        provider:
+          type: string
+          description: The OAuth provider, e.g. "google".
+        linkedAt:
+          type: string
+          format: date-time
+    AdminSession:
+      type: object
+      required: [id, userAgent, createdAt, lastActiveAt, expiresAt, familyName, impersonatedByName]
+      properties:
+        id:
+          type: string
+        userAgent:
+          type: string
+          nullable: true
+          description: The browser's own description; the console turns it into "Chrome on Android".
+        createdAt:
+          type: string
+          format: date-time
+        lastActiveAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        familyName:
+          type: string
+          nullable: true
+        impersonatedByName:
+          type: string
+          nullable: true
+          description: The operator driving this session, when one is.
+    AdminEmailChange:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          minLength: 3
+          maxLength: 254
     AuditNote:
       type: object
       required: [action, target]

@@ -166,6 +166,10 @@ func TestAdminRoutesRequireSysadmin(t *testing.T) {
 		{http.MethodPost, "/api/admin/users/" + userID + "/password"},
 		{http.MethodPost, "/api/admin/users/" + userID + "/sessions/revoke"},
 		{http.MethodPost, "/api/admin/users/" + userID + "/impersonate"},
+		{http.MethodGet, "/api/admin/users/" + userID},
+		{http.MethodPost, "/api/admin/users/" + userID + "/email"},
+		{http.MethodDelete, "/api/admin/users/" + userID + "/role"},
+		{http.MethodDelete, "/api/admin/users/" + userID + "/sessions/some-session"},
 		{http.MethodGet, "/api/admin/audit"},
 		{http.MethodPost, "/api/admin/audit"},
 	}
@@ -175,6 +179,11 @@ func TestAdminRoutesRequireSysadmin(t *testing.T) {
 		var body any
 		if route.path == "/api/admin/users/"+userID+"/password" {
 			body = map[string]any{"password": "hunter2hunter2"}
+		}
+		// A well-formed body, so request validation passes and the gate is
+		// what answers.
+		if route.path == "/api/admin/users/"+userID+"/email" {
+			body = map[string]any{"email": "new@example.com"}
 		}
 		if route.method == http.MethodPost && strings.HasSuffix(route.path, "/api/admin/audit") {
 			body = map[string]any{"action": "poke", "target": "x"}

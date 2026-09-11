@@ -68,21 +68,33 @@ type ServerInterface interface {
 	// ListAdminUsers Accounts on the platform (never the tombstone that deleted accounts' records point at). `query` filters on name or email (case-insensitive substring). One page at a time, newest first: pass the previous page's `nextCursor` as `cursor` (`limit` 50 by default, 200 at most); a malformed cursor is a 400. NEW in Go — replaces the better-auth admin plugin's client-side listUsers call. System admin only.
 	// (GET /api/admin/users)
 	ListAdminUsers(w http.ResponseWriter, r *http.Request, params ListAdminUsersParams)
+	// GetAdminUserDetail One person, for the operator console's user page: their families and their role in each, how they sign in, and their live sessions (browser and device, when each started and was last active, which family it is in, and whether an operator is driving it). Never a token or an address. 404 for an unknown id or the tombstone. System admin only.
+	// (GET /api/admin/users/{id})
+	GetAdminUserDetail(w http.ResponseWriter, r *http.Request, id IdPath)
 	// BanAdminUser Ban an account: sets banned + ban_reason AND revokes every session the user holds, so the ban is enforced by absence rather than by every reader remembering to check a flag. Their API keys stop authenticating too (GetAPIKeyByHash joins on a non-banned creator). Audited as `user.ban`. System admin only.
 	// (POST /api/admin/users/{id}/ban)
 	BanAdminUser(w http.ResponseWriter, r *http.Request, id IdPath)
 	// DeleteAdminUser Delete an account safely. Every non-cascading reference to the user (log attribution on all eleven log kinds, vaccine documents and dismissals, invites, API keys, calendar events and audit rows) is reassigned to the tombstone "Deleted user" in ONE transaction, calendar assignments are dropped, the user's API keys are revoked, and only then is the account removed (sessions, memberships and push subscriptions cascade). POST rather than DELETE, matching the TypeScript predecessor's route. Audited as `user.delete`. System admin only.
 	// (POST /api/admin/users/{id}/delete)
 	DeleteAdminUser(w http.ResponseWriter, r *http.Request, id IdPath)
+	// ChangeAdminUserEmail Change a person's login address. Their sessions and a linked Google account stay (Google sign-in follows the Google account's id, not the address); password sign-in uses the new address from then on. Audited old → new. 409 EMAIL_TAKEN when another account holds it, 400 UNCHANGED when it is already theirs. System admin only.
+	// (POST /api/admin/users/{id}/email)
+	ChangeAdminUserEmail(w http.ResponseWriter, r *http.Request, id IdPath)
 	// ImpersonateAdminUser Sign in as another user for support. Mints a session for the target carrying the admin's id in its metadata (the in-app banner reads it) and swaps the session cookie over; the admin's own session is kept, and POST /api/admin/stop-impersonating restores it. Refused for the caller's own account and for banned targets. Audited as `user.impersonate` against the REAL admin. System admin only.
 	// (POST /api/admin/users/{id}/impersonate)
 	ImpersonateAdminUser(w http.ResponseWriter, r *http.Request, id IdPath)
 	// SetAdminUserPassword Set a user's password (support flow — also establishes a first password for an account created through the invite flow with no credential). The password itself is NEVER written to the audit trail; the row records only the user id. Audited as `user.password.set`. System admin only.
 	// (POST /api/admin/users/{id}/password)
 	SetAdminUserPassword(w http.ResponseWriter, r *http.Request, id IdPath)
+	// RevokeAdminUserRole Take the system-admin role away. Never your own (400 REFUSED), never the last active admin's (409 LAST_ADMIN — two operators revoking each other at once cannot leave nobody), and it ends any session they are driving through impersonation. Effective on their next request. There is deliberately no route that GRANTS the role. System admin only.
+	// (DELETE /api/admin/users/{id}/role)
+	RevokeAdminUserRole(w http.ResponseWriter, r *http.Request, id IdPath)
 	// RevokeAdminUserSessions Sign a user out everywhere. Audited as `user.sessions.revoke`. System admin only.
 	// (POST /api/admin/users/{id}/sessions/revoke)
 	RevokeAdminUserSessions(w http.ResponseWriter, r *http.Request, id IdPath)
+	// RevokeAdminUserSession Sign out one of a person's sessions ("I left it signed in on my sister's phone"). Audited with the session's user agent. 404 when the session is not theirs. System admin only.
+	// (DELETE /api/admin/users/{id}/sessions/{sessionId})
+	RevokeAdminUserSession(w http.ResponseWriter, r *http.Request, id IdPath, sessionId string)
 	// UnbanAdminUser Lift a ban: clears banned + ban_reason. Sessions revoked by the ban stay revoked — the user signs in again. Audited as `user.unban`. System admin only.
 	// (POST /api/admin/users/{id}/unban)
 	UnbanAdminUser(w http.ResponseWriter, r *http.Request, id IdPath)
@@ -939,6 +951,32 @@ func (siw *ServerInterfaceWrapper) ListAdminUsers(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// GetAdminUserDetail operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminUserDetail(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminUserDetail(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // BanAdminUser operation middleware
 func (siw *ServerInterfaceWrapper) BanAdminUser(w http.ResponseWriter, r *http.Request) {
 
@@ -982,6 +1020,32 @@ func (siw *ServerInterfaceWrapper) DeleteAdminUser(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteAdminUser(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeAdminUserEmail operation middleware
+func (siw *ServerInterfaceWrapper) ChangeAdminUserEmail(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeAdminUserEmail(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1043,6 +1107,32 @@ func (siw *ServerInterfaceWrapper) SetAdminUserPassword(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// RevokeAdminUserRole operation middleware
+func (siw *ServerInterfaceWrapper) RevokeAdminUserRole(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeAdminUserRole(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RevokeAdminUserSessions operation middleware
 func (siw *ServerInterfaceWrapper) RevokeAdminUserSessions(w http.ResponseWriter, r *http.Request) {
 
@@ -1060,6 +1150,41 @@ func (siw *ServerInterfaceWrapper) RevokeAdminUserSessions(w http.ResponseWriter
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RevokeAdminUserSessions(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeAdminUserSession operation middleware
+func (siw *ServerInterfaceWrapper) RevokeAdminUserSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sessionId" -------------
+	var sessionId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sessionId", r.PathValue("sessionId"), &sessionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sessionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeAdminUserSession(w, r, id, sessionId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4114,6 +4239,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/admin/families/{id}/invites/{code}", wrapper.RevokeAdminFamilyInvite)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/admin/families/{id}/keys/{keyId}", wrapper.RevokeAdminFamilyKey)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/admin/users", wrapper.ListAdminUsers)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/admin/users/{id}", wrapper.GetAdminUserDetail)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/users/{id}/email", wrapper.ChangeAdminUserEmail)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/admin/users/{id}/role", wrapper.RevokeAdminUserRole)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/admin/users/{id}/sessions/{sessionId}", wrapper.RevokeAdminUserSession)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/users/{id}/delete", wrapper.DeleteAdminUser)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/users/{id}/ban", wrapper.BanAdminUser)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/users/{id}/unban", wrapper.UnbanAdminUser)
@@ -4737,6 +4866,42 @@ func (response ListAdminUsers400JSONResponse) VisitListAdminUsersResponse(w http
 	return err
 }
 
+type GetAdminUserDetailRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type GetAdminUserDetailResponseObject interface {
+	VisitGetAdminUserDetailResponse(w http.ResponseWriter) error
+}
+
+type GetAdminUserDetail200JSONResponse AdminUserDetail
+
+func (response GetAdminUserDetail200JSONResponse) VisitGetAdminUserDetailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAdminUserDetail404JSONResponse Error
+
+func (response GetAdminUserDetail404JSONResponse) VisitGetAdminUserDetailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type BanAdminUserRequestObject struct {
 	Id   IdPath `json:"id"`
 	Body *BanAdminUserJSONRequestBody
@@ -4834,6 +4999,71 @@ func (response DeleteAdminUser404JSONResponse) VisitDeleteAdminUserResponse(w ht
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeAdminUserEmailRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *ChangeAdminUserEmailJSONRequestBody
+}
+
+type ChangeAdminUserEmailResponseObject interface {
+	VisitChangeAdminUserEmailResponse(w http.ResponseWriter) error
+}
+
+type ChangeAdminUserEmail200JSONResponse AdminUser
+
+func (response ChangeAdminUserEmail200JSONResponse) VisitChangeAdminUserEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeAdminUserEmail400JSONResponse Error
+
+func (response ChangeAdminUserEmail400JSONResponse) VisitChangeAdminUserEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeAdminUserEmail404JSONResponse Error
+
+func (response ChangeAdminUserEmail404JSONResponse) VisitChangeAdminUserEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeAdminUserEmail409JSONResponse Error
+
+func (response ChangeAdminUserEmail409JSONResponse) VisitChangeAdminUserEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -4939,6 +5169,64 @@ func (response SetAdminUserPassword404JSONResponse) VisitSetAdminUserPasswordRes
 	return err
 }
 
+type RevokeAdminUserRoleRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type RevokeAdminUserRoleResponseObject interface {
+	VisitRevokeAdminUserRoleResponse(w http.ResponseWriter) error
+}
+
+type RevokeAdminUserRole204Response struct {
+}
+
+func (response RevokeAdminUserRole204Response) VisitRevokeAdminUserRoleResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeAdminUserRole400JSONResponse Error
+
+func (response RevokeAdminUserRole400JSONResponse) VisitRevokeAdminUserRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeAdminUserRole404JSONResponse Error
+
+func (response RevokeAdminUserRole404JSONResponse) VisitRevokeAdminUserRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeAdminUserRole409JSONResponse Error
+
+func (response RevokeAdminUserRole409JSONResponse) VisitRevokeAdminUserRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type RevokeAdminUserSessionsRequestObject struct {
 	Id IdPath `json:"id"`
 }
@@ -4964,6 +5252,37 @@ func (response RevokeAdminUserSessions200JSONResponse) VisitRevokeAdminUserSessi
 type RevokeAdminUserSessions404JSONResponse Error
 
 func (response RevokeAdminUserSessions404JSONResponse) VisitRevokeAdminUserSessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeAdminUserSessionRequestObject struct {
+	Id        IdPath `json:"id"`
+	SessionId string `json:"sessionId"`
+}
+
+type RevokeAdminUserSessionResponseObject interface {
+	VisitRevokeAdminUserSessionResponse(w http.ResponseWriter) error
+}
+
+type RevokeAdminUserSession204Response struct {
+}
+
+func (response RevokeAdminUserSession204Response) VisitRevokeAdminUserSessionResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeAdminUserSession404JSONResponse Error
+
+func (response RevokeAdminUserSession404JSONResponse) VisitRevokeAdminUserSessionResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -9047,21 +9366,33 @@ type StrictServerInterface interface {
 	// ListAdminUsers Accounts on the platform (never the tombstone that deleted accounts' records point at). `query` filters on name or email (case-insensitive substring). One page at a time, newest first: pass the previous page's `nextCursor` as `cursor` (`limit` 50 by default, 200 at most); a malformed cursor is a 400. NEW in Go — replaces the better-auth admin plugin's client-side listUsers call. System admin only.
 	// (GET /api/admin/users)
 	ListAdminUsers(ctx context.Context, request ListAdminUsersRequestObject) (ListAdminUsersResponseObject, error)
+	// GetAdminUserDetail One person, for the operator console's user page: their families and their role in each, how they sign in, and their live sessions (browser and device, when each started and was last active, which family it is in, and whether an operator is driving it). Never a token or an address. 404 for an unknown id or the tombstone. System admin only.
+	// (GET /api/admin/users/{id})
+	GetAdminUserDetail(ctx context.Context, request GetAdminUserDetailRequestObject) (GetAdminUserDetailResponseObject, error)
 	// BanAdminUser Ban an account: sets banned + ban_reason AND revokes every session the user holds, so the ban is enforced by absence rather than by every reader remembering to check a flag. Their API keys stop authenticating too (GetAPIKeyByHash joins on a non-banned creator). Audited as `user.ban`. System admin only.
 	// (POST /api/admin/users/{id}/ban)
 	BanAdminUser(ctx context.Context, request BanAdminUserRequestObject) (BanAdminUserResponseObject, error)
 	// DeleteAdminUser Delete an account safely. Every non-cascading reference to the user (log attribution on all eleven log kinds, vaccine documents and dismissals, invites, API keys, calendar events and audit rows) is reassigned to the tombstone "Deleted user" in ONE transaction, calendar assignments are dropped, the user's API keys are revoked, and only then is the account removed (sessions, memberships and push subscriptions cascade). POST rather than DELETE, matching the TypeScript predecessor's route. Audited as `user.delete`. System admin only.
 	// (POST /api/admin/users/{id}/delete)
 	DeleteAdminUser(ctx context.Context, request DeleteAdminUserRequestObject) (DeleteAdminUserResponseObject, error)
+	// ChangeAdminUserEmail Change a person's login address. Their sessions and a linked Google account stay (Google sign-in follows the Google account's id, not the address); password sign-in uses the new address from then on. Audited old → new. 409 EMAIL_TAKEN when another account holds it, 400 UNCHANGED when it is already theirs. System admin only.
+	// (POST /api/admin/users/{id}/email)
+	ChangeAdminUserEmail(ctx context.Context, request ChangeAdminUserEmailRequestObject) (ChangeAdminUserEmailResponseObject, error)
 	// ImpersonateAdminUser Sign in as another user for support. Mints a session for the target carrying the admin's id in its metadata (the in-app banner reads it) and swaps the session cookie over; the admin's own session is kept, and POST /api/admin/stop-impersonating restores it. Refused for the caller's own account and for banned targets. Audited as `user.impersonate` against the REAL admin. System admin only.
 	// (POST /api/admin/users/{id}/impersonate)
 	ImpersonateAdminUser(ctx context.Context, request ImpersonateAdminUserRequestObject) (ImpersonateAdminUserResponseObject, error)
 	// SetAdminUserPassword Set a user's password (support flow — also establishes a first password for an account created through the invite flow with no credential). The password itself is NEVER written to the audit trail; the row records only the user id. Audited as `user.password.set`. System admin only.
 	// (POST /api/admin/users/{id}/password)
 	SetAdminUserPassword(ctx context.Context, request SetAdminUserPasswordRequestObject) (SetAdminUserPasswordResponseObject, error)
+	// RevokeAdminUserRole Take the system-admin role away. Never your own (400 REFUSED), never the last active admin's (409 LAST_ADMIN — two operators revoking each other at once cannot leave nobody), and it ends any session they are driving through impersonation. Effective on their next request. There is deliberately no route that GRANTS the role. System admin only.
+	// (DELETE /api/admin/users/{id}/role)
+	RevokeAdminUserRole(ctx context.Context, request RevokeAdminUserRoleRequestObject) (RevokeAdminUserRoleResponseObject, error)
 	// RevokeAdminUserSessions Sign a user out everywhere. Audited as `user.sessions.revoke`. System admin only.
 	// (POST /api/admin/users/{id}/sessions/revoke)
 	RevokeAdminUserSessions(ctx context.Context, request RevokeAdminUserSessionsRequestObject) (RevokeAdminUserSessionsResponseObject, error)
+	// RevokeAdminUserSession Sign out one of a person's sessions ("I left it signed in on my sister's phone"). Audited with the session's user agent. 404 when the session is not theirs. System admin only.
+	// (DELETE /api/admin/users/{id}/sessions/{sessionId})
+	RevokeAdminUserSession(ctx context.Context, request RevokeAdminUserSessionRequestObject) (RevokeAdminUserSessionResponseObject, error)
 	// UnbanAdminUser Lift a ban: clears banned + ban_reason. Sessions revoked by the ban stay revoked — the user signs in again. Audited as `user.unban`. System admin only.
 	// (POST /api/admin/users/{id}/unban)
 	UnbanAdminUser(ctx context.Context, request UnbanAdminUserRequestObject) (UnbanAdminUserResponseObject, error)
@@ -9902,6 +10233,32 @@ func (sh *strictHandler) ListAdminUsers(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
+// GetAdminUserDetail operation middleware
+func (sh *strictHandler) GetAdminUserDetail(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request GetAdminUserDetailRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAdminUserDetail(ctx, request.(GetAdminUserDetailRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAdminUserDetail")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAdminUserDetailResponseObject); ok {
+		if err := validResponse.VisitGetAdminUserDetailResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // BanAdminUser operation middleware
 func (sh *strictHandler) BanAdminUser(w http.ResponseWriter, r *http.Request, id IdPath) {
 	var request BanAdminUserRequestObject
@@ -9957,6 +10314,39 @@ func (sh *strictHandler) DeleteAdminUser(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(DeleteAdminUserResponseObject); ok {
 		if err := validResponse.VisitDeleteAdminUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangeAdminUserEmail operation middleware
+func (sh *strictHandler) ChangeAdminUserEmail(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request ChangeAdminUserEmailRequestObject
+
+	request.Id = id
+
+	var body ChangeAdminUserEmailJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ChangeAdminUserEmail(ctx, request.(ChangeAdminUserEmailRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeAdminUserEmail")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeAdminUserEmailResponseObject); ok {
+		if err := validResponse.VisitChangeAdminUserEmailResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -10023,6 +10413,32 @@ func (sh *strictHandler) SetAdminUserPassword(w http.ResponseWriter, r *http.Req
 	}
 }
 
+// RevokeAdminUserRole operation middleware
+func (sh *strictHandler) RevokeAdminUserRole(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request RevokeAdminUserRoleRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeAdminUserRole(ctx, request.(RevokeAdminUserRoleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeAdminUserRole")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeAdminUserRoleResponseObject); ok {
+		if err := validResponse.VisitRevokeAdminUserRoleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // RevokeAdminUserSessions operation middleware
 func (sh *strictHandler) RevokeAdminUserSessions(w http.ResponseWriter, r *http.Request, id IdPath) {
 	var request RevokeAdminUserSessionsRequestObject
@@ -10042,6 +10458,33 @@ func (sh *strictHandler) RevokeAdminUserSessions(w http.ResponseWriter, r *http.
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RevokeAdminUserSessionsResponseObject); ok {
 		if err := validResponse.VisitRevokeAdminUserSessionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeAdminUserSession operation middleware
+func (sh *strictHandler) RevokeAdminUserSession(w http.ResponseWriter, r *http.Request, id IdPath, sessionId string) {
+	var request RevokeAdminUserSessionRequestObject
+
+	request.Id = id
+	request.SessionId = sessionId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeAdminUserSession(ctx, request.(RevokeAdminUserSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeAdminUserSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeAdminUserSessionResponseObject); ok {
+		if err := validResponse.VisitRevokeAdminUserSessionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

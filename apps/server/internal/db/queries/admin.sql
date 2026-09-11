@@ -329,3 +329,79 @@ DELETE FROM "calendar_assignee" WHERE "user_id" = $1;
 -- DELETE CASCADE (sessions, accounts, memberships, invitations sent
 -- through Limen, push subscriptions and prefs, impersonation records).
 DELETE FROM "users" WHERE "id" = $1;
+
+-- ---------------------------------------------------------------------------
+-- The user page (docs/superpowers/specs/2026-09-11-admin-user-support-design.md).
+-- Plain reads and our own users.role column; Limen's sessions and the login
+-- address go through auth.Service instead (internal/auth/sessions.go).
+-- ---------------------------------------------------------------------------
+
+-- name: GetAdminUserDetail :one
+-- The page's header. The tombstone is not a person: 404, like an unknown id.
+-- has_password is a boolean so the hash itself never leaves this query.
+SELECT
+    "id",
+    COALESCE("name", '') AS name,
+    "email",
+    "role",
+    "banned",
+    "ban_reason",
+    "created_at",
+    (COALESCE("password", '') <> '')::boolean AS has_password
+FROM "users"
+WHERE "id" = sqlc.arg('id')::text AND "id" <> sqlc.arg('tombstone_id')::text;
+
+-- name: AdminUserFamilies :many
+-- Every family the person belongs to, with their role in each — the most
+-- privileged one, exactly as GetFamilyMembershipRole ranks them.
+SELECT
+    o."id" AS family_id,
+    o."name",
+    COALESCE(r."role", '') AS role
+FROM "organization_members" om
+JOIN "organizations" o ON o."id" = om."organization_id"
+LEFT JOIN LATERAL (
+    SELECT omr."role"
+    FROM "organization_member_roles" omr
+    WHERE omr."member_id" = om."id"
+    ORDER BY CASE omr."role"
+        WHEN 'admin' THEN 0
+        WHEN 'owner' THEN 1
+        ELSE 2
+    END, omr."role"
+    LIMIT 1
+) r ON true
+WHERE om."user_id" = $1
+ORDER BY o."name", o."id";
+
+-- name: AdminUserProviders :many
+-- Linked OAuth accounts: the provider and when it was linked — never the
+-- token columns beside them. Password sign-in keeps no row here.
+SELECT "provider", "created_at"
+FROM "accounts"
+WHERE "user_id" = $1
+ORDER BY "created_at", "provider";
+
+-- name: EmailInUseByAnother :one
+-- The email change's pre-check, so a taken address is refused before an
+-- audit row is written for a change that cannot happen. The unique index
+-- still has the last word (ChangeEmail maps its 23505).
+SELECT EXISTS (
+    SELECT 1 FROM "users" WHERE "email" = $1 AND "id" <> $2
+) AS in_use;
+
+-- name: LockActiveSystemAdmins :many
+-- Taken inside the role revoke's transaction, before it counts: two
+-- operators revoking each other at once would otherwise each see two admins
+-- and both succeed, leaving nobody able to run the console. The second
+-- transaction blocks on these row locks, then re-reads — and sees one.
+SELECT "id"
+FROM "users"
+WHERE "role" = 'admin' AND NOT "banned"
+ORDER BY "id"
+FOR UPDATE;
+
+-- name: RevokeSystemAdmin :execrows
+-- Our own column, as BanAdminUser writes `banned`. Zero rows means they were
+-- not a system admin.
+UPDATE "users" SET "role" = NULL WHERE "id" = $1 AND "role" = 'admin';
