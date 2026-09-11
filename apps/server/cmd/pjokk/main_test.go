@@ -35,6 +35,10 @@ func TestParseArgs(t *testing.T) {
 		{"cron with no job at all", []string{"cron"}, dispatch{mode: modeCron, raw: "cron"}},
 		{"cron with an unknown job stays cron", []string{"cron", "hourly"}, dispatch{mode: modeCron, raw: "cron", job: "hourly"}},
 
+		{"restore", []string{"restore", "--from", "2026-09-10"}, dispatch{mode: modeRestore, raw: "restore"}},
+		{"restore a family", []string{"restore", "family", "f1", "--from", "2026-09-10"}, dispatch{mode: modeRestore, raw: "restore"}},
+		{"set-password", []string{"set-password", "a@example.com"}, dispatch{mode: modeSetPassword, raw: "set-password"}},
+
 		{"a typo is not the server", []string{"migrationz"}, dispatch{mode: modeUnknown, raw: "migrationz"}},
 		{"case matters", []string{"Server"}, dispatch{mode: modeUnknown, raw: "Server"}},
 		{"trailing arguments do not rescue an unknown mode", []string{"serve", "please"}, dispatch{mode: modeUnknown, raw: "serve"}},

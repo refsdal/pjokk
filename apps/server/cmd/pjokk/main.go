@@ -16,6 +16,8 @@
 //	migrate | migrations   apply migrations, exit 0/1
 //	cron <job>             run one job, exit 0/1 (bad job: usage, exit 2)
 //	healthcheck            probe /healthz on this pod, exit 0/1
+//	restore …              put a snapshot back, exit 0/1 (bad args: usage, exit 2)
+//	set-password <email>   set a password read from stdin, exit 0/1
 //	anything else          complain, exit 2
 package main
 
@@ -103,7 +105,7 @@ func run(args []string) int {
 		// typo'd `pjokk migrationz` in a Kubernetes Job would otherwise
 		// silently become a pod that starts a web server and never
 		// completes, instead of failing loudly.
-		fmt.Fprintf(os.Stderr, "Unknown dispatch mode: %q. Expected one of: server, worker, migrate (or migrations), cron, healthcheck, landing, or no argument to migrate-then-serve.\n", d.raw)
+		fmt.Fprintf(os.Stderr, "Unknown dispatch mode: %q. Expected one of: server, worker, migrate (or migrations), cron, healthcheck, landing, restore, set-password, or no argument to migrate-then-serve.\n", d.raw)
 		return 2
 
 	case modeLanding:
@@ -119,6 +121,12 @@ func run(args []string) int {
 
 	case modeCron:
 		return cronMode(d.job)
+
+	case modeRestore:
+		return restoreMode(args[1:])
+
+	case modeSetPassword:
+		return setPasswordMode(args[1:], os.Stdin)
 
 	case modeWorker:
 		return workerMode()
@@ -154,6 +162,8 @@ const (
 	modeCron
 	modeHealthcheck
 	modeLanding
+	modeRestore
+	modeSetPassword
 	modeUnknown
 )
 
@@ -188,6 +198,12 @@ func parseArgs(args []string) dispatch {
 		return dispatch{mode: modeHealthcheck, raw: raw}
 	case "landing":
 		return dispatch{mode: modeLanding, raw: raw}
+	case "restore":
+		// Its arguments (a date or file, and for a family its id) are
+		// parsed by restoreMode, which run hands the rest of argv.
+		return dispatch{mode: modeRestore, raw: raw}
+	case "set-password":
+		return dispatch{mode: modeSetPassword, raw: raw}
 	case "cron":
 		job := ""
 		if len(args) > 1 {
