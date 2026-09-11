@@ -59,7 +59,7 @@ func (f *fixture) deviceFamily() (familyID, adminID string) {
 // deviceChain is the production order for a family route: DeviceAuth ahead
 // of Session, then RequireFamily, then whatever tail the test adds.
 func (f *fixture) deviceChain(p *probe, tail ...func(http.Handler) http.Handler) http.Handler {
-	var h http.Handler = p.handler()
+	h := p.handler()
 	for i := len(tail) - 1; i >= 0; i-- {
 		h = tail[i](h)
 	}
