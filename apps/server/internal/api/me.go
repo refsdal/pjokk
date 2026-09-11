@@ -114,32 +114,23 @@ func (d Deps) UpdateMe(ctx context.Context, _ gen.UpdateMeRequestObject) (gen.Up
 
 	// Language (00018): the Settings choice, which every device follows,
 	// and what the app resolved it to, which pushes are written in. Both
-	// enums are the spec's; neither can be cleared back to null.
-	languageMode := current.LanguageMode
-	if modeSet {
-		if modeVal == nil {
-			return gen.UpdateMe400JSONResponse(gen.Error{Error: "Language mode must be auto, en or nb", Code: "VALIDATION"}), nil
-		}
-		languageMode = modeVal
+	// enums are the spec's; neither can be cleared back to null, and an
+	// absent one reaches the query as nil, which keeps the stored value.
+	if modeSet && modeVal == nil {
+		return gen.UpdateMe400JSONResponse(gen.Error{Error: "Language mode must be auto, en or nb", Code: "VALIDATION"}), nil
 	}
-	language := current.Language
-	if langSet {
-		if langVal == nil {
-			return gen.UpdateMe400JSONResponse(gen.Error{Error: "Language must be en or nb", Code: "VALIDATION"}), nil
-		}
-		language = *langVal
+	if langSet && langVal == nil {
+		return gen.UpdateMe400JSONResponse(gen.Error{Error: "Language must be en or nb", Code: "VALIDATION"}), nil
 	}
 
 	if err := d.Q.UpdateUserProfile(ctx, dbgen.UpdateUserProfileParams{
-		ID:       session.UserID,
-		Name:     &name,
-		Nickname: nickname,
-		Phone:    phone,
-		Units:    units,
-		// Named per field, not left to zero values: an omitted field here
-		// would write NULL / "" over the person's choice.
-		LanguageMode: languageMode,
-		Language:     language,
+		ID:           session.UserID,
+		Name:         &name,
+		Nickname:     nickname,
+		Phone:        phone,
+		Units:        units,
+		LanguageMode: modeVal,
+		Language:     langVal,
 	}); err != nil {
 		return nil, err
 	}
