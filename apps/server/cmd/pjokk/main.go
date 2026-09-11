@@ -624,6 +624,7 @@ func buildDeps(ctx context.Context, cfg *config.Config) (api.Deps, func(), error
 		// Its own domain separator, so the kiosk PIN key and Limen's keys can
 		// never be the same bytes even though all derive from AUTH_SECRET.
 		DevicePINKey: sha256.Sum256([]byte(cfg.AuthSecret + ":device-pin")),
+		SnoozeKey:    sha256.Sum256([]byte(cfg.AuthSecret + ":push-snooze")),
 		Version:      buildinfo.Version,
 		StorageInfo:  storageInfo(cfg),
 
@@ -718,11 +719,12 @@ func buildPush(q *dbgen.Queries, cfg *config.Config) (push.Sender, error) {
 func cronDeps(d api.Deps) cron.Deps {
 	return cron.Deps{
 		Deps: jobs.Deps{
-			Pool:    d.Pool,
-			Q:       d.Q,
-			Storage: d.Storage,
-			Push:    d.Push,
-			Now:     d.Now,
+			Pool:      d.Pool,
+			Q:         d.Q,
+			Storage:   d.Storage,
+			Push:      d.Push,
+			Now:       d.Now,
+			SnoozeKey: d.SnoozeKey,
 		},
 		RateLimit: d.RateLimit,
 	}

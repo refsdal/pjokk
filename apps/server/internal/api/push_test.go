@@ -258,7 +258,8 @@ func TestTestPushCountsDeliveriesViaRecordingPush(t *testing.T) {
 	}
 }
 
-// TestPushRoutesForbidAPIKeyAuth proves every /api/push/* operation is
+// TestPushRoutesForbidAPIKeyAuth proves every /api/push/* operation but
+// SnoozePush (public: its token is the credential, push_snooze_test.go) is
 // tierFamilyNoAPIKey: a pjk_ bearer resolves fine through auth/tenancy (the
 // key is live, the family membership real) and is refused ONLY at the
 // push-specific rejectApiKey gate, matching

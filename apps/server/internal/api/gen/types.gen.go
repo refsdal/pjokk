@@ -3662,6 +3662,12 @@ type ListPumpsParams struct {
 	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// SnoozePushParams defines parameters for SnoozePush.
+type SnoozePushParams struct {
+	// T The token from the notification's Snooze button.
+	T string `form:"t" json:"t"`
+}
+
 // ListSleepsParams defines parameters for ListSleeps.
 type ListSleepsParams struct {
 	// BabyId Restrict the result to one baby in the caller's family.

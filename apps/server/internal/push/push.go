@@ -30,6 +30,9 @@ type PushAction struct {
 	Action string `json:"action"`
 	Title  string `json:"title"`
 	URL    string `json:"url"`
+	// Post makes the button a background POST to URL rather than a link:
+	// the service worker calls it without opening the app (Snooze).
+	Post bool `json:"post,omitempty"`
 }
 
 // Sender delivers a push notification to every subscription registered for

@@ -40,6 +40,10 @@ type Deps struct {
 	Storage storage.Storage
 	Push    push.Sender
 
+	// SnoozeKey signs the Snooze button on every reminder notification
+	// (internal/push/snooze.go); cmd/pjokk derives it from AUTH_SECRET.
+	SnoozeKey [32]byte
+
 	// Now returns the job's clock. Every run function takes an explicit
 	// `now time.Time` parameter defaulting to Now() (Go has no default
 	// parameter values, so callers needing the override — tests, mostly —

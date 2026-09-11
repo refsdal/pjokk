@@ -112,6 +112,9 @@ var DeliberatelyExcluded = map[string]bool{
 	// like goose's version table: nothing in it is worth restoring, and a
 	// restored database starts a fresh history.
 	"job_run": true,
+	// Snoozed reminders (00017): due within minutes of being written, and
+	// meaningless once the moment has passed — nothing to restore.
+	"push_snooze": true,
 }
 
 // backupRetentionDays is BACKUP_RETENTION_DAYS: backups hold every table,

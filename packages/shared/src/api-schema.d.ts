@@ -1025,6 +1025,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/push/snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The Snooze button on a reminder notification: puts that reminder off until 15 minutes after it was sent — one tick of the frequent job later — when it is sent again, to this person only, rebuilt from the reminder or calendar event as it is then. Logging the reminder's kind in between cancels it. The service worker makes this call in the background, with no app window and no reliable session, so the signed token the button carries is the credential and the route is public: it names the person, the reminder and when it was sent, and expires after 12 hours. A second tap replaces the first snooze. */
+        post: operations["snoozePush"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/push/test": {
         parameters: {
             query?: never;
@@ -6357,6 +6374,38 @@ export interface operations {
             };
             /** @description No such reminder of the caller's. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    snoozePush: {
+        parameters: {
+            query: {
+                /** @description The token from the notification's Snooze button. */
+                t: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Snoozed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description A token that is malformed, forged or out of date (INVALID_TOKEN). */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };

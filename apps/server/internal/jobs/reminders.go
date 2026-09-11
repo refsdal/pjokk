@@ -107,10 +107,12 @@ func RunReminders(ctx context.Context, d Deps, now time.Time) (int, error) {
 			body = name + ": " + body
 		}
 		delivered, err := d.Push.ToUser(ctx, r.UserID, push.PushPayload{
-			Title:   "Pjokk",
-			Body:    body,
-			URL:     "/home",
-			Actions: reminderActions(r.Kind),
+			Title: "Pjokk",
+			Body:  body,
+			URL:   "/home",
+			Actions: append(reminderActions(r.Kind), push.SnoozeAction(d.SnoozeKey, push.SnoozeClaims{
+				Source: push.SnoozeReminder, ID: r.ID, UserID: r.UserID, FamilyID: r.FamilyID, SentAt: now,
+			})),
 		})
 		if err != nil {
 			return sent, fmt.Errorf("jobs: deliver reminder %s to %s: %w", r.ID, r.UserID, err)

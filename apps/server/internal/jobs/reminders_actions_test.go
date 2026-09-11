@@ -9,7 +9,8 @@ import (
 )
 
 // Issue #51: a reminder's push carries a "log it now" action pointing at
-// Home's ?log= deep link; a custom reminder carries none.
+// Home's ?log= deep link; a custom reminder carries none. Every reminder
+// also ends with the Snooze button (snooze_test.go).
 func TestRunRemindersCarriesLogAction(t *testing.T) {
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
@@ -38,13 +39,18 @@ func TestRunRemindersCarriesLogAction(t *testing.T) {
 	}
 	var sawFeed, sawCustom bool
 	for _, p := range payloads {
-		switch {
-		case len(p.Actions) == 1:
+		n := len(p.Actions)
+		if n == 0 || p.Actions[n-1].Action != "snooze" {
+			t.Errorf("actions = %+v, want the Snooze button last", p.Actions)
+			continue
+		}
+		switch rest := p.Actions[:n-1]; len(rest) {
+		case 1:
 			sawFeed = true
-			if p.Actions[0].URL != "/home?log=feed" || p.Actions[0].Title != "Log feed" || p.Actions[0].Action != "log" {
-				t.Errorf("feed action = %+v, want log / Log feed / /home?log=feed", p.Actions[0])
+			if rest[0].URL != "/home?log=feed" || rest[0].Title != "Log feed" || rest[0].Action != "log" {
+				t.Errorf("feed action = %+v, want log / Log feed / /home?log=feed", rest[0])
 			}
-		case len(p.Actions) == 0:
+		case 0:
 			sawCustom = true
 		default:
 			t.Errorf("unexpected actions: %+v", p.Actions)

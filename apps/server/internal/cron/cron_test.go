@@ -47,11 +47,12 @@ func depsFor(a *testrig.AppRig) (cron.Deps, *recordingRateLimit) {
 	rl := &recordingRateLimit{inner: a.Deps.RateLimit}
 	return cron.Deps{
 		Deps: jobs.Deps{
-			Pool:    a.Deps.Pool,
-			Q:       a.Deps.Q,
-			Storage: a.Deps.Storage,
-			Push:    a.Push,
-			Now:     a.Deps.Now,
+			Pool:      a.Deps.Pool,
+			Q:         a.Deps.Q,
+			Storage:   a.Deps.Storage,
+			Push:      a.Push,
+			Now:       a.Deps.Now,
+			SnoozeKey: a.Deps.SnoozeKey,
 		},
 		RateLimit: rl,
 	}, rl

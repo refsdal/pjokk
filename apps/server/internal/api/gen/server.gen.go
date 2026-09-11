@@ -371,6 +371,9 @@ type ServerInterface interface {
 	// GetPushConfig The VAPID public key the frontend needs to create a browser push subscription. Never available to API keys (device/session-bound — see internal/api/middleware's RejectAPIKey).
 	// (GET /api/push/config)
 	GetPushConfig(w http.ResponseWriter, r *http.Request)
+	// SnoozePush The Snooze button on a reminder notification: puts that reminder off until 15 minutes after it was sent — one tick of the frequent job later — when it is sent again, to this person only, rebuilt from the reminder or calendar event as it is then. Logging the reminder's kind in between cancels it. The service worker makes this call in the background, with no app window and no reliable session, so the signed token the button carries is the credential and the route is public: it names the person, the reminder and when it was sent, and expires after 12 hours. A second tap replaces the first snooze.
+	// (POST /api/push/snooze)
+	SnoozePush(w http.ResponseWriter, r *http.Request, params SnoozePushParams)
 	// SubscribePush Register this browser's push subscription for the signed-in caretaker. Upserts by endpoint: re-subscribing the SAME endpoint rebinds it to the calling user/family and refreshes its keys rather than failing a uniqueness check. Rejects an endpoint whose host isn't one of the recognized push services, or that isn't https — see internal/api/push.go's isAllowedPushEndpoint (SSRF guard: the scheduler later POSTs to stored endpoints unattended).
 	// (POST /api/push/subscribe)
 	SubscribePush(w http.ResponseWriter, r *http.Request)
@@ -3431,6 +3434,39 @@ func (siw *ServerInterfaceWrapper) GetPushConfig(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// SnoozePush operation middleware
+func (siw *ServerInterfaceWrapper) SnoozePush(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SnoozePushParams
+
+	// ------------- Required query parameter "t" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "t", r.URL.Query(), &params.T, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "t"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "t", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SnoozePush(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SubscribePush operation middleware
 func (siw *ServerInterfaceWrapper) SubscribePush(w http.ResponseWriter, r *http.Request) {
 
@@ -4368,6 +4404,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/reminders", wrapper.ListReminders)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/reminders", wrapper.CreateReminder)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/reminders/{id}", wrapper.DeleteReminder)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/push/snooze", wrapper.SnoozePush)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/push/test", wrapper.TestPush)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/help", wrapper.CreateHelpRequest)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/help/{id}/acknowledge", wrapper.AcknowledgeHelpRequest)
@@ -8728,6 +8765,42 @@ func (response GetPushConfig200JSONResponse) VisitGetPushConfigResponse(w http.R
 	return err
 }
 
+type SnoozePushRequestObject struct {
+	Params SnoozePushParams
+}
+
+type SnoozePushResponseObject interface {
+	VisitSnoozePushResponse(w http.ResponseWriter) error
+}
+
+type SnoozePush200JSONResponse Ok
+
+func (response SnoozePush200JSONResponse) VisitSnoozePushResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SnoozePush400JSONResponse Error
+
+func (response SnoozePush400JSONResponse) VisitSnoozePushResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type SubscribePushRequestObject struct {
 	Body *SubscribePushJSONRequestBody
 }
@@ -10017,6 +10090,9 @@ type StrictServerInterface interface {
 	// GetPushConfig The VAPID public key the frontend needs to create a browser push subscription. Never available to API keys (device/session-bound — see internal/api/middleware's RejectAPIKey).
 	// (GET /api/push/config)
 	GetPushConfig(ctx context.Context, request GetPushConfigRequestObject) (GetPushConfigResponseObject, error)
+	// SnoozePush The Snooze button on a reminder notification: puts that reminder off until 15 minutes after it was sent — one tick of the frequent job later — when it is sent again, to this person only, rebuilt from the reminder or calendar event as it is then. Logging the reminder's kind in between cancels it. The service worker makes this call in the background, with no app window and no reliable session, so the signed token the button carries is the credential and the route is public: it names the person, the reminder and when it was sent, and expires after 12 hours. A second tap replaces the first snooze.
+	// (POST /api/push/snooze)
+	SnoozePush(ctx context.Context, request SnoozePushRequestObject) (SnoozePushResponseObject, error)
 	// SubscribePush Register this browser's push subscription for the signed-in caretaker. Upserts by endpoint: re-subscribing the SAME endpoint rebinds it to the calling user/family and refreshes its keys rather than failing a uniqueness check. Rejects an endpoint whose host isn't one of the recognized push services, or that isn't https — see internal/api/push.go's isAllowedPushEndpoint (SSRF guard: the scheduler later POSTs to stored endpoints unattended).
 	// (POST /api/push/subscribe)
 	SubscribePush(ctx context.Context, request SubscribePushRequestObject) (SubscribePushResponseObject, error)
@@ -13453,6 +13529,32 @@ func (sh *strictHandler) GetPushConfig(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetPushConfigResponseObject); ok {
 		if err := validResponse.VisitGetPushConfigResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SnoozePush operation middleware
+func (sh *strictHandler) SnoozePush(w http.ResponseWriter, r *http.Request, params SnoozePushParams) {
+	var request SnoozePushRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SnoozePush(ctx, request.(SnoozePushRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SnoozePush")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SnoozePushResponseObject); ok {
+		if err := validResponse.VisitSnoozePushResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

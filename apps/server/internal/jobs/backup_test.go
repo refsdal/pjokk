@@ -20,11 +20,12 @@ import (
 // against the same database and storage.
 func depsFor(a *testrig.AppRig) jobs.Deps {
 	return jobs.Deps{
-		Pool:    a.Deps.Pool,
-		Q:       a.Deps.Q,
-		Storage: a.Deps.Storage,
-		Push:    a.Push,
-		Now:     a.Deps.Now,
+		Pool:      a.Deps.Pool,
+		Q:         a.Deps.Q,
+		Storage:   a.Deps.Storage,
+		Push:      a.Push,
+		Now:       a.Deps.Now,
+		SnoozeKey: a.Deps.SnoozeKey,
 	}
 }
 
