@@ -173,6 +173,62 @@ func (q *Queries) DeleteImpersonation(ctx context.Context, impersonatedToken str
 	return err
 }
 
+const deleteMemberCalendarAssignments = `-- name: DeleteMemberCalendarAssignments :exec
+DELETE FROM "calendar_assignee" ca
+USING "calendar_event" e
+WHERE e."id" = ca."event_id"
+  AND e."family_id" = $1
+  AND ca."user_id" = $2
+`
+
+type DeleteMemberCalendarAssignmentsParams struct {
+	FamilyID string
+	UserID   string
+}
+
+// calendar_assignee has no family_id of its own; its event carries it.
+func (q *Queries) DeleteMemberCalendarAssignments(ctx context.Context, arg DeleteMemberCalendarAssignmentsParams) error {
+	_, err := q.db.Exec(ctx, deleteMemberCalendarAssignments, arg.FamilyID, arg.UserID)
+	return err
+}
+
+const deleteMemberPushSnoozes = `-- name: DeleteMemberPushSnoozes :exec
+DELETE FROM "push_snooze"
+WHERE "family_id" = $1 AND "user_id" = $2
+`
+
+type DeleteMemberPushSnoozesParams struct {
+	FamilyID string
+	UserID   string
+}
+
+func (q *Queries) DeleteMemberPushSnoozes(ctx context.Context, arg DeleteMemberPushSnoozesParams) error {
+	_, err := q.db.Exec(ctx, deleteMemberPushSnoozes, arg.FamilyID, arg.UserID)
+	return err
+}
+
+const deleteMemberReminders = `-- name: DeleteMemberReminders :exec
+
+DELETE FROM "reminder"
+WHERE "family_id" = $1 AND "user_id" = $2
+`
+
+type DeleteMemberRemindersParams struct {
+	FamilyID string
+	UserID   string
+}
+
+// The three deletes below are a removed member's scheduled pushes in that
+// family (issue #92), run inside RemoveMember's transaction. None of these
+// tables references organization_members, so nothing cascades from the
+// membership, and a person who has left cannot reach the reminders routes
+// to delete their own. Each is scoped to the one family: the same person's
+// rows in another family they still belong to are theirs to keep.
+func (q *Queries) DeleteMemberReminders(ctx context.Context, arg DeleteMemberRemindersParams) error {
+	_, err := q.db.Exec(ctx, deleteMemberReminders, arg.FamilyID, arg.UserID)
+	return err
+}
+
 const getAuthSession = `-- name: GetAuthSession :one
 
 SELECT
