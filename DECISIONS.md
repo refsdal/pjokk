@@ -2704,3 +2704,31 @@ to drift from the spec without anything noticing. This closes it.
 - **`push_snooze` is transient**: left out of the nightly backup
   (`DeliberatelyExcluded`), dropped with its person in a family restore,
   and its user reference cascades.
+
+## 2026-09-11 — the app's language is the person's, and so are push notifications
+
+- **The language is stored on the person**, like units (#53): Settings'
+  Auto / English / Norsk is saved to `users.language_mode` and every device
+  the person signs in on follows it. "Auto" still means each device's own
+  language, so the server also keeps `users.language` — what the app last
+  resolved the choice to — and writes server text in that. With "auto" on
+  a Norwegian phone and an English laptop, pushes follow whichever the
+  person opened last; storing a language per push subscription instead
+  would reshape every sender for that corner.
+- **Null until an app sends one.** `language_mode` starts empty, and the
+  first signed-in device uploads its own, until now device-local, choice
+  rather than the server's default overwriting it.
+- **The app syncs when the server's copy changes, never when only the
+  device's did** (`useLanguageSync`, pure logic in
+  `lib/language-sync.ts`): a pick in Settings saves itself, so it cannot
+  be undone by the `me` it was made against. Screens before sign-in and
+  kiosk tablets keep the device-local setting; there is no person behind
+  them.
+- **Every server-written push is translated**: reminder bodies and
+  buttons, Snooze, the help requests (in the RECIPIENT's language; a typed
+  message goes as written) and the test push. Calendar pushes carry the
+  family's own event title, and a reminder's label is the person's own:
+  neither is translated. `internal/push/text.go` keys Norwegian by the
+  English string, as the SPA's `t()` does, with its words; a test reads the
+  senders' source and fails on a string without Norwegian, or on a
+  translation whose format verbs differ.

@@ -329,6 +329,12 @@ separate test deploy).
   untouched prefill is saved unchanged. The CSV export stays metric.
 - Pipe every user-facing string through a `t()` helper now; actual translation
   (English/Norwegian) comes later. Default UI language: English for now.
+- The language choice (Auto / English / Norsk) is the PERSON's, stored as
+  `users.language_mode` and followed by every signed-in device; the
+  server also keeps `users.language`, what the app last resolved it to,
+  and writes push notifications in that (`internal/push/text.go`, keyed
+  by the English string like `t()`; its test fails on an untranslated
+  string). Sign-in screens and kiosk tablets keep a device-local choice.
 
 ## Information architecture
 
