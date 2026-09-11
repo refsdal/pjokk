@@ -73,8 +73,9 @@ func (s *service) UserSessions(ctx context.Context, userID string) ([]SessionInf
 	return out, nil
 }
 
-// RevokeSession signs out one of userID's sessions. A session id that is
-// not theirs is ErrSessionNotFound, exactly like one that does not exist.
+// RevokeSession signs out one of userID's sessions, and any session an
+// operator was impersonating somebody FROM it. A session id that is not
+// theirs is ErrSessionNotFound, exactly like one that does not exist.
 func (s *service) RevokeSession(ctx context.Context, userID, sessionID string) error {
 	token, err := s.q.GetUserSessionToken(ctx, gen.GetUserSessionTokenParams{ID: sessionID, UserID: userID})
 	switch {
@@ -83,6 +84,22 @@ func (s *service) RevokeSession(ctx context.Context, userID, sessionID string) e
 	case err != nil:
 		return fmt.Errorf("auth: find session: %w", err)
 	}
+
+	// The impersonated sessions started from this one go first (#93), for
+	// the same reason SetPassword sweeps first: revoking this session
+	// cascades their `impersonation` rows away, and those rows are the only
+	// way to find them. They belong to the TARGET, so nothing addressed to
+	// this user would ever reach them again.
+	driven, err := s.q.ListImpersonatedTokensByAdminToken(ctx, token)
+	if err != nil {
+		return fmt.Errorf("auth: list impersonated sessions: %w", err)
+	}
+	for _, impersonated := range driven {
+		if err := s.limen.RevokeSession(ctx, impersonated); err != nil {
+			return fmt.Errorf("auth: revoke impersonated session: %w", err)
+		}
+	}
+
 	// Through Limen, so its session store stays consistent with the table.
 	// An impersonated session's `impersonation` row cascades away with it
 	// (00003_impersonation.sql).

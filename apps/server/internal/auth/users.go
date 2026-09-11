@@ -102,6 +102,18 @@ func (s *service) SetPassword(ctx context.Context, userID, newPassword string) e
 		return fmt.Errorf("auth: load user: %w", err)
 	}
 
+	// The sessions this user is DRIVING as somebody else go first, ahead of
+	// both branches (#93). Each branch revokes the user's own sessions, and
+	// the `impersonation` rows cascade away with those (00003) — which are
+	// the only thing RevokeImpersonatedSessions can find a driven session
+	// by. Sweeping afterwards would find nothing and leave an operator whose
+	// password was reset after a compromise still signed in as whoever they
+	// were impersonating. Done before the write, so a reset that then fails
+	// has only cost the operator those sessions: the harmless direction.
+	if err := s.RevokeImpersonatedSessions(ctx, userID); err != nil {
+		return err
+	}
+
 	// An empty string is treated as "no password", not as a password of
 	// length zero: CreateUser's passwordless branch stores NULL, but a row
 	// written by anything else (a migration, an import) could hold '' with

@@ -101,23 +101,36 @@ func (s *service) resolveSession(r *http.Request) (*Session, *limen.SessionResul
 
 	// An impersonated session is only as valid as the OPERATOR behind it.
 	// Its user_id is the TARGET's, so revoking the operator's sessions —
-	// banning them, signing them out, deleting the account — does not touch
-	// this row unless something also walks the `impersonation` table
-	// (Service.RevokeImpersonatedSessions does, and every caller that cuts
-	// an operator off calls it). This is the backstop for the case where
-	// one does not: an operator who is banned or gone cannot keep acting as
-	// somebody else, whatever state the impersonation table is in.
+	// banning them, signing them out, resetting their password, deleting
+	// the account — does not touch this row unless something also walks the
+	// `impersonation` table (Service.RevokeImpersonatedSessions does, and
+	// every caller that cuts an operator off calls it). This is the backstop
+	// for the case where one does not, so that correctness never depends on
+	// callers ordering their revocations right (#93). The session needs its
+	// `impersonation` row, which goes with the operator session it was
+	// started from, and an operator who is still an unbanned system admin:
+	// impersonating is that role's power, and losing the role, being banned
+	// or being deleted all end it.
+	//
+	// A session that fails is REVOKED, not merely refused. Otherwise it
+	// would come back the moment the operator was unbanned or re-granted
+	// the role, long after anyone remembered it existed. Best-effort: the
+	// refusal is what protects, and a revoke that fails is tried again on
+	// the session's next request.
 	//
 	// Reported as "signed out" rather than an error, exactly like a banned
 	// user above: no caller has to remember to check.
 	if session.ImpersonatedBy != "" {
-		banned, err := s.q.IsUserBanned(r.Context(), session.ImpersonatedBy)
-		switch {
-		case errors.Is(err, pgx.ErrNoRows):
-			return nil, nil, nil
-		case err != nil:
-			return nil, nil, fmt.Errorf("auth: load impersonating admin: %w", err)
-		case banned:
+		live, err := s.q.ImpersonationIsLive(r.Context(), gen.ImpersonationIsLiveParams{
+			ImpersonatedToken: session.Token,
+			AdminID:           session.ImpersonatedBy,
+			SystemAdminRole:   RoleSystemAdmin,
+		})
+		if err != nil {
+			return nil, nil, fmt.Errorf("auth: check impersonating admin: %w", err)
+		}
+		if !live {
+			_ = s.limen.RevokeSession(r.Context(), session.Token)
 			return nil, nil, nil
 		}
 	}
