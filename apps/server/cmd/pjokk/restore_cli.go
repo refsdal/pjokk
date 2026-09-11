@@ -117,11 +117,14 @@ func restoreMode(args []string) int {
 
 	if cmd.family == "" {
 		rep, err := restore.Whole(ctx, rd, snap)
+		if rep != nil {
+			printReport(os.Stdout, rep)
+		}
 		if err != nil {
+			// With a report, the rows are in and only photos failed.
 			log.Print(err)
 			return 1
 		}
-		printReport(os.Stdout, rep)
 		fmt.Fprint(os.Stdout, `
 Passwords are not in backups, so nobody can sign in with one yet. Set yours:
   pjokk set-password <your email>     (it reads the password from stdin)
@@ -131,11 +134,13 @@ Google sign-in works as before.
 	}
 
 	rep, err := restore.Family(ctx, rd, snap, cmd.family, nil)
+	if rep != nil {
+		printFamilyReport(os.Stdout, rep)
+	}
 	if err != nil {
 		log.Print(err)
 		return 1
 	}
-	printFamilyReport(os.Stdout, rep)
 	return 0
 }
 

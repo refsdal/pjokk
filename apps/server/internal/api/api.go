@@ -471,6 +471,8 @@ var operationAuthTiers = map[string]authTier{
 	"GetAdminOps":             tierSysadmin,
 	"RunAdminJob":             tierSysadmin,
 	"ListAdminBackups":        tierSysadmin,
+	"ListDeletedFamilies":     tierSysadmin,
+	"RestoreDeletedFamily":    tierSysadmin,
 	"DeleteAdminUser":         tierSysadmin,
 	"BanAdminUser":            tierSysadmin,
 	"UnbanAdminUser":          tierSysadmin,

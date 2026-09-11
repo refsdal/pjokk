@@ -28,6 +28,12 @@ type ServerInterface interface {
 	// ListAdminBackups The nightly snapshots in storage, newest first, with their sizes, and the photo backup's object counts. Downloading one is GET /api/admin/backups/{date} — hand-routed, as a streamed body is, and audited — which is why it is not described here. System admin only.
 	// (GET /api/admin/backups)
 	ListAdminBackups(w http.ResponseWriter, r *http.Request)
+	// ListDeletedFamilies The families in one nightly snapshot that do not exist now — the ones a family restore could bring back — with their member and baby counts from the snapshot, and who deleted each and when, from the audit trail. System admin only.
+	// (GET /api/admin/backups/{date}/families)
+	ListDeletedFamilies(w http.ResponseWriter, r *http.Request, date SnapshotDatePath)
+	// RestoreDeletedFamily Bring one deleted family back from a nightly snapshot, with its original ids (spec 2026-09-11-admin-restore §2). Members whose accounts were deleted since are left out and what they logged is credited to the Deleted user; API keys, kiosk devices and push subscriptions stay gone; a taken slug becomes <slug>-restored. The audit row is written in the restore's own transaction. 409 FAMILY_EXISTS for a family that exists. System admin only.
+	// (POST /api/admin/backups/{date}/families/{id}/restore)
+	RestoreDeletedFamily(w http.ResponseWriter, r *http.Request, date SnapshotDatePath, id IdPath)
 	// ListAdminFamilies Families on the platform with member and baby counts, whether each still has an admin, and the timestamp of its most recent feed (null when it has never logged one). `query` filters on name or slug (case-insensitive substring). One page at a time, newest first: pass the previous page's `nextCursor` as `cursor` (`limit` 50 by default, 200 at most); a malformed cursor is a 400. System admin only.
 	// (GET /api/admin/families)
 	ListAdminFamilies(w http.ResponseWriter, r *http.Request, params ListAdminFamiliesParams)
@@ -535,6 +541,67 @@ func (siw *ServerInterfaceWrapper) ListAdminBackups(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminBackups(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDeletedFamilies operation middleware
+func (siw *ServerInterfaceWrapper) ListDeletedFamilies(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "date" -------------
+	var date SnapshotDatePath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "date", r.PathValue("date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDeletedFamilies(w, r, date)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RestoreDeletedFamily operation middleware
+func (siw *ServerInterfaceWrapper) RestoreDeletedFamily(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "date" -------------
+	var date SnapshotDatePath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "date", r.PathValue("date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RestoreDeletedFamily(w, r, date, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4318,6 +4385,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/admin/ops", wrapper.GetAdminOps)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/jobs/{job}/run", wrapper.RunAdminJob)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/admin/backups", wrapper.ListAdminBackups)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/admin/backups/{date}/families", wrapper.ListDeletedFamilies)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/admin/backups/{date}/families/{id}/restore", wrapper.RestoreDeletedFamily)
 
 	return m
 }
@@ -4397,6 +4466,93 @@ func (response ListAdminBackups200JSONResponse) VisitListAdminBackupsResponse(w 
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeletedFamiliesRequestObject struct {
+	Date SnapshotDatePath `json:"date"`
+}
+
+type ListDeletedFamiliesResponseObject interface {
+	VisitListDeletedFamiliesResponse(w http.ResponseWriter) error
+}
+
+type ListDeletedFamilies200JSONResponse []DeletedFamily
+
+func (response ListDeletedFamilies200JSONResponse) VisitListDeletedFamiliesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeletedFamilies404JSONResponse Error
+
+func (response ListDeletedFamilies404JSONResponse) VisitListDeletedFamiliesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreDeletedFamilyRequestObject struct {
+	Date SnapshotDatePath `json:"date"`
+	Id   IdPath           `json:"id"`
+}
+
+type RestoreDeletedFamilyResponseObject interface {
+	VisitRestoreDeletedFamilyResponse(w http.ResponseWriter) error
+}
+
+type RestoreDeletedFamily200JSONResponse FamilyRestoreReport
+
+func (response RestoreDeletedFamily200JSONResponse) VisitRestoreDeletedFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreDeletedFamily404JSONResponse Error
+
+func (response RestoreDeletedFamily404JSONResponse) VisitRestoreDeletedFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreDeletedFamily409JSONResponse Error
+
+func (response RestoreDeletedFamily409JSONResponse) VisitRestoreDeletedFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -9470,6 +9626,12 @@ type StrictServerInterface interface {
 	// ListAdminBackups The nightly snapshots in storage, newest first, with their sizes, and the photo backup's object counts. Downloading one is GET /api/admin/backups/{date} — hand-routed, as a streamed body is, and audited — which is why it is not described here. System admin only.
 	// (GET /api/admin/backups)
 	ListAdminBackups(ctx context.Context, request ListAdminBackupsRequestObject) (ListAdminBackupsResponseObject, error)
+	// ListDeletedFamilies The families in one nightly snapshot that do not exist now — the ones a family restore could bring back — with their member and baby counts from the snapshot, and who deleted each and when, from the audit trail. System admin only.
+	// (GET /api/admin/backups/{date}/families)
+	ListDeletedFamilies(ctx context.Context, request ListDeletedFamiliesRequestObject) (ListDeletedFamiliesResponseObject, error)
+	// RestoreDeletedFamily Bring one deleted family back from a nightly snapshot, with its original ids (spec 2026-09-11-admin-restore §2). Members whose accounts were deleted since are left out and what they logged is credited to the Deleted user; API keys, kiosk devices and push subscriptions stay gone; a taken slug becomes <slug>-restored. The audit row is written in the restore's own transaction. 409 FAMILY_EXISTS for a family that exists. System admin only.
+	// (POST /api/admin/backups/{date}/families/{id}/restore)
+	RestoreDeletedFamily(ctx context.Context, request RestoreDeletedFamilyRequestObject) (RestoreDeletedFamilyResponseObject, error)
 	// ListAdminFamilies Families on the platform with member and baby counts, whether each still has an admin, and the timestamp of its most recent feed (null when it has never logged one). `query` filters on name or slug (case-insensitive substring). One page at a time, newest first: pass the previous page's `nextCursor` as `cursor` (`limit` 50 by default, 200 at most); a malformed cursor is a 400. System admin only.
 	// (GET /api/admin/families)
 	ListAdminFamilies(ctx context.Context, request ListAdminFamiliesRequestObject) (ListAdminFamiliesResponseObject, error)
@@ -10003,6 +10165,59 @@ func (sh *strictHandler) ListAdminBackups(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListAdminBackupsResponseObject); ok {
 		if err := validResponse.VisitListAdminBackupsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDeletedFamilies operation middleware
+func (sh *strictHandler) ListDeletedFamilies(w http.ResponseWriter, r *http.Request, date SnapshotDatePath) {
+	var request ListDeletedFamiliesRequestObject
+
+	request.Date = date
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDeletedFamilies(ctx, request.(ListDeletedFamiliesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDeletedFamilies")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDeletedFamiliesResponseObject); ok {
+		if err := validResponse.VisitListDeletedFamiliesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RestoreDeletedFamily operation middleware
+func (sh *strictHandler) RestoreDeletedFamily(w http.ResponseWriter, r *http.Request, date SnapshotDatePath, id IdPath) {
+	var request RestoreDeletedFamilyRequestObject
+
+	request.Date = date
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RestoreDeletedFamily(ctx, request.(RestoreDeletedFamilyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RestoreDeletedFamily")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RestoreDeletedFamilyResponseObject); ok {
+		if err := validResponse.VisitRestoreDeletedFamilyResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

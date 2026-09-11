@@ -3723,6 +3723,66 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminBackups"
+  /api/admin/backups/{date}/families:
+    get:
+      operationId: listDeletedFamilies
+      summary: >-
+        The families in one nightly snapshot that do not exist now — the ones
+        a family restore could bring back — with their member and baby counts
+        from the snapshot, and who deleted each and when, from the audit
+        trail. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/snapshotDatePath"
+      responses:
+        "200":
+          description: The deleted families, by name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeletedFamily"
+        "404":
+          description: No snapshot for that date (NOT_FOUND).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/backups/{date}/families/{id}/restore:
+    post:
+      operationId: restoreDeletedFamily
+      summary: >-
+        Bring one deleted family back from a nightly snapshot, with its
+        original ids (spec 2026-09-11-admin-restore §2). Members whose
+        accounts were deleted since are left out and what they logged is
+        credited to the Deleted user; API keys, kiosk devices and push
+        subscriptions stay gone; a taken slug becomes <slug>-restored. The
+        audit row is written in the restore's own transaction. 409
+        FAMILY_EXISTS for a family that exists. System admin only.
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/snapshotDatePath"
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Restored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FamilyRestoreReport"
+        "404":
+          description: No snapshot for that date, or the family is not in it (NOT_FOUND).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: The family exists (FAMILY_EXISTS).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
   parameters:
     babyIdQuery:
@@ -3749,6 +3809,14 @@ components:
       schema:
         type: string
         maxLength: 200
+    snapshotDatePath:
+      name: date
+      in: path
+      required: true
+      description: The night a snapshot names, YYYY-MM-DD (UTC).
+      schema:
+        type: string
+        pattern: '^\d{4}-\d{2}-\d{2}$'
     idPath:
       name: id
       in: path
@@ -6611,6 +6679,69 @@ components:
           format: int64
         deleted:
           type: integer
+    DeletedFamily:
+      type: object
+      description: A family in a snapshot that does not exist now.
+      required: [id, name, slug, members, babies]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        members:
+          type: integer
+        babies:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+          description: From the family.delete audit row, when there is one.
+        deletedBy:
+          type: string
+          description: The operator who deleted it, from the same row.
+    FamilyRestoreReport:
+      type: object
+      required:
+        [familyId, name, slug, membersRejoined, membersDropped, hasAdmin, rows, photosRestored, photosMissing, warnings]
+      properties:
+        familyId:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        previousSlug:
+          type: string
+          description: Set when the slug had been taken and the family came back under a new one.
+        membersRejoined:
+          type: integer
+        membersDropped:
+          type: integer
+          description: Memberships of accounts deleted since the snapshot.
+        hasAdmin:
+          type: boolean
+          description: False when every admin's account has gone.
+        rows:
+          type: object
+          description: Rows restored per table.
+          additionalProperties:
+            type: integer
+            format: int64
+        photosRestored:
+          type: integer
+        photosMissing:
+          type: array
+          items:
+            type: string
+        warnings:
+          type: array
+          items:
+            type: string
     AdminStats:
       type: object
       description: >-
