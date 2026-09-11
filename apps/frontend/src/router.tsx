@@ -218,6 +218,16 @@ const adminAuditRoute = createRoute({
   ),
 });
 
+// Health, job runs and backups (spec 2026-09-11-admin-ops).
+const adminOpsRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: "/ops",
+  component: lazyRouteComponent(
+    () => import("@/screens/admin/Ops"),
+    "AdminOps",
+  ),
+});
+
 // Exported for apps/frontend/test/router.test.ts, which finds rootIndexRoute
 // by id and calls its beforeLoad directly to pin the "/" redirect — this
 // suite has no DOM, and TanStack Router's client load path needs one.
@@ -269,6 +279,7 @@ export const routeTree = rootRoute.addChildren([
     adminUsersRoute,
     adminUserDetailRoute,
     adminAuditRoute,
+    adminOpsRoute,
   ]),
 ]);
 

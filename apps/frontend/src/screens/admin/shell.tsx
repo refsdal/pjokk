@@ -1,6 +1,7 @@
 import { Link, Navigate, Outlet } from "@tanstack/react-router";
 import {
   IconArrowLeft,
+  IconHeartbeat,
   IconHistory,
   IconLayoutDashboard,
   IconShieldCog,
@@ -19,6 +20,7 @@ const adminTabs: TabItem[] = [
   { to: "/admin/families", label: "Families", icon: IconUsersGroup },
   { to: "/admin/users", label: "Users", icon: IconUser },
   { to: "/admin/audit", label: "Audit", icon: IconHistory },
+  { to: "/admin/ops", label: "Ops", icon: IconHeartbeat },
 ];
 
 export function AdminShell() {

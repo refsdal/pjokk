@@ -55,8 +55,16 @@ export const persister = createAsyncStoragePersister({
 // pre-family snapshot (familyId null) and get bounced to /welcome, where a
 // second create is refused. Persistence exists for offline-viewable CONTENT
 // (timeline, home cards, stats) — those tolerate a stale-then-revalidate
-// render; "which family am I in" does not.
-const NEVER_PERSIST = new Set(["me", "family", "members", "my-families"]);
+// render; "which family am I in" does not. Nor the operator console: it
+// has no offline use, and its queries hold other people's emails, sessions
+// and the deployment's details, which have no business in a disk snapshot.
+const NEVER_PERSIST = new Set([
+  "me",
+  "family",
+  "members",
+  "my-families",
+  "admin",
+]);
 
 // The persisted cache is keyed on the BUILD, not a hand-bumped string: a
 // snapshot written by one build is dropped by the next. Stats gained

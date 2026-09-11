@@ -1698,6 +1698,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/ops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The operator's health page (spec 2026-09-11-admin-ops §2): the build and schema versions, where storage points, the database's size, and each scheduled job's recent runs, next due time and staleness. Never a credential. System admin only. */
+        get: operations["getAdminOps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/jobs/{job}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run a scheduled job now, exactly as its schedule would. Takes the job's lock and records the run, writes an audit row naming it, then answers 202 while the job carries on in the background. 409 JOB_RUNNING when it is already running anywhere. System admin only. */
+        post: operations["runAdminJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/backups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The nightly snapshots in storage, newest first, with their sizes, and the photo backup's object counts. Downloading one is GET /api/admin/backups/{date} — hand-routed, as a streamed body is, and audited — which is why it is not described here. System admin only. */
+        get: operations["listAdminBackups"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2902,6 +2953,90 @@ export interface components {
             /** @enum {string} */
             role: "admin" | "member";
             alreadyMember: boolean;
+        };
+        /** @description The Ops page. Metadata about the deployment, never a credential. */
+        AdminOps: {
+            /** @description The running build, the same string as the image tag. */
+            version: string;
+            schema: components["schemas"]["AdminSchemaVersion"];
+            storage: components["schemas"]["AdminStorage"];
+            database: components["schemas"]["AdminDatabase"];
+            jobs: components["schemas"]["AdminJob"][];
+        };
+        /** @description The highest migration applied to the database, and the newest one this binary carries. Unequal means a rollout skipped `migrate` (or an old image runs against a newer database). */
+        AdminSchemaVersion: {
+            /** Format: int64 */
+            applied: number;
+            /** Format: int64 */
+            latest: number;
+        };
+        /** @description Where files live — for s3 the bucket, region and endpoint host, for fs the path. Never a credential. */
+        AdminStorage: {
+            driver: string;
+            bucket?: string;
+            region?: string;
+            endpointHost?: string;
+            path?: string;
+        };
+        AdminDatabase: {
+            /** Format: int64 */
+            sizeBytes: number;
+            serverVersion: string;
+        };
+        AdminJob: {
+            name: string;
+            /** @description The cron expression, in UTC. */
+            schedule: string;
+            /** Format: date-time */
+            nextDue: string;
+            /**
+             * Format: date-time
+             * @description Absent when the job has never finished without an error.
+             */
+            lastSuccessAt?: string;
+            /** @description No success within 26 h (nightly) or 30 min (frequent) — or never. */
+            stale: boolean;
+            running: boolean;
+            /** @description The last 10 runs, newest first. */
+            runs: components["schemas"]["AdminJobRun"][];
+        };
+        AdminJobRun: {
+            id: string;
+            /** @enum {string} */
+            trigger: "schedule" | "cli" | "console";
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            finishedAt?: string;
+            /**
+             * @description interrupted is a run still unfinished past its job's timeout: its process died.
+             * @enum {string}
+             */
+            status: "running" | "ok" | "failed" | "interrupted";
+            error?: string;
+        };
+        AdminJobStarted: {
+            runId: string;
+        };
+        AdminBackups: {
+            snapshots: components["schemas"]["AdminBackup"][];
+            retentionDays: number;
+            photos: components["schemas"]["AdminPhotoBackups"];
+        };
+        AdminBackup: {
+            /** @description YYYY-MM-DD, UTC — the night it names. */
+            date: string;
+            /** Format: int64 */
+            sizeBytes: number;
+            /** Format: date-time */
+            uploadedAt: string;
+        };
+        /** @description Object counts under the photo backup's two trees. */
+        AdminPhotoBackups: {
+            current: number;
+            /** Format: int64 */
+            currentBytes: number;
+            deleted: number;
         };
         /** @description Platform totals. Every count is a plain integer — the underlying COUNT(*) is bigint and must be cast (`::int`) in SQL, or the driver hands it back as a string (CLAUDE.md's Postgres notes). */
         AdminStats: {
@@ -7741,6 +7876,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Ok"];
+                };
+            };
+        };
+    };
+    getAdminOps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Health. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminOps"];
+                };
+            };
+        };
+    };
+    runAdminJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job: "nightly" | "frequent";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Started. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminJobStarted"];
+                };
+            };
+            /** @description Already running (JOB_RUNNING). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listAdminBackups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The snapshots. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminBackups"];
                 };
             };
         };
