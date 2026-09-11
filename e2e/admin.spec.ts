@@ -202,3 +202,55 @@ test("an operator whose role is revoked loses the console at once", async ({
   await other.context.close();
 });
 
+
+// --- The Ops tab (docs/superpowers/specs/2026-09-11-admin-ops-design.md)
+
+/** The card holding one job's details and its runs. */
+function jobCard(page: import("@playwright/test").Page, job: string) {
+  return page.getByTestId(`job-${job}`).locator("..");
+}
+
+test("runs the jobs from the Ops tab and downloads the snapshot", async ({
+  page,
+  request,
+}) => {
+  await operator(page, request);
+  await page.goto("/admin/ops");
+  await expect(page.getByText("Version")).toBeVisible();
+
+  // Run now: recorded before the 202, then watched until it finishes. The
+  // newest run in the card is the one just started.
+  const frequent = jobCard(page, "frequent");
+  await frequent.getByRole("button", { name: "Run now" }).click();
+  const newest = frequent.getByTestId("job-run").first();
+  await expect(newest).toContainText("from the console");
+  await expect(newest).toContainText("OK", { timeout: 30_000 });
+
+  // The nightly job writes tonight's snapshot (named by the UTC date), and
+  // the list picks it up once the run is over.
+  const nightly = jobCard(page, "nightly");
+  await nightly.getByRole("button", { name: "Run now" }).click();
+  await expect(nightly.getByTestId("job-run").first()).toContainText("OK", {
+    timeout: 30_000,
+  });
+  const today = new Date().toISOString().slice(0, 10);
+  const snapshot = page.getByTestId("backup-snapshot").filter({ hasText: today });
+  await expect(snapshot).toBeVisible({ timeout: 10_000 });
+
+  // The download is the snapshot itself, saved under its night's name.
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    snapshot.getByRole("button", { name: "Download" }).click(),
+  ]);
+  expect(download.suggestedFilename()).toBe(`pjokk-backup-${today}.json`);
+  const { readFile } = await import("node:fs/promises");
+  const body = JSON.parse(await readFile(await download.path(), "utf8"));
+  expect(typeof body.exportedAt).toBe("string");
+  expect(body.tables.users.length).toBeGreaterThan(0);
+  // Credentials are nulled before the dump.
+  expect(body.tables.users.every((u: { password: unknown }) => u.password === null)).toBe(true);
+
+  // Overview's line leads here.
+  await page.goto("/admin");
+  await expect(page.getByTestId("ops-summary")).toBeVisible();
+});
