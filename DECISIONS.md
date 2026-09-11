@@ -2569,3 +2569,36 @@ Spec: `docs/superpowers/specs/2026-09-11-admin-restore-design.md`.
   prints its report instead.
 - **The privacy policy** now says backups are also used "to undo a deletion
   made by mistake — never one you asked for", in both languages.
+
+## 2026-09-11 — calendar: this occurrence only (follow-up to #52)
+
+Spec: `docs/superpowers/specs/2026-09-11-calendar-occurrence-exceptions-design.md`.
+Built without a design conversation, on the owner's instruction to make
+the calls and report them afterwards.
+
+- **Skips, not overrides.** One occurrence leaves a series as a
+  `calendar_event_skip` row. Deleting "this event" writes one. Editing
+  "this event" writes one and creates a standalone event from the series'
+  fields with the edit applied (babies, assignees and reminder copied, the
+  series' creator kept). Every reader already handles one-off events, so
+  the detached one needs nothing new. Rejected: per-field overrides on an
+  exception row, which every reader, the reminder job and the ICS feed
+  (RECURRENCE-ID) would have to learn to merge.
+- **Two scopes, "This event" and "All events", and the sheet defaults to
+  "This event"** — it is the occurrence that was tapped. "This and
+  following" is not offered: ending a series is its Until date.
+- **The API is the existing routes plus `?occurrence=`.** Without it
+  PATCH and DELETE act on the series as before, so no old client changes
+  meaning. A time that is not an occurrence (off the rule, past Until,
+  already skipped, or the event does not repeat) is 400
+  `NOT_AN_OCCURRENCE`.
+- **Skips survive series edits unless the occurrences move.** A real
+  change to the series' start or rule makes a different set of
+  occurrences, so its skips are deleted; an unchanged `startTime` — the
+  sheet sends it on every save — keeps them, as does a new Until.
+  Detached events always stay.
+- **The feed lists skips as EXDATE** in the same form as DTSTART (a date
+  for all-day events, local Oslo time with a TZID otherwise), and the
+  reminder job steps past a skipped occurrence to the next.
+- **The new table carries `family_id`,** so the nightly backup lists it
+  and a family restore brings it back with its family.
