@@ -178,22 +178,31 @@ type Service interface {
 	RemoveMember(ctx context.Context, familyID, memberID string) error
 	SetMemberRole(ctx context.Context, familyID, memberID, role string) error
 	SetActiveFamily(ctx context.Context, sessionToken, familyID string) error
+
+	// SetPassword also signs the user out everywhere, including every
+	// session they are driving through impersonation (it sweeps those
+	// itself, first — see users.go).
 	SetPassword(ctx context.Context, userID, newPassword string) error
 	RevokeAllSessions(ctx context.Context, userID string) error
 
 	// RevokeImpersonatedSessions revokes every session this user is driving
 	// through impersonation. RevokeAllSessions does NOT cover those: an
 	// impersonated session's user_id is the TARGET's, so cutting off an
-	// operator (ban, sign-out-everywhere, account deletion) must call both
-	// or the operator keeps working sessions as whoever they were
-	// impersonating.
+	// operator (ban, sign-out-everywhere, account deletion) must call both,
+	// this one FIRST — revoking the operator's own sessions cascades away
+	// the rows this one finds them by. SetPassword and RevokeSession do it
+	// themselves. The session resolver refuses (and revokes) an
+	// impersonated session whose operator is no longer an unbanned system
+	// admin or whose record is gone, but that is a backstop, not a licence
+	// to skip the call.
 	RevokeImpersonatedSessions(ctx context.Context, adminUserID string) error
 
 	// The operator console's user page (sessions.go, spec
 	// 2026-09-11-admin-user-support §3): one person's live sessions — never
 	// a token; signing one of them out by id (ErrSessionNotFound when it is
-	// not theirs); and changing their login address (ErrEmailTaken when
-	// another account holds it).
+	// not theirs), which also ends any impersonation started from it; and
+	// changing their login address (ErrEmailTaken when another account
+	// holds it).
 	UserSessions(ctx context.Context, userID string) ([]SessionInfo, error)
 	RevokeSession(ctx context.Context, userID, sessionID string) error
 	ChangeEmail(ctx context.Context, userID, email string) error

@@ -143,11 +143,23 @@ VALUES ($1, $2, $3);
 -- what its sign-in comparison expects; only the write is ours.
 UPDATE "users" SET "password" = $2, "updated_at" = now() WHERE "id" = $1;
 
--- name: IsUserBanned :one
--- Ban state for a user id, for the impersonation check in resolveSession:
--- an impersonated session is only as valid as the OPERATOR behind it. No
--- rows means the account is gone, which the caller treats the same way.
-SELECT "banned" FROM "users" WHERE "id" = $1;
+-- name: ImpersonationIsLive :one
+-- Whether an impersonated session still has an operator behind it, for the
+-- backstop in resolveSession: its `impersonation` row must still exist
+-- (it cascades away with the operator's own session, 00003), name the same
+-- operator as the session's impersonated_by marker, and that operator must
+-- still be an unbanned system admin. An account that is gone fails the JOIN
+-- and reads the same as one that lost the role. A NULL role never equals
+-- anything, so it fails too.
+SELECT EXISTS (
+	SELECT 1
+	FROM "impersonation" i
+	JOIN "users" u ON u."id" = i."admin_id"
+	WHERE i."impersonated_token" = sqlc.arg(impersonated_token)
+		AND i."admin_id" = sqlc.arg(admin_id)
+		AND u."role" = sqlc.arg(system_admin_role)::text
+		AND NOT u."banned"
+);
 
 -- name: ListImpersonatedTokensByAdmin :many
 -- Every live impersonated session this operator is driving.
@@ -158,6 +170,13 @@ SELECT "banned" FROM "users" WHERE "id" = $1;
 -- those sessions outlive the operator's own access. Served by
 -- impersonation_admin_idx (00003_impersonation.sql).
 SELECT "impersonated_token" FROM "impersonation" WHERE "admin_id" = $1;
+
+-- name: ListImpersonatedTokensByAdminToken :many
+-- The impersonated sessions started FROM one operator session: what signing
+-- out that single session must end too. Same reason as the list above, one
+-- session instead of one person. Served by impersonation_admin_token_idx
+-- (00003_impersonation.sql).
+SELECT "impersonated_token" FROM "impersonation" WHERE "admin_token" = $1;
 
 -- name: GetUserRole :one
 -- Backs allowOrgCreation (see auth.go): the system-admin role that opens

@@ -375,6 +375,38 @@ func (q *Queries) GetUserSessionToken(ctx context.Context, arg GetUserSessionTok
 	return token, err
 }
 
+const impersonationIsLive = `-- name: ImpersonationIsLive :one
+SELECT EXISTS (
+	SELECT 1
+	FROM "impersonation" i
+	JOIN "users" u ON u."id" = i."admin_id"
+	WHERE i."impersonated_token" = $1
+		AND i."admin_id" = $2
+		AND u."role" = $3::text
+		AND NOT u."banned"
+)
+`
+
+type ImpersonationIsLiveParams struct {
+	ImpersonatedToken string
+	AdminID           string
+	SystemAdminRole   string
+}
+
+// Whether an impersonated session still has an operator behind it, for the
+// backstop in resolveSession: its `impersonation` row must still exist
+// (it cascades away with the operator's own session, 00003), name the same
+// operator as the session's impersonated_by marker, and that operator must
+// still be an unbanned system admin. An account that is gone fails the JOIN
+// and reads the same as one that lost the role. A NULL role never equals
+// anything, so it fails too.
+func (q *Queries) ImpersonationIsLive(ctx context.Context, arg ImpersonationIsLiveParams) (bool, error) {
+	row := q.db.QueryRow(ctx, impersonationIsLive, arg.ImpersonatedToken, arg.AdminID, arg.SystemAdminRole)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const insertFamilyMemberRole = `-- name: InsertFamilyMemberRole :exec
 INSERT INTO "organization_member_roles" ("member_id", "organization_id", "role")
 VALUES ($1, $2, $3)
@@ -408,20 +440,6 @@ func (q *Queries) IsSessionUserBanned(ctx context.Context, token string) (bool, 
 	return banned, err
 }
 
-const isUserBanned = `-- name: IsUserBanned :one
-SELECT "banned" FROM "users" WHERE "id" = $1
-`
-
-// Ban state for a user id, for the impersonation check in resolveSession:
-// an impersonated session is only as valid as the OPERATOR behind it. No
-// rows means the account is gone, which the caller treats the same way.
-func (q *Queries) IsUserBanned(ctx context.Context, id string) (bool, error) {
-	row := q.db.QueryRow(ctx, isUserBanned, id)
-	var banned bool
-	err := row.Scan(&banned)
-	return banned, err
-}
-
 const listImpersonatedTokensByAdmin = `-- name: ListImpersonatedTokensByAdmin :many
 SELECT "impersonated_token" FROM "impersonation" WHERE "admin_id" = $1
 `
@@ -435,6 +453,34 @@ SELECT "impersonated_token" FROM "impersonation" WHERE "admin_id" = $1
 // impersonation_admin_idx (00003_impersonation.sql).
 func (q *Queries) ListImpersonatedTokensByAdmin(ctx context.Context, adminID string) ([]string, error) {
 	rows, err := q.db.Query(ctx, listImpersonatedTokensByAdmin, adminID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var impersonated_token string
+		if err := rows.Scan(&impersonated_token); err != nil {
+			return nil, err
+		}
+		items = append(items, impersonated_token)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listImpersonatedTokensByAdminToken = `-- name: ListImpersonatedTokensByAdminToken :many
+SELECT "impersonated_token" FROM "impersonation" WHERE "admin_token" = $1
+`
+
+// The impersonated sessions started FROM one operator session: what signing
+// out that single session must end too. Same reason as the list above, one
+// session instead of one person. Served by impersonation_admin_token_idx
+// (00003_impersonation.sql).
+func (q *Queries) ListImpersonatedTokensByAdminToken(ctx context.Context, adminToken string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listImpersonatedTokensByAdminToken, adminToken)
 	if err != nil {
 		return nil, err
 	}
