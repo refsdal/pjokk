@@ -334,8 +334,11 @@ export function KioskScreen() {
           sub={
             night || !s
               ? null
-              : napsLine(s.today, s.lastNightMin, (min) =>
-                  durationShort(min * 60_000),
+              : napsLine(
+                  s.today,
+                  s.lastNightMin,
+                  (min) => durationShort(min * 60_000),
+                  s.lastNightLongestMin ?? null,
                 )
           }
           tone={sleepView.state === "sleeping" ? "live" : "normal"}

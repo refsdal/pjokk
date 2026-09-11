@@ -5135,6 +5135,7 @@ components:
         - activeSleep
         - lastSleep
         - lastNightMin
+        - lastNightLongestMin
         - activePlay
         - activeFeed
         - activePump
@@ -5170,6 +5171,14 @@ components:
             night to its last stretch. Null when there is no completed
             night session, or the newest one ended more than 24 hours ago.
             A running night has no length yet and is ignored.
+        lastNightLongestMin:
+          type: integer
+          format: int32
+          nullable: true
+          description: >-
+            The longest single session of that same night — the number
+            Stats calls the longest stretch. Null exactly when lastNightMin
+            is.
         activePlay:
           allOf:
             - $ref: "#/components/schemas/PlayLog"

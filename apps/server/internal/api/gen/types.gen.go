@@ -3172,6 +3172,9 @@ type Summary struct {
 	LastDiaper  *DiaperLog `json:"lastDiaper"`
 	LastFeed    *FeedLog   `json:"lastFeed"`
 
+	// LastNightLongestMin The longest single session of that same night — the number Stats calls the longest stretch. Null exactly when lastNightMin is.
+	LastNightLongestMin *int32 `json:"lastNightLongestMin"`
+
 	// LastNightMin Minutes asleep last night: every completed `night` session of the newest completed night, where a night runs from local noon to noon and a session belongs to the night it started in (the rule StatsNight uses), so a real waking does not shrink the night to its last stretch. Null when there is no completed night session, or the newest one ended more than 24 hours ago. A running night has no length yet and is ignored.
 	LastNightMin *int32    `json:"lastNightMin"`
 	LastSleep    *SleepLog `json:"lastSleep"`

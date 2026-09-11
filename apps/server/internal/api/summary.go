@@ -268,30 +268,39 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 			newestNight = &sleeps[i]
 		}
 	}
-	var lastNightMin *int32
+	// Its longest single session is the longest stretch — the number
+	// Stats shows for the same night (stats.go's longestMs), on Home.
+	var lastNightMin, lastNightLongestMin *int32
 	if newestNight != nil && now-newestNight.EndTime.Time.UnixMilli() <= summaryDayMs {
 		idx := nightIndex(newestNight.StartTime.Time.UnixMilli())
-		var ms int64
+		var ms, longest int64
 		for _, sl := range sleeps {
 			if isCompletedNight(sl) && nightIndex(sl.StartTime.Time.UnixMilli()) == idx {
-				ms += sl.EndTime.Time.UnixMilli() - sl.StartTime.Time.UnixMilli()
+				d := sl.EndTime.Time.UnixMilli() - sl.StartTime.Time.UnixMilli()
+				ms += d
+				if d > longest {
+					longest = d
+				}
 			}
 		}
 		v := int32(roundDiv(ms, 60_000))
 		lastNightMin = &v
+		l := int32(roundDiv(longest, 60_000))
+		lastNightLongestMin = &l
 	}
 
 	return gen.GetSummary200JSONResponse{
-		LastFeed:        lastFeed,
-		LastDiaper:      lastDiaper,
-		ActiveSleep:     activeSleep,
-		LastSleep:       lastSleep,
-		LastNightMin:    lastNightMin,
-		ActivePlay:      activePlay,
-		ActiveFeed:      activeFeed,
-		ActivePump:      activePump,
-		LastTemperature: lastTemperature,
-		OpenHelp:        openHelp,
+		LastFeed:            lastFeed,
+		LastDiaper:          lastDiaper,
+		ActiveSleep:         activeSleep,
+		LastSleep:           lastSleep,
+		LastNightMin:        lastNightMin,
+		LastNightLongestMin: lastNightLongestMin,
+		ActivePlay:          activePlay,
+		ActiveFeed:          activeFeed,
+		ActivePump:          activePump,
+		LastTemperature:     lastTemperature,
+		OpenHelp:            openHelp,
 		Today: struct {
 			Both     int32 `json:"both"`
 			Dirty    int32 `json:"dirty"`

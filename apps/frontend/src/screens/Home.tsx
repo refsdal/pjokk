@@ -391,8 +391,12 @@ export function HomeScreen() {
                   new Date(s.lastSleep.endTime).getTime() -
                     new Date(s.lastSleep.startTime).getTime(),
                 )} ${sleepNoun(s.lastSleep.type)}`}
-                sub={napsLine(s.today, s.lastNightMin, (min) =>
-                  formatDuration(min * 60_000),
+                sub={napsLine(
+                  s.today,
+                  s.lastNightMin,
+                  (min) => formatDuration(min * 60_000),
+                  // Absent from a snapshot cached before the field existed.
+                  s.lastNightLongestMin ?? null,
                 )}
                 note={nap ? describeNapWindow(nap) : undefined}
                 tintClass="text-sleep"
