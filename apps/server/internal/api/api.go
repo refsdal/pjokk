@@ -284,8 +284,8 @@ var operationAuthTiers = map[string]authTier{
 
 	"GetSummary": tierFamily,
 
-	// The six Phase 3 activity types ("other-logs.ts —
-	// makeLogRoutes factory"). All 24 operations are tierFamily: every kind
+	// The six Phase 3 activity types (other-logs.ts's makeLogRoutes
+	// factory). All 24 operations are tierFamily: every kind
 	// is free (no plan gate) and every operation is ordinary family-scoped
 	// CRUD, unlike sleep-locations' admin-only writes.
 	"ListMedicine":      tierFamily,

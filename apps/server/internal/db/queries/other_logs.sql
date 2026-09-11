@@ -1,5 +1,5 @@
--- The six Phase 3 activity types ("other-logs.ts —
--- makeLogRoutes factory"). Every kind shares one structural shape (id,
+-- The six Phase 3 activity types (other-logs.ts's makeLogRoutes
+-- factory). Every kind shares one structural shape (id,
 -- family_id, baby_id, caretaker_id, time, …kind-specific columns, notes,
 -- created_at) and therefore one query shape: List/Get/Create/Update/Delete,
 -- five queries per table, thirty in total. sqlc has no generics, so these

@@ -64,7 +64,7 @@ import (
 // already the reusable unit.
 
 // babyExists reports whether babyID exists in familyID, the check every
-// CreateX handler below runs before inserting ( 404 unknown baby).
+// CreateX handler below runs before inserting (404 unknown baby).
 func babyExists(ctx context.Context, d Deps, familyID, babyID string) (bool, error) {
 	if _, err := d.Q.GetBaby(ctx, dbgen.GetBabyParams{FamilyID: familyID, ID: babyID}); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

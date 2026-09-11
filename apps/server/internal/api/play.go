@@ -171,8 +171,8 @@ func (d Deps) CreatePlay(ctx context.Context, req gen.CreatePlayRequestObject) (
 	return gen.CreatePlay201JSONResponse(serPlay(created)), nil
 }
 
-// GetActivePlay implements GET /api/play/active. —
-// see this file's doc comment, divergence 2, for why the "no running
+// GetActivePlay implements GET /api/play/active: the running session or
+// null. See this file's doc comment, divergence 2, for why the "no running
 // session" branch returns a hand-written response type instead of the
 // generated 200 one.
 func (d Deps) GetActivePlay(ctx context.Context, req gen.GetActivePlayRequestObject) (gen.GetActivePlayResponseObject, error) {
