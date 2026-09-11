@@ -190,3 +190,37 @@ WHERE "token" = $1 AND "active_organization_id" IS NULL;
 -- family is a state worth reaching.
 SELECT "id" FROM "organization_members"
 WHERE "organization_id" = $1 AND "user_id" = $2;
+
+-- name: ListUserSessions :many
+-- One person's live sessions, for the operator console's user page
+-- (internal/auth/sessions.go). Never the token: the console signs a session
+-- out by id (GetUserSessionToken below), and the metadata blob is decoded in
+-- Go for its user agent and impersonation marker only — the address digest
+-- in it goes no further. Expired rows Limen has not swept yet are left out.
+SELECT
+    s."id",
+    s."created_at",
+    s."expires_at",
+    s."last_access",
+    COALESCE(s."metadata", '') AS metadata,
+    COALESCE(s."active_organization_id", '') AS active_family_id,
+    COALESCE(o."name", '') AS family_name
+FROM "sessions" s
+LEFT JOIN "organizations" o ON o."id" = s."active_organization_id"
+WHERE s."user_id" = $1 AND s."expires_at" > now()
+ORDER BY COALESCE(s."last_access", s."created_at") DESC, s."id" DESC;
+
+-- name: GetUserSessionToken :one
+-- The token behind one of a user's sessions, so it can be revoked through
+-- Limen. Keyed by (id, user_id): a session id addressed under the wrong
+-- person is simply not found.
+SELECT "token" FROM "sessions" WHERE "id" = $1 AND "user_id" = $2;
+
+-- name: ChangeUserEmail :exec
+-- An operator's change of a login address (already normalised by the
+-- caller). The unique index refuses a taken one (23505 → ErrEmailTaken).
+-- email_verified_at is cleared: nobody has verified the new address, and
+-- nothing in the pinned Limen (v0.2.1) gates sign-in on it.
+UPDATE "users"
+SET "email" = $2, "email_verified_at" = NULL, "updated_at" = now()
+WHERE "id" = $1;
