@@ -79,11 +79,47 @@ func (q *Queries) DeletePushSnoozesFor(ctx context.Context, arg DeletePushSnooze
 	return err
 }
 
-const listDuePushSnoozes = `-- name: ListDuePushSnoozes :many
-SELECT id, family_id, user_id, source, source_id, occurrence_start, sent_at, due_at, created_at FROM "push_snooze" WHERE "due_at" <= $1 ORDER BY "due_at", "id"
+const deleteUndeliverablePushSnoozes = `-- name: DeleteUndeliverablePushSnoozes :execrows
+DELETE FROM "push_snooze" s
+WHERE s."due_at" <= $1
+  AND NOT EXISTS (
+    SELECT 1 FROM "organization_members" om
+    JOIN "users" u ON u."id" = om."user_id"
+    WHERE om."organization_id" = s."family_id"
+      AND om."user_id" = s."user_id"
+      AND NOT u."banned"
+  )
 `
 
-// The job's read, across families like ListAllReminders.
+// Spends every due snooze whose person is no longer a member of its family,
+// or is banned (issue #92), before the job reads the rest. Dropped rather
+// than skipped: a snooze is one shot, and one kept past a ban or a removal
+// would come back as a stale notification after an unban or a re-invite.
+func (q *Queries) DeleteUndeliverablePushSnoozes(ctx context.Context, dueAt pgtype.Timestamptz) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteUndeliverablePushSnoozes, dueAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const listDuePushSnoozes = `-- name: ListDuePushSnoozes :many
+SELECT id, family_id, user_id, source, source_id, occurrence_start, sent_at, due_at, created_at FROM "push_snooze" s
+WHERE s."due_at" <= $1
+  AND EXISTS (
+    SELECT 1 FROM "organization_members" om
+    JOIN "users" u ON u."id" = om."user_id"
+    WHERE om."organization_id" = s."family_id"
+      AND om."user_id" = s."user_id"
+      AND NOT u."banned"
+  )
+ORDER BY s."due_at", s."id"
+`
+
+// The job's read, across families like ListAllReminders, and filtered the
+// same way: only a current, unbanned member's snoozes. The prune above
+// already removed the rest; this keeps a membership that ends between the
+// two statements from delivering.
 func (q *Queries) ListDuePushSnoozes(ctx context.Context, dueAt pgtype.Timestamptz) ([]PushSnooze, error) {
 	rows, err := q.db.Query(ctx, listDuePushSnoozes, dueAt)
 	if err != nil {

@@ -206,11 +206,24 @@ func (q *Queries) LastPumpTime(ctx context.Context, arg LastPumpTimeParams) (pgt
 
 const listAllReminders = `-- name: ListAllReminders :many
 
-SELECT id, family_id, user_id, baby_id, kind, mode, interval_min, at_minute, days_mask, tz, quiet_start, quiet_end, label, last_fired_at, created_at FROM "reminder"
-ORDER BY "family_id", "user_id", "id"
+SELECT id, family_id, user_id, baby_id, kind, mode, interval_min, at_minute, days_mask, tz, quiet_start, quiet_end, label, last_fired_at, created_at FROM "reminder" r
+WHERE EXISTS (
+    SELECT 1 FROM "organization_members" om
+    JOIN "users" u ON u."id" = om."user_id"
+    WHERE om."organization_id" = r."family_id"
+      AND om."user_id" = r."user_id"
+      AND NOT u."banned"
+)
+ORDER BY r."family_id", r."user_id", r."id"
 `
 
 // Queries below back internal/jobs/reminders.go.
+// Only the reminders of a current, unbanned member of the reminder's family
+// (issue #92). Removing a member deletes their reminders there
+// (auth.Service.RemoveMember); this is what keeps a row that survived some
+// other way from ever telling a former caretaker, or a banned account, how
+// long it has been since the baby ate. EXISTS rather than a JOIN, so the
+// rows stay plain reminder rows.
 func (q *Queries) ListAllReminders(ctx context.Context) ([]Reminder, error) {
 	rows, err := q.db.Query(ctx, listAllReminders)
 	if err != nil {

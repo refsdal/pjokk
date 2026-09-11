@@ -28,8 +28,21 @@ WHERE "id" = $1 AND "user_id" = $2 AND "family_id" = $3;
 -- Queries below back internal/jobs/reminders.go.
 
 -- name: ListAllReminders :many
-SELECT * FROM "reminder"
-ORDER BY "family_id", "user_id", "id";
+-- Only the reminders of a current, unbanned member of the reminder's family
+-- (issue #92). Removing a member deletes their reminders there
+-- (auth.Service.RemoveMember); this is what keeps a row that survived some
+-- other way from ever telling a former caretaker, or a banned account, how
+-- long it has been since the baby ate. EXISTS rather than a JOIN, so the
+-- rows stay plain reminder rows.
+SELECT * FROM "reminder" r
+WHERE EXISTS (
+    SELECT 1 FROM "organization_members" om
+    JOIN "users" u ON u."id" = om."user_id"
+    WHERE om."organization_id" = r."family_id"
+      AND om."user_id" = r."user_id"
+      AND NOT u."banned"
+)
+ORDER BY r."family_id", r."user_id", r."id";
 
 -- name: SetReminderLastFired :exec
 UPDATE "reminder" SET "last_fired_at" = $2 WHERE "id" = $1;
