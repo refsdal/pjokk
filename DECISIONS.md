@@ -2516,3 +2516,56 @@ Spec: `docs/superpowers/specs/2026-09-11-admin-ops-design.md`.
   cron package's tests moved to `package cron_test`, with the unexported
   seams in `export_test.go`, because `internal/api` now imports `cron` and
   an in-package test importing the test rig would be an import cycle.
+
+## 2026-09-11 — restore (console spec 4)
+
+Spec: `docs/superpowers/specs/2026-09-11-admin-restore-design.md`.
+
+- **A family restore undoes a deletion, and nothing else.** It only brings
+  back a family that no longer exists, with its original ids, so it can
+  neither clash with nor overwrite live data. Rolling a live family back was
+  rejected: it destroys whatever was logged since the snapshot. It runs from
+  the console (Ops → a snapshot → Deleted families, which shows who deleted
+  each family and when — the console's delete is the only path that removes
+  one) and from `pjokk restore family`, through the same code.
+- **The whole restore only goes into an empty database.** `pjokk restore`
+  migrates, then refuses a database with a family or a real user. No
+  `--replace`: starting over means a fresh `DATABASE_URL`, so a mistyped one
+  cannot wipe production.
+- **The schema drives the loader.** Tables load parents-first from the live
+  foreign keys, and each is `INSERT … SELECT … FROM
+  json_populate_recordset(NULL::t, $1)` over only the columns the snapshot
+  carries: Postgres types every row, a column the table lost is ignored, a
+  column it gained takes its default (naming it explicitly would insert
+  NULL), and the generated `display_name` is never written. Rejected:
+  per-table restore code (a forgotten table silently loses data) and SQL
+  for review (the scratch image has no psql).
+- **Every table must declare how a family restore treats it.** Scoped by a
+  family id, reached through a parent that has one, never for a family
+  (`api_key`, `device`, `push_subscription` — credentials and device
+  bindings stay gone), or global. A new table that is none of these fails
+  `TestEveryTableHasAFamilyRestoreRule`.
+- **People deleted since the snapshot.** Their own rows (membership and its
+  roles, reminders, push prefs, calendar assignments) are dropped; every
+  other reference is credited to the tombstone — the rule account deletion
+  already applies. A family can come back with no admin left; the report
+  and the console's "no admin" badge say so. A slug taken since becomes
+  `<slug>-restored`.
+- **The tombstone is replaced, not skipped.** A fresh database already has
+  the migration-seeded "Deleted user"; the whole restore deletes it inside
+  its transaction and loads the snapshot's, so a round trip is exact. The
+  test compares every backed-up table before and after.
+- **Sessions are never restored,** and passwords never were backed up, so a
+  whole restore signs everyone out and disables every password.
+  `pjokk set-password <email>` reads a new one from stdin — never argv,
+  which lands in shell history and process lists — and applies the app's
+  password policy.
+- **A snapshot from a newer schema is refused.** Loading it into an older
+  build would drop its newer columns without a word. Snapshots now record
+  their `schemaVersion`; older ones load with a warning.
+- **The console's audit row is inside the restore's transaction,** so it
+  exists exactly when the restore does. The CLI's family restore writes
+  none — `admin_audit` names an operator account and a shell has none — and
+  prints its report instead.
+- **The privacy policy** now says backups are also used "to undo a deletion
+  made by mistake — never one you asked for", in both languages.

@@ -224,9 +224,18 @@ directions, so "every table" stays true as the schema grows.
 
 Five things to know before you rely on it:
 
-- **Restores are manual.** There is no restore command. The snapshot is
-  `{ exportedAt, tables: { <table>: [rows...] } }` — readable, and insertable
-  in foreign-key order, but you are writing that script yourself.
+- **Restoring.** `pjokk restore --from YYYY-MM-DD` (or `--file PATH`, for a
+  snapshot downloaded from the console) migrates an **empty** database and
+  loads the snapshot into it, then puts milestone photos back from the photo
+  backup. It refuses a database that already holds a family or a user, so
+  point `DATABASE_URL` at a fresh one — a mistyped URL cannot mix a snapshot
+  into live data. Passwords are not in backups: afterwards, set yours with
+  `pjokk set-password you@example.com`, which reads the password from stdin
+  (`docker exec -i <app> /app/pjokk set-password you@example.com`). One
+  family deleted by mistake comes back with
+  `pjokk restore family <id> --from YYYY-MM-DD`, or from the console's Ops
+  tab → a snapshot → Deleted families. A snapshot from a newer schema than
+  the image is refused; restore with an image at least that new.
 - **Live credentials are nulled out.** Password hashes (`users.password`),
   OAuth access/refresh/id tokens (`accounts.*`) and session tokens
   (`sessions.token`) never reach the snapshot. Thirty days of retained
