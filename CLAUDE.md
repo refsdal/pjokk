@@ -70,7 +70,7 @@ separate test deploy).
   `apps/server/internal/api/gen` (committed — neither CI nor the image runs
   codegen), kin-openapi validates every request against it at runtime as
   middleware, and `bun run gen:client` turns it into
-  `apps/frontend/src/lib/api-schema.d.ts` for the SPA. Adding an endpoint
+  `packages/shared/src/api-schema.d.ts` for the SPA. Adding an endpoint
   means editing the YAML and running `go generate ./...` from `apps/server`;
   `internal/api/pjokk.yaml` is a committed copy of the same file that exists
   only because `go:embed` cannot reach above the module root — never
@@ -254,7 +254,7 @@ separate test deploy).
   Charts (perpetual beta). Do NOT add TanStack DB or Store now.
 - UI: Tailwind + shadcn/ui + vaul for bottom sheets. Mobile-first. Crank touch
   targets well above shadcn defaults on log-flow screens (44 px minimum).
-- API client: `openapi-fetch` over `apps/frontend/src/lib/api-schema.d.ts`,
+- API client: `openapi-fetch` over `packages/shared/src/api-schema.d.ts`,
   which `bun run gen:client` generates from `openapi/pjokk.yaml` (it replaced
   the Hono RPC client, which could only exist while the server was
   TypeScript). Configurable base URL (`''` same-origin on web; overridable
@@ -688,7 +688,11 @@ sheet pattern — build the pattern well once.
   is the only place both meet.
 - `openapi/pjokk.yaml` is the single source of truth for API shapes
   (validation → generated Go server → generated TS client). `packages/shared`
-  is now only the SPA's domain types, and no longer describes the wire.
+  (`@pjokk/shared`) IS that generated client plus names for it: the
+  generated `api-schema.d.ts`, and `index.ts`, which only aliases its
+  schemas (`Baby`, `FeedLog`, …) and lists the few enums the SPA renders
+  chips from — checked against the spec so a new value cannot be missed.
+  Never hand-write a wire type; add it to the spec and alias it.
 - No `<form>` submission tricks; standard handlers.
 - Keep bundle size honest — the SPA is embedded in the binary, so it is also
   image size.
