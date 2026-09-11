@@ -2650,3 +2650,23 @@ to drift from the spec without anything noticing. This closes it.
   source file. They stay in `package.json` for now: CLAUDE.md names
   react-hook-form + zod as the forms stack, and dropping a decided
   dependency is its own decision.
+
+## 2026-09-11 — each workspace declares its own dependencies
+
+- **The root manifest held the SPA's runtime dependencies** while
+  `apps/frontend/package.json` listed three — a leftover from before the
+  repo had workspaces. Now each workspace declares what its own code
+  imports: `apps/frontend` its runtime packages (20) and its build tooling
+  (vite and its plugins, Tailwind, the React and qrcode types),
+  `apps/landing` react and its types, and the root only repo-wide tooling
+  (biome, TypeScript, Playwright, the bun/node types) plus `web-push` for
+  `scripts/gen-vapid.mjs`. `workbox-window` sits with the frontend although
+  no file names it: `virtual:pwa-register` pulls it in at runtime.
+- **zod, react-hook-form and @hookform/resolvers are gone.** Nothing
+  imported them once the shared types came from the spec, and no form in
+  the app ever used react-hook-form; CLAUDE.md's stack line now says what
+  the forms actually are.
+- **The "hoisted" linker stays.** It gives the flat node_modules the scripts
+  and CI were built against. Bun's "isolated" default for workspaces would
+  additionally fail any import a package has not declared — worth having,
+  and a change of its own.
