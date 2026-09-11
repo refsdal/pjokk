@@ -16,7 +16,7 @@ import (
 )
 
 // TestInternalErrorsUseTheStandardEnvelope is a regression test for a code
-// review finding on Task 9: gen.NewStrictHandler's DEFAULT
+// review finding: gen.NewStrictHandler's DEFAULT
 // ResponseErrorHandlerFunc is http.Error(w, err.Error(), 500) — a
 // text/plain body carrying the raw Go error string. Since every
 // gen.StrictServerInterface method (babies.go, me.go, and every future

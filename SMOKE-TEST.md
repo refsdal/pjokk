@@ -216,7 +216,7 @@ deploy.
     `/home`.
 31. Paste `https://pjokk.no` into a chat (Messenger, Slack, iMessage) — the
     preview shows the title, the description and the brand card. Regenerate
-    that card with `node scripts/gen-og.mjs` if the icon ever changes.
+    that card with `node apps/landing/scripts/gen-og.mjs` if the icon ever changes.
 32. From `app.pjokk.no`, Login / Settings / the Join consent screen all link
     to `pjokk.no/privacy` and `/terms` (or the `/nb/` document on a Norwegian
     device) — never to `app.pjokk.no` itself, and never to the English

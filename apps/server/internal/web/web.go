@@ -3,8 +3,8 @@
 // package api builds the /api/* handler, and web.Handler wraps it — every
 // request lands here first.
 //
-// See docs/superpowers/plans/2026-08-31-go-migration-reference.md §A9 for
-// the exact header set and CSP string this file implements byte-for-byte.
+// The header set and CSP string are the TypeScript app's, byte-for-byte,
+// with one deliberate addition (see csp below).
 package web
 
 import (
@@ -36,8 +36,8 @@ var scalarHTML []byte
 // to serve at GET /api/docs after its own session gate.
 func ScalarHTML() []byte { return scalarHTML }
 
-// csp is REF §A9's Content-Security-Policy value, reproduced byte-exact
-// except for one deliberate addition: `blob:` in img-src. The on-device
+// csp is the TypeScript app's Content-Security-Policy value, reproduced
+// byte-exact except for one deliberate addition: `blob:` in img-src. The on-device
 // avatar crop (apps/frontend/src/lib/avatar-image.ts) decodes the picked
 // file through an object URL before uploading it, and object URLs are
 // created by the page itself — this does not open the door to loading a
@@ -52,7 +52,7 @@ const csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inl
 // opens up the apex and leaves the app host disallowed, which is correct.
 const robotsBody = "User-agent: *\nDisallow: /\n"
 
-// securityHeaders sets REF §A9's full header set on a non-/api response.
+// securityHeaders sets the full security header set on a non-/api response.
 // Called before any body is written, on every branch below (assets, robots,
 // SPA fallback alike) — the header set does not vary by which of those a
 // request happens to hit.
@@ -67,7 +67,7 @@ func securityHeaders(h http.Header) {
 }
 
 // probePaths are the two top-level health endpoints package api registers
-// outside the /api/ namespace (REF §A1 items 3 and 4: `GET /healthz` and
+// outside the /api/ namespace (`GET /healthz` and
 // `GET /readyz`, exactly where the TypeScript app mounted them). They need an
 // exact-match escape hatch here because this handler otherwise dispatches to
 // the API by /api/ prefix alone — without it both probes fall through to the
@@ -85,11 +85,11 @@ var probePaths = map[string]bool{
 }
 
 // Handler wraps apiHandler with static asset serving, the SPA fallback, and
-// REF §A9's headers on everything that is not an API path.
+// the security headers on everything that is not an API path.
 //
 // Requests under /api/, and the two top-level probes, are handed to
-// apiHandler UNTOUCHED — no headers are added here, matching REF §A1 item 5
-// ("No CSP on API") and the TypeScript mount order, where the probes were
+// apiHandler UNTOUCHED — no headers are added here, matching the TypeScript
+// app (no CSP on API responses) and its mount order, where the probes were
 // registered ahead of the header middleware and so never received them
 // either. Package api owns whatever headers its own responses need.
 func Handler(apiHandler http.Handler) http.Handler {

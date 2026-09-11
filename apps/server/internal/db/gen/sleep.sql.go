@@ -188,7 +188,7 @@ type ListSleepsRow struct {
 	Notes         *string
 }
 
-// Sleep logs (Task 11; REF §A1 sleep.ts). Same family-scoped skeleton as
+// Sleep logs (sleep.ts). Same family-scoped skeleton as
 // feeds.sql/diapers.sql (see feeds.sql's header for the UpdateSleep
 // CASE/set-flag pattern) plus the active-session lifecycle: "end_time IS
 // NULL" means a session is running, and 00001_init.sql's partial unique

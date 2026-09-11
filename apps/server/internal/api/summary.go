@@ -12,7 +12,7 @@ import (
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
 )
 
-// This file implements GET /api/summary (REF §A1; ports
+// This file implements GET /api/summary (ports
 // apps/api/src/routes/sleep.ts's summary route in full — the route lives
 // alongside sleep in the TS source, but gets its own file here since it
 // touches feeds/diapers/sleep/play, not just sleep).
@@ -52,9 +52,9 @@ func floorDivInt64(a, b int64) int64 {
 	return q
 }
 
-// GetSummary implements GET /api/summary. REF: "{lastFeed, lastDiaper,
+// GetSummary implements GET /api/summary. {lastFeed, lastDiaper,
 // activeSleep, lastSleep, activePlay, lastTemperature, openHelp, today} /
-// 404 unknown baby", plus lastNightMin (not in the TS route).
+// 404 unknown baby, plus lastNightMin (not in the TS route).
 func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (gen.GetSummaryResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	babyID := req.Params.BabyId

@@ -4,9 +4,6 @@
 // apps/server/src/cron-cli.ts's job dispatch half — the exit-code wrapper
 // that CLI adds lives in cmd/pjokk, which owns every process exit.
 //
-// See docs/superpowers/plans/2026-08-31-go-migration-reference.md §A4 for
-// the authoritative schedules and per-job composition this file implements.
-//
 // Two jobs, matching the two cron expressions the Cloudflare deployment used
 // to carry in wrangler.jsonc:
 //
@@ -146,7 +143,7 @@ func runNightly(ctx context.Context, d Deps) error {
 
 	// There is no plan reconciliation here. cron.ts ran reconcilePlans as a
 	// compensating control for missed Stripe webhooks; billing does not
-	// exist in this port (REF §A1), so there is nothing to reconcile.
+	// exist in this port, so there is nothing to reconcile.
 
 	swept, err := d.RateLimit.Sweep(ctx, now)
 	if err != nil {
@@ -256,7 +253,7 @@ func StartScheduler(d Deps) func() {
 }
 
 // runSafely runs fn, logging (never propagating) both a returned error and a
-// panic. REF §A4: "a panicking job must not kill the process".
+// panic: a panicking job must not kill the process.
 func runSafely(ctx context.Context, name string, fn func(context.Context) error) {
 	defer func() {
 		if r := recover(); r != nil {

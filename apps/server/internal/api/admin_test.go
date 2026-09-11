@@ -22,7 +22,7 @@ import (
 // (M5)" block, plus the coverage the TypeScript suite could not have: the
 // user-support surface (list/ban/unban/password/session revocation/
 // impersonation) that used to come from better-auth's admin plugin and is
-// now ours (REF §A1's "NEW in Go" table).
+// now ours.
 //
 // One test-shape difference from the TS suite: testrig.Setup truncates every
 // table per test, so these assert absolute counts where admin.test.ts had to
@@ -894,7 +894,7 @@ func TestAdminImpersonationRoundTrip(t *testing.T) {
 	}
 
 	// A write made while impersonating leaves a trail carrying both
-	// identities (middleware.RequireFamily; proven in isolation by Task 6's
+	// identities (middleware.RequireFamily; proven in isolation by the
 	// middleware tests, asserted once here end to end).
 	if err := a.Deps.Auth.SetActiveFamily(context.Background(), tokenOf(impersonated), familyID); err != nil {
 		t.Fatalf("SetActiveFamily on the impersonated session: %v", err)

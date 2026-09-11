@@ -1,4 +1,4 @@
--- Core queries backing internal/db/gen (Task 3). Every domain query is
+-- Core queries backing internal/db/gen. Every domain query is
 -- family-scoped (WHERE family_id = $1) per CLAUDE.md's tenancy discipline —
 -- "family" is the product word for what the schema still calls
 -- "organizations" (Limen's org plugin tables), ported from apps/api.
@@ -59,7 +59,7 @@ GROUP BY om."id", om."organization_id", om."user_id", om."created_at", o."plan";
 
 -- name: UpsertTombstone :exec
 -- Belt-and-braces re-insert of the tombstone user the migration already
--- seeds (00001_init.sql), per REF §A2. Idempotent: ON CONFLICT DO NOTHING.
+-- seeds (00001_init.sql). Idempotent: ON CONFLICT DO NOTHING.
 INSERT INTO "users" ("id", "email", "name", "banned")
 VALUES ($1, 'deleted@pjokk.invalid', 'Deleted user', true)
 ON CONFLICT DO NOTHING;

@@ -13,8 +13,8 @@ import (
 	"github.com/refsdal/pjokk/server/internal/api/respond"
 )
 
-// This file is the PATCH tri-state pattern established by Task 10
-// (feeds.go/diapers.go) for every future log-route PATCH (sleep,
+// This file is the PATCH tri-state pattern first used by feeds.go and
+// diapers.go, and by every log-route PATCH since (sleep,
 // other-logs, play, …). See feeds.go's package doc comment for the full
 // rationale; this file is just the mechanics two things need:
 //

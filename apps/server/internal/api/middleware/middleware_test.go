@@ -196,7 +196,7 @@ func assertRejected(t *testing.T, rec *httptest.ResponseRecorder, p *probe, want
 }
 
 // -------------------------------------------------------------------------
-// RequireFamily — REF §A5 item 2
+// RequireFamily
 // -------------------------------------------------------------------------
 
 func TestRequireFamilyRejectsAnonymousRequests(t *testing.T) {
@@ -350,7 +350,7 @@ func TestRequireFamilyAdmitsARolelessMembership(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------
-// Impersonated writes — REF §A5 item 2, second half
+// Impersonated writes
 // -------------------------------------------------------------------------
 
 // impersonate signs an admin in, has them impersonate target, and returns the
@@ -469,7 +469,7 @@ func TestImpersonatedReadIsNotAudited(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------
-// RequireAdmin — REF §A5 item 3
+// RequireAdmin
 // -------------------------------------------------------------------------
 
 func TestRequireAdminAllowsAFamilyAdmin(t *testing.T) {
@@ -535,7 +535,7 @@ func TestRequireAdminRejectsAPIKeys(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------
-// APIKeyAuth — REF §A5 item 5
+// APIKeyAuth
 // -------------------------------------------------------------------------
 
 // apiKeyChain is the shipped order: keys resolve first, the session
@@ -603,7 +603,7 @@ func TestAPIKeyAuthRejectsARevokedKey(t *testing.T) {
 }
 
 // A ban is enforced by absence — banning revokes every session the user
-// holds (Task 21's /api/admin/users/{id}/ban) — but an API key is a second,
+// holds (POST /api/admin/users/{id}/ban) — but an API key is a second,
 // longer-lived credential that no session revocation touches. Filtering it
 // at the authentication join is the only place that closes for every route
 // at once, since a key authenticates AS its creator.
@@ -756,7 +756,7 @@ func TestAPIKeyAuthStampsLastUsedAtMostEveryFiveMinutes(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------
-// RejectAPIKey — REF §A5 item 6
+// RejectAPIKey
 // -------------------------------------------------------------------------
 
 func TestRejectAPIKeyBlocksKeysAndAllowsSessions(t *testing.T) {
@@ -790,7 +790,7 @@ func TestRejectAPIKeyBlocksKeysAndAllowsSessions(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------
-// RequireSysadmin — REF §A5 item 4
+// RequireSysadmin
 // -------------------------------------------------------------------------
 
 func TestRequireSysadmin(t *testing.T) {
@@ -847,7 +847,7 @@ func TestRequireSysadmin(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------
-// RateLimit — REF §A5 item 8
+// RateLimit
 // -------------------------------------------------------------------------
 
 func TestRateLimitAllowsUpToTheLimitThenRefuses(t *testing.T) {

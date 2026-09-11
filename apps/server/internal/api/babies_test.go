@@ -13,7 +13,7 @@ import (
 // Babies — ports apps/api/test/household.test.ts's "multiple babies per
 // household" describe block and apps/api/test/api-keys.test.ts's "baby sex"
 // block. The 402 multipleBabies gate those TS tests worked around
-// (setPlan(..., "premium")) is gone in Go (REF §A1: "free — no plan gate"),
+// (setPlan(..., "premium")) is gone in Go,
 // so the Go port needs no plan setup at all.
 // -----------------------------------------------------------------------
 
@@ -41,7 +41,7 @@ func TestCreateBabyIsFreeAndListsOldestFirst(t *testing.T) {
 		"sex":       "boy",
 	})
 	if res.Status != http.StatusCreated {
-		t.Fatalf("POST /api/babies status = %d, body %s (multipleBabies is free in Go, REF §A1)", res.Status, res.Raw)
+		t.Fatalf("POST /api/babies status = %d, body %s (multipleBabies is free in Go)", res.Status, res.Raw)
 	}
 	emilID, _ := res.JSON["id"].(string)
 	if emilID == "" {
@@ -186,8 +186,8 @@ func TestUpdateBabyUnknownIDIs404(t *testing.T) {
 // Family / members — ports apps/api/test/household.test.ts's "household
 // member management" describe block. The TS version drove better-auth's own
 // organization.update-member-role/remove-member routes directly; the Go
-// surface is the NEW /api/family/members/{memberId}[/role] pair (REF §A1,
-// end of admin.ts), so these tests exercise those instead, keeping the same
+// surface is the new /api/family/members/{memberId}[/role] pair, so these
+// tests exercise those instead, keeping the same
 // scenarios: list shape, admin promotes/removes, removed member loses
 // access, plain members are refused.
 // -----------------------------------------------------------------------

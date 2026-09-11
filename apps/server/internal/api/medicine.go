@@ -42,7 +42,7 @@ func serMedicine(row dbgen.GetMedicineRow) gen.MedicineLog {
 	}
 }
 
-// ListMedicine implements GET /api/medicine. REF: "MedicineLog[] newest first".
+// ListMedicine implements GET /api/medicine.
 func (d Deps) ListMedicine(ctx context.Context, req gen.ListMedicineRequestObject) (gen.ListMedicineResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	rows, err := d.Q.ListMedicine(ctx, dbgen.ListMedicineParams{
@@ -60,8 +60,8 @@ func (d Deps) ListMedicine(ctx context.Context, req gen.ListMedicineRequestObjec
 	return gen.ListMedicine200JSONResponse(out), nil
 }
 
-// CreateMedicine implements POST /api/medicine. REF: "{babyId, time, name,
-// amount?, unit?, notes?} → 201 / 404 unknown baby".
+// CreateMedicine implements POST /api/medicine. {babyId, time, name,
+// amount?, unit?, notes?} → 201 / 404 unknown baby.
 func (d Deps) CreateMedicine(ctx context.Context, req gen.CreateMedicineRequestObject) (gen.CreateMedicineResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	if req.Body == nil {
@@ -108,8 +108,8 @@ func (d Deps) CreateMedicine(ctx context.Context, req gen.CreateMedicineRequestO
 	return gen.CreateMedicine201JSONResponse(serMedicine(row)), nil
 }
 
-// UpdateMedicine implements PATCH /api/medicine/{id}. REF: "partial
-// (nullable clears) → MedicineLog / 404". `name`/`time` are settable but not
+// UpdateMedicine implements PATCH /api/medicine/{id}. partial
+// (nullable clears) → MedicineLog / 404. `name`/`time` are settable but not
 // nullable (patchField still detects their presence; they are never sent as
 // a clearing null by the spec's schema — see UpdateMedicine's OpenAPI
 // description).
@@ -172,7 +172,7 @@ func (d Deps) UpdateMedicine(ctx context.Context, req gen.UpdateMedicineRequestO
 	return gen.UpdateMedicine200JSONResponse(serMedicine(row)), nil
 }
 
-// DeleteMedicine implements DELETE /api/medicine/{id}. REF: "{ok:true} / 404".
+// DeleteMedicine implements DELETE /api/medicine/{id}.
 func (d Deps) DeleteMedicine(ctx context.Context, req gen.DeleteMedicineRequestObject) (gen.DeleteMedicineResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	ok, err := deleteLog(ctx, func(ctx context.Context) (int64, error) {

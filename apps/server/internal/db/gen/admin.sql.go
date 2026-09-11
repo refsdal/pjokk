@@ -145,8 +145,7 @@ DELETE FROM "organizations" WHERE "id" = $1
 
 // Everything the family owns cascades: members, invites, babies, keys and
 // every log. Nothing here cancels a subscription — billing is gone from
-// this port entirely (REF §A1: "Stripe cancel/subscription rows GONE in
-// Go").
+// this port entirely.
 func (q *Queries) DeleteOrganization(ctx context.Context, id string) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteOrganization, id)
 	if err != nil {
@@ -240,7 +239,7 @@ type GetAdminStatsRow struct {
 	UsersLast7d       int32
 }
 
-// Queries backing the system-admin console (Task 21; REF §A1 admin.ts):
+// Queries backing the system-admin console (admin.ts):
 // platform stats, the family overview, safe account deletion, the user
 // support surface (list/ban/unban) and the append-only audit trail.
 //
@@ -684,7 +683,7 @@ type ListAdminUsersRow struct {
 	CreatedAt pgtype.Timestamptz
 }
 
-// The user-support list. NEW in Go (REF §A1's "NEW in Go" table): the
+// The user-support list. NEW in Go: the
 // TypeScript app got this from better-auth's admin plugin over
 // /api/auth/admin/list-users, which this port does not have.
 //

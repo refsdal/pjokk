@@ -73,7 +73,7 @@ func (s *service) createUserWithoutCredential(ctx context.Context, name, email s
 // gone.
 //
 // It does NOT take the current password, on purpose: the caller is an
-// operator acting on someone else's account (Task 21's
+// operator acting on someone else's account (the console's
 // POST /api/admin/users/{id}/password), not the account's owner. Guarding
 // this is the API layer's job — it sits behind RequireSysadmin and audits
 // every call.

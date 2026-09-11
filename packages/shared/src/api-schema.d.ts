@@ -1117,7 +1117,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Bearer API keys for the family, newest first. The full key is never included — only createApiKey's response ever carries it. Family admin only; refused for API-key callers (Task 19). */
+        /** Bearer API keys for the family, newest first. The full key is never included — only createApiKey's response ever carries it. Family admin only; refused for API-key callers. */
         get: operations["listApiKeys"];
         put?: never;
         /** Create a bearer API key for integrations (Home Assistant, Grafana). The full key is returned ONCE and never again — use it as `Authorization: Bearer pjk_…`. Free (no plan gate — the TypeScript predecessor's apiKeys 402 is removed). Family admin only; refused for API-key callers. */

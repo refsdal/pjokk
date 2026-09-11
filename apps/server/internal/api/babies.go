@@ -13,10 +13,9 @@ import (
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
 )
 
-// This file ports apps/api/src/routes/babies.ts (REF §A1's babies.ts route
-// table) plus the family/member-management endpoints REF §A1 lists as "NEW
-// in Go" at the end of admin.ts — everything except /api/me (me.go) and the
-// admin/impersonation surface (Task 21, not this one).
+// This file ports apps/api/src/routes/babies.ts plus the family and
+// member-management endpoints that are new in Go — everything except
+// /api/me (me.go) and the admin/impersonation surface (admin.go).
 //
 // Every method below is reached only through the tierFamily/tierAdmin chain
 // api.go's authChain wires per operationAuthTiers, so
@@ -68,8 +67,8 @@ func babySexPtr(s *string) *gen.BabySex {
 	return &v
 }
 
-// ListBabies implements GET /api/babies. REF: "Baby[] {id, name, birthDate,
-// sex}", ordered oldest-first (ListBabies' own ORDER BY created_at).
+// ListBabies implements GET /api/babies. Baby[] {id, name, birthDate,
+// sex}, ordered oldest-first (ListBabies' own ORDER BY created_at).
 func (d Deps) ListBabies(ctx context.Context, _ gen.ListBabiesRequestObject) (gen.ListBabiesResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	rows, err := d.Q.ListBabies(ctx, fam.FamilyID)
@@ -104,10 +103,9 @@ func errNoRequestBody(operation string) error {
 	return fmt.Errorf("api: %s reached with no request body", operation)
 }
 
-// CreateBaby implements POST /api/babies. REF: free in Go — the
-// multipleBabies 402 gate apps/api/src/routes/babies.ts applied is removed
-// (CLAUDE.md's entitlement helper always returns true today; Task 9's route
-// table says so explicitly).
+// CreateBaby implements POST /api/babies. Free in Go: the multipleBabies
+// 402 gate apps/api/src/routes/babies.ts applied is removed, as there is no
+// billing.
 func (d Deps) CreateBaby(ctx context.Context, req gen.CreateBabyRequestObject) (gen.CreateBabyResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	if req.Body == nil {
@@ -133,8 +131,8 @@ func (d Deps) CreateBaby(ctx context.Context, req gen.CreateBabyRequestObject) (
 	return gen.CreateBaby201JSONResponse(serBaby(baby)), nil
 }
 
-// UpdateBaby implements PATCH /api/babies/{id}. REF: "{name?, birthDate?,
-// sex?} → Baby / 404". A genuinely empty JSON object body ({}, which
+// UpdateBaby implements PATCH /api/babies/{id}. {name?, birthDate?,
+// sex?} → Baby / 404. A genuinely empty JSON object body ({}, which
 // decodes to a non-nil Body whose three fields are all nil) is a no-op
 // that re-reads the row unchanged, mirroring apps/api/src/db/scoped.ts's
 // updateBaby (compactPatch on an empty patch skips the UPDATE entirely
@@ -196,8 +194,8 @@ func (d Deps) UpdateBaby(ctx context.Context, req gen.UpdateBabyRequestObject) (
 	return gen.UpdateBaby200JSONResponse(serBaby(updated)), nil
 }
 
-// DeleteBaby implements DELETE /api/babies/{id}. REF: "{ok:true}; 403 unless
-// memberRole admin/owner; cascades logs" — the role check is
+// DeleteBaby implements DELETE /api/babies/{id}. {ok:true}; 403 unless
+// memberRole admin/owner; cascades logs — the role check is
 // middleware.RequireAdmin (tierAdmin), not this method; the cascade is the
 // baby table's own FKs (ON DELETE CASCADE on every log table), not
 // application code.
@@ -213,7 +211,7 @@ func (d Deps) DeleteBaby(ctx context.Context, req gen.DeleteBabyRequestObject) (
 	return gen.DeleteBaby200JSONResponse{Ok: gen.OkOkTrue}, nil
 }
 
-// GetFamily implements GET /api/family. REF: "{id, name, slug, plan} / 404".
+// GetFamily implements GET /api/family.
 // The 404 is effectively unreachable in practice — middleware.RequireFamily
 // already proved a live membership row (and therefore a live organization
 // row) exists before this method runs — but is kept, with the exact message
@@ -231,8 +229,8 @@ func (d Deps) GetFamily(ctx context.Context, _ gen.GetFamilyRequestObject) (gen.
 	return gen.GetFamily200JSONResponse{Id: row.ID, Name: row.Name, Slug: row.Slug, Plan: row.Plan}, nil
 }
 
-// ListFamilyMembers implements GET /api/family/members. REF: "Member[]
-// {memberId, userId, name, email, role, image, hasPush}".
+// ListFamilyMembers implements GET /api/family/members. Member[]
+// {memberId, userId, name, email, role, image, hasPush}.
 func (d Deps) ListFamilyMembers(ctx context.Context, _ gen.ListFamilyMembersRequestObject) (gen.ListFamilyMembersResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	rows, err := d.Q.ListFamilyMembers(ctx, fam.FamilyID)
@@ -255,7 +253,7 @@ func (d Deps) ListFamilyMembers(ctx context.Context, _ gen.ListFamilyMembersRequ
 }
 
 // DeleteFamilyMember implements DELETE /api/family/members/{memberId}. NEW
-// in Go (REF §A1, end of admin.ts): "{ok:true}; requireAdmin; 404". Thin
+// in Go: "{ok:true}; requireAdmin; 404". Thin
 // wrapper over auth.Service.RemoveMember, which already does the
 // membership-row lookup, session-detach and role-row/membership-row
 // deletes in one transaction (see internal/auth/auth.go's doc comment on
@@ -280,7 +278,7 @@ func (d Deps) DeleteFamilyMember(ctx context.Context, req gen.DeleteFamilyMember
 }
 
 // SetFamilyMemberRole implements POST /api/family/members/{memberId}/role.
-// NEW in Go (REF §A1, end of admin.ts): "{role: admin|member} → {ok:true};
+// NEW in Go: "{role: admin|member} → {ok:true};
 // requireAdmin; 404". The role's admin|member shape is already enforced by
 // spec validation before this method runs; auth.Service.SetMemberRole
 // re-validates it too (validRole), which is fine — defense in depth, not a

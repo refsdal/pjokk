@@ -24,11 +24,11 @@ import (
 // the series ("this occurrence only" is not v1). Changing the rule or its
 // end re-arms the reminder latch like a start-time change does.
 
-// This file ports apps/api/src/routes/calendar.ts (REF §A1's calendar.ts
-// route table): GET/POST /api/calendar/events, PATCH/DELETE
-// /api/calendar/events/{id}. contacts.go is the sibling file — same
-// tenancy-backstop shape (links.go's refsValid), a simpler PATCH (no
-// invariant, no reminder latch) and only one link table instead of two.
+// This file ports apps/api/src/routes/calendar.ts: GET/POST
+// /api/calendar/events, PATCH/DELETE /api/calendar/events/{id}. contacts.go
+// is the sibling file — same tenancy-backstop shape (links.go's refsValid), a
+// simpler PATCH (no invariant, no reminder latch) and only one link table
+// instead of two.
 //
 // # Divergence: no billing gate
 //
@@ -247,9 +247,9 @@ func (d Deps) getCalendarEventHydrated(ctx context.Context, familyID, id string)
 
 const maxCalendarRange = 366 * 24 * time.Hour
 
-// ListCalendarEvents implements GET /api/calendar/events. REF: "Events in
+// ListCalendarEvents implements GET /api/calendar/events. Events in
 // [from, to), ascending by startTime; 400 INVALID_RANGE when to <= from or
-// span > 366 days".
+// span > 366 days.
 func (d Deps) ListCalendarEvents(ctx context.Context, req gen.ListCalendarEventsRequestObject) (gen.ListCalendarEventsResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	from, to := req.Params.From, req.Params.To
@@ -321,10 +321,10 @@ func (d Deps) ListCalendarEvents(ctx context.Context, req gen.ListCalendarEvents
 	return gen.ListCalendarEvents200JSONResponse(out), nil
 }
 
-// CreateCalendarEvent implements POST /api/calendar/events. REF:
-// "{title, description?, location?, category, startTime, allDay,
+// CreateCalendarEvent implements POST /api/calendar/events.
+// {title, description?, location?, category, startTime, allDay,
 // durationMin?, remindMinutesBefore?, babyIds[], assigneeUserIds[]} →
-// 201; 400 INVALID_REFERENCE on an unknown baby/member". Free — see this
+// 201; 400 INVALID_REFERENCE on an unknown baby/member. Free — see this
 // file's doc comment for why there is no 402 path.
 func (d Deps) CreateCalendarEvent(ctx context.Context, req gen.CreateCalendarEventRequestObject) (gen.CreateCalendarEventResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
@@ -655,8 +655,8 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 	return gen.UpdateCalendarEvent200JSONResponse(updated), nil
 }
 
-// DeleteCalendarEvent implements DELETE /api/calendar/events/{id}. REF:
-// "{ok:true} / 404". Link rows go with it via ON DELETE CASCADE.
+// DeleteCalendarEvent implements DELETE /api/calendar/events/{id}.
+// {ok:true} / 404. Link rows go with it via ON DELETE CASCADE.
 func (d Deps) DeleteCalendarEvent(ctx context.Context, req gen.DeleteCalendarEventRequestObject) (gen.DeleteCalendarEventResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 

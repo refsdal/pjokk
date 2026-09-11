@@ -8,7 +8,7 @@ import (
 	"github.com/refsdal/pjokk/server/internal/testrig"
 )
 
-// GET /api/me is NEW in Go (REF §A1, end of admin.ts): there is no TS route
+// GET /api/me is NEW in Go: there is no TS route
 // to port assertions from, so these tests exercise the shape and null
 // semantics the route table spells out directly:
 // {userId, name, email, role, familyId, memberRole, plan, impersonatedBy},

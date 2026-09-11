@@ -2,7 +2,7 @@
 // bucket at all (STORAGE_DRIVER=fs in internal/config) can point this at a
 // mounted volume instead. There is no TypeScript equivalent — apps/api only
 // ever spoke S3 — so this driver's contract is defined entirely by the
-// Storage interface plus REF §A6, not by porting an existing behaviour.
+// Storage interface, not by porting an existing behaviour.
 package storage
 
 import (

@@ -9,10 +9,9 @@ import (
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
 )
 
-// This file ports apps/api/src/routes/feeds.ts (REF §A1's feeds.ts route
-// table): GET/POST /api/feeds, PATCH/DELETE /api/feeds/{id}. diapers.go is
-// the identical skeleton one table over — read this file first, then that
-// one's shorter comments.
+// This file ports apps/api/src/routes/feeds.ts: GET/POST /api/feeds,
+// PATCH/DELETE /api/feeds/{id}. diapers.go is the identical skeleton one
+// table over — read this file first, then that one's shorter comments.
 //
 // # The PATCH tri-state pattern (established here; reuse for every future
 // # log-route PATCH — sleep, other-logs, play, …)
@@ -102,7 +101,7 @@ func serFeed(row dbgen.GetFeedRow) gen.FeedLog {
 	}
 }
 
-// ListFeeds implements GET /api/feeds. REF: "FeedLog[] newest first".
+// ListFeeds implements GET /api/feeds.
 func (d Deps) ListFeeds(ctx context.Context, req gen.ListFeedsRequestObject) (gen.ListFeedsResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
@@ -121,9 +120,9 @@ func (d Deps) ListFeeds(ctx context.Context, req gen.ListFeedsRequestObject) (ge
 	return gen.ListFeeds200JSONResponse(out), nil
 }
 
-// CreateFeed implements POST /api/feeds. REF: "{babyId, time, type,
+// CreateFeed implements POST /api/feeds. {babyId, time, type,
 // amountMl?, side?, durationMin?, leftMin?, rightMin?, notes?} → 201 /
-// 404 unknown baby".
+// 404 unknown baby.
 func (d Deps) CreateFeed(ctx context.Context, req gen.CreateFeedRequestObject) (gen.CreateFeedResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	if req.Body == nil {
@@ -163,8 +162,8 @@ func (d Deps) CreateFeed(ctx context.Context, req gen.CreateFeedRequestObject) (
 	return gen.CreateFeed201JSONResponse(serFeed(row)), nil
 }
 
-// UpdateFeed implements PATCH /api/feeds/{id}. REF: "partial (nullable
-// clears) → FeedLog / 404". See this file's package doc comment for the
+// UpdateFeed implements PATCH /api/feeds/{id}. partial (nullable
+// clears) → FeedLog / 404. See this file's package doc comment for the
 // presence-detection pattern below — req.Body (the generated strict type)
 // is deliberately UNUSED here; patchBody/patchField read the same
 // request body a second time, from the copy withRawBody stashed in ctx,
@@ -237,7 +236,7 @@ func (d Deps) UpdateFeed(ctx context.Context, req gen.UpdateFeedRequestObject) (
 	return gen.UpdateFeed200JSONResponse(serFeed(row)), nil
 }
 
-// DeleteFeed implements DELETE /api/feeds/{id}. REF: "{ok:true} / 404".
+// DeleteFeed implements DELETE /api/feeds/{id}.
 func (d Deps) DeleteFeed(ctx context.Context, req gen.DeleteFeedRequestObject) (gen.DeleteFeedResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	ok, err := deleteLog(ctx, func(ctx context.Context) (int64, error) {

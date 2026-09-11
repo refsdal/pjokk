@@ -263,7 +263,7 @@ type ServerInterface interface {
 	// RevokeInvite Revoke a code (sets revokedAt) so it can no longer be redeemed. Family admin only.
 	// (DELETE /api/invites/{code})
 	RevokeInvite(w http.ResponseWriter, r *http.Request, code CodePath)
-	// ListApiKeys Bearer API keys for the family, newest first. The full key is never included — only createApiKey's response ever carries it. Family admin only; refused for API-key callers (Task 19).
+	// ListApiKeys Bearer API keys for the family, newest first. The full key is never included — only createApiKey's response ever carries it. Family admin only; refused for API-key callers.
 	// (GET /api/keys)
 	ListApiKeys(w http.ResponseWriter, r *http.Request)
 	// CreateApiKey Create a bearer API key for integrations (Home Assistant, Grafana). The full key is returned ONCE and never again — use it as `Authorization: Bearer pjk_…`. Free (no plan gate — the TypeScript predecessor's apiKeys 402 is removed). Family admin only; refused for API-key callers.
@@ -9982,7 +9982,7 @@ type StrictServerInterface interface {
 	// RevokeInvite Revoke a code (sets revokedAt) so it can no longer be redeemed. Family admin only.
 	// (DELETE /api/invites/{code})
 	RevokeInvite(ctx context.Context, request RevokeInviteRequestObject) (RevokeInviteResponseObject, error)
-	// ListApiKeys Bearer API keys for the family, newest first. The full key is never included — only createApiKey's response ever carries it. Family admin only; refused for API-key callers (Task 19).
+	// ListApiKeys Bearer API keys for the family, newest first. The full key is never included — only createApiKey's response ever carries it. Family admin only; refused for API-key callers.
 	// (GET /api/keys)
 	ListApiKeys(ctx context.Context, request ListApiKeysRequestObject) (ListApiKeysResponseObject, error)
 	// CreateApiKey Create a bearer API key for integrations (Home Assistant, Grafana). The full key is returned ONCE and never again — use it as `Authorization: Bearer pjk_…`. Free (no plan gate — the TypeScript predecessor's apiKeys 402 is removed). Family admin only; refused for API-key callers.

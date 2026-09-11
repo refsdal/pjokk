@@ -1,11 +1,11 @@
 // This file adds the HTTP-level rig on top of Setup's Postgres rig: a full
-// api.NewHandler wired against real collaborators (Task 4's auth service,
-// Task 6's storage, a recording stand-in for Task 7's push, an in-process
+// api.NewHandler wired against real collaborators (the auth service,
+// storage, a recording stand-in for push, an in-process
 // rate limiter), driven with real *http.Request/ResponseRecorder round
 // trips rather than by calling handler functions directly.
 //
 // It is the Go port of apps/api/test/helpers.ts's rig()/signIn()/api()
-// trio: Task 9's route tests build on AppRig instead of reassembling Deps
+// trio: route tests build on AppRig instead of reassembling Deps
 // by hand in every _test.go file.
 package testrig
 
@@ -363,7 +363,7 @@ func (a *AppRig) AddMember(familyID, userID, role, email string) string {
 	return c.Name + "=" + c.Value
 }
 
-// NewBaby inserts a baby directly via sqlc — bypassing HTTP, since Task 9's
+// NewBaby inserts a baby directly via sqlc — bypassing HTTP, since the
 // /api/babies routes are what the HTTP path itself exercises — and returns
 // its id.
 func (a *AppRig) NewBaby(familyID, name string) string {

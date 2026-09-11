@@ -79,8 +79,8 @@ func serSleep(row dbgen.GetSleepRow) gen.SleepLog {
 	}
 }
 
-// ListSleeps implements GET /api/sleep. REF: "SleepLog[] newest first (by
-// startTime)".
+// ListSleeps implements GET /api/sleep. SleepLog[] newest first (by
+// startTime).
 func (d Deps) ListSleeps(ctx context.Context, req gen.ListSleepsRequestObject) (gen.ListSleepsResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
@@ -99,9 +99,9 @@ func (d Deps) ListSleeps(ctx context.Context, req gen.ListSleepsRequestObject) (
 	return gen.ListSleeps200JSONResponse(out), nil
 }
 
-// CreateSleep implements POST /api/sleep. REF: "{babyId, startTime, endTime?,
+// CreateSleep implements POST /api/sleep. {babyId, startTime, endTime?,
 // location?, notes?} → 201; 404 unknown baby; 409 ALREADY_ACTIVE when
-// creating an active session (endTime absent) while one exists" — see this
+// creating an active session (endTime absent) while one exists — see this
 // file's doc comment, divergence 1, for why both a pre-check AND a 23505
 // catch are needed.
 func (d Deps) CreateSleep(ctx context.Context, req gen.CreateSleepRequestObject) (gen.CreateSleepResponseObject, error) {
@@ -164,7 +164,7 @@ func (d Deps) CreateSleep(ctx context.Context, req gen.CreateSleepRequestObject)
 	return gen.CreateSleep201JSONResponse(serSleep(created)), nil
 }
 
-// GetActiveSleep implements GET /api/sleep/active. REF: "SleepLog | null" —
+// GetActiveSleep implements GET /api/sleep/active. —
 // see this file's doc comment, divergence 2, for why the "no active
 // session" branch returns a hand-written response type instead of the
 // generated 200 one.
@@ -180,8 +180,8 @@ func (d Deps) GetActiveSleep(ctx context.Context, req gen.GetActiveSleepRequestO
 	return gen.GetActiveSleep200JSONResponse(serSleep(dbgen.GetSleepRow(row))), nil
 }
 
-// WakeSleep implements POST /api/sleep/{id}/wake. REF: "body optional
-// {endTime?} (default now via Deps.Now) → SleepLog / 404". The end_time IS
+// WakeSleep implements POST /api/sleep/{id}/wake. body optional
+// {endTime?} (default now via Deps.Now) → SleepLog / 404. The end_time IS
 // NULL guard in queries/sleep.sql's WakeSleep makes a double-wake a 404
 // (zero rows affected) rather than silently overwriting the endTime a first
 // wake already set.
@@ -212,9 +212,9 @@ func (d Deps) WakeSleep(ctx context.Context, req gen.WakeSleepRequestObject) (ge
 	return gen.WakeSleep200JSONResponse(serSleep(updated)), nil
 }
 
-// UpdateSleep implements PATCH /api/sleep/{id}. REF: "{startTime?, endTime?
+// UpdateSleep implements PATCH /api/sleep/{id}. {startTime?, endTime?
 // (nullable clears→reopens), location?(nullable), notes?(nullable)} → 200 /
-// 404 / 409 on reopen conflict". See feeds.go's package doc comment for the
+// 404 / 409 on reopen conflict. See feeds.go's package doc comment for the
 // presence-detection pattern below, and this file's doc comment (divergence
 // 1) for why only the endTime-cleared case needs a 23505 catch.
 func (d Deps) UpdateSleep(ctx context.Context, req gen.UpdateSleepRequestObject) (gen.UpdateSleepResponseObject, error) {
@@ -277,7 +277,7 @@ func (d Deps) UpdateSleep(ctx context.Context, req gen.UpdateSleepRequestObject)
 	return gen.UpdateSleep200JSONResponse(serSleep(row)), nil
 }
 
-// DeleteSleep implements DELETE /api/sleep/{id}. REF: "{ok:true} / 404".
+// DeleteSleep implements DELETE /api/sleep/{id}.
 func (d Deps) DeleteSleep(ctx context.Context, req gen.DeleteSleepRequestObject) (gen.DeleteSleepResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	ok, err := deleteLog(ctx, func(ctx context.Context) (int64, error) {

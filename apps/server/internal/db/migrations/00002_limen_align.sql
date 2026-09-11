@@ -3,7 +3,7 @@
 -- ===========================================================================
 -- Limen schema alignment.
 --
--- 00001_init.sql wrote the auth tables best-effort from REF §B4's prose column
+-- 00001_init.sql wrote the auth tables best-effort from prose column
 -- lists, before any Limen code had been run. This migration replaces the
 -- guesses with Limen's real expectations, read off the library itself: with
 -- `Config.CLI` enabled Limen serialises its resolved schema to

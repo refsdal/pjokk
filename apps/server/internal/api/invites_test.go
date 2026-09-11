@@ -16,7 +16,7 @@ import (
 // Invite codes — ports apps/api/test/invites.test.ts's "invite codes"
 // describe block, plus the case-insensitivity assertions from
 // apps/api/test/defects.test.ts's "invite codes are case-insensitive"
-// block, plus rate-limit coverage (REF §A5's invite-info/invite-redeem
+// block, plus rate-limit coverage (the invite-info/invite-redeem
 // limits) neither TS file exercises end-to-end the way this file does.
 // -----------------------------------------------------------------------
 
@@ -476,7 +476,7 @@ func TestRedeemRequiresSignIn(t *testing.T) {
 	}
 }
 
-// Rate limits — REF §A5's invite-info (30/10min per client, 500/10min
+// Rate limits — invite-info (30/10min per client, 500/10min
 // global) and invite-redeem (10/10min per client, 200/10min global).
 // httptest.NewRequest fixes RemoteAddr to the same value on every call
 // (see net/http/httptest), so every request AppRig.Do issues in one test

@@ -119,8 +119,8 @@ func TestComposedNonProbePathsAreUnaffected(t *testing.T) {
 		if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
 			t.Errorf("GET %s Content-Type = %q, want text/html (SPA fallback)", path, ct)
 		}
-		// The SPA fallback is a non-API response, so REF §A9's headers apply.
-		assertA9Headers(t, rec.Header())
+		// The SPA fallback is a non-API response, so the security headers apply.
+		assertSecurityHeaders(t, rec.Header())
 	}
 
 	rec := get(t, h, "/api/definitely-not-a-route")
@@ -134,7 +134,7 @@ func TestComposedNonProbePathsAreUnaffected(t *testing.T) {
 
 // The probes must NOT pick up the SPA's security headers: package api owns
 // its own response headers, and the TypeScript app mounted both probes ahead
-// of its header middleware (REF §A1 mount order, items 3-5).
+// of its header middleware.
 func TestComposedProbesDoNotGetSPAHeaders(t *testing.T) {
 	h, _ := composed(t)
 

@@ -17,7 +17,7 @@ import (
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
 )
 
-// This file implements GET /api/timeline (REF §A1 timeline.ts): the merged,
+// This file implements GET /api/timeline: the merged,
 // newest-first, keyset-paginated feed across all eleven log kinds (feeds,
 // diapers, sleeps, medicine, baths, notes, milestones, measurements, pumps,
 // plays, vaccines).
@@ -120,7 +120,7 @@ func parseTimelineCursor(before *string) timelineCursor {
 }
 
 // timelineBase builds the six fields every TimelineEntry has regardless of
-// kind — the wire equivalent of logBase in packages/shared/src/schemas.ts.
+// kind: the fields every log schema in openapi/pjokk.yaml shares.
 func timelineBase(kind gen.TimelineEntryKind, id, babyID, caretakerID, caretakerName string, notes *string) gen.TimelineEntry {
 	return gen.TimelineEntry{
 		Kind:          kind,
@@ -263,8 +263,8 @@ func fetchTimelinePage[Row any](ctx context.Context, want bool,
 	return out, nil
 }
 
-// ListTimeline implements GET /api/timeline. REF: "{entries, nextCursor} /
-// 404 unknown baby" — see this file's doc comment for the full merge/sort/
+// ListTimeline implements GET /api/timeline. {entries, nextCursor} /
+// 404 unknown baby — see this file's doc comment for the full merge/sort/
 // cursor/hasMore contract.
 func (d Deps) ListTimeline(ctx context.Context, req gen.ListTimelineRequestObject) (gen.ListTimelineResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)

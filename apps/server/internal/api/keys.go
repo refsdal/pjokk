@@ -15,19 +15,19 @@ import (
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
 )
 
-// This file ports apps/api/src/routes/keys.ts (REF §A1's keys.ts route
-// table): GET/POST /api/keys, DELETE /api/keys/{id}. Reached only via the
-// tierAdmin entries api.go's operationAuthTiers gives ListApiKeys/
-// CreateApiKey/RevokeApiKey — middleware.RequireAdmin already answers both
-// "not available to API keys" (a key can never mint or manage keys) and
-// "family admin only", so this file, like sleep_locations.go, only has the
-// domain logic RequireAdmin can't provide.
+// This file ports apps/api/src/routes/keys.ts: GET/POST /api/keys, DELETE
+// /api/keys/{id}. Reached only via the tierAdmin entries api.go's
+// operationAuthTiers gives ListApiKeys/ CreateApiKey/RevokeApiKey —
+// middleware.RequireAdmin already answers both "not available to API keys" (a
+// key can never mint or manage keys) and "family admin only", so this file,
+// like sleep_locations.go, only has the domain logic RequireAdmin can't
+// provide.
 //
 // # Key format: a deliberate divergence from the TypeScript predecessor
 //
 // apps/api/src/db/scoped.ts's generateApiKey base64url-encodes 24 random
 // bytes (`pjk_` + 32 base64url chars). This port instead hex-encodes 20
-// random bytes (`pjk_` + 40 hex chars, per this task's brief) — a different
+// random bytes (`pjk_` + 40 hex chars) — a different
 // alphabet, not a smaller keyspace (20 random bytes is MORE entropy than
 // TS's 24-byte input has after the 4:3 stretch of base64: both encode
 // exactly 20-24 bytes of crypto/rand output, hex just spends 2 characters
@@ -94,8 +94,8 @@ func serAPIKey(row dbgen.ApiKey) gen.ApiKey {
 	}
 }
 
-// ListApiKeys implements GET /api/keys. REF: "ApiKey[] for the family,
-// newest first, key material never included". Every key ever issued is
+// ListApiKeys implements GET /api/keys. ApiKey[] for the family,
+// newest first, key material never included. Every key ever issued is
 // listed, revoked or not — see queries/api_keys.sql's ListAPIKeys.
 func (d Deps) ListApiKeys(ctx context.Context, _ gen.ListApiKeysRequestObject) (gen.ListApiKeysResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
@@ -110,9 +110,9 @@ func (d Deps) ListApiKeys(ctx context.Context, _ gen.ListApiKeysRequestObject) (
 	return gen.ListApiKeys200JSONResponse(out), nil
 }
 
-// CreateApiKey implements POST /api/keys. REF: "{name(1..60),
+// CreateApiKey implements POST /api/keys. {name(1..60),
 // expiresInDays?(1..3650), readOnly?} → 201 with the full key, shown
-// exactly once". Free — no plan gate (see this file's package doc comment
+// exactly once. Free — no plan gate (see this file's package doc comment
 // and api.go's operationAuthTiers entry: the TypeScript predecessor's
 // canUse(family, "apiKeys") 402 is removed).
 func (d Deps) CreateApiKey(ctx context.Context, req gen.CreateApiKeyRequestObject) (gen.CreateApiKeyResponseObject, error) {
@@ -167,7 +167,7 @@ func (d Deps) CreateApiKey(ctx context.Context, req gen.CreateApiKeyRequestObjec
 	}, nil
 }
 
-// RevokeApiKey implements DELETE /api/keys/{id}. REF: "{ok:true} / 404".
+// RevokeApiKey implements DELETE /api/keys/{id}.
 // Soft-delete (sets revoked_at) rather than a real DELETE — see
 // queries/api_keys.sql's RevokeAPIKey doc comment for why: a revoked key
 // must become indistinguishable from one that never existed to

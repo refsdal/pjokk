@@ -9,7 +9,7 @@ import (
 	"github.com/refsdal/pjokk/server/internal/testrig"
 )
 
-// REF §A5 item 7. The header is caller-supplied, so it is only consulted
+// The header is caller-supplied, so it is only consulted
 // when the operator has declared how many proxies sit in front, and the
 // address is counted from the RIGHT — anything a client prepends sits
 // further left and is ignored.

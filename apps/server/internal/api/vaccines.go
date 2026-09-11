@@ -37,7 +37,7 @@ import (
 //
 // ListVaccineDismissals/CreateVaccineDismissal/DeleteVaccineDismissal are a
 // separate table (vaccine_dismissal) with its own idempotent-create
-// semantics (REF: "idempotent on unique — returns existing row"), not a
+// semantics ( idempotent on unique — returns existing row), not a
 // field on VaccineLog. api.go's operationAuthTiers lists all seven
 // operations (four vaccine, three dismissal) as tierFamily; nothing here
 // needs the ordering care api.go's doc comment warns Hono's tree needed —
@@ -108,8 +108,8 @@ func (d Deps) getVaccineWithDocuments(ctx context.Context, familyID, id string) 
 	return serVaccine(row, docs), nil
 }
 
-// ListVaccines implements GET /api/vaccines. REF: "VaccineLog[] (documents
-// as {…, url: "/api/files/{docId}"})", newest first.
+// ListVaccines implements GET /api/vaccines. VaccineLog[] (documents
+// as {…, url: /api/files/{docId}"})", newest first.
 func (d Deps) ListVaccines(ctx context.Context, req gen.ListVaccinesRequestObject) (gen.ListVaccinesResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	rows, err := d.Q.ListVaccines(ctx, dbgen.ListVaccinesParams{
@@ -143,8 +143,8 @@ func (d Deps) ListVaccines(ctx context.Context, req gen.ListVaccinesRequestObjec
 	return gen.ListVaccines200JSONResponse(out), nil
 }
 
-// CreateVaccine implements POST /api/vaccines. REF: "{babyId, time, name,
-// doseNumber?, scheduleSlot?, notes?} → 201 / 404 unknown baby". Free — no
+// CreateVaccine implements POST /api/vaccines. {babyId, time, name,
+// doseNumber?, scheduleSlot?, notes?} → 201 / 404 unknown baby. Free — no
 // plan gate on the log itself (see this file's doc comment).
 func (d Deps) CreateVaccine(ctx context.Context, req gen.CreateVaccineRequestObject) (gen.CreateVaccineResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
@@ -184,8 +184,8 @@ func (d Deps) CreateVaccine(ctx context.Context, req gen.CreateVaccineRequestObj
 	return gen.CreateVaccine201JSONResponse(row), nil
 }
 
-// UpdateVaccine implements PATCH /api/vaccines/{id}. REF: "partial
-// (nullable clears) → VaccineLog / 404". `time`/`name` are settable but not
+// UpdateVaccine implements PATCH /api/vaccines/{id}. partial
+// (nullable clears) → VaccineLog / 404. `time`/`name` are settable but not
 // nullable; `doseNumber`/`scheduleSlot`/`notes` may be sent as `null` to
 // clear.
 func (d Deps) UpdateVaccine(ctx context.Context, req gen.UpdateVaccineRequestObject) (gen.UpdateVaccineResponseObject, error) {
@@ -237,8 +237,8 @@ func (d Deps) UpdateVaccine(ctx context.Context, req gen.UpdateVaccineRequestObj
 	return gen.UpdateVaccine200JSONResponse(row), nil
 }
 
-// DeleteVaccine implements DELETE /api/vaccines/{id}. REF: "{ok:true} / 404;
-// also deletes stored objects for attached docs". The DB row (and its
+// DeleteVaccine implements DELETE /api/vaccines/{id}. {ok:true} / 404;
+// also deletes stored objects for attached docs. The DB row (and its
 // vaccine_document children, via ON DELETE CASCADE) cascades away with
 // DeleteVaccine; the objects behind those documents do not, so the object
 // keys are read BEFORE the delete and removed from Storage AFTER it — a
@@ -277,8 +277,8 @@ func serVaccineDismissal(id, babyID, slotKey string) gen.VaccineDismissal {
 	return gen.VaccineDismissal{Id: id, BabyId: babyID, SlotKey: slotKey}
 }
 
-// ListVaccineDismissals implements GET /api/vaccines/dismissals. REF:
-// "{id, babyId, slotKey}[]". Free, like the log itself.
+// ListVaccineDismissals implements GET /api/vaccines/dismissals.
+// {id, babyId, slotKey}[]. Free, like the log itself.
 func (d Deps) ListVaccineDismissals(ctx context.Context, req gen.ListVaccineDismissalsRequestObject) (gen.ListVaccineDismissalsResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	rows, err := d.Q.ListVaccineDismissals(ctx, dbgen.ListVaccineDismissalsParams{FamilyID: fam.FamilyID, BabyID: req.Params.BabyId})
@@ -292,8 +292,8 @@ func (d Deps) ListVaccineDismissals(ctx context.Context, req gen.ListVaccineDism
 	return gen.ListVaccineDismissals200JSONResponse(out), nil
 }
 
-// CreateVaccineDismissal implements POST /api/vaccines/dismissals. REF:
-// "{babyId, slotKey} → 201 (idempotent on unique) / 404 unknown baby".
+// CreateVaccineDismissal implements POST /api/vaccines/dismissals.
+// {babyId, slotKey} → 201 (idempotent on unique) / 404 unknown baby.
 // vaccine_dismissal_baby_slot's unique index on (baby_id, slot_key) is what
 // makes a repeat dismissal idempotent: CreateVaccineDismissal's INSERT ...
 // ON CONFLICT DO NOTHING affects zero rows on a repeat, which sqlc's :one
@@ -339,7 +339,6 @@ func (d Deps) CreateVaccineDismissal(ctx context.Context, req gen.CreateVaccineD
 }
 
 // DeleteVaccineDismissal implements DELETE /api/vaccines/dismissals/{id}.
-// REF: "{ok:true} / 404".
 func (d Deps) DeleteVaccineDismissal(ctx context.Context, req gen.DeleteVaccineDismissalRequestObject) (gen.DeleteVaccineDismissalResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	n, err := d.Q.DeleteVaccineDismissal(ctx, dbgen.DeleteVaccineDismissalParams{FamilyID: fam.FamilyID, ID: req.Id})

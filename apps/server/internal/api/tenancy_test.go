@@ -10,7 +10,7 @@ import (
 )
 
 // -----------------------------------------------------------------------
-// Tenancy — Task 22's belt-and-braces sweep. Ports apps/api/test/
+// Tenancy — a belt-and-braces sweep. Ports apps/api/test/
 // tenancy.test.ts's five `it` blocks verbatim (below), then extends far
 // past that file's Phase-1-only scope: every route class the Go backend
 // grew across Tasks 9-21 gets its own cross-family probe here too, even
@@ -157,7 +157,7 @@ func TestTenancyRejectsStaleActiveFamilyClaimWithoutMembership(t *testing.T) {
 	}
 }
 
-// --- The sweep: every route class Task 9-21 added ---
+// --- The sweep: every route class the Go backend has ---
 
 // simpleLogKind describes one "create under a baby, list/patch/delete by
 // id" resource — the shape feeds, diapers, sleep and the six Phase-3 kinds
@@ -484,7 +484,7 @@ func TestTenancySweepKeys(t *testing.T) {
 	}
 }
 
-// TestTenancySweepMemberManagementForeignMemberId is a NEW probe (Task 22):
+// TestTenancySweepMemberManagementForeignMemberId is a NEW probe:
 // prior member-management tests (babies_test.go's
 // TestSetMemberRoleUnknownMemberIs404 / TestDeleteFamilyMemberUnknownMemberIs404)
 // only used a nonexistent id string, never a REAL memberId belonging to a

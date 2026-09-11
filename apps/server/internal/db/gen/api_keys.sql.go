@@ -28,7 +28,7 @@ type CreateAPIKeyParams struct {
 	ReadOnly  bool
 }
 
-// Queries backing the /api/keys admin surface (Task 19; REF §A1 keys.ts).
+// Queries backing the /api/keys admin surface (keys.ts).
 // The authentication-time lookup (GetAPIKeyByHash) and last-used bookkeeping
 // (TouchAPIKey) live in queries/middleware.sql — this file is only the
 // family-admin management surface: create, list, revoke.

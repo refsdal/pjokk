@@ -47,9 +47,9 @@ import (
 const DocumentUploadsEnabled = false
 
 const (
-	// maxVaccineDocBytes is REF's 10 MiB cap on one uploaded file.
+	// maxVaccineDocBytes is the 10 MiB cap on one uploaded file.
 	maxVaccineDocBytes = 10 * 1024 * 1024
-	// maxVaccineDocsPerEntry is REF's "at most 5 files per entry".
+	// maxVaccineDocsPerEntry is the limit of 5 files per entry.
 	maxVaccineDocsPerEntry = 5
 	// maxMultipartOverhead is slack above maxVaccineDocBytes for the
 	// multipart boundary/headers ParseMultipartForm also has to read, so a
@@ -61,7 +61,7 @@ const (
 )
 
 // allowedVaccineDocTypes is what a phone camera and a helsestasjon card
-// actually produce (REF: "jpeg/png/webp/heic/heif/pdf"). Anything else is
+// actually produce ( jpeg/png/webp/heic/heif/pdf). Anything else is
 // refused outright rather than stored and served back later.
 var allowedVaccineDocTypes = map[string]bool{
 	"image/jpeg":      true,
@@ -81,11 +81,11 @@ func internalError(w http.ResponseWriter, r *http.Request, err error) {
 	respond.Error(w, http.StatusInternalServerError, "Internal error", "INTERNAL")
 }
 
-// uploadVaccineDocument implements POST /api/vaccines/{id}/documents. REF:
-// "multipart file. DOCUMENT_UPLOADS_ENABLED = false → always 403
+// uploadVaccineDocument implements POST /api/vaccines/{id}/documents.
+// multipart file. DOCUMENT_UPLOADS_ENABLED = false → always 403
 // FEATURE_DISABLED. Behind the flag: 404 unknown entry, 400 TOO_MANY (>5),
 // 400 NO_FILE, 415 BAD_TYPE, 413 TOO_LARGE. Key =
-// vaccine-docs/{familyId}/{uuid}". See this file's doc comment for why the
+// vaccine-docs/{familyId}/{uuid}. See this file's doc comment for why the
 // full path below is real code, not exercised by any test while the flag
 // is off.
 func (d Deps) uploadVaccineDocument(w http.ResponseWriter, r *http.Request) {
@@ -191,9 +191,9 @@ func (d Deps) uploadVaccineDocument(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// getFile implements GET /api/files/{id}. REF: "streams
+// getFile implements GET /api/files/{id}. streams
 // storage.GetStream(objectKey); headers: content-type, content-length,
-// content-disposition: attachment; filename="…" (quotes stripped; never
+// content-disposition: attachment; filename=…" (quotes stripped; never
 // inline), cache-control: private, max-age=3600, x-content-type-options:
 // nosniff. 404 row-missing or object-missing (check existence BEFORE
 // streaming)".
@@ -240,8 +240,8 @@ func (d Deps) getFile(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(w, body)
 }
 
-// deleteFile implements DELETE /api/files/{id}. REF: "{ok:true}; deletes
-// object". Never gated: a downgraded family must still be able to delete
+// deleteFile implements DELETE /api/files/{id}. {ok:true}; deletes
+// object. Never gated: a downgraded family must still be able to delete
 // files.
 func (d Deps) deleteFile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()

@@ -1,4 +1,4 @@
--- Calendar (Task 16; REF §A1 calendar.ts). Free — no plan gate on this
+-- Calendar (calendar.ts). Free — no plan gate on this
 -- port (the TS predecessor soft-locked creation behind premium; that gate
 -- is removed here, see internal/api/calendar.go's package doc comment).
 -- Babies and responsible members attach via join tables; zero baby rows =

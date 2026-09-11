@@ -177,8 +177,8 @@ func TestGetFileServesAndDeleteRemovesASeededDocument(t *testing.T) {
 }
 
 // A document row whose object went missing behind it (deleted straight
-// from storage, bypassing the row) must still 404 cleanly — REF: "check
-// existence BEFORE streaming" — never a 200 with an empty or broken body.
+// from storage, bypassing the row) must still 404 cleanly — check
+// existence BEFORE streaming — never a 200 with an empty or broken body.
 func TestGetFileMissingObjectBehindRowIs404(t *testing.T) {
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")

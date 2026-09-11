@@ -33,7 +33,7 @@ func serMilestone(row dbgen.GetMilestoneRow, photos []dbgen.ListMilestonePhotosF
 	}
 }
 
-// ListMilestones implements GET /api/milestones. REF: "MilestoneLog[] newest first".
+// ListMilestones implements GET /api/milestones.
 func (d Deps) ListMilestones(ctx context.Context, req gen.ListMilestonesRequestObject) (gen.ListMilestonesResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	rows, err := d.Q.ListMilestones(ctx, dbgen.ListMilestonesParams{
@@ -59,8 +59,8 @@ func (d Deps) ListMilestones(ctx context.Context, req gen.ListMilestonesRequestO
 	return gen.ListMilestones200JSONResponse(out), nil
 }
 
-// CreateMilestone implements POST /api/milestones. REF: "{babyId, time,
-// title, notes?} → 201 / 404 unknown baby". Free in Go (see
+// CreateMilestone implements POST /api/milestones. {babyId, time,
+// title, notes?} → 201 / 404 unknown baby. Free in Go (see
 // other_logs.go's doc comment).
 func (d Deps) CreateMilestone(ctx context.Context, req gen.CreateMilestoneRequestObject) (gen.CreateMilestoneResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
@@ -93,8 +93,8 @@ func (d Deps) CreateMilestone(ctx context.Context, req gen.CreateMilestoneReques
 	return gen.CreateMilestone201JSONResponse(serMilestone(row, nil)), nil
 }
 
-// UpdateMilestone implements PATCH /api/milestones/{id}. REF: "partial
-// (nullable clears) → MilestoneLog / 404".
+// UpdateMilestone implements PATCH /api/milestones/{id}. partial
+// (nullable clears) → MilestoneLog / 404.
 func (d Deps) UpdateMilestone(ctx context.Context, req gen.UpdateMilestoneRequestObject) (gen.UpdateMilestoneResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
@@ -142,7 +142,7 @@ func (d Deps) UpdateMilestone(ctx context.Context, req gen.UpdateMilestoneReques
 	return gen.UpdateMilestone200JSONResponse(serMilestone(row, photos)), nil
 }
 
-// DeleteMilestone implements DELETE /api/milestones/{id}. REF: "{ok:true} / 404".
+// DeleteMilestone implements DELETE /api/milestones/{id}.
 func (d Deps) DeleteMilestone(ctx context.Context, req gen.DeleteMilestoneRequestObject) (gen.DeleteMilestoneResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	// Keys before the delete: the photo rows cascade away with the log, the

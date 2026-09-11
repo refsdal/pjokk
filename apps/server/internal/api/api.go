@@ -4,11 +4,10 @@
 // server code in internal/api/gen.
 //
 // package web wraps whatever NewHandler returns with static asset serving
-// and REF §A9's headers; api.NewHandler itself is only ever reached for
+// and the security headers; api.NewHandler itself is only ever reached for
 // /api/* requests (see web.Handler's routing).
 //
-// # Route registration pattern (established by Task 9, followed by every
-// route task after it)
+// # Route registration pattern
 //
 // Every generated operation (a path+method in openapi/pjokk.yaml, one
 // gen.StrictServerInterface method) is registered exactly once, through
@@ -38,8 +37,8 @@
 //     (ctx, w, r, request)-shaped world instead of reimplementing
 //     authorization at that layer.
 //
-// A route task adding new operations MUST add each new operationID to
-// operationAuthTiers with the tier its route table calls for
+// Adding operations means adding each new operationID to
+// operationAuthTiers with the tier the route calls for
 // (tierFamily is the default for ordinary family-scoped CRUD; tierAdmin
 // for family-admin-only actions; tierSysadmin for the /admin console,
 // which needs the system-admin role and no family at all; tierSession
@@ -181,13 +180,13 @@ func loadSpec() *openapi3.T {
 	return spec
 }
 
-// authTier is how much of the middleware chain (REF §A5) an /api/ operation
+// authTier is how much of the middleware chain an /api/ operation
 // runs behind. See this package's doc comment for the full pattern.
 type authTier int
 
 const (
 	// tierPublic runs no auth chain at all: liveness/readiness probes, plus
-	// (from Task 20) GET /api/invites/info/{code} — the /join page's
+	// GET /api/invites/info/{code} — the /join page's
 	// pre-sign-in status check needs no caller at all.
 	tierPublic authTier = iota
 	// tierSession requires a resolved caller (session or API key) but NOT
@@ -199,8 +198,8 @@ const (
 	// tierAdmin is tierFamily plus middleware.RequireAdmin — the
 	// family-admin-only surface (member management, deleting a baby).
 	tierAdmin
-	// tierSysadmin is the /admin console (Task 20's sibling gate, REF §A5
-	// item 4): a resolved session whose users.role is "admin" — OUR
+	// tierSysadmin is the /admin console: a resolved session whose
+	// users.role is "admin" — OUR
 	// system-admin column, unrelated to the per-family admin role tierAdmin
 	// checks — and never an API key. Notably it does NOT require a family:
 	// a system admin looking at platform stats or deleting somebody else's
@@ -211,7 +210,7 @@ const (
 	// caller (and family) must resolve exactly as tierFamily requires, but
 	// a pjk_ bearer is then refused anyway. This is for endpoints bound to
 	// a human, session-carrying browser rather than a programmatic caller —
-	// push subscriptions today (REF §A5 item 6; apps/api/src/app.ts's
+	// push subscriptions today (apps/api/src/app.ts's
 	// domainBase.use("/api/push/*", rejectApiKey), mounted AFTER
 	// requireFamily, which is exactly this tier's ordering). Distinct from
 	// tierAdmin: RejectAPIKey has nothing to do with the caller's role,
@@ -231,7 +230,7 @@ var operationAuthTiers = map[string]authTier{
 	"Healthz": tierPublic,
 	"Readyz":  tierPublic,
 
-	// GetConfig (invitee-signup Task 2): the /login and /join screens' own
+	// GetConfig: the /login and /join screens' own
 	// pre-sign-in read, same shape of need as GetInviteInfo below — no
 	// caller exists yet. See tierPublicAPIAllowlist and config.go's doc
 	// comment.
@@ -273,7 +272,7 @@ var operationAuthTiers = map[string]authTier{
 	"UpdateSleep":    tierFamily,
 	"DeleteSleep":    tierFamily,
 
-	// Play sessions (Task 13; REF §A1 play.ts). Structurally sleep's
+	// Play sessions (play.ts). Structurally sleep's
 	// active-session lifecycle one table over; free (no plan gate — see
 	// internal/api/play.go's package doc comment).
 	"ListPlays":     tierFamily,
@@ -285,7 +284,7 @@ var operationAuthTiers = map[string]authTier{
 
 	"GetSummary": tierFamily,
 
-	// The six Phase 3 activity types (Task 12; REF §A1 "other-logs.ts —
+	// The six Phase 3 activity types ("other-logs.ts —
 	// makeLogRoutes factory"). All 24 operations are tierFamily: every kind
 	// is free (no plan gate) and every operation is ordinary family-scoped
 	// CRUD, unlike sleep-locations' admin-only writes.
@@ -315,7 +314,7 @@ var operationAuthTiers = map[string]authTier{
 	"DeletePump":        tierFamily,
 
 	// ListSleepLocations is a plain family-scoped read; Create/Delete are
-	// family-admin-only AND rejected for API keys (REF §A1
+	// family-admin-only AND rejected for API keys (as in
 	// sleep-locations.ts). middleware.RequireAdmin already answers both
 	// cases — "Not available to API keys"/FORBIDDEN before the role check,
 	// "Admin only"/FORBIDDEN after — so tierAdmin alone reproduces the TS
@@ -325,7 +324,7 @@ var operationAuthTiers = map[string]authTier{
 	"CreateSleepLocation": tierAdmin,
 	"DeleteSleepLocation": tierAdmin,
 
-	// Vaccines (Task 14; REF §A1 "vaccines.ts (+ files)"). Free, like the
+	// Vaccines ("vaccines.ts (+ files)"). Free, like the
 	// six Phase 3 kinds above — dismissals are their own tierFamily
 	// operations too, not folded into the log's tier. The multipart
 	// document-upload route and /api/files/{id} streaming/delete are
@@ -341,11 +340,11 @@ var operationAuthTiers = map[string]authTier{
 	"CreateVaccineDismissal": tierFamily,
 	"DeleteVaccineDismissal": tierFamily,
 
-	// Timeline (Task 15; REF §A1 timeline.ts): the merged, keyset-paginated
+	// Timeline (timeline.ts): the merged, keyset-paginated
 	// feed across all eleven kinds above. Ordinary family-scoped read.
 	"ListTimeline": tierFamily,
 
-	// Calendar + contacts (Task 16; REF §A1 calendar.ts/contacts.ts). Both
+	// Calendar + contacts (calendar.ts/contacts.ts). Both
 	// were premium-gated (402 on create) in the TS predecessor; this port
 	// removes that gate entirely — every operation, including create, is
 	// ordinary tierFamily CRUD (see internal/api/calendar.go's and
@@ -365,7 +364,7 @@ var operationAuthTiers = map[string]authTier{
 	"UpdateContact":                tierFamily,
 	"DeleteContact":                tierFamily,
 
-	// Stats (Task 17; REF §A1 stats.ts). The TS predecessor's statsMonth
+	// Stats (stats.ts). The TS predecessor's statsMonth
 	// premium gate (402 when days>7) is removed — every window up to the
 	// spec's 90-day cap is ordinary tierFamily. CSV export
 	// (GET /api/export.csv) sits outside this map entirely: it is
@@ -373,7 +372,7 @@ var operationAuthTiers = map[string]authTier{
 	// familyChain rather than authChain's operationID dispatch.
 	"GetStats": tierFamily,
 
-	// Push (Task 18; REF §A1 push.ts). Device/session-bound: every
+	// Push (push.ts). Device/session-bound: every
 	// operation is tierFamilyNoAPIKey, not plain tierFamily — see that
 	// tier's doc comment and internal/api/push.go's package doc comment.
 	"GetPushConfig":   tierFamilyNoAPIKey,
@@ -396,14 +395,13 @@ var operationAuthTiers = map[string]authTier{
 	"DeleteFamilyMember":  tierAdmin,
 	"SetFamilyMemberRole": tierAdmin,
 
-	// API keys (Task 19; REF §A1 keys.ts). Family-admin-only, same as
+	// API keys (keys.ts). Family-admin-only, same as
 	// member management above: apps/api/src/app.ts mounts requireAdmin on
 	// /api/keys/*, and requireAdmin itself already answers "Not available
 	// to API keys"/FORBIDDEN before the role check (a key can never mint or
 	// revoke another key) — see internal/api/keys.go. The TypeScript
 	// predecessor's canUse(family, "apiKeys") 402 gate on create is removed
-	// (this port's free-tier policy, matching every other Task 16-18 gate
-	// removal).
+	// (this port's free-tier policy, like every other billing gate).
 	"ListApiKeys":  tierAdmin,
 	"CreateApiKey": tierAdmin,
 	"RevokeApiKey": tierAdmin,
@@ -422,7 +420,7 @@ var operationAuthTiers = map[string]authTier{
 	"UnenrolDevice":        tierDevice,
 	"ListDeviceThresholds": tierDevice,
 
-	// Invites (Task 20; REF §A1 invites.ts). ListInvites/CreateInvite/
+	// Invites (invites.ts). ListInvites/CreateInvite/
 	// RevokeInvite are the family-admin management surface, same tier as
 	// API keys above. GetInviteInfo is tierPublic — the /join page's
 	// pre-sign-in status check — and RedeemInvite is tierSession: a caller
@@ -437,7 +435,7 @@ var operationAuthTiers = map[string]authTier{
 	"GetInviteInfo": tierPublic,
 	"RedeemInvite":  tierSession,
 
-	// The system-admin console (Task 21; REF §A1 admin.ts, including its
+	// The system-admin console (admin.ts, including its
 	// "NEW in Go" table). Every operation is tierSysadmin — see that tier's
 	// doc comment for why it is NOT tierAdmin and why it requires no family
 	// — with one deliberate exception.
@@ -497,7 +495,7 @@ var operationAuthTiers = map[string]authTier{
 // tierPublic too but sit at the top level, outside /api/ entirely (see
 // NewHandler's mount order). "No auth chain at all" is a much louder claim
 // for a route nested under /api/ than for a liveness probe, so
-// assertOperationAuthCoverage panics at boot if a future task's mistyped
+// assertOperationAuthCoverage panics at boot if a mistyped
 // tier entry (meant tierFamily or tierSession, typed tierPublic) would
 // otherwise ship an unauthenticated domain route silently. Extend this
 // alongside operationAuthTiers when a new operation genuinely needs
@@ -593,8 +591,8 @@ var publicNeedsHTTP = map[string]bool{
 }
 
 // assertOperationAuthCoverage panics unless operationAuthTiers has exactly
-// one entry per operationId in spec — no fewer (a new route task that forgot
-// to classify its operation) and no more (a stale entry left behind by a
+// one entry per operationId in spec — no fewer (a new operation nobody
+// classified) and no more (a stale entry left behind by a
 // rename) — and, for every operation nested under /api/, panics if its tier
 // is tierPublic without an explicit tierPublicAPIAllowlist entry (see that
 // map's doc comment). Called once, at NewHandler build time, so a wiring
@@ -680,7 +678,7 @@ func (d Deps) mwDeps() middleware.Deps {
 
 // authChain is the one gen.StrictMiddlewareFunc passed to gen.NewStrictHandler:
 // it looks up operationID in operationAuthTiers and wraps the call in the
-// matching middleware chain (REF §A5's order: APIKeyAuth, then DeviceAuth and
+// matching middleware chain (in order: APIKeyAuth, then DeviceAuth and
 // the device allowlist, Session, RequireFamily/RequireSession, RequireAdmin).
 func authChain(d Deps) gen.StrictMiddlewareFunc {
 	mwDeps := d.mwDeps()
@@ -740,8 +738,8 @@ func authChain(d Deps) gen.StrictMiddlewareFunc {
 
 // rateLimitChain is the second gen.StrictMiddlewareFunc passed to
 // gen.NewStrictHandlerWithOptions, alongside authChain: the operationID-keyed
-// layer that applies the invite endpoints' credential rate limits (REF §A1
-// invites.ts's `middleware: [rateLimit(...), rateLimit(...)]` array on
+// layer that applies the invite endpoints' credential rate limits
+// (invites.ts's `middleware: [rateLimit(...), rateLimit(...)]` array on
 // inviteInfo/redeem — a per-operation middleware list has no equivalent at
 // this layer's granularity other than switching on operationID, same as
 // authChain does for auth tiers). Every other operationID is untouched.
@@ -855,7 +853,7 @@ func skipSpecValidation(r *http.Request) bool {
 
 // withSpecValidation validates every /api/ request against spec except the
 // paths skipSpecValidation names, returning 400 {"error":"Invalid
-// request","code":"VALIDATION"} on failure (REF §A1 item 15).
+// request","code":"VALIDATION"} on failure.
 //
 // A request whose path/method matches NO spec operation at all is not a
 // validation failure — the hand-routed streaming endpoints live outside the
@@ -941,7 +939,7 @@ func NewHandler(d Deps) http.Handler {
 	authHandler := d.Auth.Handler()
 	mux.Handle(auth.BasePath+"/", authHandler)
 
-	// Credential brute-force brake (REF §A5's rate-limit points): Limen's own
+	// Credential brute-force brake: Limen's own
 	// limiter is fine, but this one is Postgres-backed and therefore shared
 	// across replicas. 20 attempts per 10 minutes per client is generous for
 	// a human and hopeless for guessing.
@@ -1014,7 +1012,7 @@ func NewHandler(d Deps) http.Handler {
 	mux.Handle("/api/", withSpecValidation(spec, http.HandlerFunc(handleAPINotFound)))
 
 	// Registers every generated operation on mux: GET /healthz and GET
-	// /readyz (top-level, outside /api/, per REF §A1) plus every /api/
+	// /readyz (top-level, outside /api/) plus every /api/
 	// operation in the spec. See this package's doc comment for the
 	// two-layer wrapping below (spec validation, then auth) and why each
 	// lives at the generated-code layer it does.

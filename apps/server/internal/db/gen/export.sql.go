@@ -153,7 +153,7 @@ type ExportFeedsRow struct {
 	Notes         *string
 }
 
-// CSV export (Task 17; REF §A1 export.ts). Every query here is
+// CSV export (export.ts). Every query here is
 // family-scoped ONLY — no baby_id filter, unlike every List query above:
 // the export covers every baby in the family in one file, exactly like
 // apps/api/src/routes/export.ts's fam.listFeeds({limit: MAX}) (no babyId in

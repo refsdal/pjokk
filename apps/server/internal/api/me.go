@@ -16,7 +16,7 @@ import (
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
 )
 
-// GetMe implements GET /api/me — NEW in Go (REF §A1, end of admin.ts):
+// GetMe implements GET /api/me — NEW in Go:
 // "session info for the SPA shell, replaces scattered better-auth session
 // casts". Session required, family NOT required: familyId/memberRole/plan
 // are null for a caller with no active family, and this method never

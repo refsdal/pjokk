@@ -10,14 +10,14 @@ import (
 )
 
 // This file is the shared engine behind the six Phase 3 activity types —
-// medicine, baths, notes, milestones, measurements, pumps (REF §A1
-// "other-logs.ts — makeLogRoutes factory", ports apps/api/src/routes/
-// other-logs.ts + apps/api/src/db/scoped.ts's logCrud). Every kind is the
+// medicine, baths, notes, milestones, measurements, pumps (it ports
+// the makeLogRoutes factory in apps/api/src/routes/other-logs.ts and
+// apps/api/src/db/scoped.ts's logCrud). Every kind is the
 // SAME four-operation shape: GET list, POST create (404 unknown baby),
 // PATCH update (tri-state clears, empty-body no-op, 404 unknown id), DELETE
 // (404 unknown id) — all free, no plan gate (CLAUDE.md's entitlement
 // helper always returns true; the five kinds apps/api gated behind
-// "otherActivities" lose that gate here, per Task 12's brief and mirroring
+// "otherActivities" lose that gate here, mirroring
 // CreateBaby's own already-removed multipleBabies gate in babies.go).
 //
 // # Why a smaller shared core instead of one fully generic sqlc-parameterized
@@ -44,9 +44,9 @@ import (
 // file (medicine.go, baths.go, notes.go, milestones.go, measurements.go,
 // pumps.go) supplies that kind's sqlc closures and does nothing else but
 // serialize the row and wrap the (Row, ok, err) result in its own concrete
-// gen.XxxResponseObject — the "thin instantiations" the brief asks for,
-// just built from closures over named sqlc funcs rather than from sqlc funcs
-// as literal type parameters. listLimit below is the default-limit
+// gen.XxxResponseObject — thin instantiations, built from closures over
+// named sqlc funcs rather than from sqlc funcs as literal type parameters.
+// listLimit below is the default-limit
 // resolution every list route in the package shares.
 //
 // The engine is no longer "the six Phase 3 kinds only": feeds, diapers,
@@ -57,14 +57,14 @@ import (
 // partial-unique-index violation to a 409, neither of which fits a create
 // closure that can only answer (id, error). They still share babyExists.
 //
-// PATCH's per-field patchField[T] calls (patch.go, Task 10) stay in each
+// PATCH's per-field patchField[T] calls (patch.go) stay in each
 // per-kind file: the field SET differs by kind (medicine has
 // name/amount/unit, pump has side/amountMl/durationMin, …), so there is
 // nothing left to generalize there beyond patchField itself, which is
 // already the reusable unit.
 
 // babyExists reports whether babyID exists in familyID, the check every
-// CreateX handler below runs before inserting (REF: "404 unknown baby").
+// CreateX handler below runs before inserting ( 404 unknown baby).
 func babyExists(ctx context.Context, d Deps, familyID, babyID string) (bool, error) {
 	if _, err := d.Q.GetBaby(ctx, dbgen.GetBabyParams{FamilyID: familyID, ID: babyID}); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

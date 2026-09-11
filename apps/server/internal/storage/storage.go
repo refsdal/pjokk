@@ -1,10 +1,7 @@
 // Package storage declares the object-storage port every S3-compatible
 // backend (MinIO in compose; S3/R2/Ceph in production) implements. This file
-// holds ONLY the interface and its supporting type — the real implementation
-// (Task 6) lives alongside it once it lands. Declaring the port now lets
-// api.Deps reference storage.Storage without waiting on that task.
-//
-// See docs/superpowers/plans/2026-08-31-go-migration-reference.md §A6.
+// holds the interface and its supporting type; the two drivers (S3 and a
+// mounted volume) live alongside it.
 package storage
 
 import (

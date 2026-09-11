@@ -28,7 +28,7 @@ type CreateInviteParams struct {
 }
 
 // Queries backing the /api/invites admin + public + redeem surface
-// (Task 20; REF §A1 invites.ts). family_invite is Pjokk's own domain table
+// (invites.ts). family_invite is Pjokk's own domain table
 // (QR-at-Sunday-dinner grain, not Limen's email-addressed
 // organization_invitations, which this port never touches — see
 // 00001_init.sql/00002_limen_align.sql's comments on that table).

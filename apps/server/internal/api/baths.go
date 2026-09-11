@@ -29,7 +29,7 @@ func serBath(row dbgen.GetBathRow) gen.BathLog {
 	}
 }
 
-// ListBaths implements GET /api/baths. REF: "BathLog[] newest first".
+// ListBaths implements GET /api/baths.
 func (d Deps) ListBaths(ctx context.Context, req gen.ListBathsRequestObject) (gen.ListBathsResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	rows, err := d.Q.ListBaths(ctx, dbgen.ListBathsParams{
@@ -47,9 +47,9 @@ func (d Deps) ListBaths(ctx context.Context, req gen.ListBathsRequestObject) (ge
 	return gen.ListBaths200JSONResponse(out), nil
 }
 
-// CreateBath implements POST /api/baths. REF: "{babyId, time, notes?} → 201
-// / 404 unknown baby". Free in Go (apps/api gated this behind
-// "otherActivities"; Task 12 removes it — see other_logs.go's doc comment).
+// CreateBath implements POST /api/baths. {babyId, time, notes?} → 201
+// / 404 unknown baby. Free in Go (apps/api gated this behind
+// "otherActivities"; see other_logs.go's doc comment).
 func (d Deps) CreateBath(ctx context.Context, req gen.CreateBathRequestObject) (gen.CreateBathResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	if req.Body == nil {
@@ -80,8 +80,8 @@ func (d Deps) CreateBath(ctx context.Context, req gen.CreateBathRequestObject) (
 	return gen.CreateBath201JSONResponse(serBath(row)), nil
 }
 
-// UpdateBath implements PATCH /api/baths/{id}. REF: "partial (nullable
-// clears) → BathLog / 404".
+// UpdateBath implements PATCH /api/baths/{id}. partial (nullable
+// clears) → BathLog / 404.
 func (d Deps) UpdateBath(ctx context.Context, req gen.UpdateBathRequestObject) (gen.UpdateBathResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
@@ -122,7 +122,7 @@ func (d Deps) UpdateBath(ctx context.Context, req gen.UpdateBathRequestObject) (
 	return gen.UpdateBath200JSONResponse(serBath(row)), nil
 }
 
-// DeleteBath implements DELETE /api/baths/{id}. REF: "{ok:true} / 404".
+// DeleteBath implements DELETE /api/baths/{id}.
 func (d Deps) DeleteBath(ctx context.Context, req gen.DeleteBathRequestObject) (gen.DeleteBathResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	ok, err := deleteLog(ctx, func(ctx context.Context) (int64, error) {

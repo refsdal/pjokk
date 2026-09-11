@@ -47,7 +47,7 @@ func TestAppRigSignUpSignInGatesOnSession(t *testing.T) {
 }
 
 // TestAppRigNewFamilyAndBaby exercises NewFamily/NewBaby against the real
-// GET /api/babies route (internal/api/babies.go, Task 9).
+// GET /api/babies route (internal/api/babies.go).
 func TestAppRigNewFamilyAndBaby(t *testing.T) {
 	app := testrig.App(t)
 
@@ -94,7 +94,7 @@ func probeArray(w http.ResponseWriter, r *http.Request) {
 
 // TestAppRigMountProtectedProvesTheMiddlewareChain drives one handler
 // through the exact Session + RequireFamily chain every real family-scoped
-// route in Task 9+ will run behind: no session (401 UNAUTHENTICATED), a
+// route runs behind: no session (401 UNAUTHENTICATED), a
 // session with no active family (403 NO_FAMILY), and a session with one
 // (200, with the resolved family/role echoed back).
 func TestAppRigMountProtectedProvesTheMiddlewareChain(t *testing.T) {
@@ -130,7 +130,7 @@ func TestAppRigMountProtectedProvesTheMiddlewareChain(t *testing.T) {
 
 // TestAppRigDoArray exercises DoArray against a probe handler that answers
 // a JSON array, the shape most list endpoints (babies, timeline entries, …)
-// will use from Task 9 on.
+// answer with.
 func TestAppRigDoArray(t *testing.T) {
 	app := testrig.App(t)
 	app.MountProtected("GET /api/_test/probe-array", probeArray)
