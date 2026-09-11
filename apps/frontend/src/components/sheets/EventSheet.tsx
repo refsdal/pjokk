@@ -22,6 +22,9 @@ import { calendarCategoryMeta } from "@/lib/calendar-ui";
 import { t } from "@/lib/i18n";
 
 type DurationChoice = "30" | "60" | "120" | "custom";
+// Which part of a recurring event the sheet edits: the tapped occurrence,
+// or the whole series.
+type Scope = "one" | "all";
 type ReminderChoice = "off" | "60" | "1440";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -67,14 +70,20 @@ export function EventSheet({
   const [babyIds, setBabyIds] = useState<string[]>([]);
   const [assignees, setAssignees] = useState<string[]>([]);
   const [reminder, setReminder] = useState<ReminderChoice>("off");
-  // Recurrence (issue #52). Editing any occurrence edits the SERIES, so
-  // the date shown is the series start, never the tapped occurrence.
+  // Recurrence (issue #52). A tapped occurrence of a series is edited on
+  // its own by default ("This event"); "All events" edits the series, and
+  // then the date shown is the series start, not the occurrence.
   const [recurrence, setRecurrence] = useState<CalendarRecurrence>("none");
   const [until, setUntil] = useState("");
+  const [scope, setScope] = useState<Scope>("one");
+  const recurring = !!edit && edit.recurrence !== "none";
+  const onlyThis = recurring && scope === "one";
 
   useSheetReset(open, () => {
     if (edit) {
-      const start = new Date(edit.seriesStart);
+      setScope("one");
+      // The occurrence that was tapped (for a one-off, its own start).
+      const start = new Date(edit.startTime);
       setRecurrence(edit.recurrence);
       setUntil(
         edit.recurrenceUntil ? toDateInput(new Date(edit.recurrenceUntil)) : "",
@@ -116,6 +125,15 @@ export function EventSheet({
       setUntil("");
     }
   });
+
+  // Each scope shows its own start: the occurrence, or the series'.
+  const changeScope = (next: Scope) => {
+    setScope(next);
+    if (!edit) return;
+    const start = new Date(next === "one" ? edit.startTime : edit.seriesStart);
+    setDate(toDateInput(start));
+    if (!allDay) setTime(toTimeInput(start));
+  };
 
   const createEvent = useCreateCalendarEvent();
   const updateEvent = useUpdateCalendarEvent();
@@ -159,6 +177,9 @@ export function EventSheet({
     if (edit) {
       updateEvent.mutate({
         id: edit.id,
+        // "This event": the server detaches the occurrence and ignores the
+        // recurrence fields (a single occurrence does not repeat).
+        occurrence: onlyThis ? edit.startTime : undefined,
         patch: {
           ...payload,
           description: payload.description ?? null,
@@ -176,7 +197,10 @@ export function EventSheet({
 
   const remove = () => {
     if (!edit) return;
-    deleteEvent.mutate({ id: edit.id });
+    deleteEvent.mutate({
+      id: edit.id,
+      occurrence: onlyThis ? edit.startTime : undefined,
+    });
     onOpenChange(false);
   };
 
@@ -189,6 +213,23 @@ export function EventSheet({
       title={edit ? t("Edit event") : t("New event")}
     >
       <div className="space-y-5 pb-4">
+        {recurring && (
+          <div className="space-y-2">
+            <ChipGroup
+              options={[
+                { value: "one", label: t("This event") },
+                { value: "all", label: t("All events") },
+              ]}
+              value={scope}
+              onChange={changeScope}
+            />
+            <p className="text-xs text-muted">
+              {onlyThis
+                ? t("Only this event changes; the rest of the series stays.")
+                : t("Changes apply to every occurrence in the series.")}
+            </p>
+          </div>
+        )}
         <Input
           placeholder={t("Title")}
           value={title}
@@ -306,41 +347,38 @@ export function EventSheet({
             onChange={setReminder}
           />
         </div>
-        <div className="space-y-2">
-          <p className="text-xs font-semibold tracking-wide text-muted uppercase">
-            {t("Repeat")}
-          </p>
-          <ChipGroup
-            options={[
-              { value: "none", label: t("Never") },
-              { value: "daily", label: t("Daily") },
-              { value: "weekly", label: t("Weekly") },
-              { value: "biweekly", label: t("Every 2 weeks") },
-              { value: "monthly", label: t("Monthly") },
-              { value: "yearly", label: t("Yearly") },
-            ]}
-            value={recurrence}
-            onChange={setRecurrence}
-          />
-          {recurrence !== "none" && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted">{t("Until")}</span>
-              <input
-                type="date"
-                aria-label={t("Until")}
-                value={until}
-                min={date}
-                onChange={(e) => setUntil(e.target.value)}
-                className="h-12 w-full rounded-xl2 border border-line bg-surface px-4 text-base text-ink"
-              />
-            </div>
-          )}
-          {edit && edit.recurrence !== "none" && (
-            <p className="text-xs text-muted">
-              {t("Changes apply to every occurrence in the series.")}
+        {!onlyThis && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold tracking-wide text-muted uppercase">
+              {t("Repeat")}
             </p>
-          )}
-        </div>
+            <ChipGroup
+              options={[
+                { value: "none", label: t("Never") },
+                { value: "daily", label: t("Daily") },
+                { value: "weekly", label: t("Weekly") },
+                { value: "biweekly", label: t("Every 2 weeks") },
+                { value: "monthly", label: t("Monthly") },
+                { value: "yearly", label: t("Yearly") },
+              ]}
+              value={recurrence}
+              onChange={setRecurrence}
+            />
+            {recurrence !== "none" && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted">{t("Until")}</span>
+                <input
+                  type="date"
+                  aria-label={t("Until")}
+                  value={until}
+                  min={date}
+                  onChange={(e) => setUntil(e.target.value)}
+                  className="h-12 w-full rounded-xl2 border border-line bg-surface px-4 text-base text-ink"
+                />
+              </div>
+            )}
+          </div>
+        )}
         <Input
           placeholder={t("Location (optional)")}
           value={location}
@@ -358,7 +396,18 @@ export function EventSheet({
         >
           {t("Save")}
         </Button>
-        {edit && <DeleteButton onDelete={remove} />}
+        {edit && (
+          <DeleteButton
+            label={
+              recurring
+                ? onlyThis
+                  ? t("Delete this event")
+                  : t("Delete all events")
+                : undefined
+            }
+            onDelete={remove}
+          />
+        )}
       </div>
     </Sheet>
   );

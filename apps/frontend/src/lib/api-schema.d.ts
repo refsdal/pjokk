@@ -843,11 +843,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete an event; its link rows cascade. */
+        /** Delete an event; its link rows cascade. With `occurrence`, only that occurrence is taken out of the series (the ICS feed lists it as an EXDATE) and the rest stays. */
         delete: operations["deleteCalendarEvent"];
         options?: never;
         head?: never;
-        /** Partial update. `description`/`location`/`durationMin`/ `remindMinutesBefore` may be sent as `null` to CLEAR that column; `title`/`category`/`startTime`/`allDay` are not nullable — only settable or omitted. An event that IS (or becomes, via this same PATCH) all-day always has durationMin cleared. Changing `startTime` or `remindMinutesBefore` re-arms the reminder sweep (clears remindedAt). `babyIds`/`assigneeUserIds`, when present, REPLACE the link set; omitted leaves it untouched. */
+        /** Partial update. `description`/`location`/`durationMin`/ `remindMinutesBefore` may be sent as `null` to CLEAR that column; `title`/`category`/`startTime`/`allDay` are not nullable — only settable or omitted. An event that IS (or becomes, via this same PATCH) all-day always has durationMin cleared. Changing `startTime` or `remindMinutesBefore` re-arms the reminder sweep (clears remindedAt). `babyIds`/`assigneeUserIds`, when present, REPLACE the link set; omitted leaves it untouched. With `occurrence`, that one occurrence is taken out of the series and a standalone event carrying the patch (over the series' fields, links and reminder) is created in its place; the response is that NEW event, and recurrence fields in the body are ignored. An edit to the whole series that changes its start or rule clears its skipped occurrences. */
         patch: operations["updateCalendarEvent"];
         trace?: never;
     };
@@ -5845,7 +5845,10 @@ export interface operations {
     };
     deleteCalendarEvent: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Delete only this occurrence of a recurring event — its start, as the list gives it. Without it the delete applies to the whole series. */
+                occurrence?: string;
+            };
             header?: never;
             path: {
                 /** @description Resource id. */
@@ -5864,6 +5867,15 @@ export interface operations {
                     "application/json": components["schemas"]["Ok"];
                 };
             };
+            /** @description NOT_AN_OCCURRENCE — `occurrence` is not one of the series' occurrences, or the event does not repeat. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description No event with this id in the caller's family. */
             404: {
                 headers: {
@@ -5877,7 +5889,10 @@ export interface operations {
     };
     updateCalendarEvent: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Edit only this occurrence of a recurring event — its start, as the list gives it. Without it the patch applies to the whole series. */
+                occurrence?: string;
+            };
             header?: never;
             path: {
                 /** @description Resource id. */
@@ -5900,7 +5915,7 @@ export interface operations {
                     "application/json": components["schemas"]["CalendarEvent"];
                 };
             };
-            /** @description Unknown baby or family member reference. */
+            /** @description Unknown baby or family member reference; NOT_AN_OCCURRENCE when `occurrence` is not one of the series' occurrences (or the event does not repeat). */
             400: {
                 headers: {
                     [name: string]: unknown;

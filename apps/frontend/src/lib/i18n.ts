@@ -441,6 +441,12 @@ const nb: Record<string, string> = {
   Repeats: "Gjentas",
   "Changes apply to every occurrence in the series.":
     "Endringer gjelder alle gjentakelsene i serien.",
+  "This event": "Bare denne",
+  "All events": "Hele serien",
+  "Only this event changes; the rest of the series stays.":
+    "Bare denne endres; resten av serien blir som den er.",
+  "Delete this event": "Slett denne",
+  "Delete all events": "Slett hele serien",
   "Calendar subscription": "Kalenderabonnement",
   "See the family's events in your phone's calendar or Google Calendar. Repeating events come along as rules.":
     "Se familiens hendelser i telefonens kalender eller Google Kalender. Gjentakende hendelser blir med som regler.",
