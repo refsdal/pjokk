@@ -21,12 +21,17 @@ FROM "users"
 WHERE "id" = $1;
 
 -- name: UpdateUserProfile :exec
--- Full-row write of the editable fields; the handler resolves the PATCH
--- tri-state (absent / null / value) before calling this.
+-- Full-row write of the profile fields; the handler resolves the PATCH
+-- tri-state (absent / null / value) before calling this. The two language
+-- columns (00018) are the exception: NULL leaves them as they are, so a
+-- caller that knows nothing of them cannot write "" over a person's choice
+-- (neither is ever cleared back to NULL).
 UPDATE "users"
-SET "name" = $2, "nickname" = $3, "phone" = $4, "units" = $5,
-    "language_mode" = $6, "language" = $7, "updated_at" = now()
-WHERE "id" = $1;
+SET "name" = @name, "nickname" = @nickname, "phone" = @phone, "units" = @units,
+    "language_mode" = COALESCE(sqlc.narg('language_mode'), "language_mode"),
+    "language" = COALESCE(sqlc.narg('language'), "language"),
+    "updated_at" = now()
+WHERE "id" = @id;
 
 -- name: GetUserLanguage :one
 -- The language a push to this person is written in (internal/push/text.go).

@@ -178,32 +178,37 @@ func (q *Queries) SetUserAvatar(ctx context.Context, arg SetUserAvatarParams) er
 
 const updateUserProfile = `-- name: UpdateUserProfile :exec
 UPDATE "users"
-SET "name" = $2, "nickname" = $3, "phone" = $4, "units" = $5,
-    "language_mode" = $6, "language" = $7, "updated_at" = now()
-WHERE "id" = $1
+SET "name" = $1, "nickname" = $2, "phone" = $3, "units" = $4,
+    "language_mode" = COALESCE($5, "language_mode"),
+    "language" = COALESCE($6, "language"),
+    "updated_at" = now()
+WHERE "id" = $7
 `
 
 type UpdateUserProfileParams struct {
-	ID           string
 	Name         *string
 	Nickname     *string
 	Phone        *string
 	Units        string
 	LanguageMode *string
-	Language     string
+	Language     *string
+	ID           string
 }
 
-// Full-row write of the editable fields; the handler resolves the PATCH
-// tri-state (absent / null / value) before calling this.
+// Full-row write of the profile fields; the handler resolves the PATCH
+// tri-state (absent / null / value) before calling this. The two language
+// columns (00018) are the exception: NULL leaves them as they are, so a
+// caller that knows nothing of them cannot write "" over a person's choice
+// (neither is ever cleared back to NULL).
 func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) error {
 	_, err := q.db.Exec(ctx, updateUserProfile,
-		arg.ID,
 		arg.Name,
 		arg.Nickname,
 		arg.Phone,
 		arg.Units,
 		arg.LanguageMode,
 		arg.Language,
+		arg.ID,
 	)
 	return err
 }
