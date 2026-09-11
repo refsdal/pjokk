@@ -110,15 +110,23 @@ func isNotFound(err error) bool {
 	return false
 }
 
-// Delete batches every key into one DeleteObjects call. The S3 API caps a
-// single DeleteObjects request at 1000 keys; today's callers (a handful of
-// vaccine-entry attachments, a handful of pruned backup snapshots) stay far
-// below that, so this does not chunk. Chunk into 1000-key batches if a
-// future caller's keys slice can grow past that.
+// s3DeleteBatch is the S3 API's cap on keys per DeleteObjects request.
+const s3DeleteBatch = 1000
+
+// Delete removes keys in DeleteObjects calls of at most s3DeleteBatch keys
+// each. Most callers pass a handful, but deleting a family or a baby
+// (issue #95) passes every photo and document it had, which can run past
+// the cap — and S3 refuses the whole request rather than the excess.
 func (s *s3Storage) Delete(ctx context.Context, keys ...string) error {
-	if len(keys) == 0 {
-		return nil
+	for start := 0; start < len(keys); start += s3DeleteBatch {
+		if err := s.deleteBatch(ctx, keys[start:min(start+s3DeleteBatch, len(keys))]); err != nil {
+			return err
+		}
 	}
+	return nil
+}
+
+func (s *s3Storage) deleteBatch(ctx context.Context, keys []string) error {
 	objects := make([]types.ObjectIdentifier, len(keys))
 	for i, key := range keys {
 		objects[i] = types.ObjectIdentifier{Key: aws.String(key)}
