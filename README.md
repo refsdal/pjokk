@@ -486,7 +486,7 @@ apps/server/                        the Go module (github.com/refsdal/pjokk/serv
       ├─ storage/                   the object-storage port: fs and s3 drivers
       ├─ web/                       static asset serving, security headers, the embedded SPA
       └─ testrig/                   in-process HTTP rig the route tests drive
-packages/shared/   @pjokk/shared    the SPA's domain types (no longer describes the wire)
+packages/shared/   @pjokk/shared    the generated API client types, and names for them
 apps/frontend/     @pjokk/frontend  React SPA (screens, log sheets, offline plumbing) + tests
 apps/landing/      @pjokk/landing   static marketing + legal site for the apex — see below
 ```

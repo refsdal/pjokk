@@ -2617,3 +2617,36 @@ stretch, but the glance at Home did not.
   unbroken session the longest would repeat the total, so it is left out.
   Wakings stay on Stats — the line is one truncated line, and the E2E
   checks the longest part still fits a phone.
+
+## 2026-09-11 — the SPA's types come from the spec
+
+The Go migration left `packages/shared/src/schemas.ts` behind on purpose (the
+entry above calls it "a known and deliberate loose end"): 937 lines of zod
+that validated nothing and duplicated the generated `api-schema.d.ts`, free
+to drift from the spec without anything noticing. This closes it.
+
+- **The generated file moved into `packages/shared`,** which is now the
+  TypeScript side of the API contract: `api-schema.d.ts` (openapi-typescript
+  output, still excluded from biome and still byte-identical on
+  regeneration) and `index.ts`, which names its schemas (`Baby`,
+  `CalendarEvent`, …) and nothing more. A wire type is changed in the spec
+  and nowhere else.
+- **Enums the spec declares on a field** (`MeasurementType`,
+  `ContactIcon`, `TimelineFilter`, …) are derived from that field, and the
+  two the SPA needs at runtime (`measurementTypes`, `contactIcons`) are
+  written out through a helper that fails the typecheck if the list and the
+  spec disagree in either direction.
+- **The timeline's rows are the one type rebuilt rather than aliased.**
+  The spec models `TimelineEntry` as an open object on purpose — oapi-codegen
+  has no clean Go shape for eleven variants — so its generated type cannot
+  narrow on `kind`. Every row is one of the log schemas plus its kind, and
+  `index.ts` builds the discriminated union from exactly those schemas;
+  `timelineKinds` fails the typecheck if the spec gains a kind the union
+  lacks. Changing the spec instead would have reshaped the Go server.
+- **Nothing else changed shape.** The other 66 importing files typecheck
+  against the aliases unchanged: the zod layer and the spec had not yet
+  drifted — the point was to stop them ever doing so.
+- **zod, react-hook-form and @hookform/resolvers are now unused** by any
+  source file. They stay in `package.json` for now: CLAUDE.md names
+  react-hook-form + zod as the forms stack, and dropping a decided
+  dependency is its own decision.
