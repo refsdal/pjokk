@@ -106,6 +106,10 @@ var DeliberatelyExcluded = map[string]bool{
 	"goose_db_version": true,
 	"impersonation":    true,
 	"family_invite":    true,
+	// Bookkeeping about the jobs themselves (spec 2026-09-11-admin-ops §1),
+	// like goose's version table: nothing in it is worth restoring, and a
+	// restored database starts a fresh history.
+	"job_run": true,
 }
 
 // backupRetentionDays is BACKUP_RETENTION_DAYS: backups hold every table,

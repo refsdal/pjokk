@@ -202,6 +202,16 @@ type Impersonation struct {
 	CreatedAt         pgtype.Timestamptz
 }
 
+type JobRun struct {
+	ID         string
+	Job        string
+	Trigger    string
+	StartedAt  pgtype.Timestamptz
+	FinishedAt pgtype.Timestamptz
+	Ok         *bool
+	Error      *string
+}
+
 type MeasurementLog struct {
 	ID          string
 	FamilyID    string

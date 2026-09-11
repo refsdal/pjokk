@@ -70,7 +70,7 @@ func (m *Memory) List(ctx context.Context, prefix string) ([]StoredObject, error
 	var out []StoredObject
 	for key, obj := range m.objects {
 		if strings.HasPrefix(key, prefix) {
-			out = append(out, StoredObject{Key: key, UploadedAt: obj.uploadedAt})
+			out = append(out, StoredObject{Key: key, UploadedAt: obj.uploadedAt, Size: int64(len(obj.body))})
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })

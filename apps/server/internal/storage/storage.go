@@ -17,6 +17,9 @@ import (
 type StoredObject struct {
 	Key        string
 	UploadedAt time.Time
+	// Size in bytes — the console's backup list shows it (spec
+	// 2026-09-11-admin-ops §3). Every driver already has it to hand.
+	Size int64
 }
 
 // Storage is the object-storage port. Every method takes a context and never

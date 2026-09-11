@@ -159,6 +159,7 @@ func (s *s3Storage) List(ctx context.Context, prefix string) ([]StoredObject, er
 			out = append(out, StoredObject{
 				Key:        aws.ToString(obj.Key),
 				UploadedAt: aws.ToTime(obj.LastModified),
+				Size:       aws.ToInt64(obj.Size),
 			})
 		}
 		if aws.ToBool(page.IsTruncated) && page.NextContinuationToken != nil {
