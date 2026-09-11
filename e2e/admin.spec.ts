@@ -210,6 +210,33 @@ function jobCard(page: import("@playwright/test").Page, job: string) {
   return page.getByTestId(`job-${job}`).locator("..");
 }
 
+// Run now answers 202 and the job runs detached, so for a moment the
+// card's newest row can still be the PREVIOUS run's "OK" — a test that
+// waited on it went on (and deleted a family) before the new snapshot was
+// written. Wait on this run instead: the 202 names it, and the Ops API
+// reports its status.
+async function runJob(page: import("@playwright/test").Page, job: string) {
+  const [res] = await Promise.all([
+    page.waitForResponse(
+      (r) => r.url().endsWith(`/api/admin/jobs/${job}/run`) && r.request().method() === "POST",
+    ),
+    jobCard(page, job).getByRole("button", { name: "Run now" }).click(),
+  ]);
+  expect(res.status(), await res.text()).toBe(202);
+  const { runId } = (await res.json()) as { runId: string };
+  await expect
+    .poll(
+      async () => {
+        const ops = (await (await page.request.get("/api/admin/ops")).json()) as {
+          jobs: { name: string; runs: { id: string; status: string }[] }[];
+        };
+        return ops.jobs.find((j) => j.name === job)?.runs.find((r) => r.id === runId)?.status;
+      },
+      { timeout: 30_000 },
+    )
+    .toBe("ok");
+}
+
 test("runs the jobs from the Ops tab and downloads the snapshot", async ({
   page,
   request,
@@ -220,22 +247,21 @@ test("runs the jobs from the Ops tab and downloads the snapshot", async ({
 
   // Run now: recorded before the 202, then watched until it finishes. The
   // newest run in the card is the one just started.
-  const frequent = jobCard(page, "frequent");
-  await frequent.getByRole("button", { name: "Run now" }).click();
-  const newest = frequent.getByTestId("job-run").first();
+  await runJob(page, "frequent");
+  const newest = jobCard(page, "frequent").getByTestId("job-run").first();
   await expect(newest).toContainText("from the console");
+  // The run is over; the card sees it on its next 10 s poll
+  // (useAdminOps refetches while a job runs).
   await expect(newest).toContainText("OK", { timeout: 30_000 });
 
   // The nightly job writes tonight's snapshot (named by the UTC date), and
   // the list picks it up once the run is over.
-  const nightly = jobCard(page, "nightly");
-  await nightly.getByRole("button", { name: "Run now" }).click();
-  await expect(nightly.getByTestId("job-run").first()).toContainText("OK", {
-    timeout: 30_000,
-  });
+  await runJob(page, "nightly");
   const today = new Date().toISOString().slice(0, 10);
   const snapshot = page.getByTestId("backup-snapshot").filter({ hasText: today });
-  await expect(snapshot).toBeVisible({ timeout: 10_000 });
+  // Likewise the list: it reloads once the page sees the run finish,
+  // which can be one 10 s poll after runJob returns.
+  await expect(snapshot).toBeVisible({ timeout: 30_000 });
 
   // The download is the snapshot itself, saved under its night's name.
   const [download] = await Promise.all([
@@ -280,11 +306,7 @@ test("restores a family deleted by mistake from last night's snapshot", async ({
 
   // Tonight's snapshot holds it.
   await page.goto("/admin/ops");
-  const nightly = jobCard(page, "nightly");
-  await nightly.getByRole("button", { name: "Run now" }).click();
-  await expect(nightly.getByTestId("job-run").first()).toContainText("OK", {
-    timeout: 30_000,
-  });
+  await runJob(page, "nightly");
 
   // Deleted by mistake.
   const deleted = await page.request.delete(`/api/admin/families/${familyId}`);
