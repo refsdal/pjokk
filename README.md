@@ -255,7 +255,11 @@ Five things to know before you rely on it:
   (object key, size); the bytes get one copy each under
   `photo-backups/current/` the night after upload, and a deleted photo's copy
   moves to `photo-backups/deleted/<date>/` and is pruned after the same 30
-  days. Avatars and vaccine documents are still outside the backup.
+  days. A photo counts as live only while its row exists: deleting a family
+  or a baby erases their photos from the store, and any stored photo left
+  with no row behind it is erased by the same nightly job, its copy taking
+  the deleted photo's 30-day path. Avatars and vaccine documents are still
+  outside the backup.
 
 If that is not enough for you, take an ordinary `pg_dump` of the same database
 on your own schedule. The two are complementary — and under `fs` the backups

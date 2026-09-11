@@ -184,6 +184,35 @@ func (q *Queries) ListFamilyMemberUserIDs(ctx context.Context, organizationID st
 	return items, nil
 }
 
+const listMilestonePhotoKeys = `-- name: ListMilestonePhotoKeys :many
+SELECT "object_key" FROM "milestone_photo"
+`
+
+// The photo backup's "live" set (jobs/photo_backup.go): the object key of
+// every photo row. Deliberately across every family, like the reminder
+// sweeps above — the nightly job serves the whole installation, and no
+// handler calls this. A stored photo object whose key is not here is an
+// orphan the job erases (issue #95). Keys only: nothing else is needed.
+func (q *Queries) ListMilestonePhotoKeys(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listMilestonePhotoKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var object_key string
+		if err := rows.Scan(&object_key); err != nil {
+			return nil, err
+		}
+		items = append(items, object_key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOrphanUsers = `-- name: ListOrphanUsers :many
 SELECT u."id" FROM "users" u
 WHERE (u."role" IS NULL OR u."role" != 'admin')
