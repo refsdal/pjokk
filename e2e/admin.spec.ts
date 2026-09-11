@@ -254,3 +254,53 @@ test("runs the jobs from the Ops tab and downloads the snapshot", async ({
   await page.goto("/admin");
   await expect(page.getByTestId("ops-summary")).toBeVisible();
 });
+
+// --- Restore (docs/superpowers/specs/2026-09-11-admin-restore-design.md)
+
+test("restores a family deleted by mistake from last night's snapshot", async ({
+  page,
+  request,
+}) => {
+  await operator(page, request);
+  const owner = freshEmail("owner");
+  await apiSignup(request, owner);
+
+  // A family with an admin, created from the console.
+  await page.goto("/admin/families");
+  await page.getByRole("button", { name: "New" }).click();
+  const family = `Undo me ${Date.now()}`;
+  await page.getByPlaceholder("Family name").fill(family);
+  await page.getByPlaceholder("Admin's email (optional)").fill(owner);
+  await page.getByRole("button", { name: "Create family" }).click();
+  await page.getByRole("button", { name: "Done" }).click();
+  await page.getByPlaceholder("Search families").fill(family);
+  await page.getByRole("link", { name: new RegExp(family) }).click();
+  await expect(page).toHaveURL(/\/admin\/families\/[^/]+$/);
+  const familyId = page.url().split("/").pop() ?? "";
+
+  // Tonight's snapshot holds it.
+  await page.goto("/admin/ops");
+  const nightly = jobCard(page, "nightly");
+  await nightly.getByRole("button", { name: "Run now" }).click();
+  await expect(nightly.getByTestId("job-run").first()).toContainText("OK", {
+    timeout: 30_000,
+  });
+
+  // Deleted by mistake.
+  const deleted = await page.request.delete(`/api/admin/families/${familyId}`);
+  expect(deleted.ok()).toBeTruthy();
+
+  // Undone from the snapshot's Deleted families.
+  const today = new Date().toISOString().slice(0, 10);
+  await page.reload();
+  const snapshot = page.getByTestId("backup-snapshot").filter({ hasText: today });
+  await snapshot.getByRole("button", { name: "Deleted families" }).click();
+  const row = page.getByTestId("deleted-family").filter({ hasText: family });
+  await expect(row).toContainText("deleted");
+  await row.getByRole("button", { name: "Restore" }).click();
+  await row.getByRole("button", { name: "Tap again to confirm" }).click();
+  await expect(page.getByTestId("restore-result")).toContainText(`${family} is back`);
+
+  await page.getByRole("link", { name: "Open the family" }).click();
+  await expect(page.getByRole("heading", { name: family })).toBeVisible();
+});
