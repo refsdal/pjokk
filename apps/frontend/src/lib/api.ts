@@ -1,5 +1,5 @@
 import createClient from "openapi-fetch";
-import type { paths } from "./api-schema";
+import type { paths } from "@pjokk/shared";
 
 // '' = same origin (the container serves both SPA and API). A future native
 // shell points this at the deployed origin instead.

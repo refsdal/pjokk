@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Baby, Family, Invite, Member } from "@pjokk/shared";
-import type { components } from "../api-schema";
+import type { components } from "@pjokk/shared";
 import { client, unwrap } from "../api";
 
 // Who the caller is, according to the server. This replaces every read the
