@@ -50,16 +50,20 @@ export function useCreateCalendarEvent() {
 export function useUpdateCalendarEvent() {
   const qc = useQueryClient();
   return useMutation({
+    // occurrence: edit only that occurrence of a series — it leaves the
+    // series as a standalone event, which is what comes back.
     mutationFn: async ({
       id,
       patch,
+      occurrence,
     }: {
       id: string;
       patch: UpdateCalendarEvent;
+      occurrence?: string;
     }) =>
       unwrap<CalendarEvent>(
         client.PATCH("/api/calendar/events/{id}", {
-          params: { path: { id } },
+          params: { path: { id }, query: occurrence ? { occurrence } : {} },
           body: patch,
         }),
       ),
@@ -71,10 +75,17 @@ export function useUpdateCalendarEvent() {
 export function useDeleteCalendarEvent() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id }: { id: string }) =>
+    // occurrence: delete only that occurrence of a series.
+    mutationFn: async ({
+      id,
+      occurrence,
+    }: {
+      id: string;
+      occurrence?: string;
+    }) =>
       unwrap(
         client.DELETE("/api/calendar/events/{id}", {
-          params: { path: { id } },
+          params: { path: { id }, query: occurrence ? { occurrence } : {} },
         }),
       ),
     onError: (err: Error) =>
