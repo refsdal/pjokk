@@ -1493,6 +1493,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One person, for the operator console's user page: their families and their role in each, how they sign in, and their live sessions (browser and device, when each started and was last active, which family it is in, and whether an operator is driving it). Never a token or an address. 404 for an unknown id or the tombstone. System admin only. */
+        get: operations["getAdminUserDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{id}/email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change a person's login address. Their sessions and a linked Google account stay (Google sign-in follows the Google account's id, not the address); password sign-in uses the new address from then on. Audited old → new. 409 EMAIL_TAKEN when another account holds it, 400 UNCHANGED when it is already theirs. System admin only. */
+        post: operations["changeAdminUserEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{id}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Take the system-admin role away. Never your own (400 REFUSED), never the last active admin's (409 LAST_ADMIN — two operators revoking each other at once cannot leave nobody), and it ends any session they are driving through impersonation. Effective on their next request. There is deliberately no route that GRANTS the role. System admin only. */
+        delete: operations["revokeAdminUserRole"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{id}/sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Sign out one of a person's sessions ("I left it signed in on my sister's phone"). Audited with the session's user agent. 404 when the session is not theirs. System admin only. */
+        delete: operations["revokeAdminUserSession"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/users/{id}/delete": {
         parameters: {
             query?: never;
@@ -2969,6 +3037,50 @@ export interface components {
             items: components["schemas"]["AdminFamily"][];
             /** @description Pass as `cursor` for the next page; null on the last one. */
             nextCursor: string | null;
+        };
+        /** @description One person for the console's user page. Metadata only: no log content, no token, no address. */
+        AdminUserDetail: {
+            id: string;
+            name: string;
+            email: string;
+            /** @description Ours, system-admin role. "admin" or null. */
+            role: string | null;
+            banned: boolean;
+            banReason: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            hasPassword: boolean;
+            families: components["schemas"]["AdminUserFamily"][];
+            providers: components["schemas"]["AdminUserProvider"][];
+            sessions: components["schemas"]["AdminSession"][];
+        };
+        AdminUserFamily: {
+            familyId: string;
+            name: string;
+            role: string;
+        };
+        AdminUserProvider: {
+            /** @description The OAuth provider, e.g. "google". */
+            provider: string;
+            /** Format: date-time */
+            linkedAt: string;
+        };
+        AdminSession: {
+            id: string;
+            /** @description The browser's own description; the console turns it into "Chrome on Android". */
+            userAgent: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            lastActiveAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            familyName: string | null;
+            /** @description The operator driving this session, when one is. */
+            impersonatedByName: string | null;
+        };
+        AdminEmailChange: {
+            email: string;
         };
         AuditNote: {
             action: string;
@@ -7134,6 +7246,171 @@ export interface operations {
             };
             /** @description A malformed cursor (VALIDATION). */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getAdminUserDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The person. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserDetail"];
+                };
+            };
+            /** @description No such person. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    changeAdminUserEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminEmailChange"];
+            };
+        };
+        responses: {
+            /** @description Changed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUser"];
+                };
+            };
+            /** @description Not an address (VALIDATION), or already theirs (UNCHANGED). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such person. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Another account has this address (EMAIL_TAKEN). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    revokeAdminUserRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Your own role (REFUSED). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such person, or not a system admin. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The last active system admin (LAST_ADMIN). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    revokeAdminUserSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such person, or not their session. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

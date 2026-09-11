@@ -458,15 +458,21 @@ var operationAuthTiers = map[string]authTier{
 	"RevokeAdminFamilyInvite":  tierSysadmin,
 	"RevokeAdminFamilyKey":     tierSysadmin,
 	"ListAdminUsers":           tierSysadmin,
-	"DeleteAdminUser":          tierSysadmin,
-	"BanAdminUser":             tierSysadmin,
-	"UnbanAdminUser":           tierSysadmin,
-	"SetAdminUserPassword":     tierSysadmin,
-	"RevokeAdminUserSessions":  tierSysadmin,
-	"ImpersonateAdminUser":     tierSysadmin,
-	"StopImpersonating":        tierSession,
-	"ListAdminAudit":           tierSysadmin,
-	"CreateAdminAuditNote":     tierSysadmin,
+	// The user page (admin_users.go). There is no grant counterpart to
+	// RevokeAdminUserRole on purpose: no route mints system admins.
+	"GetAdminUserDetail":      tierSysadmin,
+	"ChangeAdminUserEmail":    tierSysadmin,
+	"RevokeAdminUserRole":     tierSysadmin,
+	"RevokeAdminUserSession":  tierSysadmin,
+	"DeleteAdminUser":         tierSysadmin,
+	"BanAdminUser":            tierSysadmin,
+	"UnbanAdminUser":          tierSysadmin,
+	"SetAdminUserPassword":    tierSysadmin,
+	"RevokeAdminUserSessions": tierSysadmin,
+	"ImpersonateAdminUser":    tierSysadmin,
+	"StopImpersonating":       tierSession,
+	"ListAdminAudit":          tierSysadmin,
+	"CreateAdminAuditNote":    tierSysadmin,
 }
 
 // tierPublicAPIAllowlist is the exhaustive set of tierPublic operations

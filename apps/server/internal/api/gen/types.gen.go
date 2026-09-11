@@ -1742,6 +1742,11 @@ type AddAdminFamilyMember struct {
 // AddAdminFamilyMemberRole defines model for AddAdminFamilyMember.Role.
 type AddAdminFamilyMemberRole string
 
+// AdminEmailChange defines model for AdminEmailChange.
+type AdminEmailChange struct {
+	Email string `json:"email"`
+}
+
 // AdminFamily defines model for AdminFamily.
 type AdminFamily struct {
 	Babies    int       `json:"babies"`
@@ -1811,6 +1816,21 @@ type AdminFamilyPage struct {
 	NextCursor *string `json:"nextCursor"`
 }
 
+// AdminSession defines model for AdminSession.
+type AdminSession struct {
+	CreatedAt  time.Time `json:"createdAt"`
+	ExpiresAt  time.Time `json:"expiresAt"`
+	FamilyName *string   `json:"familyName"`
+	Id         string    `json:"id"`
+
+	// ImpersonatedByName The operator driving this session, when one is.
+	ImpersonatedByName *string   `json:"impersonatedByName"`
+	LastActiveAt       time.Time `json:"lastActiveAt"`
+
+	// UserAgent The browser's own description; the console turns it into "Chrome on Android".
+	UserAgent *string `json:"userAgent"`
+}
+
 // AdminStats Platform totals. Every count is a plain integer — the underlying COUNT(*) is bigint and must be cast (`::int`) in SQL, or the driver hands it back as a string (CLAUDE.md's Postgres notes).
 type AdminStats struct {
 	Babies int `json:"babies"`
@@ -1838,12 +1858,44 @@ type AdminUser struct {
 	Role *string `json:"role"`
 }
 
+// AdminUserDetail One person for the console's user page. Metadata only: no log content, no token, no address.
+type AdminUserDetail struct {
+	BanReason   *string             `json:"banReason"`
+	Banned      bool                `json:"banned"`
+	CreatedAt   time.Time           `json:"createdAt"`
+	Email       string              `json:"email"`
+	Families    []AdminUserFamily   `json:"families"`
+	HasPassword bool                `json:"hasPassword"`
+	Id          string              `json:"id"`
+	Name        string              `json:"name"`
+	Providers   []AdminUserProvider `json:"providers"`
+
+	// Role Ours, system-admin role. "admin" or null.
+	Role     *string        `json:"role"`
+	Sessions []AdminSession `json:"sessions"`
+}
+
+// AdminUserFamily defines model for AdminUserFamily.
+type AdminUserFamily struct {
+	FamilyId string `json:"familyId"`
+	Name     string `json:"name"`
+	Role     string `json:"role"`
+}
+
 // AdminUserPage One page of accounts, newest first.
 type AdminUserPage struct {
 	Items []AdminUser `json:"items"`
 
 	// NextCursor Pass as `cursor` for the next page; null on the last one.
 	NextCursor *string `json:"nextCursor"`
+}
+
+// AdminUserProvider defines model for AdminUserProvider.
+type AdminUserProvider struct {
+	LinkedAt time.Time `json:"linkedAt"`
+
+	// Provider The OAuth provider, e.g. "google".
+	Provider string `json:"provider"`
 }
 
 // ApiKey One bearer API key, key material never included (see ApiKeyCreated for the one response that carries it).
@@ -3481,6 +3533,9 @@ type SetAdminFamilyMemberRoleJSONRequestBody = SetMemberRole
 
 // BanAdminUserJSONRequestBody defines body for BanAdminUser for application/json ContentType.
 type BanAdminUserJSONRequestBody = BanUser
+
+// ChangeAdminUserEmailJSONRequestBody defines body for ChangeAdminUserEmail for application/json ContentType.
+type ChangeAdminUserEmailJSONRequestBody = AdminEmailChange
 
 // SetAdminUserPasswordJSONRequestBody defines body for SetAdminUserPassword for application/json ContentType.
 type SetAdminUserPasswordJSONRequestBody = SetUserPassword

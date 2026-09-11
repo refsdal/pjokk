@@ -11,6 +11,90 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const adminUserFamilies = `-- name: AdminUserFamilies :many
+SELECT
+    o."id" AS family_id,
+    o."name",
+    COALESCE(r."role", '') AS role
+FROM "organization_members" om
+JOIN "organizations" o ON o."id" = om."organization_id"
+LEFT JOIN LATERAL (
+    SELECT omr."role"
+    FROM "organization_member_roles" omr
+    WHERE omr."member_id" = om."id"
+    ORDER BY CASE omr."role"
+        WHEN 'admin' THEN 0
+        WHEN 'owner' THEN 1
+        ELSE 2
+    END, omr."role"
+    LIMIT 1
+) r ON true
+WHERE om."user_id" = $1
+ORDER BY o."name", o."id"
+`
+
+type AdminUserFamiliesRow struct {
+	FamilyID string
+	Name     string
+	Role     string
+}
+
+// Every family the person belongs to, with their role in each — the most
+// privileged one, exactly as GetFamilyMembershipRole ranks them.
+func (q *Queries) AdminUserFamilies(ctx context.Context, userID string) ([]AdminUserFamiliesRow, error) {
+	rows, err := q.db.Query(ctx, adminUserFamilies, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AdminUserFamiliesRow
+	for rows.Next() {
+		var i AdminUserFamiliesRow
+		if err := rows.Scan(&i.FamilyID, &i.Name, &i.Role); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const adminUserProviders = `-- name: AdminUserProviders :many
+SELECT "provider", "created_at"
+FROM "accounts"
+WHERE "user_id" = $1
+ORDER BY "created_at", "provider"
+`
+
+type AdminUserProvidersRow struct {
+	Provider  string
+	CreatedAt pgtype.Timestamptz
+}
+
+// Linked OAuth accounts: the provider and when it was linked — never the
+// token columns beside them. Password sign-in keeps no row here.
+func (q *Queries) AdminUserProviders(ctx context.Context, userID string) ([]AdminUserProvidersRow, error) {
+	rows, err := q.db.Query(ctx, adminUserProviders, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AdminUserProvidersRow
+	for rows.Next() {
+		var i AdminUserProvidersRow
+		if err := rows.Scan(&i.Provider, &i.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const banAdminUser = `-- name: BanAdminUser :exec
 UPDATE "users" SET "banned" = true, "ban_reason" = $2 WHERE "id" = $1
 `
@@ -69,6 +153,27 @@ func (q *Queries) DeleteOrganization(ctx context.Context, id string) (int64, err
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const emailInUseByAnother = `-- name: EmailInUseByAnother :one
+SELECT EXISTS (
+    SELECT 1 FROM "users" WHERE "email" = $1 AND "id" <> $2
+) AS in_use
+`
+
+type EmailInUseByAnotherParams struct {
+	Email string
+	ID    string
+}
+
+// The email change's pre-check, so a taken address is refused before an
+// audit row is written for a change that cannot happen. The unique index
+// still has the last word (ChangeEmail maps its 23505).
+func (q *Queries) EmailInUseByAnother(ctx context.Context, arg EmailInUseByAnotherParams) (bool, error) {
+	row := q.db.QueryRow(ctx, emailInUseByAnother, arg.Email, arg.ID)
+	var in_use bool
+	err := row.Scan(&in_use)
+	return in_use, err
 }
 
 const getAdminFamilyRow = `-- name: GetAdminFamilyRow :one
@@ -195,6 +300,60 @@ func (q *Queries) GetAdminUser(ctx context.Context, id string) (GetAdminUserRow,
 		&i.Name,
 		&i.Email,
 		&i.Banned,
+	)
+	return i, err
+}
+
+const getAdminUserDetail = `-- name: GetAdminUserDetail :one
+
+SELECT
+    "id",
+    COALESCE("name", '') AS name,
+    "email",
+    "role",
+    "banned",
+    "ban_reason",
+    "created_at",
+    (COALESCE("password", '') <> '')::boolean AS has_password
+FROM "users"
+WHERE "id" = $1::text AND "id" <> $2::text
+`
+
+type GetAdminUserDetailParams struct {
+	ID          string
+	TombstoneID string
+}
+
+type GetAdminUserDetailRow struct {
+	ID          string
+	Name        string
+	Email       string
+	Role        *string
+	Banned      bool
+	BanReason   *string
+	CreatedAt   pgtype.Timestamptz
+	HasPassword bool
+}
+
+// ---------------------------------------------------------------------------
+// The user page (docs/superpowers/specs/2026-09-11-admin-user-support-design.md).
+// Plain reads and our own users.role column; Limen's sessions and the login
+// address go through auth.Service instead (internal/auth/sessions.go).
+// ---------------------------------------------------------------------------
+// The page's header. The tombstone is not a person: 404, like an unknown id.
+// has_password is a boolean so the hash itself never leaves this query.
+func (q *Queries) GetAdminUserDetail(ctx context.Context, arg GetAdminUserDetailParams) (GetAdminUserDetailRow, error) {
+	row := q.db.QueryRow(ctx, getAdminUserDetail, arg.ID, arg.TombstoneID)
+	var i GetAdminUserDetailRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Email,
+		&i.Role,
+		&i.Banned,
+		&i.BanReason,
+		&i.CreatedAt,
+		&i.HasPassword,
 	)
 	return i, err
 }
@@ -571,6 +730,38 @@ func (q *Queries) ListAdminUsers(ctx context.Context, arg ListAdminUsersParams) 
 	return items, nil
 }
 
+const lockActiveSystemAdmins = `-- name: LockActiveSystemAdmins :many
+SELECT "id"
+FROM "users"
+WHERE "role" = 'admin' AND NOT "banned"
+ORDER BY "id"
+FOR UPDATE
+`
+
+// Taken inside the role revoke's transaction, before it counts: two
+// operators revoking each other at once would otherwise each see two admins
+// and both succeed, leaving nobody able to run the console. The second
+// transaction blocks on these row locks, then re-reads — and sees one.
+func (q *Queries) LockActiveSystemAdmins(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, lockActiveSystemAdmins)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const reassignUserReferences = `-- name: ReassignUserReferences :exec
 WITH
     sleep AS (UPDATE "sleep_log" SET "caretaker_id" = $1 WHERE "sleep_log"."caretaker_id" = $2),
@@ -675,6 +866,20 @@ type RenameOrganizationParams struct {
 // rename would change an identifier under whatever already holds it.
 func (q *Queries) RenameOrganization(ctx context.Context, arg RenameOrganizationParams) (int64, error) {
 	result, err := q.db.Exec(ctx, renameOrganization, arg.ID, arg.Name)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const revokeSystemAdmin = `-- name: RevokeSystemAdmin :execrows
+UPDATE "users" SET "role" = NULL WHERE "id" = $1 AND "role" = 'admin'
+`
+
+// Our own column, as BanAdminUser writes `banned`. Zero rows means they were
+// not a system admin.
+func (q *Queries) RevokeSystemAdmin(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeSystemAdmin, id)
 	if err != nil {
 		return 0, err
 	}
