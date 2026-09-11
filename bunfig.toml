@@ -1,12 +1,9 @@
 [install]
-# Bun defaults to the "isolated" linker once a `workspaces` field exists,
-# which gives each workspace package its own node_modules containing only
-# what its own package.json declares. Every third-party dependency (react,
-# recharts, zod, vaul, …) is declared ONLY in the root manifest, so under the
-# isolated linker apps/frontend, apps/landing and packages/shared would not be
-# able to resolve any of them. "hoisted" restores the flat node_modules layout
-# this repo already used before workspaces existed, which links all workspace
-# packages by name and gives every package access to the root-declared
-# dependencies. Revisit this if third-party deps are ever split out per
-# package.
+# Every workspace now declares the third-party packages its own code imports
+# (apps/frontend its runtime deps and build tooling, apps/landing react; the
+# root only repo-wide tooling: biome, TypeScript, Playwright, types, and
+# web-push for scripts/gen-vapid.mjs). The "hoisted" linker is kept anyway: it
+# gives the flat node_modules the scripts and CI were built against, and bun's
+# default "isolated" linker for workspaces is a separate change to make on its
+# own — it would also start failing any import a package has not declared.
 linker = "hoisted"
