@@ -129,6 +129,10 @@ func runConformance(t *testing.T, newStorage func(t *testing.T) storage.Storage)
 			if o.UploadedAt.Before(before) {
 				t.Errorf("UploadedAt %v predates the Put, want it recent", o.UploadedAt)
 			}
+			// The console's backup list shows each snapshot's size.
+			if o.Size != 2 {
+				t.Errorf("Size of %q = %d, want 2", o.Key, o.Size)
+			}
 		}
 		if !gotKeys["backups/2026-08-01.json"] || !gotKeys["backups/2026-08-02.json"] {
 			t.Errorf("List keys = %v, want both backups/ files and nothing else", objs)

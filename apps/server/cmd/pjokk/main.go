@@ -326,7 +326,13 @@ func cronMode(job string) int {
 	}
 	defer closeDeps()
 
-	if err := cron.RunJob(ctx, job, cronDeps(deps)); err != nil {
+	if _, err := cron.Run(ctx, job, "cli", cronDeps(deps)); err != nil {
+		if errors.Is(err, cron.ErrJobRunning) {
+			// The job IS running — elsewhere, with its own record. A
+			// CronJob overlapping a long nightly should not page anyone.
+			log.Printf("cron: %s is already running elsewhere; nothing to do", job)
+			return 0
+		}
 		log.Printf("cron: %s failed: %v", job, err)
 		return 1
 	}

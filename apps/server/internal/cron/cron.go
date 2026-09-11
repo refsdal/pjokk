@@ -24,11 +24,13 @@ package cron
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"runtime/debug"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	robfig "github.com/robfig/cron/v3"
 
 	"github.com/refsdal/pjokk/server/internal/jobs"
@@ -134,6 +136,14 @@ func runNightly(ctx context.Context, d Deps) error {
 		log.Printf("cron: purged %d old help request(s)", helpPurged)
 	}
 
+	prunedRuns, err := d.Q.PruneJobRuns(ctx, pgtype.Timestamptz{Time: now.Add(-jobRunRetention), Valid: true})
+	if err != nil {
+		return err
+	}
+	if prunedRuns > 0 {
+		log.Printf("cron: pruned %d old job run record(s)", prunedRuns)
+	}
+
 	// There is no plan reconciliation here. cron.ts ran reconcilePlans as a
 	// compensating control for missed Stripe webhooks; billing does not
 	// exist in this port (REF §A1), so there is nothing to reconcile.
@@ -207,7 +217,14 @@ func StartScheduler(d Deps) func() {
 			// A fresh background context per tick: the scheduler outlives any
 			// single request and a job must not be cancelled by one.
 			runSafely(context.Background(), job, func(ctx context.Context) error {
-				return RunJob(ctx, job, d)
+				_, err := Run(ctx, job, "schedule", d)
+				if errors.Is(err, ErrJobRunning) {
+					// Another process (or a console run) has it; that run
+					// has its own row.
+					log.Printf("cron: %s skipped: already running", job)
+					return nil
+				}
+				return err
 			})
 		}); err != nil {
 			// Schedules is a compile-time constant map validated by

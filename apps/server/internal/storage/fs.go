@@ -186,7 +186,7 @@ func (f *fsStorage) List(ctx context.Context, prefix string) ([]StoredObject, er
 		if err != nil {
 			return err
 		}
-		out = append(out, StoredObject{Key: key, UploadedAt: info.ModTime()})
+		out = append(out, StoredObject{Key: key, UploadedAt: info.ModTime(), Size: info.Size()})
 		return nil
 	})
 	if err != nil {
