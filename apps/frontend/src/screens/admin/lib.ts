@@ -12,6 +12,13 @@ export type AdminFamily = components["schemas"]["AdminFamily"];
 export type AdminFamilyDetail = components["schemas"]["AdminFamilyDetail"];
 export type AdminFamilyMember = components["schemas"]["AdminFamilyMember"];
 export type AdminInvite = components["schemas"]["Invite"];
+export type AdminUserDetail = components["schemas"]["AdminUserDetail"];
+export type AdminSession = components["schemas"]["AdminSession"];
+export type AuditEntry = components["schemas"]["AuditEntry"];
+
+// One page of a console list (spec 2026-09-11-admin-user-support §2):
+// pass nextCursor back as `cursor` for the next; null on the last page.
+export type Page<T> = { items: T[]; nextCursor: string | null };
 
 // The two roles a family membership can hold. "owner" also exists — Limen's
 // organization plugin can still assign its own default — and is read as

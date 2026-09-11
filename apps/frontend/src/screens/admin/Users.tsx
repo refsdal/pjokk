@@ -1,219 +1,85 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { IconChevronRight } from "@tabler/icons-react";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { DeleteButton } from "@/components/DeleteButton";
-import { Sheet } from "@/components/Sheet";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { client, unwrap } from "@/lib/api";
-import { useMe } from "@/lib/data";
-import { resetCache } from "@/lib/query";
-import { toast } from "@/lib/toast";
-import type { AdminUser } from "./lib";
+import { t } from "@/lib/i18n";
+import { useDebounced } from "@/lib/use-debounced";
+import type { AdminUser, Page } from "./lib";
+import { LoadMore } from "./LoadMore";
 
-function UserSheet({
-  user,
-  onClose,
-  refresh,
-}: {
-  user: AdminUser | null;
-  onClose: () => void;
-  refresh: () => void;
-}) {
-  const [password, setPassword] = useState("");
-  const me = useMe();
-  const isSelf = user?.id === me.data?.userId;
-
-  // Auditing happens server-side for every admin op (issue #6).
-  const run = async (label: string, fn: () => Promise<unknown>) => {
-    try {
-      await fn();
-      toast(`${label} ✓`);
-      refresh();
-      onClose();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : `${label} failed`, "error");
-    }
-  };
-
-  return (
-    <Sheet
-      open={!!user}
-      onOpenChange={(o) => !o && onClose()}
-      title={user?.name ?? ""}
-    >
-      {user && (
-        <div className="space-y-3 pb-4">
-          <p className="text-sm text-muted">
-            {user.email}
-            {user.role === "admin" && " · system admin"}
-            {user.banned && " · BANNED"}
-          </p>
-
-          <Button
-            size="full"
-            variant="outline"
-            onClick={() =>
-              void run("Sessions revoked", () =>
-                unwrap(
-                  client.POST("/api/admin/users/{id}/sessions/revoke", {
-                    params: { path: { id: user.id } },
-                  }),
-                ),
-              )
-            }
-          >
-            Revoke all sessions
-          </Button>
-
-          <div className="flex gap-2">
-            <Input
-              type="text"
-              placeholder="New password (min 8)"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <Button
-              variant="secondary"
-              disabled={password.length < 8}
-              onClick={() =>
-                void run("Password set", () =>
-                  unwrap(
-                    client.POST("/api/admin/users/{id}/password", {
-                      params: { path: { id: user.id } },
-                      body: { password },
-                    }),
-                  ),
-                )
-              }
-            >
-              Set
-            </Button>
-          </div>
-
-          {!isSelf && (
-            <>
-              <Button
-                size="full"
-                variant="outline"
-                onClick={() =>
-                  void run(user.banned ? "Unbanned" : "Banned", () =>
-                    user.banned
-                      ? unwrap(
-                          client.POST("/api/admin/users/{id}/unban", {
-                            params: { path: { id: user.id } },
-                          }),
-                        )
-                      : unwrap(
-                          client.POST("/api/admin/users/{id}/ban", {
-                            params: { path: { id: user.id } },
-                            body: { reason: "banned via admin console" },
-                          }),
-                        ),
-                  )
-                }
-              >
-                {user.banned ? "Unban" : "Ban"}
-              </Button>
-
-              <Button
-                size="full"
-                variant="secondary"
-                onClick={() =>
-                  void run("Impersonating", async () => {
-                    await unwrap(
-                      client.POST("/api/admin/users/{id}/impersonate", {
-                        params: { path: { id: user.id } },
-                      }),
-                    );
-                    // The session cookie now belongs to the target; the
-                    // persisted query cache still holds the admin's own
-                    // /api/me, family and members. Drop it before the reload
-                    // or the app renders the wrong person.
-                    await resetCache();
-                    window.location.assign("/home");
-                  })
-                }
-              >
-                Impersonate
-              </Button>
-
-              <DeleteButton
-                onDelete={() =>
-                  void run(
-                    "User deleted",
-                    // Server-side safe delete: reassigns log attribution to
-                    // the tombstone first, audits, then removes the account.
-                    async () =>
-                      unwrap(
-                        client.POST("/api/admin/users/{id}/delete", {
-                          params: { path: { id: user.id } },
-                        }),
-                      ),
-                  )
-                }
-              />
-            </>
-          )}
-        </div>
-      )}
-    </Sheet>
-  );
-}
-
+// The operator's user list: a server-side search (name or email) and a page
+// at a time. A row opens the user page (UserDetail.tsx), where every support
+// tool for a person lives.
 export function AdminUsers() {
-  const queryClient = useQueryClient();
-  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
-
-  const users = useQuery({
-    queryKey: ["admin", "users"],
-    // Newest-first ordering is the server's, not a query parameter:
-    // GET /api/admin/users replaced better-auth's client-side listUsers.
-    queryFn: async () =>
-      (
-        await unwrap<{ items: AdminUser[] }>(
-          client.GET("/api/admin/users", { params: { query: { limit: 200 } } }),
-        )
-      ).items,
+  const [query, setQuery] = useState("");
+  const q = useDebounced(query.trim());
+  const users = useInfiniteQuery({
+    queryKey: ["admin", "users", q],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) =>
+      unwrap<Page<AdminUser>>(
+        client.GET("/api/admin/users", {
+          params: {
+            query: {
+              ...(q ? { query: q } : {}),
+              ...(pageParam ? { cursor: pageParam } : {}),
+            },
+          },
+        }),
+      ),
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
+  const rows = users.data?.pages.flatMap((p) => p.items) ?? [];
 
   return (
-    <>
+    <div className="space-y-2">
+      <Input
+        type="search"
+        placeholder={t("Search users")}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
       <Card className="divide-y divide-line p-0">
-        {(users.data ?? []).map((u) => (
-          <button
+        {rows.map((u) => (
+          <Link
             key={u.id}
-            type="button"
-            onClick={() => setSelectedUser(u)}
-            className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-surface-2"
+            to="/admin/users/$id"
+            params={{ id: u.id }}
+            className="flex items-center gap-3 px-4 py-3 active:bg-surface-2"
           >
             <div className="min-w-0 flex-1">
               <p className="truncate font-semibold text-ink">
-                {u.name}
+                {u.name || u.email}
                 {u.role === "admin" && (
                   <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-bold text-accent uppercase">
-                    admin
+                    {t("admin")}
                   </span>
                 )}
                 {u.banned && (
                   <span className="ml-2 rounded-full bg-danger/15 px-2 py-0.5 text-[10px] font-bold text-danger uppercase">
-                    banned
+                    {t("banned")}
                   </span>
                 )}
               </p>
               <p className="truncate text-xs text-muted">{u.email}</p>
             </div>
-          </button>
+            <IconChevronRight className="h-5 w-5 shrink-0 text-muted" />
+          </Link>
         ))}
+        {users.isSuccess && rows.length === 0 && (
+          <p className="px-4 py-6 text-center text-sm text-muted">
+            {q ? t("No users match.") : t("No users yet.")}
+          </p>
+        )}
       </Card>
-
-      <UserSheet
-        user={selectedUser}
-        onClose={() => setSelectedUser(null)}
-        refresh={() =>
-          void queryClient.invalidateQueries({ queryKey: ["admin"] })
-        }
+      <LoadMore
+        hasMore={!!users.hasNextPage}
+        loading={users.isFetchingNextPage}
+        onLoad={() => void users.fetchNextPage()}
       />
-    </>
+    </div>
   );
 }

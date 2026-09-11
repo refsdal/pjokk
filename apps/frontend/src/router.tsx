@@ -198,6 +198,17 @@ const adminUsersRoute = createRoute({
   ),
 });
 
+// The user page: a child of adminRoute like the family page, so the tab bar
+// highlights Users for both the list and the detail.
+const adminUserDetailRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: "/users/$id",
+  component: lazyRouteComponent(
+    () => import("@/screens/admin/UserDetail"),
+    "AdminUserDetailScreen",
+  ),
+});
+
 const adminAuditRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: "/audit",
@@ -256,6 +267,7 @@ export const routeTree = rootRoute.addChildren([
     adminFamiliesRoute,
     adminFamilyDetailRoute,
     adminUsersRoute,
+    adminUserDetailRoute,
     adminAuditRoute,
   ]),
 ]);

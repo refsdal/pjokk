@@ -22,6 +22,7 @@ import {
   isPrivilegedRole,
   wouldStrandFamily,
 } from "./lib";
+import { Empty, Section } from "./Section";
 
 // One family, in full — the page every other family-scoped operator tool
 // hangs off.
@@ -32,30 +33,6 @@ import {
 // banner. See internal/api/admin_families.go's header for the whole
 // argument; adding a log view here means adding a clause to the privacy
 // policy first.
-
-function Section({
-  title,
-  action,
-  children,
-}: {
-  title: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between px-1">
-        <h2 className="text-[11px] font-bold text-muted uppercase">{title}</h2>
-        {action}
-      </div>
-      <Card className="divide-y divide-line p-0">{children}</Card>
-    </div>
-  );
-}
-
-function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="px-4 py-5 text-center text-sm text-muted">{children}</p>;
-}
 
 // Rename, inline. The slug is deliberately NOT editable and NOT regenerated
 // — it is an identifier something may already hold.

@@ -1,4 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { IconChevronRight, IconPlus } from "@tabler/icons-react";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -11,7 +15,9 @@ import { client, unwrap } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { formatRelative } from "@/lib/time";
 import { toast } from "@/lib/toast";
-import type { AdminFamily } from "./lib";
+import { useDebounced } from "@/lib/use-debounced";
+import type { AdminFamily, Page } from "./lib";
+import { LoadMore } from "./LoadMore";
 
 // The operator's family list. Rows are LINKS to the detail page and no
 // longer carry a delete button: a cascade delete one fat-fingered tap from a
@@ -220,17 +226,25 @@ export function AdminFamilies() {
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
 
-  const families = useQuery({
-    queryKey: ["admin", "families", query],
-    queryFn: async () =>
-      (
-        await unwrap<{ items: AdminFamily[] }>(
-          client.GET("/api/admin/families", {
-            params: { query: query ? { query } : {} },
-          }),
-        )
-      ).items,
+  // Asked of the server a page at a time, once typing settles.
+  const q = useDebounced(query.trim());
+  const families = useInfiniteQuery({
+    queryKey: ["admin", "families", q],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) =>
+      unwrap<Page<AdminFamily>>(
+        client.GET("/api/admin/families", {
+          params: {
+            query: {
+              ...(q ? { query: q } : {}),
+              ...(pageParam ? { cursor: pageParam } : {}),
+            },
+          },
+        }),
+      ),
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
+  const rows = families.data?.pages.flatMap((p) => p.items) ?? [];
 
   return (
     <div className="space-y-2">
@@ -248,7 +262,7 @@ export function AdminFamilies() {
       </div>
 
       <Card className="divide-y divide-line p-0">
-        {(families.data ?? []).map((f) => (
+        {rows.map((f) => (
           <Link
             key={f.id}
             to="/admin/families/$id"
@@ -278,12 +292,17 @@ export function AdminFamilies() {
             <IconChevronRight className="h-5 w-5 shrink-0 text-muted" />
           </Link>
         ))}
-        {families.isSuccess && families.data.length === 0 && (
+        {families.isSuccess && rows.length === 0 && (
           <p className="px-4 py-6 text-center text-sm text-muted">
-            {query ? t("No families match.") : t("No families yet.")}
+            {q ? t("No families match.") : t("No families yet.")}
           </p>
         )}
       </Card>
+      <LoadMore
+        hasMore={!!families.hasNextPage}
+        loading={families.isFetchingNextPage}
+        onLoad={() => void families.fetchNextPage()}
+      />
 
       <CreateFamilySheet
         open={creating}
