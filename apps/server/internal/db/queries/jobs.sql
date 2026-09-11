@@ -94,3 +94,11 @@ WHERE (u."role" IS NULL OR u."role" != 'admin')
 -- unattended nightly sweep — keeping them distinct keeps each call site's
 -- intent legible at the call, not just in the SQL text.
 DELETE FROM "users" WHERE "id" = $1;
+
+-- name: ListMilestonePhotoKeys :many
+-- The photo backup's "live" set (jobs/photo_backup.go): the object key of
+-- every photo row. Deliberately across every family, like the reminder
+-- sweeps above — the nightly job serves the whole installation, and no
+-- handler calls this. A stored photo object whose key is not here is an
+-- orphan the job erases (issue #95). Keys only: nothing else is needed.
+SELECT "object_key" FROM "milestone_photo";

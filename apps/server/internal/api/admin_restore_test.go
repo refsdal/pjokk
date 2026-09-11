@@ -3,6 +3,7 @@ package api_test
 // The console's family restore (spec 2026-09-11-admin-restore §3).
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/refsdal/pjokk/server/internal/jobs"
+	"github.com/refsdal/pjokk/server/internal/storage"
 	"github.com/refsdal/pjokk/server/internal/testrig"
 )
 
@@ -98,5 +100,55 @@ func TestRestoreDeletedFamilyFromTheConsole(t *testing.T) {
 	}
 	if bad := a.Do(http.MethodPost, "/api/admin/backups/latest/families/"+familyID+"/restore", cookie, nil); bad.Status != http.StatusBadRequest {
 		t.Errorf("a malformed date = %d, want 400", bad.Status)
+	}
+}
+
+// Issue #95: the console's delete erases a family's photos from the store,
+// and the family restore still gets them back — from the photo backup's
+// dated deleted tree, where the next night moves the family's copies.
+func TestRestoredFamilyGetsItsPhotoBackAfterTheDeleteErasedIt(t *testing.T) {
+	a, _, cookie, _ := sysadminRig(t, "Ops family")
+	ctx := context.Background()
+	mem := a.Deps.Storage.(*storage.Memory)
+
+	familyID, parentCookie := a.NewFamily("Hansen", "parent@example.com")
+	babyID := a.NewBaby(familyID, "Nora")
+	up := photoUpload(t, a, newMilestone(t, a, parentCookie, babyID, "First smile"), parentCookie, realPNG(t, 40, 30))
+	if up.Status != http.StatusCreated {
+		t.Fatalf("upload = %d %s", up.Status, up.Raw)
+	}
+	var key string
+	if err := a.Rig.Pool.QueryRow(ctx, `SELECT "object_key" FROM "milestone_photo" WHERE "id" = $1`, up.JSON["id"]).Scan(&key); err != nil {
+		t.Fatalf("photo key: %v", err)
+	}
+	original, _ := mem.Read(key)
+
+	d := jobs.Deps{Pool: a.Deps.Pool, Q: a.Deps.Q, Storage: a.Deps.Storage, Push: a.Push, Now: a.Deps.Now}
+	backupTonight(t, a)
+	night1 := time.Now().UTC().Add(2 * time.Hour)
+	if _, err := jobs.RunPhotoBackup(ctx, d, night1); err != nil {
+		t.Fatalf("photo backup, night 1: %v", err)
+	}
+
+	if res := a.Do(http.MethodDelete, "/api/admin/families/"+familyID, cookie, nil); res.Status != http.StatusOK {
+		t.Fatalf("delete family = %d %s", res.Status, res.Raw)
+	}
+	if _, ok := mem.Read(key); ok {
+		t.Fatalf("the photo is still stored after its family was deleted")
+	}
+	night2 := night1.Add(24 * time.Hour)
+	if res, err := jobs.RunPhotoBackup(ctx, d, night2); err != nil || res.Moved != 1 {
+		t.Fatalf("photo backup, night 2 = %+v (%v), want the family's copy moved", res, err)
+	}
+
+	res := a.Do(http.MethodPost, "/api/admin/backups/2026-09-10/families/"+familyID+"/restore", cookie, nil)
+	if res.Status != http.StatusOK {
+		t.Fatalf("restore = %d %s", res.Status, res.Raw)
+	}
+	if res.JSON["photosRestored"] != float64(1) {
+		t.Errorf("photosRestored = %v, want 1 (report %s)", res.JSON["photosRestored"], res.Raw)
+	}
+	if got, ok := mem.Read(key); !ok || !bytes.Equal(got, original) {
+		t.Errorf("the photo was not put back from the deleted tree (present %v)", ok)
 	}
 }
