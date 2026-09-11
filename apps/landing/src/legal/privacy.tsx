@@ -119,7 +119,10 @@ export function En() {
         We take an encrypted backup once a day and keep it for{" "}
         <strong>30 days</strong>. That means a deletion takes up to 30 days to
         work its way out of our backups completely. Backups are only ever used
-        to restore the service after a failure.
+        to restore the service after a failure. For that purpose the operator
+        can download a copy; every download is recorded in the audit trail, and
+        a downloaded copy is kept inside the EU and deleted as soon as it has
+        served its purpose.
       </p>
 
       <H>Your rights</H>
@@ -296,7 +299,10 @@ export function Nb() {
         Vi tar en kryptert sikkerhetskopi én gang i døgnet og beholder den i{" "}
         <strong>30 dager</strong>. Det betyr at en sletting bruker inntil 30
         dager på å forsvinne helt ut av sikkerhetskopiene våre. Sikkerhetskopier
-        brukes utelukkende til å gjenopprette tjenesten etter feil.
+        brukes utelukkende til å gjenopprette tjenesten etter feil. Til det
+        formålet kan driftsansvarlig laste ned en kopi; hver nedlasting
+        registreres i revisjonsloggen, og en nedlastet kopi oppbevares innenfor
+        EU og slettes så snart den har gjort nytten sin.
       </p>
 
       <H>Rettighetene dine</H>

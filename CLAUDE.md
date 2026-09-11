@@ -112,6 +112,11 @@ separate test deploy).
   Kubernetes, scale `server` for HTTP and drive the scheduled work from
   either CronJobs or exactly one `worker` replica — never more than one thing
   scheduling at once, or every replica/worker fires every job N times.
+  Every run — the scheduler, `pjokk cron <job>`, or the console's Run now —
+  goes through `cron.Claim`, which takes a per-job Postgres advisory lock
+  and writes a `job_run` row (pruned after 30 days), so the Ops page can
+  say whether a job ran wherever it ran. The lock stops runs OVERLAPPING,
+  not repeating: it is not a licence to schedule from several places.
 - Web push is `SherClockHolmes/webpush-go` (VAPID). Absent `VAPID_*` the
   subsystem is simply off and the boot log says so.
 - Configuration is environment variables, parsed and validated at startup in
@@ -387,8 +392,13 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   per family (spec `docs/superpowers/specs/2026-09-08-admin-family-management-design.md`)
   and per person (spec `docs/superpowers/specs/2026-09-11-admin-user-support-design.md`:
   families, sign-in methods, sessions with sign-out, change email, revoke
-  system admin). Metadata only — never a log entry. Every write audits
-  first; the system-admin role can be revoked over HTTP but never granted.
+  system admin), and an Ops tab (spec `docs/superpowers/specs/2026-09-11-admin-ops-design.md`:
+  build and schema versions, where storage points, each job's recorded runs
+  with Run now, the backup list with an audited download). Metadata only —
+  never a log entry; the one exception is a backup download, which the
+  operator chose knowing it hands out every family's data. Every write
+  audits first; the system-admin role can be revoked over HTTP but never
+  granted.
 - **Night mode:** scheduled + manual override; deliberate exit gesture.
 - **Active sessions are state, not screens:** one `activeSession` query,
   rendered everywhere (home banner, timeline badge, tab tint). The nursing
@@ -487,9 +497,9 @@ sheet pattern — build the pattern well once.
   session tokens, and `family_invite`, because its primary key IS the invite
   code, a credential that can be issued for the whole 30-day window.
   `jobs.DeliberatelyExcluded` names both alongside the two rate-limit tables
-  and goose's bookkeeping, and `backup_tables_test.go` checks the list
-  against the live schema **in both directions**, so "every table" stays
-  true as the schema grows.
+  and the bookkeeping tables (goose's and `job_run`), and
+  `backup_tables_test.go` checks the list against the live schema **in both
+  directions**, so "every table" stays true as the schema grows.
 
 ## Phased roadmap
 

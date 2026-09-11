@@ -2465,3 +2465,54 @@ Spec: `docs/superpowers/specs/2026-09-11-admin-user-support-design.md`.
   family pages, but the i18n check skips `screens/admin/`. They stay
   English until someone translates them, and nothing fails meanwhile.
 
+
+## 2026-09-11 — admin ops (console spec 3)
+
+Spec: `docs/superpowers/specs/2026-09-11-admin-ops-design.md`.
+
+- **Run records and the lock live in Postgres.** In a split deployment
+  the process answering `/admin` is not the one running the jobs — a
+  `worker` replica or CronJobs are — so "did last night's backup happen"
+  cannot come from memory. Every run goes through `cron.Claim`: a per-job
+  `pg_try_advisory_lock` on a connection held for the run, and a
+  `job_run` row. Rejected: a queue the scheduler polls (a CronJob-only
+  deployment has no poller) and no table at all (it cannot say whether
+  reminders ran).
+- **The lock stops overlap, not repetition.** Two replicas ticking at the
+  same minute now run the job once, but a quick run that finishes before
+  the second tick starts still runs twice. It is not a licence to
+  schedule from several places. A held lock is success for the scheduler
+  and `pjokk cron` (exit 0): the job IS running, with its own row.
+- **Claim, audit, Begin.** The console claims first so a 409 is honest
+  and the audit row can name the run, then writes the audit row, then
+  starts the job. A failed audit write abandons the claim (row deleted,
+  lock released), so no run starts without a trail entry, and a refused
+  run leaves no audit row claiming it happened.
+- **"Interrupted" is read, not written.** A process that dies mid-run
+  leaves its row unfinished; the session-scoped lock dies with its
+  connection. The Ops page calls a row still running past its job's
+  timeout (1 h nightly, 10 min frequent — the same timeouts that now
+  bound every run) interrupted.
+- **Stale is 26 h for nightly, 30 min for frequent, and "never run" is
+  stale** — that is what a deployment with nothing scheduling looks like.
+- **Backups can be downloaded from the console.** The operator chose it
+  knowing a snapshot is every family's data. The route is audited before
+  the first byte, `Cache-Control: no-store`, and the SPA saves it through
+  fetch → blob rather than a navigation. The privacy policy says so, in
+  both languages; that a downloaded copy stays in the EU and is deleted
+  afterwards is a promise the operator keeps, not one the code can.
+- **The service worker and the persisted cache no longer hold admin
+  responses.** Found while designing the download: the NetworkFirst rule
+  cached every `/api/` GET but auth and `/api/me` for 14 days, and the
+  IndexedDB snapshot persisted every query but identity — so other
+  people's emails, their sessions and the audit trail sat in an
+  operator's browser. `/api/admin/` is now excluded from both.
+- **The storage description is shown, never the credentials.** Bucket,
+  region and endpoint host (or the fs path) let an operator check the
+  EU-residency promise from the console instead of taking the deployment's
+  word for it.
+- **Two structural notes.** `goose_db_version` is read with a raw query:
+  no migration creates it, so sqlc cannot type-check against it. And the
+  cron package's tests moved to `package cron_test`, with the unexported
+  seams in `export_test.go`, because `internal/api` now imports `cron` and
+  an in-package test importing the test rig would be an import cycle.

@@ -71,14 +71,17 @@ wraps.
   and the CLI log "already running" and treat it as success — the job IS
   running, and a CronJob that overlaps a long nightly should not page
   anyone. The console answers `409 JOB_RUNNING`.
-- **Console runs** split the same steps across the request: the handler
-  takes the lock and inserts the row inside the request (so the 409 is
-  honest and the id exists), writes the audit row, then hands the held
-  connection to a goroutine that runs the job on a background context with
-  its own timeout — **1 h** for nightly, **10 min** for frequent — and
-  closes the row and the lock. The handler answers `202 {runId}`. This is
-  `cron.Start(ctx, job, trigger, d) (runID string, wait func(), err error)`;
-  `Run` is `Start` followed by `wait()`.
+- **Console runs** split the same steps across the request.
+  `cron.Claim(ctx, job, trigger, d) (*Claimed, error)` takes the lock and
+  inserts the row inside the request, so the 409 is honest and the id
+  exists; the handler writes the audit row naming the run; then
+  `claimed.Begin(ctx) (wait func() error)` runs the job in a goroutine on a
+  context detached from the request, with its job's timeout — **1 h** for
+  nightly, **10 min** for frequent (every run gets it) — and closes the row
+  and the lock. The handler answers `202 {runId}`. If the audit write
+  fails, `claimed.Abandon()` deletes the row and releases the lock: no run
+  starts without a trail entry. `cron.Start` is `Claim` then `Begin`, and
+  `cron.Run` is `Start` then `wait()`.
 - **Interrupted runs.** A process killed mid-run leaves `finished_at` NULL.
   The lock is session-scoped, so it dies with the connection and the next
   run proceeds. Reads report a row that is still running after its job's
@@ -142,7 +145,7 @@ already have it to hand (S3's listing, `fs.FileInfo`, the in-memory bytes).
 
 - **Hand-routed**, like `/api/export.csv` and `/api/files/{id}`: a streamed
   body does not fit the strict server. Wrapped in a new `sysadminChain`
-  (session, then the system-admin check) so it gets exactly the tier the
+  (API key, session, then the system-admin check) so it gets exactly the tier the
   generated routes get; the tier gate test covers it.
 - `date` must match `^\d{4}-\d{2}-\d{2}$` (400 `VALIDATION` otherwise);
   a missing snapshot is 404.
