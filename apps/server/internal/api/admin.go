@@ -205,6 +205,17 @@ func (d Deps) DeleteAdminFamily(ctx context.Context, req gen.DeleteAdminFamilyRe
 	if err := audit(ctx, qtx, admin, "family.delete", req.Id, name); err != nil {
 		return nil, err
 	}
+	// Keys before the delete, in the same transaction: every photo and
+	// document row cascades away with the organization, the objects behind
+	// them do not (issue #95 — erasure has to reach the bytes too).
+	photoKeys, err := qtx.MilestonePhotoKeysForFamily(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+	docKeys, err := qtx.VaccineObjectKeysForFamily(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
 	// Zero rows means the family disappeared between the lookup above and
 	// this DELETE (a concurrent delete). Answered as the same 404 the
 	// lookup would have given rather than a 200 for a delete that deleted
@@ -218,6 +229,14 @@ func (d Deps) DeleteAdminFamily(ctx context.Context, req gen.DeleteAdminFamilyRe
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
+	}
+	// The objects go after the commit, as the per-item routes do: a failure
+	// here leaves an orphan object rather than a row pointing at nothing,
+	// and the nightly photo backup erases orphaned photos.
+	if keys := append(photoKeys, docKeys...); len(keys) > 0 {
+		if err := d.Storage.Delete(ctx, keys...); err != nil {
+			return nil, err
+		}
 	}
 	return gen.DeleteAdminFamily200JSONResponse{Ok: gen.OkOkTrue}, nil
 }

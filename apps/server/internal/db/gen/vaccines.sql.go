@@ -554,6 +554,71 @@ func (q *Queries) UpdateVaccine(ctx context.Context, arg UpdateVaccineParams) (i
 	return result.RowsAffected(), nil
 }
 
+const vaccineObjectKeysForBaby = `-- name: VaccineObjectKeysForBaby :many
+SELECT d."object_key"
+FROM "vaccine_document" d
+JOIN "vaccine_log" v ON v."id" = d."vaccine_log_id"
+WHERE d."family_id" = $1
+  AND v."family_id" = $1
+  AND v."baby_id" = $2
+`
+
+type VaccineObjectKeysForBabyParams struct {
+	FamilyID string
+	BabyID   string
+}
+
+// The same, for every vaccine entry of one baby: read BEFORE DeleteBaby
+// (core.sql), whose cascade takes the document rows but not the objects
+// (issue #95). Both sides of the join are held to the family.
+func (q *Queries) VaccineObjectKeysForBaby(ctx context.Context, arg VaccineObjectKeysForBabyParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, vaccineObjectKeysForBaby, arg.FamilyID, arg.BabyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var object_key string
+		if err := rows.Scan(&object_key); err != nil {
+			return nil, err
+		}
+		items = append(items, object_key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const vaccineObjectKeysForFamily = `-- name: VaccineObjectKeysForFamily :many
+SELECT "object_key"
+FROM "vaccine_document"
+WHERE "family_id" = $1
+`
+
+// The same, for the whole family: read BEFORE DeleteOrganization
+// (admin.sql) (issue #95).
+func (q *Queries) VaccineObjectKeysForFamily(ctx context.Context, familyID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, vaccineObjectKeysForFamily, familyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var object_key string
+		if err := rows.Scan(&object_key); err != nil {
+			return nil, err
+		}
+		items = append(items, object_key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const vaccineObjectKeysForLog = `-- name: VaccineObjectKeysForLog :many
 SELECT "object_key"
 FROM "vaccine_document"

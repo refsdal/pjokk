@@ -76,6 +76,24 @@ SELECT "object_key"
 FROM "vaccine_document"
 WHERE "family_id" = $1 AND "vaccine_log_id" = $2;
 
+-- name: VaccineObjectKeysForBaby :many
+-- The same, for every vaccine entry of one baby: read BEFORE DeleteBaby
+-- (core.sql), whose cascade takes the document rows but not the objects
+-- (issue #95). Both sides of the join are held to the family.
+SELECT d."object_key"
+FROM "vaccine_document" d
+JOIN "vaccine_log" v ON v."id" = d."vaccine_log_id"
+WHERE d."family_id" = sqlc.arg(family_id)
+  AND v."family_id" = sqlc.arg(family_id)
+  AND v."baby_id" = sqlc.arg(baby_id);
+
+-- name: VaccineObjectKeysForFamily :many
+-- The same, for the whole family: read BEFORE DeleteOrganization
+-- (admin.sql) (issue #95).
+SELECT "object_key"
+FROM "vaccine_document"
+WHERE "family_id" = $1;
+
 -- name: DeleteVaccine :execrows
 DELETE FROM "vaccine_log"
 WHERE "family_id" = $1 AND "id" = $2;

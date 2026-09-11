@@ -198,15 +198,31 @@ func (d Deps) UpdateBaby(ctx context.Context, req gen.UpdateBabyRequestObject) (
 // memberRole admin/owner; cascades logs — the role check is
 // middleware.RequireAdmin (tierAdmin), not this method; the cascade is the
 // baby table's own FKs (ON DELETE CASCADE on every log table), not
-// application code.
+// application code. The cascade takes the baby's milestone photo and
+// vaccine document rows but not the stored objects behind them, so their
+// keys are read first and the objects deleted once the rows are gone
+// (issue #95), the same order the per-item routes use.
 func (d Deps) DeleteBaby(ctx context.Context, req gen.DeleteBabyRequestObject) (gen.DeleteBabyResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
+	photoKeys, err := d.Q.MilestonePhotoKeysForBaby(ctx, dbgen.MilestonePhotoKeysForBabyParams{FamilyID: fam.FamilyID, BabyID: req.Id})
+	if err != nil {
+		return nil, err
+	}
+	docKeys, err := d.Q.VaccineObjectKeysForBaby(ctx, dbgen.VaccineObjectKeysForBabyParams{FamilyID: fam.FamilyID, BabyID: req.Id})
+	if err != nil {
+		return nil, err
+	}
 	n, err := d.Q.DeleteBaby(ctx, dbgen.DeleteBabyParams{FamilyID: fam.FamilyID, ID: req.Id})
 	if err != nil {
 		return nil, err
 	}
 	if n == 0 {
 		return gen.DeleteBaby404JSONResponse(notFound()), nil
+	}
+	if keys := append(photoKeys, docKeys...); len(keys) > 0 {
+		if err := d.Storage.Delete(ctx, keys...); err != nil {
+			return nil, err
+		}
 	}
 	return gen.DeleteBaby200JSONResponse{Ok: gen.OkOkTrue}, nil
 }

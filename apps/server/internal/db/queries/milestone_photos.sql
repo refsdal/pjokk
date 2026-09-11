@@ -52,3 +52,21 @@ RETURNING "object_key";
 SELECT "object_key"
 FROM "milestone_photo"
 WHERE "family_id" = $1 AND "milestone_log_id" = $2;
+
+-- name: MilestonePhotoKeysForBaby :many
+-- Read BEFORE DeleteBaby (core.sql): the baby's milestones cascade away
+-- with it, and their photo rows with them; the objects do not (issue #95).
+-- Both sides of the join are held to the family.
+SELECT p."object_key"
+FROM "milestone_photo" p
+JOIN "milestone_log" m ON m."id" = p."milestone_log_id"
+WHERE p."family_id" = sqlc.arg(family_id)
+  AND m."family_id" = sqlc.arg(family_id)
+  AND m."baby_id" = sqlc.arg(baby_id);
+
+-- name: MilestonePhotoKeysForFamily :many
+-- Read BEFORE DeleteOrganization (admin.sql): everything the family owns
+-- cascades away with it, the objects behind its photos do not (issue #95).
+SELECT "object_key"
+FROM "milestone_photo"
+WHERE "family_id" = $1;
