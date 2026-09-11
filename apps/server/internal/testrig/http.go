@@ -180,6 +180,7 @@ func App(t *testing.T) *AppRig {
 		PhotoQuotaBytes:  500 << 20,
 		DevicePINKey:     sha256.Sum256([]byte("pjokk-test-device-pin-key")),
 		Version:          Version,
+		StorageInfo:      api.StorageInfo{Driver: "memory"},
 	}
 
 	ar.mu.Lock()

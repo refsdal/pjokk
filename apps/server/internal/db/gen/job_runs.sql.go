@@ -11,6 +11,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const deleteJobRun = `-- name: DeleteJobRun :exec
+DELETE FROM "job_run" WHERE "id" = $1
+`
+
+// A claim given back before it ran (its audit row could not be written):
+// no run happened, so no row either.
+func (q *Queries) DeleteJobRun(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, deleteJobRun, id)
+	return err
+}
+
 const finishJobRun = `-- name: FinishJobRun :exec
 UPDATE "job_run"
 SET "finished_at" = $2, "ok" = $3, "error" = $4

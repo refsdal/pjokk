@@ -3662,6 +3662,67 @@ paths:
               schema:
                 $ref: "#/components/schemas/Ok"
 
+  /api/admin/ops:
+    get:
+      operationId: getAdminOps
+      summary: >-
+        The operator's health page (spec 2026-09-11-admin-ops §2): the build
+        and schema versions, where storage points, the database's size, and
+        each scheduled job's recent runs, next due time and staleness. Never
+        a credential. System admin only.
+      tags: [admin]
+      responses:
+        "200":
+          description: Health.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOps"
+  /api/admin/jobs/{job}/run:
+    post:
+      operationId: runAdminJob
+      summary: >-
+        Run a scheduled job now, exactly as its schedule would. Takes the
+        job's lock and records the run, writes an audit row naming it, then
+        answers 202 while the job carries on in the background. 409
+        JOB_RUNNING when it is already running anywhere. System admin only.
+      tags: [admin]
+      parameters:
+        - name: job
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [nightly, frequent]
+      responses:
+        "202":
+          description: Started.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminJobStarted"
+        "409":
+          description: Already running (JOB_RUNNING).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/backups:
+    get:
+      operationId: listAdminBackups
+      summary: >-
+        The nightly snapshots in storage, newest first, with their sizes, and
+        the photo backup's object counts. Downloading one is GET
+        /api/admin/backups/{date} — hand-routed, as a streamed body is, and
+        audited — which is why it is not described here. System admin only.
+      tags: [admin]
+      responses:
+        "200":
+          description: The snapshots.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminBackups"
 components:
   parameters:
     babyIdQuery:
@@ -6399,6 +6460,157 @@ components:
           type: boolean
 
     # --- System-admin console (Task 21) ---------------------------------
+    AdminOps:
+      type: object
+      description: The Ops page. Metadata about the deployment, never a credential.
+      required: [version, schema, storage, database, jobs]
+      properties:
+        version:
+          type: string
+          description: The running build, the same string as the image tag.
+        schema:
+          $ref: "#/components/schemas/AdminSchemaVersion"
+        storage:
+          $ref: "#/components/schemas/AdminStorage"
+        database:
+          $ref: "#/components/schemas/AdminDatabase"
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminJob"
+    AdminSchemaVersion:
+      type: object
+      description: >-
+        The highest migration applied to the database, and the newest one
+        this binary carries. Unequal means a rollout skipped `migrate` (or an
+        old image runs against a newer database).
+      required: [applied, latest]
+      properties:
+        applied:
+          type: integer
+          format: int64
+        latest:
+          type: integer
+          format: int64
+    AdminStorage:
+      type: object
+      description: >-
+        Where files live — for s3 the bucket, region and endpoint host, for fs
+        the path. Never a credential.
+      required: [driver]
+      properties:
+        driver:
+          type: string
+        bucket:
+          type: string
+        region:
+          type: string
+        endpointHost:
+          type: string
+        path:
+          type: string
+    AdminDatabase:
+      type: object
+      required: [sizeBytes, serverVersion]
+      properties:
+        sizeBytes:
+          type: integer
+          format: int64
+        serverVersion:
+          type: string
+    AdminJob:
+      type: object
+      required: [name, schedule, nextDue, stale, running, runs]
+      properties:
+        name:
+          type: string
+        schedule:
+          type: string
+          description: The cron expression, in UTC.
+        nextDue:
+          type: string
+          format: date-time
+        lastSuccessAt:
+          type: string
+          format: date-time
+          description: Absent when the job has never finished without an error.
+        stale:
+          type: boolean
+          description: >-
+            No success within 26 h (nightly) or 30 min (frequent) — or never.
+        running:
+          type: boolean
+        runs:
+          type: array
+          description: The last 10 runs, newest first.
+          items:
+            $ref: "#/components/schemas/AdminJobRun"
+    AdminJobRun:
+      type: object
+      required: [id, trigger, startedAt, status]
+      properties:
+        id:
+          type: string
+        trigger:
+          type: string
+          enum: [schedule, cli, console]
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [running, ok, failed, interrupted]
+          description: >-
+            interrupted is a run still unfinished past its job's timeout: its
+            process died.
+        error:
+          type: string
+    AdminJobStarted:
+      type: object
+      required: [runId]
+      properties:
+        runId:
+          type: string
+    AdminBackups:
+      type: object
+      required: [snapshots, retentionDays, photos]
+      properties:
+        snapshots:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminBackup"
+        retentionDays:
+          type: integer
+        photos:
+          $ref: "#/components/schemas/AdminPhotoBackups"
+    AdminBackup:
+      type: object
+      required: [date, sizeBytes, uploadedAt]
+      properties:
+        date:
+          type: string
+          description: YYYY-MM-DD, UTC — the night it names.
+        sizeBytes:
+          type: integer
+          format: int64
+        uploadedAt:
+          type: string
+          format: date-time
+    AdminPhotoBackups:
+      type: object
+      description: Object counts under the photo backup's two trees.
+      required: [current, currentBytes, deleted]
+      properties:
+        current:
+          type: integer
+        currentBytes:
+          type: integer
+          format: int64
+        deleted:
+          type: integer
     AdminStats:
       type: object
       description: >-

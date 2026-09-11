@@ -114,6 +114,10 @@ type Deps struct {
 	// would be reversible by enumeration in moments.
 	DevicePINKey [32]byte
 
+	// StorageInfo says where files live, for the console's Ops page (never
+	// a credential); cmd/pjokk fills it from config.
+	StorageInfo StorageInfo
+
 	// Version is internal/buildinfo.Version as the composition root read
 	// it — passed in rather than imported here so the handlers stay
 	// dependency-free and the test rig can pin a known value. Surfaces on
@@ -464,6 +468,9 @@ var operationAuthTiers = map[string]authTier{
 	"ChangeAdminUserEmail":    tierSysadmin,
 	"RevokeAdminUserRole":     tierSysadmin,
 	"RevokeAdminUserSession":  tierSysadmin,
+	"GetAdminOps":             tierSysadmin,
+	"RunAdminJob":             tierSysadmin,
+	"ListAdminBackups":        tierSysadmin,
 	"DeleteAdminUser":         tierSysadmin,
 	"BanAdminUser":            tierSysadmin,
 	"UnbanAdminUser":          tierSysadmin,

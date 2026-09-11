@@ -29,3 +29,8 @@ LIMIT 1;
 
 -- name: PruneJobRuns :execrows
 DELETE FROM "job_run" WHERE "started_at" < $1;
+
+-- name: DeleteJobRun :exec
+-- A claim given back before it ran (its audit row could not be written):
+-- no run happened, so no row either.
+DELETE FROM "job_run" WHERE "id" = $1;

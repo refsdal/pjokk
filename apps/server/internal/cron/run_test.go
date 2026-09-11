@@ -1,4 +1,4 @@
-package cron
+package cron_test
 
 // Every run leaves a job_run row wherever it ran, and a job never overlaps
 // itself (docs/superpowers/specs/2026-09-11-admin-ops-design.md §1). The
@@ -14,6 +14,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/refsdal/pjokk/server/internal/cron"
 	"github.com/refsdal/pjokk/server/internal/testrig"
 )
 
@@ -46,19 +47,18 @@ func runsOf(t *testing.T, pool *pgxpool.Pool, job string) []runRow {
 }
 
 // withBody swaps the job body for the length of one test.
-func withBody(t *testing.T, body func(context.Context, string, Deps) error) {
+func withBody(t *testing.T, body func(context.Context, string, cron.Deps) error) {
 	t.Helper()
-	jobBody = body
-	t.Cleanup(func() { jobBody = RunJob })
+	t.Cleanup(cron.SetJobBody(body))
 }
 
 func TestRunRecordsASuccessfulRun(t *testing.T) {
 	a := testrig.App(t)
 	d, _ := depsFor(a)
 
-	id, err := Run(context.Background(), "frequent", "cli", d)
+	id, err := cron.Run(context.Background(), "frequent", "cli", d)
 	if err != nil {
-		t.Fatalf("Run: %v", err)
+		t.Fatalf("cron.Run: %v", err)
 	}
 	runs := runsOf(t, a.Deps.Pool, "frequent")
 	if len(runs) != 1 {
@@ -73,12 +73,12 @@ func TestRunRecordsASuccessfulRun(t *testing.T) {
 func TestRunRecordsAFailure(t *testing.T) {
 	a := testrig.App(t)
 	d, _ := depsFor(a)
-	withBody(t, func(context.Context, string, Deps) error {
+	withBody(t, func(context.Context, string, cron.Deps) error {
 		return errors.New("storage unreachable")
 	})
 
-	if _, err := Run(context.Background(), "nightly", "schedule", d); err == nil || err.Error() != "storage unreachable" {
-		t.Fatalf("Run err = %v, want the job's own error", err)
+	if _, err := cron.Run(context.Background(), "nightly", "schedule", d); err == nil || err.Error() != "storage unreachable" {
+		t.Fatalf("cron.Run err = %v, want the job's own error", err)
 	}
 	runs := runsOf(t, a.Deps.Pool, "nightly")
 	if len(runs) != 1 || runs[0].ok == nil || *runs[0].ok || runs[0].errText == nil || *runs[0].errText != "storage unreachable" {
@@ -93,11 +93,11 @@ func TestRunRecordsAFailure(t *testing.T) {
 func TestRunRecordsAPanicAsAFailure(t *testing.T) {
 	a := testrig.App(t)
 	d, _ := depsFor(a)
-	withBody(t, func(context.Context, string, Deps) error { panic("job exploded") })
+	withBody(t, func(context.Context, string, cron.Deps) error { panic("job exploded") })
 
-	_, err := Run(context.Background(), "frequent", "cli", d)
+	_, err := cron.Run(context.Background(), "frequent", "cli", d)
 	if err == nil || !strings.Contains(err.Error(), "panic: job exploded") {
-		t.Fatalf("Run err = %v, want the panic as an error", err)
+		t.Fatalf("cron.Run err = %v, want the panic as an error", err)
 	}
 	runs := runsOf(t, a.Deps.Pool, "frequent")
 	if len(runs) != 1 || runs[0].ok == nil || *runs[0].ok || runs[0].errText == nil ||
@@ -109,14 +109,14 @@ func TestRunRecordsAPanicAsAFailure(t *testing.T) {
 func TestRunTruncatesALongError(t *testing.T) {
 	a := testrig.App(t)
 	d, _ := depsFor(a)
-	withBody(t, func(context.Context, string, Deps) error {
+	withBody(t, func(context.Context, string, cron.Deps) error {
 		return errors.New(strings.Repeat("x", 600))
 	})
 
-	_, _ = Run(context.Background(), "frequent", "cli", d)
+	_, _ = cron.Run(context.Background(), "frequent", "cli", d)
 	runs := runsOf(t, a.Deps.Pool, "frequent")
-	if len(runs) != 1 || runs[0].errText == nil || len(*runs[0].errText) != maxRunError {
-		t.Fatalf("stored error length = %v, want %d", runs, maxRunError)
+	if len(runs) != 1 || runs[0].errText == nil || len(*runs[0].errText) != cron.MaxRunError {
+		t.Fatalf("stored error length = %v, want %d", runs, cron.MaxRunError)
 	}
 }
 
@@ -125,63 +125,63 @@ func TestRunTruncatesALongError(t *testing.T) {
 func TestRunRefusesWhileTheJobIsLocked(t *testing.T) {
 	a := testrig.App(t)
 	d, _ := depsFor(a)
-	withBody(t, func(context.Context, string, Deps) error { return nil })
+	withBody(t, func(context.Context, string, cron.Deps) error { return nil })
 	ctx := context.Background()
 
 	conn, err := a.Deps.Pool.Acquire(ctx)
 	if err != nil {
 		t.Fatalf("acquire: %v", err)
 	}
-	if _, err := conn.Exec(ctx, `SELECT pg_advisory_lock($1)`, lockKey("nightly")); err != nil {
+	if _, err := conn.Exec(ctx, `SELECT pg_advisory_lock($1)`, cron.LockKey("nightly")); err != nil {
 		t.Fatalf("lock: %v", err)
 	}
 
-	if _, err := Run(ctx, "nightly", "schedule", d); !errors.Is(err, ErrJobRunning) {
-		t.Fatalf("Run while locked = %v, want ErrJobRunning", err)
+	if _, err := cron.Run(ctx, "nightly", "schedule", d); !errors.Is(err, cron.ErrJobRunning) {
+		t.Fatalf("cron.Run while locked = %v, want cron.ErrJobRunning", err)
 	}
 	if runs := runsOf(t, a.Deps.Pool, "nightly"); len(runs) != 0 {
 		t.Errorf("a refused run left rows: %+v", runs)
 	}
 	// Each job has its own lock.
-	if _, err := Run(ctx, "frequent", "schedule", d); err != nil {
+	if _, err := cron.Run(ctx, "frequent", "schedule", d); err != nil {
 		t.Errorf("frequent while nightly is locked: %v", err)
 	}
 
-	if _, err := conn.Exec(ctx, `SELECT pg_advisory_unlock($1)`, lockKey("nightly")); err != nil {
+	if _, err := conn.Exec(ctx, `SELECT pg_advisory_unlock($1)`, cron.LockKey("nightly")); err != nil {
 		t.Fatalf("unlock: %v", err)
 	}
 	conn.Release()
 
 	// Free again, and released again after a run: two in a row both go.
 	for i := range 2 {
-		if _, err := Run(ctx, "nightly", "schedule", d); err != nil {
-			t.Fatalf("Run %d after unlock: %v", i, err)
+		if _, err := cron.Run(ctx, "nightly", "schedule", d); err != nil {
+			t.Fatalf("cron.Run %d after unlock: %v", i, err)
 		}
 	}
 }
 
-// The console's shape: Start returns once the run is recorded, while the
+// The console's shape: cron.Start returns once the run is recorded, while the
 // job is still going, and the lock holds until it ends.
 func TestStartReturnsWhileTheJobRuns(t *testing.T) {
 	a := testrig.App(t)
 	d, _ := depsFor(a)
 	release := make(chan struct{})
-	withBody(t, func(context.Context, string, Deps) error {
+	withBody(t, func(context.Context, string, cron.Deps) error {
 		<-release
 		return nil
 	})
 	ctx := context.Background()
 
-	id, wait, err := Start(ctx, "frequent", "console", d)
+	id, wait, err := cron.Start(ctx, "frequent", "console", d)
 	if err != nil {
-		t.Fatalf("Start: %v", err)
+		t.Fatalf("cron.Start: %v", err)
 	}
 	runs := runsOf(t, a.Deps.Pool, "frequent")
 	if len(runs) != 1 || runs[0].id != id || runs[0].finished || runs[0].trigger != "console" {
 		t.Fatalf("runs while running = %+v, want one unfinished console run", runs)
 	}
-	if _, _, err := Start(ctx, "frequent", "console", d); !errors.Is(err, ErrJobRunning) {
-		t.Errorf("second Start = %v, want ErrJobRunning", err)
+	if _, _, err := cron.Start(ctx, "frequent", "console", d); !errors.Is(err, cron.ErrJobRunning) {
+		t.Errorf("second cron.Start = %v, want cron.ErrJobRunning", err)
 	}
 
 	close(release)
@@ -197,8 +197,8 @@ func TestStartReturnsWhileTheJobRuns(t *testing.T) {
 func TestRunRejectsAnUnknownJob(t *testing.T) {
 	a := testrig.App(t)
 	d, _ := depsFor(a)
-	if _, err := Run(context.Background(), "weekly", "cli", d); err == nil {
-		t.Fatal("Run(weekly) = nil, want an error")
+	if _, err := cron.Run(context.Background(), "weekly", "cli", d); err == nil {
+		t.Fatal("cron.Run(weekly) = nil, want an error")
 	}
 }
 
@@ -219,8 +219,8 @@ func TestNightlyPrunesOldJobRuns(t *testing.T) {
 		}
 	}
 
-	if _, err := Run(ctx, "nightly", "schedule", d); err != nil {
-		t.Fatalf("Run(nightly): %v", err)
+	if _, err := cron.Run(ctx, "nightly", "schedule", d); err != nil {
+		t.Fatalf("cron.Run(nightly): %v", err)
 	}
 	var old, kept int
 	if err := a.Deps.Pool.QueryRow(ctx, `
@@ -230,5 +230,39 @@ func TestNightlyPrunesOldJobRuns(t *testing.T) {
 	}
 	if old != 0 || kept != 1 {
 		t.Errorf("after nightly: %d runs older than 30 days, %d newer; want 0 and 1", old, kept)
+	}
+}
+
+// The console's audit row sits between cron.Claim and Begin; a failed audit
+// write gives the claim back: no row, and the job free again.
+func TestAbandonLeavesNoRunAndFreesTheJob(t *testing.T) {
+	a := testrig.App(t)
+	d, _ := depsFor(a)
+	withBody(t, func(context.Context, string, cron.Deps) error { return nil })
+	ctx := context.Background()
+
+	c, err := cron.Claim(ctx, "nightly", "console", d)
+	if err != nil {
+		t.Fatalf("cron.Claim: %v", err)
+	}
+	c.Abandon()
+	if runs := runsOf(t, a.Deps.Pool, "nightly"); len(runs) != 0 {
+		t.Errorf("an abandoned claim left rows: %+v", runs)
+	}
+	if _, err := cron.Run(ctx, "nightly", "schedule", d); err != nil {
+		t.Errorf("cron.Run after Abandon: %v", err)
+	}
+}
+
+func TestNextDueFollowsTheScheduleInUTC(t *testing.T) {
+	now := time.Date(2026, 3, 1, 12, 5, 0, 0, time.UTC)
+	for job, want := range map[string]time.Time{
+		"nightly":  time.Date(2026, 3, 2, 3, 15, 0, 0, time.UTC),
+		"frequent": time.Date(2026, 3, 1, 12, 15, 0, 0, time.UTC),
+	} {
+		got, err := cron.NextDue(job, now)
+		if err != nil || !got.Equal(want) {
+			t.Errorf("cron.NextDue(%s) = %v, %v; want %v", job, got, err, want)
+		}
 	}
 }

@@ -29,6 +29,51 @@ func (e AddAdminFamilyMemberRole) Valid() bool {
 	}
 }
 
+// Defines values for AdminJobRunStatus.
+const (
+	AdminJobRunStatusFailed      AdminJobRunStatus = "failed"
+	AdminJobRunStatusInterrupted AdminJobRunStatus = "interrupted"
+	AdminJobRunStatusOk          AdminJobRunStatus = "ok"
+	AdminJobRunStatusRunning     AdminJobRunStatus = "running"
+)
+
+// Valid indicates whether the value is a known member of the AdminJobRunStatus enum.
+func (e AdminJobRunStatus) Valid() bool {
+	switch e {
+	case AdminJobRunStatusFailed:
+		return true
+	case AdminJobRunStatusInterrupted:
+		return true
+	case AdminJobRunStatusOk:
+		return true
+	case AdminJobRunStatusRunning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminJobRunTrigger.
+const (
+	Cli      AdminJobRunTrigger = "cli"
+	Console  AdminJobRunTrigger = "console"
+	Schedule AdminJobRunTrigger = "schedule"
+)
+
+// Valid indicates whether the value is a known member of the AdminJobRunTrigger enum.
+func (e AdminJobRunTrigger) Valid() bool {
+	switch e {
+	case Cli:
+		return true
+	case Console:
+		return true
+	case Schedule:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for BabySex.
 const (
 	BabySexBoy  BabySex = "boy"
@@ -1664,6 +1709,24 @@ func (e UpdateSleepType) Valid() bool {
 	}
 }
 
+// Defines values for RunAdminJobParamsJob.
+const (
+	Frequent RunAdminJobParamsJob = "frequent"
+	Nightly  RunAdminJobParamsJob = "nightly"
+)
+
+// Valid indicates whether the value is a known member of the RunAdminJobParamsJob enum.
+func (e RunAdminJobParamsJob) Valid() bool {
+	switch e {
+	case Frequent:
+		return true
+	case Nightly:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListTimelineParamsFilter.
 const (
 	ListTimelineParamsFilterDiapers ListTimelineParamsFilter = "diapers"
@@ -1742,6 +1805,28 @@ type AddAdminFamilyMember struct {
 // AddAdminFamilyMemberRole defines model for AddAdminFamilyMember.Role.
 type AddAdminFamilyMemberRole string
 
+// AdminBackup defines model for AdminBackup.
+type AdminBackup struct {
+	// Date YYYY-MM-DD, UTC — the night it names.
+	Date       string    `json:"date"`
+	SizeBytes  int64     `json:"sizeBytes"`
+	UploadedAt time.Time `json:"uploadedAt"`
+}
+
+// AdminBackups defines model for AdminBackups.
+type AdminBackups struct {
+	// Photos Object counts under the photo backup's two trees.
+	Photos        AdminPhotoBackups `json:"photos"`
+	RetentionDays int               `json:"retentionDays"`
+	Snapshots     []AdminBackup     `json:"snapshots"`
+}
+
+// AdminDatabase defines model for AdminDatabase.
+type AdminDatabase struct {
+	ServerVersion string `json:"serverVersion"`
+	SizeBytes     int64  `json:"sizeBytes"`
+}
+
 // AdminEmailChange defines model for AdminEmailChange.
 type AdminEmailChange struct {
 	Email string `json:"email"`
@@ -1816,6 +1901,75 @@ type AdminFamilyPage struct {
 	NextCursor *string `json:"nextCursor"`
 }
 
+// AdminJob defines model for AdminJob.
+type AdminJob struct {
+	// LastSuccessAt Absent when the job has never finished without an error.
+	LastSuccessAt *time.Time `json:"lastSuccessAt,omitempty"`
+	Name          string     `json:"name"`
+	NextDue       time.Time  `json:"nextDue"`
+	Running       bool       `json:"running"`
+
+	// Runs The last 10 runs, newest first.
+	Runs []AdminJobRun `json:"runs"`
+
+	// Schedule The cron expression, in UTC.
+	Schedule string `json:"schedule"`
+
+	// Stale No success within 26 h (nightly) or 30 min (frequent) — or never.
+	Stale bool `json:"stale"`
+}
+
+// AdminJobRun defines model for AdminJobRun.
+type AdminJobRun struct {
+	Error      *string    `json:"error,omitempty"`
+	FinishedAt *time.Time `json:"finishedAt,omitempty"`
+	Id         string     `json:"id"`
+	StartedAt  time.Time  `json:"startedAt"`
+
+	// Status interrupted is a run still unfinished past its job's timeout: its process died.
+	Status  AdminJobRunStatus  `json:"status"`
+	Trigger AdminJobRunTrigger `json:"trigger"`
+}
+
+// AdminJobRunStatus interrupted is a run still unfinished past its job's timeout: its process died.
+type AdminJobRunStatus string
+
+// AdminJobRunTrigger defines model for AdminJobRun.Trigger.
+type AdminJobRunTrigger string
+
+// AdminJobStarted defines model for AdminJobStarted.
+type AdminJobStarted struct {
+	RunId string `json:"runId"`
+}
+
+// AdminOps The Ops page. Metadata about the deployment, never a credential.
+type AdminOps struct {
+	Database AdminDatabase `json:"database"`
+	Jobs     []AdminJob    `json:"jobs"`
+
+	// Schema The highest migration applied to the database, and the newest one this binary carries. Unequal means a rollout skipped `migrate` (or an old image runs against a newer database).
+	Schema AdminSchemaVersion `json:"schema"`
+
+	// Storage Where files live — for s3 the bucket, region and endpoint host, for fs the path. Never a credential.
+	Storage AdminStorage `json:"storage"`
+
+	// Version The running build, the same string as the image tag.
+	Version string `json:"version"`
+}
+
+// AdminPhotoBackups Object counts under the photo backup's two trees.
+type AdminPhotoBackups struct {
+	Current      int   `json:"current"`
+	CurrentBytes int64 `json:"currentBytes"`
+	Deleted      int   `json:"deleted"`
+}
+
+// AdminSchemaVersion The highest migration applied to the database, and the newest one this binary carries. Unequal means a rollout skipped `migrate` (or an old image runs against a newer database).
+type AdminSchemaVersion struct {
+	Applied int64 `json:"applied"`
+	Latest  int64 `json:"latest"`
+}
+
 // AdminSession defines model for AdminSession.
 type AdminSession struct {
 	CreatedAt  time.Time `json:"createdAt"`
@@ -1843,6 +1997,15 @@ type AdminStats struct {
 	// Users Every row in `users`, the "Deleted user" tombstone included — the TypeScript predecessor counted it the same way once it had been created.
 	Users       int `json:"users"`
 	UsersLast7d int `json:"usersLast7d"`
+}
+
+// AdminStorage Where files live — for s3 the bucket, region and endpoint host, for fs the path. Never a credential.
+type AdminStorage struct {
+	Bucket       *string `json:"bucket,omitempty"`
+	Driver       string  `json:"driver"`
+	EndpointHost *string `json:"endpointHost,omitempty"`
+	Path         *string `json:"path,omitempty"`
+	Region       *string `json:"region,omitempty"`
 }
 
 // AdminUser defines model for AdminUser.
@@ -3319,6 +3482,9 @@ type ListAdminFamiliesParams struct {
 	// Limit Maximum number of rows to return.
 	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
 }
+
+// RunAdminJobParamsJob defines parameters for RunAdminJob.
+type RunAdminJobParamsJob string
 
 // ListAdminUsersParams defines parameters for ListAdminUsers.
 type ListAdminUsersParams struct {
