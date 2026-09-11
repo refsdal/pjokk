@@ -698,7 +698,7 @@ type ListMedicineRow struct {
 	Notes         *string
 }
 
-// The six Phase 3 activity types (Task 12; REF §A1 "other-logs.ts —
+// The six Phase 3 activity types ("other-logs.ts —
 // makeLogRoutes factory"). Every kind shares one structural shape (id,
 // family_id, baby_id, caretaker_id, time, …kind-specific columns, notes,
 // created_at) and therefore one query shape: List/Get/Create/Update/Delete,

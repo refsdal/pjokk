@@ -273,7 +273,7 @@ func New(cfg Config) (Service, error) {
 				}
 				return familySlug(name)
 			}),
-			// Task 22 fix (security review H2 — "only system admins can
+			// A security-review fix (H2 — "only system admins can
 			// create families"): apps/api/src/infrastructure/auth.ts's
 			// allowUserToCreateOrganization gate had NO Go-side equivalent.
 			// organizations:create stays enabled in allowedRouteIDs above

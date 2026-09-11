@@ -40,7 +40,7 @@ type GetAPIKeyByHashRow struct {
 	Plan       string
 }
 
-// The api-key authentication join (REF §A5 item 5). The key authenticates as
+// The api-key authentication join. The key authenticates as
 // the caretaker who created it — their attribution ends up on the logs — and
 // is scoped to the key's family, so the user and the organization are joined
 // in rather than looked up separately.
@@ -48,7 +48,7 @@ type GetAPIKeyByHashRow struct {
 // Revoked keys are filtered here rather than reported separately: a revoked
 // key must be indistinguishable from one that never existed.
 //
-// A BANNED creator's keys are filtered the same way (Task 21). A ban is
+// A BANNED creator's keys are filtered the same way. A ban is
 // enforced by absence — banning revokes every session the user holds — but
 // an API key is a second, longer-lived credential that no session
 // revocation touches: without this predicate a banned user kept full
@@ -107,7 +107,7 @@ type GetFamilyMembershipRoleParams struct {
 //
 // An active_organization_id on the session is NOT proof of membership (a
 // member removed from a family keeps the column until their next switch), so
-// the row's existence is the check — a missing row is REF §A5's 403
+// the row's existence is the check — a missing row is the 403
 // NOT_MEMBER.
 //
 // The role lives on organization_member_roles, one row per role held
@@ -194,7 +194,7 @@ type HitRateLimitParams struct {
 
 // Queries backing the request pipeline: the rate-limit counters
 // (internal/ratelimit) and the tenancy/auth middleware chain
-// (internal/api/middleware). See REF §A5 for the semantics each one serves.
+// (internal/api/middleware).
 // One atomic increment, replacing the KV-era read-compare-write. The counter
 // is exact even when several replicas serve the same caller concurrently,
 // which is the whole reason the limiter moved into Postgres.
@@ -223,7 +223,7 @@ type InsertAdminAuditParams struct {
 }
 
 // The append-only system-admin trail. Used by the middleware for
-// `impersonated.write` (REF §A5 item 2) and by the admin console for
+// `impersonated.write` and by the admin console for
 // everything else.
 func (q *Queries) InsertAdminAudit(ctx context.Context, arg InsertAdminAuditParams) error {
 	_, err := q.db.Exec(ctx, insertAdminAudit,

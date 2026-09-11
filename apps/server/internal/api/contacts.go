@@ -11,12 +11,11 @@ import (
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
 )
 
-// This file ports apps/api/src/routes/contacts.ts (REF §A1's contacts.ts
-// route table): GET/POST /api/contacts, PATCH/DELETE /api/contacts/{id}.
-// calendar.go is the sibling file with the same tenancy-backstop shape
-// (links.go's refsValid) but two link tables and a more involved PATCH —
-// read that file's doc comment for the shared reasoning; this one is
-// shorter.
+// This file ports apps/api/src/routes/contacts.ts: GET/POST /api/contacts,
+// PATCH/DELETE /api/contacts/{id}. calendar.go is the sibling file with the
+// same tenancy-backstop shape (links.go's refsValid) but two link tables and
+// a more involved PATCH — read that file's doc comment for the shared
+// reasoning; this one is shorter.
 //
 // # Divergence: no billing gate
 //
@@ -79,8 +78,8 @@ func (d Deps) getContactHydrated(ctx context.Context, familyID, id string) (gen.
 	return serContact(row, babies), nil
 }
 
-// ListContacts implements GET /api/contacts. REF: "Contact[] ordered by
-// name".
+// ListContacts implements GET /api/contacts. Contact[] ordered by
+// name.
 func (d Deps) ListContacts(ctx context.Context, req gen.ListContactsRequestObject) (gen.ListContactsResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	rows, err := d.Q.ListContacts(ctx, fam.FamilyID)
@@ -116,9 +115,9 @@ func (d Deps) ListContacts(ctx context.Context, req gen.ListContactsRequestObjec
 	return gen.ListContacts200JSONResponse(out), nil
 }
 
-// CreateContact implements POST /api/contacts. REF: "{name, role?, icon?,
+// CreateContact implements POST /api/contacts. {name, role?, icon?,
 // phone?, email?, website?, notes?, babyIds[]} → 201; 400
-// INVALID_REFERENCE on an unknown baby". Free — see this file's doc
+// INVALID_REFERENCE on an unknown baby. Free — see this file's doc
 // comment for why there is no 402 path.
 func (d Deps) CreateContact(ctx context.Context, req gen.CreateContactRequestObject) (gen.CreateContactResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
@@ -182,9 +181,9 @@ func (d Deps) CreateContact(ctx context.Context, req gen.CreateContactRequestObj
 	return gen.CreateContact201JSONResponse(created), nil
 }
 
-// UpdateContact implements PATCH /api/contacts/{id}. REF: "partial
+// UpdateContact implements PATCH /api/contacts/{id}. partial
 // (nullable clears) → Contact / 404; babyIds present replaces the link
-// set". See patch.go for the omitted-vs-null presence-detection pattern
+// set. See patch.go for the omitted-vs-null presence-detection pattern
 // this endpoint needs, same as feeds.go's UpdateFeed.
 func (d Deps) UpdateContact(ctx context.Context, req gen.UpdateContactRequestObject) (gen.UpdateContactResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
@@ -303,8 +302,8 @@ func (d Deps) UpdateContact(ctx context.Context, req gen.UpdateContactRequestObj
 	return gen.UpdateContact200JSONResponse(updated), nil
 }
 
-// DeleteContact implements DELETE /api/contacts/{id}. REF: "{ok:true} /
-// 404". Link rows go with it via ON DELETE CASCADE.
+// DeleteContact implements DELETE /api/contacts/{id}. {ok:true} /
+// 404. Link rows go with it via ON DELETE CASCADE.
 func (d Deps) DeleteContact(ctx context.Context, req gen.DeleteContactRequestObject) (gen.DeleteContactResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	n, err := d.Q.DeleteContact(ctx, dbgen.DeleteContactParams{FamilyID: fam.FamilyID, ID: req.Id})

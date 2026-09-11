@@ -42,7 +42,7 @@ func newDeps(t *testing.T) (api.Deps, *testrig.Rig) {
 }
 
 // The credential sign-in route is the one auth route NewHandler puts behind
-// our own limiter (REF §A5's rate-limit points: auth-signin, 20 per 10
+// our own limiter (auth-signin: 20 per 10
 // minutes per client). The brake sits in FRONT of Limen's handler, so a wrong
 // password still costs an attempt.
 //

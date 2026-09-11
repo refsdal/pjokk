@@ -179,7 +179,7 @@ func Run(ctx context.Context, job, trigger string, d Deps) (string, error) {
 }
 
 // runRecovered runs the job and turns a panic into its error: a panicking
-// job is a failed run, not a dead process (REF §A4).
+// job is a failed run, not a dead process.
 func runRecovered(ctx context.Context, job string, d Deps) (err error) {
 	defer func() {
 		if r := recover(); r != nil {

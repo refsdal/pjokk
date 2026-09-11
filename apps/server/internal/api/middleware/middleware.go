@@ -1,7 +1,7 @@
 // Package middleware is Pjokk's request pipeline: who is calling, which
 // family they are calling into, and whether they may.
 //
-// It implements REF §A5 item by item, porting apps/api/src/middleware/*.ts.
+// It ports apps/api/src/middleware/*.ts.
 // The shipped chain applies them in the order the TypeScript app used —
 // TrustedProxy, APIKeyAuth, Session, RequireFamily, then the role gates — and
 // that order matters:
@@ -161,8 +161,8 @@ func FamilyFromContext(ctx context.Context) FamilyCtx {
 	return fc
 }
 
-// Session resolves the caller once per request and never rejects (REF §A5
-// item 1): routes decide what an anonymous request means. It is skipped
+// Session resolves the caller once per request and never rejects:
+// routes decide what an anonymous request means. It is skipped
 // entirely when APIKeyAuth already established an identity.
 //
 // It uses the auth service's refreshing resolver, so a sliding session's
@@ -208,7 +208,7 @@ func RequireSession() func(http.Handler) http.Handler {
 	}
 }
 
-// RequireFamily is the tenancy gate (REF §A5 item 2). Every domain route sits
+// RequireFamily is the tenancy gate. Every domain route sits
 // behind it: it resolves the family from the session's active organization
 // and verifies the membership row actually exists — an activeOrganizationId
 // alone is not proof, because it survives the member being removed.
@@ -312,7 +312,7 @@ func IsAdminRole(role string) bool {
 }
 
 // RequireAdmin gates the family-administration surface — settings, invites,
-// keys, billing (REF §A5 item 3). It reads the role RequireFamily resolved,
+// keys, billing. It reads the role RequireFamily resolved,
 // so it must be mounted behind it.
 //
 // "owner" is accepted alongside "admin": Pjokk assigns neither by name but
@@ -342,7 +342,7 @@ func RequireAdmin() func(http.Handler) http.Handler {
 	}
 }
 
-// Audit appends a row to the system-admin trail (REF §A5 item 4's helper).
+// Audit appends a row to the system-admin trail.
 // An empty detail is stored as NULL.
 //
 // It returns nothing on purpose: every caller — the impersonated-write trail
@@ -369,7 +369,7 @@ func Audit(ctx context.Context, q *gen.Queries, adminID, action, target, detail 
 // wrote — accepted for reading, never assigned.
 const roleOwner = "owner"
 
-// RequireSysadmin gates the /admin console (REF §A5 item 4). System admins
+// RequireSysadmin gates the /admin console. System admins
 // are users whose own users.role is "admin" — a column of ours, unrelated to
 // per-family roles, and never reachable with an API key.
 func RequireSysadmin() func(http.Handler) http.Handler {
@@ -447,7 +447,7 @@ const apiKeyPrefix = "pjk_"
 // per five minutes, not one per request.
 const lastUsedInterval = 5 * time.Minute
 
-// APIKeyAuth authenticates `Authorization: Bearer pjk_…` (REF §A5 item 5).
+// APIKeyAuth authenticates `Authorization: Bearer pjk_…`.
 //
 // A key authenticates AS the caretaker who created it — their name ends up on
 // the logs it writes — scoped to the key's family. The stored value is a
@@ -457,7 +457,7 @@ const lastUsedInterval = 5 * time.Minute
 // mounted on the whole API, not just the key-authenticated part.
 //
 // The 402 premium gate the TypeScript version applied here is deliberately
-// gone (REF §A5 item 5).
+// gone.
 func APIKeyAuth(d Deps) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -519,8 +519,7 @@ func APIKeyAuth(d Deps) func(http.Handler) http.Handler {
 }
 
 // RejectAPIKey guards the endpoints that only make sense for a human session
-// — push subscriptions bound to a browser, billing, admin management (REF §A5
-// item 6).
+// — push subscriptions bound to a browser, billing, admin management.
 func RejectAPIKey() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -533,7 +532,7 @@ func RejectAPIKey() func(http.Handler) http.Handler {
 	}
 }
 
-// RateLimit is the fixed-window counter (REF §A5 item 8).
+// RateLimit is the fixed-window counter.
 //
 // global buckets every client together: it defeats distributed guessing at
 // the cost of shared-fate 429s, so it is only used with generous limits

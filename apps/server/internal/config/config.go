@@ -4,9 +4,7 @@
 // applies, so a malformed DATABASE_URL kills the container on boot — a
 // crash-looping pod is loud and obvious — rather than surfacing as a 500 on
 // the first request that happens to touch the database.
-//
-// See docs/superpowers/plans/2026-08-31-go-migration-reference.md §A3 for
-// the exact env-var contract this file implements.
+
 package config
 
 import (

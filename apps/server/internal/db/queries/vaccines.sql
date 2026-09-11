@@ -1,4 +1,4 @@
--- Vaccines (Task 14; REF §A1 "vaccines.ts (+ files)"). vaccine_log is
+-- Vaccines ("vaccines.ts (+ files)"). vaccine_log is
 -- structurally the same "id, family_id, baby_id, caretaker_id, time,
 -- …kind-specific columns, notes, created_at" shape other_logs.sql's six
 -- kinds share (dose_number/schedule_slot instead of e.g. medicine_log's

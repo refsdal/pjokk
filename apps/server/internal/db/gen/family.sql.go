@@ -53,7 +53,7 @@ type ListFamilyMembersRow struct {
 	HasPush   bool
 }
 
-// Queries backing GET /api/family/members (Task 9). GetFamilyBySlugless
+// Queries backing GET /api/family/members. GetFamilyBySlugless
 // (core.sql) already answers GET /api/family; the auth.sql queries already
 // cover the member-management writes (DeleteFamilyMember,
 // DeleteFamilyMemberRoles, InsertFamilyMemberRole, GetFamilyMember) that

@@ -76,10 +76,10 @@ type FeedsInRangeRow struct {
 	AmountMl *int32
 }
 
-// Backs GET /api/summary (Task 11; REF §A1 sleep.ts's summary route). The
+// Backs GET /api/summary (sleep.ts's summary route). The
 // "last X"/"active X" halves of the payload reuse existing queries
 // (ListFeeds/ListDiapers with lim=1, sleep.sql's ActiveSleep/ListSleeps,
-// play.sql's ActivePlay since Task 13) — see internal/api/summary.go — so
+// play.sql's ActivePlay) — see internal/api/summary.go — so
 // this file only has the range queries the `today` block needs.
 // [from, to) — matches apps/api/src/db/scoped.ts's feedsInRange (gte/lt).
 // Named args (sqlc.arg(from_ts)/sqlc.arg(to_ts)) rather than positional $3/$4:

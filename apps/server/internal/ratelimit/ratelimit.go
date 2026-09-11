@@ -2,9 +2,8 @@
 // table, CLAUDE.md) and the client-address resolution the buckets are keyed
 // on.
 //
-// See docs/superpowers/plans/2026-08-31-go-migration-reference.md §A5 items
-// 7-8 and §A6, where the port is named RateLimitStore; the package name here
-// already carries "ratelimit", so the exported type is just Store.
+// The exported type is just Store: the package name already carries
+// "ratelimit".
 //
 // The counters used to live in Cloudflare KV, which was eventually consistent:
 // the old limiter read a value, compared it and wrote it back, a race its own
@@ -78,8 +77,7 @@ func (p *Postgres) Sweep(ctx context.Context, now time.Time) (int, error) {
 	return int(removed), nil
 }
 
-// ClientIP is the client's address, as far as it can be trusted (REF §A5
-// item 7).
+// ClientIP is the client's address, as far as it can be trusted.
 //
 // On Workers this was simply cf-connecting-ip, which Cloudflare set and a
 // caller could not forge. There is no such header off Cloudflare, and

@@ -11,7 +11,7 @@ import (
 	"github.com/refsdal/pjokk/server/internal/push"
 )
 
-// This file ports apps/api/src/routes/push.ts (REF §A1 push.ts): the VAPID
+// This file ports apps/api/src/routes/push.ts: the VAPID
 // config endpoint, the subscription lifecycle (subscribe/unsubscribe), the
 // per-caretaker feed-reminder preference, and a test-send. Every operation
 // here is tierFamilyNoAPIKey (api.go's operationAuthTiers) — a push
@@ -55,15 +55,15 @@ func isAllowedPushEndpoint(endpoint string) bool {
 	return false
 }
 
-// GetPushConfig implements GET /api/push/config. REF: "{publicKey}".
+// GetPushConfig implements GET /api/push/config.
 func (d Deps) GetPushConfig(_ context.Context, _ gen.GetPushConfigRequestObject) (gen.GetPushConfigResponseObject, error) {
 	return gen.GetPushConfig200JSONResponse{PublicKey: d.VAPIDPublicKey}, nil
 }
 
-// SubscribePush implements POST /api/push/subscribe. REF: "{endpoint,
+// SubscribePush implements POST /api/push/subscribe. {endpoint,
 // p256dh, auth} → {ok:true}; 400 BAD_ENDPOINT unless https and the host is
 // allowlisted. Upserts by endpoint — re-subscribing rebinds it to the
-// calling user/family and refreshes its keys" (UpsertPushSubscription's
+// calling user/family and refreshes its keys (UpsertPushSubscription's
 // ON CONFLICT ("endpoint") DO UPDATE).
 func (d Deps) SubscribePush(ctx context.Context, req gen.SubscribePushRequestObject) (gen.SubscribePushResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
@@ -88,8 +88,8 @@ func (d Deps) SubscribePush(ctx context.Context, req gen.SubscribePushRequestObj
 	return gen.SubscribePush200JSONResponse{Ok: gen.OkOkTrue}, nil
 }
 
-// UnsubscribePush implements POST /api/push/unsubscribe. REF: "{endpoint} →
-// {ok:true} (deletes only OWN rows — user-scoped)". Removing an endpoint
+// UnsubscribePush implements POST /api/push/unsubscribe. {endpoint} →
+// {ok:true} (deletes only OWN rows — user-scoped). Removing an endpoint
 // that isn't the caller's, or doesn't exist at all, is still 200: this is a
 // set-membership operation ("make sure this endpoint isn't registered to
 // me"), not a lookup that can 404.
@@ -107,8 +107,8 @@ func (d Deps) UnsubscribePush(ctx context.Context, req gen.UnsubscribePushReques
 	return gen.UnsubscribePush200JSONResponse{Ok: gen.OkOkTrue}, nil
 }
 
-// TestPush implements POST /api/push/test. REF: "{sent: n} via
-// Deps.Push.ToUser(currentUser)". In English the payload matches
+// TestPush implements POST /api/push/test. {sent: n} via
+// Deps.Push.ToUser(currentUser). In English the payload matches
 // apps/api/src/routes/push.ts's byte-for-byte (title, body, and the /home
 // deep link the frontend's service worker reads on notification click);
 // the body is in the person's language (internal/push/text.go).

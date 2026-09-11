@@ -1,4 +1,4 @@
--- Contacts (Task 16; REF §A1 contacts.ts). Free — no plan gate on this
+-- Contacts (contacts.ts). Free — no plan gate on this
 -- port (the TS predecessor soft-locked creation behind premium; that gate
 -- is removed here, see internal/api/contacts.go's package doc comment).
 -- Babies attach via contact_baby; zero rows means the contact belongs to

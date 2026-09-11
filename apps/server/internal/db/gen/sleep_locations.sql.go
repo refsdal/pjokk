@@ -63,7 +63,7 @@ type ListSleepLocationsRow struct {
 	Name string
 }
 
-// Custom sleep-location chips (Task 11; REF §A1 sleep-locations.ts). No
+// Custom sleep-location chips (sleep-locations.ts). No
 // unique constraint on (family_id, name) at the database — the duplicate
 // and 20-cap checks are application-level in internal/api/sleep_locations.go
 // (a pre-check-then-insert race, same as apps/api/src/routes/

@@ -1,18 +1,15 @@
 // Package jobs is the Go port of apps/api/src/jobs: the nightly backup
 // (+ retention prune), the feed-reminder sweep, the calendar-reminder sweep,
-// and the orphan-user purge. See
-// docs/superpowers/plans/2026-08-31-go-migration-reference.md §A7 for the
-// authoritative behavior spec this package implements.
+// and the orphan-user purge.
 //
 // There is no reconcilePlans here — apps/api/src/jobs/plans.ts's other half,
 // a compensating control for Stripe webhook failures. Billing does not
-// exist in this port (REF §A1), so there is nothing to reconcile.
+// exist in this port, so there is nothing to reconcile.
 //
-// Wiring these functions to `bun run cron` / `/app/dispatch cron`'s Go
-// equivalent (the scheduler and the one-shot CLI) is Task 24, not this
-// package: jobs only exports the run functions and the Deps they need,
-// mirroring apps/api/src/deps.ts's Deps rather than constructing its own
-// collaborators.
+// Wiring these functions to the scheduler and the one-shot CLI is
+// internal/cron's job, not this package's: jobs only exports the run
+// functions and the Deps they need, mirroring apps/api/src/deps.ts's Deps
+// rather than constructing its own collaborators.
 package jobs
 
 import (

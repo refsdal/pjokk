@@ -32,7 +32,7 @@ func serPump(row dbgen.GetPumpRow) gen.PumpLog {
 	}
 }
 
-// ListPumps implements GET /api/pumps. REF: "PumpLog[] newest first".
+// ListPumps implements GET /api/pumps.
 func (d Deps) ListPumps(ctx context.Context, req gen.ListPumpsRequestObject) (gen.ListPumpsResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	rows, err := d.Q.ListPumps(ctx, dbgen.ListPumpsParams{
@@ -50,8 +50,8 @@ func (d Deps) ListPumps(ctx context.Context, req gen.ListPumpsRequestObject) (ge
 	return gen.ListPumps200JSONResponse(out), nil
 }
 
-// CreatePump implements POST /api/pumps. REF: "{babyId, time, side?,
-// amountMl?, durationMin?, notes?} → 201 / 404 unknown baby". Free in Go
+// CreatePump implements POST /api/pumps. {babyId, time, side?,
+// amountMl?, durationMin?, notes?} → 201 / 404 unknown baby. Free in Go
 // (see other_logs.go's doc comment).
 func (d Deps) CreatePump(ctx context.Context, req gen.CreatePumpRequestObject) (gen.CreatePumpResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
@@ -86,8 +86,8 @@ func (d Deps) CreatePump(ctx context.Context, req gen.CreatePumpRequestObject) (
 	return gen.CreatePump201JSONResponse(serPump(row)), nil
 }
 
-// UpdatePump implements PATCH /api/pumps/{id}. REF: "partial (nullable
-// clears) → PumpLog / 404".
+// UpdatePump implements PATCH /api/pumps/{id}. partial (nullable
+// clears) → PumpLog / 404.
 func (d Deps) UpdatePump(ctx context.Context, req gen.UpdatePumpRequestObject) (gen.UpdatePumpResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
@@ -137,7 +137,7 @@ func (d Deps) UpdatePump(ctx context.Context, req gen.UpdatePumpRequestObject) (
 	return gen.UpdatePump200JSONResponse(serPump(row)), nil
 }
 
-// DeletePump implements DELETE /api/pumps/{id}. REF: "{ok:true} / 404".
+// DeletePump implements DELETE /api/pumps/{id}.
 func (d Deps) DeletePump(ctx context.Context, req gen.DeletePumpRequestObject) (gen.DeletePumpResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	ok, err := deleteLog(ctx, func(ctx context.Context) (int64, error) {

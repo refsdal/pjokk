@@ -16,16 +16,16 @@ import (
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
 )
 
-// This file ports apps/api/src/routes/invites.ts (REF §A1's invites.ts route
-// table): the family-admin management surface (GET/POST /api/invites,
-// DELETE /api/invites/{code}, all tierAdmin) plus the public surface
-// (GET /api/invites/info/{code}, tierPublic; POST /api/invites/redeem,
-// tierSession — see api.go's operationAuthTiers and its doc comment for
-// what those tiers mean). Codes are credentials — apps/api/src/app.ts
-// mounted the public two behind Hono rate-limit middleware; this port
-// wires the same four limits (30/500 for info, 10/200 for redeem) via
-// api.go's rateLimitChain instead, since a per-operation StrictMiddlewareFunc
-// is this codebase's equivalent of createRoute's `middleware:` array.
+// This file ports apps/api/src/routes/invites.ts: the family-admin management
+// surface (GET/POST /api/invites, DELETE /api/invites/{code}, all tierAdmin)
+// plus the public surface (GET /api/invites/info/{code}, tierPublic; POST
+// /api/invites/redeem, tierSession — see api.go's operationAuthTiers and its
+// doc comment for what those tiers mean). Codes are credentials —
+// apps/api/src/app.ts mounted the public two behind Hono rate-limit
+// middleware; this port wires the same four limits (30/500 for info, 10/200
+// for redeem) via api.go's rateLimitChain instead, since a per-operation
+// StrictMiddlewareFunc is this codebase's equivalent of createRoute's
+// `middleware:` array.
 //
 // # Redeem: why the membership insert is hand-written SQL, not auth.Service
 //
@@ -117,8 +117,8 @@ func classifyInvite(row *dbgen.FamilyInvite, now time.Time) inviteClassification
 	}
 }
 
-// ListInvites implements GET /api/invites. REF: "every code ever issued for
-// the family, newest first — used and revoked ones included". Family admin
+// ListInvites implements GET /api/invites. every code ever issued for
+// the family, newest first — used and revoked ones included. Family admin
 // only (api.go's tierAdmin entry).
 func (d Deps) ListInvites(ctx context.Context, _ gen.ListInvitesRequestObject) (gen.ListInvitesResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
@@ -133,9 +133,9 @@ func (d Deps) ListInvites(ctx context.Context, _ gen.ListInvitesRequestObject) (
 	return gen.ListInvites200JSONResponse(out), nil
 }
 
-// CreateInvite implements POST /api/invites. REF: "optional body
+// CreateInvite implements POST /api/invites. optional body
 // {role(admin|member, default member), expiresInHours(1..720, default 72),
-// maxUses(1..50, default 5)} → 201 Invite". Family admin only. The body
+// maxUses(1..50, default 5)} → 201 Invite. Family admin only. The body
 // itself is optional (spec: requestBody.required=false, matching
 // CreateInviteSchema's all-defaulted Zod shape) — a nil req.Body, and a nil
 // field within a present body, both mean "use the default", exactly like
@@ -201,8 +201,8 @@ func (d Deps) createInvite(ctx context.Context, familyID, createdBy string, body
 	return serInvite(row, d.AppURL), nil
 }
 
-// RevokeInvite implements DELETE /api/invites/{code}. REF: "{ok:true} /
-// 404". Family admin only. Unlike GetInviteInfo/RedeemInvite, the code
+// RevokeInvite implements DELETE /api/invites/{code}. {ok:true} /
+// 404. Family admin only. Unlike GetInviteInfo/RedeemInvite, the code
 // path param is used exactly as given — no uppercasing — matching
 // apps/api/src/db/scoped.ts's revokeInvite, which never normalises it
 // either (an admin revokes the code exactly as ListInvites displayed it,
@@ -238,12 +238,12 @@ func (d Deps) getInviteByCodeOrNil(ctx context.Context, code string) (*dbgen.Fam
 	}
 }
 
-// GetInviteInfo implements GET /api/invites/info/{code}. REF: "what the
-// /join page shows before sign-in: which family, which role, still valid?"
+// GetInviteInfo implements GET /api/invites/info/{code}. what the
+// /join page shows before sign-in: which family, which role, still valid?
 // — tierPublic (api.go), no session required. Codes are generated
-// uppercase to be read aloud; accepted typed in any case (REF §A1's
-// case-insensitivity note; apps/api/src/routes/invites.ts's inviteInfo
-// handler does the identical `.toUpperCase()`).
+// uppercase to be read aloud; accepted typed in any case
+// (apps/api/src/routes/invites.ts's inviteInfo handler does the identical
+// `.toUpperCase()`).
 func (d Deps) GetInviteInfo(ctx context.Context, req gen.GetInviteInfoRequestObject) (gen.GetInviteInfoResponseObject, error) {
 	code := strings.ToUpper(req.Code)
 	invite, err := d.getInviteByCodeOrNil(ctx, code)
@@ -283,8 +283,8 @@ func (d Deps) GetInviteInfo(ctx context.Context, req gen.GetInviteInfoRequestObj
 	}, nil
 }
 
-// RedeemInvite implements POST /api/invites/redeem. REF: "{code(1..64)} →
-// 200 RedeemResult / 400 invalid / 401 not signed in". tierSession
+// RedeemInvite implements POST /api/invites/redeem. {code(1..64)} →
+// 200 RedeemResult / 400 invalid / 401 not signed in. tierSession
 // (api.go) already guarantees a session by the time this runs — see
 // GetMe's identical guard for why the nil check below is defensive rather
 // than a real, reachable 401 path (RequireSession already answered that

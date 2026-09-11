@@ -1,4 +1,4 @@
--- Queries backing internal/jobs (Task 23; REF §A7): feed reminders,
+-- Queries backing internal/jobs: feed reminders,
 -- calendar reminders, and the purge-orphan-users sweep.
 --
 -- The nightly backup itself (jobs/backup.go) is NOT here: it reads every
@@ -59,7 +59,7 @@ UPDATE "calendar_event" SET "reminded_at" = $1 WHERE "id" = $2;
 -- name: ListOrphanUsers :many
 -- Accounts created past the invite flow, with no membership, past the
 -- 7-day grace window, never a sysadmin, never the tombstone. Selects the id
--- ONLY — the caller must never log an email (REF §A7; CLAUDE.md never
+-- ONLY — the caller must never log an email (CLAUDE.md never
 -- records raw identifying data it does not need to).
 SELECT u."id" FROM "users" u
 WHERE (u."role" IS NULL OR u."role" != 'admin')

@@ -15,9 +15,8 @@ import (
 // comment: "Medicine is exercised deeply; the rest get a create/read pass
 // through the same code path") and apps/api/test/entitlement-rework.test.ts
 // INVERTED: that TS file asserted 402 PLAN_REQUIRED for five of these six
-// kinds on a free-plan family; Task 1's Go-side entitlement rework removed
-// that gate entirely (REF §A1: "All previously-gated creates become free in
-// Go"), so TestOtherKindsCreateIsFreeOnDefaultPlan asserts 201 instead,
+// kinds on a free-plan family; the Go port removed that gate entirely
+// (every previously gated create is free in Go), so TestOtherKindsCreateIsFreeOnDefaultPlan asserts 201 instead,
 // exactly the assertions babies_test.go already made for CreateBaby's own
 // removed multipleBabies gate.
 // -----------------------------------------------------------------------
@@ -178,7 +177,7 @@ func TestListMedicineNewestFirstWithLimitBounds(t *testing.T) {
 	}
 }
 
-// Bounds parity with the zod schema (packages/shared/src/schemas.ts):
+// The bounds the spec enforces (openapi/pjokk.yaml):
 // name 1..100, amount 0..1000, unit must be one of the fixed enum.
 func TestCreateMedicineBounds(t *testing.T) {
 	a := testrig.App(t)
@@ -375,7 +374,7 @@ func TestMedicineRejectUnauthenticated(t *testing.T) {
 // end-to-end. A bare `type: number` in the OpenAPI schema defaults to Go
 // float32 in oapi-codegen, which would round-trip a value like
 // 123.456789 (9 significant digits, more than float32's ~7) lossily —
-// Task 12 added `format: double` to fix this (see openapi/pjokk.yaml's
+// `format: double` fixes this (see openapi/pjokk.yaml's
 // MeasurementLog/CreateMeasurement/UpdateMeasurement schemas). Exercised on
 // create, list and PATCH so a regression on any one of the three paths
 // fails this test.

@@ -43,16 +43,16 @@ const exportMaxRows = 100_000
 // (') even though RFC 4180 never requires quoting for one — the TS
 // predecessor's regex is `/[",\n']/`, and this port keeps that behaviour
 // rather than "fixing" it, since a stricter escaper is still a correct
-// (if slightly more eager) CSV, and matching the TS byte-for-byte is what
-// this task asked for.
+// (if slightly more eager) CSV, and the export matches the TS
+// byte-for-byte.
 var (
 	formulaGuard = regexp.MustCompile(`^[=+\-@\t\r]`)
 	needsQuoting = regexp.MustCompile(`["\n',]`)
 )
 
 // esc formats one CSV cell. nil renders as "". A leading =, +, -, @, tab,
-// or CR gets a leading apostrophe FIRST (formula-injection guard — REF sec
-// review M1, ported verbatim from export.ts's esc doc comment) so the cell
+// or CR gets a leading apostrophe FIRST (a formula-injection guard, ported
+// verbatim from export.ts's esc doc comment) so the cell
 // can never execute as a formula in Excel/Sheets; the (possibly
 // apostrophe-prefixed) result is THEN RFC-4180-quoted if it matches
 // needsQuoting, doubling any interior double quotes. Order matters — a
@@ -328,10 +328,10 @@ func rowVaccine(r dbgen.ExportVaccinesRow) exportRow {
 	}
 }
 
-// exportCSV implements GET /api/export.csv. REF: "text/csv; charset=utf-8,
+// exportCSV implements GET /api/export.csv. text/csv; charset=utf-8,
 // content-disposition attachment, filename pjokk-export-YYYY-MM-DD.csv
 // (UTC date from Deps.Now); every log source, MAX 100000 rows each,
-// ascending by time".
+// ascending by time.
 func (d Deps) exportCSV(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	fam := middleware.FamilyFromContext(ctx)

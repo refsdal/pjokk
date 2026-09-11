@@ -1,4 +1,4 @@
--- Feed logs (Task 10; REF §A1 feeds.ts). Every query is family-scoped
+-- Feed logs (feeds.ts). Every query is family-scoped
 -- (CLAUDE.md's tenancy discipline).
 --
 -- UpdateFeed is the PATCH tri-state pattern internal/api/feeds.go documents

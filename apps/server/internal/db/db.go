@@ -33,7 +33,7 @@ func New(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 }
 
 // EnsureTombstone re-inserts the tombstone user with ON CONFLICT DO NOTHING,
-// a belt-and-braces guard alongside the migration's own seed row (REF §A2):
+// a belt-and-braces guard alongside the migration's own seed row:
 // safe to call on every boot.
 func EnsureTombstone(ctx context.Context, pool *pgxpool.Pool) error {
 	if err := gen.New(pool).UpsertTombstone(ctx, TombstoneID); err != nil {

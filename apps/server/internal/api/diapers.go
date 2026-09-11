@@ -9,8 +9,8 @@ import (
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
 )
 
-// This file ports apps/api/src/routes/diapers.ts (REF §A1: "same skeleton"
-// as feeds.ts, minus the feed-only columns). Read feeds.go first — its
+// This file ports apps/api/src/routes/diapers.ts: the same skeleton as
+// feeds.ts, minus the feed-only columns. Read feeds.go first — its
 // package doc comment documents, in full, the PATCH tri-state pattern
 // (patch.go's withRawBody/patchBody/patchField) this file reuses
 // verbatim for `notes`, the one clearable field diaper_log has.
@@ -29,7 +29,7 @@ func serDiaper(row dbgen.GetDiaperRow) gen.DiaperLog {
 	}
 }
 
-// ListDiapers implements GET /api/diapers. REF: "DiaperLog[] newest first".
+// ListDiapers implements GET /api/diapers.
 func (d Deps) ListDiapers(ctx context.Context, req gen.ListDiapersRequestObject) (gen.ListDiapersResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
@@ -48,8 +48,8 @@ func (d Deps) ListDiapers(ctx context.Context, req gen.ListDiapersRequestObject)
 	return gen.ListDiapers200JSONResponse(out), nil
 }
 
-// CreateDiaper implements POST /api/diapers. REF: "{babyId, time, type,
-// notes?} → 201 / 404 unknown baby".
+// CreateDiaper implements POST /api/diapers. {babyId, time, type,
+// notes?} → 201 / 404 unknown baby.
 func (d Deps) CreateDiaper(ctx context.Context, req gen.CreateDiaperRequestObject) (gen.CreateDiaperResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	if req.Body == nil {
@@ -83,8 +83,8 @@ func (d Deps) CreateDiaper(ctx context.Context, req gen.CreateDiaperRequestObjec
 	return gen.CreateDiaper201JSONResponse(serDiaper(row)), nil
 }
 
-// UpdateDiaper implements PATCH /api/diapers/{id}. REF: "partial (nullable
-// clears) → DiaperLog / 404". See feeds.go's package doc comment for the
+// UpdateDiaper implements PATCH /api/diapers/{id}. partial (nullable
+// clears) → DiaperLog / 404. See feeds.go's package doc comment for the
 // presence-detection pattern below.
 func (d Deps) UpdateDiaper(ctx context.Context, req gen.UpdateDiaperRequestObject) (gen.UpdateDiaperResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
@@ -136,7 +136,7 @@ func (d Deps) UpdateDiaper(ctx context.Context, req gen.UpdateDiaperRequestObjec
 	return gen.UpdateDiaper200JSONResponse(serDiaper(row)), nil
 }
 
-// DeleteDiaper implements DELETE /api/diapers/{id}. REF: "{ok:true} / 404".
+// DeleteDiaper implements DELETE /api/diapers/{id}.
 func (d Deps) DeleteDiaper(ctx context.Context, req gen.DeleteDiaperRequestObject) (gen.DeleteDiaperResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	ok, err := deleteLog(ctx, func(ctx context.Context) (int64, error) {

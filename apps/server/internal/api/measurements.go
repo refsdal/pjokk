@@ -12,8 +12,8 @@ import (
 // This file ports the "measurements" kind of apps/api/src/routes/other-logs.ts's
 // makeLogRoutes factory — `type` and `value` are required and NOT nullable
 // (settable or omitted, never cleared). `value` is double precision
-// end-to-end: the OpenAPI schema carries `format: double` (Task 12 added
-// this — a bare `type: number` defaults to Go float32 in oapi-codegen,
+// end-to-end: the OpenAPI schema carries `format: double` (because a bare
+// `type: number` defaults to Go float32 in oapi-codegen,
 // which would round-trip 8.4 lossily), sqlc's column is `double precision`,
 // and both generated Go types land on float64 with no narrowing conversion
 // anywhere in this file. See other_logs.go's package doc comment for the
@@ -60,7 +60,7 @@ func serMeasurement(row dbgen.GetMeasurementRow) gen.MeasurementLog {
 	}
 }
 
-// ListMeasurements implements GET /api/measurements. REF: "MeasurementLog[] newest first".
+// ListMeasurements implements GET /api/measurements.
 func (d Deps) ListMeasurements(ctx context.Context, req gen.ListMeasurementsRequestObject) (gen.ListMeasurementsResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	rows, err := d.Q.ListMeasurements(ctx, dbgen.ListMeasurementsParams{
@@ -78,8 +78,8 @@ func (d Deps) ListMeasurements(ctx context.Context, req gen.ListMeasurementsRequ
 	return gen.ListMeasurements200JSONResponse(out), nil
 }
 
-// CreateMeasurement implements POST /api/measurements. REF: "{babyId, time,
-// type, value, notes?} → 201 / 404 unknown baby". Free in Go (see
+// CreateMeasurement implements POST /api/measurements. {babyId, time,
+// type, value, notes?} → 201 / 404 unknown baby. Free in Go (see
 // other_logs.go's doc comment).
 func (d Deps) CreateMeasurement(ctx context.Context, req gen.CreateMeasurementRequestObject) (gen.CreateMeasurementResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
@@ -113,8 +113,8 @@ func (d Deps) CreateMeasurement(ctx context.Context, req gen.CreateMeasurementRe
 	return gen.CreateMeasurement201JSONResponse(serMeasurement(row)), nil
 }
 
-// UpdateMeasurement implements PATCH /api/measurements/{id}. REF: "partial
-// (nullable clears) → MeasurementLog / 404".
+// UpdateMeasurement implements PATCH /api/measurements/{id}. partial
+// (nullable clears) → MeasurementLog / 404.
 func (d Deps) UpdateMeasurement(ctx context.Context, req gen.UpdateMeasurementRequestObject) (gen.UpdateMeasurementResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
@@ -161,8 +161,8 @@ func (d Deps) UpdateMeasurement(ctx context.Context, req gen.UpdateMeasurementRe
 	return gen.UpdateMeasurement200JSONResponse(serMeasurement(row)), nil
 }
 
-// DeleteMeasurement implements DELETE /api/measurements/{id}. REF:
-// "{ok:true} / 404".
+// DeleteMeasurement implements DELETE /api/measurements/{id}.
+// {ok:true} / 404.
 func (d Deps) DeleteMeasurement(ctx context.Context, req gen.DeleteMeasurementRequestObject) (gen.DeleteMeasurementResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	ok, err := deleteLog(ctx, func(ctx context.Context) (int64, error) {

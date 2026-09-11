@@ -133,7 +133,7 @@ INSERT INTO "organization_member_roles" ("member_id", "organization_id", "role")
 VALUES ($1, $2, $3);
 
 -- name: SetUserPassword :exec
--- Replace an account's password hash outright (Task 21's admin reset).
+-- Replace an account's password hash outright (the console's admin reset).
 --
 -- Limen's own credential plugin cannot express this: its SetPassword only
 -- establishes a FIRST password (ErrPasswordAlreadySet otherwise) and its

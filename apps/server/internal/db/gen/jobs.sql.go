@@ -67,7 +67,7 @@ type LatchStaleCalendarRemindersParams struct {
 	StartTime  pgtype.Timestamptz
 }
 
-// Queries backing internal/jobs (Task 23; REF §A7): feed reminders,
+// Queries backing internal/jobs: feed reminders,
 // calendar reminders, and the purge-orphan-users sweep.
 //
 // The nightly backup itself (jobs/backup.go) is NOT here: it reads every
@@ -201,7 +201,7 @@ type ListOrphanUsersParams struct {
 
 // Accounts created past the invite flow, with no membership, past the
 // 7-day grace window, never a sysadmin, never the tombstone. Selects the id
-// ONLY — the caller must never log an email (REF §A7; CLAUDE.md never
+// ONLY — the caller must never log an email (CLAUDE.md never
 // records raw identifying data it does not need to).
 func (q *Queries) ListOrphanUsers(ctx context.Context, arg ListOrphanUsersParams) ([]string, error) {
 	rows, err := q.db.Query(ctx, listOrphanUsers, arg.TombstoneID, arg.Cutoff)

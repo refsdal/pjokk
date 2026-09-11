@@ -1,4 +1,4 @@
--- Play logs (Task 13; REF §A1 play.ts). Structurally a sleep_log clone: same
+-- Play logs (play.ts). Structurally a sleep_log clone: same
 -- family-scoped skeleton as feeds.sql/diapers.sql (see feeds.sql's header
 -- for the UpdateFeed CASE/set-flag pattern), same active-session lifecycle
 -- as sleep.sql (see that file's header in full — "end_time IS NULL" means a

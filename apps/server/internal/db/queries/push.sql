@@ -1,4 +1,4 @@
--- Queries backing internal/push (Task 7). See
+-- Queries backing internal/push. See
 -- apps/api/src/infrastructure/push.ts for the TypeScript original this
 -- ports: load a user's subscriptions, send to each, and delete whichever
 -- ones the push service reports as gone (404/410).
@@ -8,8 +8,8 @@ SELECT * FROM "push_subscription"
 WHERE "user_id" = $1;
 
 -- name: CreatePushSubscription :one
--- Test/fixture helper — the real write path (subscribe/unsubscribe routes)
--- lands with the API handlers, not this task.
+-- Test/fixture helper: the subscribe and unsubscribe routes have queries of
+-- their own.
 INSERT INTO "push_subscription" ("family_id", "user_id", "endpoint", "p256dh", "auth")
 VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
@@ -20,7 +20,7 @@ RETURNING *;
 DELETE FROM "push_subscription"
 WHERE "endpoint" = $1;
 
--- Queries below back internal/api/push.go (Task 18; REF §A1 push.ts).
+-- Queries below back internal/api/push.go (push.ts).
 
 -- name: UpsertPushSubscription :exec
 -- POST /api/push/subscribe. Re-subscribing the SAME endpoint (a browser can

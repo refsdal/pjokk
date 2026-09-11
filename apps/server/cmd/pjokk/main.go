@@ -6,9 +6,7 @@
 // none of them reads os.Getenv or constructs a client at module scope.
 //
 // It is also the dispatch table. One image, several modes, selected by
-// argv[1] — the Go port of apps/server/src/dispatch.ts. See
-// docs/superpowers/plans/2026-08-31-go-migration-reference.md §A4 for the
-// authoritative table; the short version:
+// argv[1] — the Go port of apps/server/src/dispatch.ts:
 //
 //	(none)                 migrate under an advisory lock, then serve + schedule
 //	server                 HTTP only — never migrates, never schedules
@@ -38,7 +36,7 @@ import (
 
 	// The scratch/distroless image carries no /usr/share/zoneinfo, so
 	// time.LoadLocation would fail there for every zone but UTC. The
-	// calendar-reminder job formats event times in Europe/Oslo (REF §A7) and
+	// calendar-reminder job formats event times in Europe/Oslo and
 	// the scheduler pins itself to UTC; both must resolve inside the
 	// container, so the zone database is compiled into the binary.
 	//

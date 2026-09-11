@@ -1,10 +1,6 @@
-// Package push declares the web-push port (VAPID) used for feed reminders
-// and calendar reminders. This file holds ONLY the interface and its payload
-// type — the real implementation (Task 6/7) lives alongside it once it
-// lands. Declaring the port now lets api.Deps reference push.Sender without
-// waiting on that task.
-//
-// See docs/superpowers/plans/2026-08-31-go-migration-reference.md §A6.
+// Package push declares the web-push port (VAPID) behind reminder
+// notifications. This file holds the interface and its payload type;
+// webpush.go is the real implementation.
 package push
 
 import "context"

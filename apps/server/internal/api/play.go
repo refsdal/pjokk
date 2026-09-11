@@ -88,8 +88,8 @@ func serPlay(row dbgen.GetPlayRow) gen.PlayLog {
 	}
 }
 
-// ListPlays implements GET /api/play. REF: "PlayLog[] newest first (by
-// startTime)".
+// ListPlays implements GET /api/play. PlayLog[] newest first (by
+// startTime).
 func (d Deps) ListPlays(ctx context.Context, req gen.ListPlaysRequestObject) (gen.ListPlaysResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
@@ -108,9 +108,9 @@ func (d Deps) ListPlays(ctx context.Context, req gen.ListPlaysRequestObject) (ge
 	return gen.ListPlays200JSONResponse(out), nil
 }
 
-// CreatePlay implements POST /api/play. REF: "{babyId, type, startTime,
+// CreatePlay implements POST /api/play. {babyId, type, startTime,
 // endTime?, notes?} → 201; 404 unknown baby; 409 ALREADY_ACTIVE when
-// creating a running session (endTime absent) while one exists" — see this
+// creating a running session (endTime absent) while one exists — see this
 // file's doc comment, divergence 1, for why both a pre-check AND a 23505
 // catch are needed, and divergence 3 for why there is no 402 path.
 func (d Deps) CreatePlay(ctx context.Context, req gen.CreatePlayRequestObject) (gen.CreatePlayResponseObject, error) {
@@ -171,7 +171,7 @@ func (d Deps) CreatePlay(ctx context.Context, req gen.CreatePlayRequestObject) (
 	return gen.CreatePlay201JSONResponse(serPlay(created)), nil
 }
 
-// GetActivePlay implements GET /api/play/active. REF: "PlayLog | null" —
+// GetActivePlay implements GET /api/play/active. —
 // see this file's doc comment, divergence 2, for why the "no running
 // session" branch returns a hand-written response type instead of the
 // generated 200 one.
@@ -187,8 +187,8 @@ func (d Deps) GetActivePlay(ctx context.Context, req gen.GetActivePlayRequestObj
 	return gen.GetActivePlay200JSONResponse(serPlay(dbgen.GetPlayRow(row))), nil
 }
 
-// StopPlay implements POST /api/play/{id}/stop. REF: "body optional
-// {endTime?} (default now via Deps.Now) → PlayLog / 404". The end_time IS
+// StopPlay implements POST /api/play/{id}/stop. body optional
+// {endTime?} (default now via Deps.Now) → PlayLog / 404. The end_time IS
 // NULL guard in queries/play.sql's StopPlay makes a double-stop a 404 (zero
 // rows affected) rather than silently overwriting the endTime a first stop
 // already set — mirrors sleep.go's WakeSleep.
@@ -219,9 +219,9 @@ func (d Deps) StopPlay(ctx context.Context, req gen.StopPlayRequestObject) (gen.
 	return gen.StopPlay200JSONResponse(serPlay(updated)), nil
 }
 
-// UpdatePlay implements PATCH /api/play/{id}. REF: "{type?, startTime?,
+// UpdatePlay implements PATCH /api/play/{id}. {type?, startTime?,
 // endTime? (nullable clears→reopens), notes?(nullable)} → 200 / 404 / 409
-// on reopen conflict". See feeds.go's package doc comment for the
+// on reopen conflict. See feeds.go's package doc comment for the
 // presence-detection pattern below, and this file's doc comment (divergence
 // 1) for why only the endTime-cleared case needs a 23505 catch.
 func (d Deps) UpdatePlay(ctx context.Context, req gen.UpdatePlayRequestObject) (gen.UpdatePlayResponseObject, error) {
@@ -281,7 +281,7 @@ func (d Deps) UpdatePlay(ctx context.Context, req gen.UpdatePlayRequestObject) (
 	return gen.UpdatePlay200JSONResponse(serPlay(row)), nil
 }
 
-// DeletePlay implements DELETE /api/play/{id}. REF: "{ok:true} / 404".
+// DeletePlay implements DELETE /api/play/{id}.
 func (d Deps) DeletePlay(ctx context.Context, req gen.DeletePlayRequestObject) (gen.DeletePlayResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	ok, err := deleteLog(ctx, func(ctx context.Context) (int64, error) {

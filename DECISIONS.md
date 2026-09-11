@@ -2732,3 +2732,19 @@ to drift from the spec without anything noticing. This closes it.
   English string, as the SPA's `t()` does, with its words; a test reads the
   senders' source and fails on a string without Norwegian, or on a
   translation whose format verbs differ.
+
+## 2026-09-11 — the migration plans leave the code and the repo
+
+- **Comments no longer cite the Go migration's plan.** About 300 "Task N"
+  and "REF §…" pointers into `2026-08-31-go-backend-migration.md` and its
+  reference document are gone, along with the package headers that sent
+  readers there. Where a pointer sat inside an explanation, the
+  explanation stays and now reads on its own; an endpoint contract quoted
+  from the plan (`REF: "{ok:true} / 404"`) became plain prose. The
+  "ports `apps/api/src/…`" notes stay: they are the record the runtime
+  note in CLAUDE.md asks for.
+- **Executed plans are deleted,** all nineteen under
+  `docs/superpowers/plans/`, together with the two specs for features the
+  app no longer has (Stripe billing and the entitlement rework). The other
+  specs stay: they are the designs of what the app does, and CLAUDE.md
+  links to them. Git keeps everything removed here.

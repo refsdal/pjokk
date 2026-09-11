@@ -9,9 +9,9 @@ import (
 	"github.com/refsdal/pjokk/server/internal/web"
 )
 
-// wantHeaders is REF §A9's exact header set, CSP included byte-for-byte
-// except for one deliberate addition: `blob:` in img-src, for the
-// on-device avatar crop (see web.go's csp comment).
+// wantHeaders is the TypeScript app's exact header set, CSP included
+// byte-for-byte except for one deliberate addition: `blob:` in img-src,
+// for the on-device avatar crop (see web.go's csp comment).
 var wantHeaders = map[string]string{
 	"X-Content-Type-Options":    "nosniff",
 	"X-Frame-Options":           "DENY",
@@ -22,7 +22,7 @@ var wantHeaders = map[string]string{
 	"Content-Security-Policy":   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
 }
 
-func assertA9Headers(t *testing.T, h http.Header) {
+func assertSecurityHeaders(t *testing.T, h http.Header) {
 	t.Helper()
 	for name, want := range wantHeaders {
 		if got := h.Get(name); got != want {
@@ -39,7 +39,7 @@ func stubAPIHandler(t *testing.T) http.Handler {
 	})
 }
 
-func TestHandlerServesIndexAtRootWithA9Headers(t *testing.T) {
+func TestHandlerServesIndexAtRootWithSecurityHeaders(t *testing.T) {
 	handler := web.Handler(stubAPIHandler(t))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -49,7 +49,7 @@ func TestHandlerServesIndexAtRootWithA9Headers(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET / status = %d, want 200", rec.Code)
 	}
-	assertA9Headers(t, rec.Header())
+	assertSecurityHeaders(t, rec.Header())
 	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
 		t.Errorf("Content-Type = %q, want text/html prefix", ct)
 	}
@@ -68,7 +68,7 @@ func TestHandlerRobotsTxtDisallowsEverything(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET /robots.txt status = %d, want 200", rec.Code)
 	}
-	assertA9Headers(t, rec.Header())
+	assertSecurityHeaders(t, rec.Header())
 	want := "User-agent: *\nDisallow: /\n"
 	if got := rec.Body.String(); got != want {
 		t.Errorf("robots.txt body = %q, want %q", got, want)
@@ -85,7 +85,7 @@ func TestHandlerUnknownPathFallsBackToIndex(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET /some/deep/spa/route status = %d, want 200", rec.Code)
 	}
-	assertA9Headers(t, rec.Header())
+	assertSecurityHeaders(t, rec.Header())
 	if !strings.Contains(rec.Body.String(), "<html") {
 		t.Errorf("body does not look like index.html: %q", rec.Body.String())
 	}
@@ -106,7 +106,7 @@ func TestHandlerDelegatesAPIPathsUntouched(t *testing.T) {
 	if !called {
 		t.Fatal("api handler was not invoked for /api/* path")
 	}
-	// No REF §A9 headers on API responses (REF §A1: "No CSP on API").
+	// No security headers on API responses.
 	if rec.Header().Get("Content-Security-Policy") != "" {
 		t.Errorf("CSP header set on /api/* response, want none")
 	}

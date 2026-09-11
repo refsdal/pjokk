@@ -17,7 +17,7 @@ import (
 // -----------------------------------------------------------------------
 // API keys — ports apps/api/test/api-keys.test.ts's "api keys" describe
 // block (the "baby sex" block in that same file is babies_test.go's, per
-// its own comment). middleware_test.go (Task 6) already exercises
+// its own comment). middleware_test.go already exercises
 // APIKeyAuth's own edge cases (expiry, revocation, read-only, bogus tokens)
 // against a hand-inserted row; these tests instead go end-to-end through
 // the real /api/keys routes — mint via HTTP, use the minted key against a

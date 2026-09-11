@@ -23,8 +23,8 @@ type CreatePushSubscriptionParams struct {
 	Auth     string
 }
 
-// Test/fixture helper — the real write path (subscribe/unsubscribe routes)
-// lands with the API handlers, not this task.
+// Test/fixture helper: the subscribe and unsubscribe routes have queries of
+// their own.
 func (q *Queries) CreatePushSubscription(ctx context.Context, arg CreatePushSubscriptionParams) (PushSubscription, error) {
 	row := q.db.QueryRow(ctx, createPushSubscription,
 		arg.FamilyID,
@@ -85,7 +85,7 @@ SELECT id, family_id, user_id, endpoint, p256dh, auth, created_at FROM "push_sub
 WHERE "user_id" = $1
 `
 
-// Queries backing internal/push (Task 7). See
+// Queries backing internal/push. See
 // apps/api/src/infrastructure/push.ts for the TypeScript original this
 // ports: load a user's subscriptions, send to each, and delete whichever
 // ones the push service reports as gone (404/410).
@@ -136,7 +136,7 @@ type UpsertPushSubscriptionParams struct {
 	Auth     string
 }
 
-// Queries below back internal/api/push.go (Task 18; REF §A1 push.ts).
+// Queries below back internal/api/push.go (push.ts).
 // POST /api/push/subscribe. Re-subscribing the SAME endpoint (a browser can
 // resend its existing subscription, or a device can change hands within a
 // family) rebinds it to whichever caller sent it now rather than failing

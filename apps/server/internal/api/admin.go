@@ -16,12 +16,12 @@ import (
 	dbgen "github.com/refsdal/pjokk/server/internal/db/gen"
 )
 
-// This file ports apps/api/src/routes/admin.ts (REF §A1's admin.ts route
-// table) AND the surface the TypeScript app got from better-auth's admin
-// plugin over /api/auth/admin/* — REF §A1's "NEW in Go" table: listing
-// users, banning, unbanning, setting a password, revoking sessions and
+// This file ports apps/api/src/routes/admin.ts AND the surface the
+// TypeScript app got from better-auth's admin plugin over
+// /api/auth/admin/*, all of it new in Go: listing users, banning,
+// unbanning, setting a password, revoking sessions and
 // impersonation. Limen has no admin plugin, so those are ours now; the
-// session machinery they need already exists on auth.Service (Task 4).
+// session machinery they need already exists on auth.Service.
 //
 // Everything here runs behind tierSysadmin (api.go's operationAuthTiers),
 // with the single, deliberate exception of StopImpersonating — see its own
@@ -31,9 +31,9 @@ import (
 //
 // The TypeScript predecessor's POST /api/admin/families/{id}/plan (the
 // audited free↔comp override) and the Stripe subscription cancellation
-// inside deleteFamily are both absent by design: this port has no billing
-// (REF §A1: "Stripe cancel/subscription rows GONE in Go"). Deleting a
-// family is now nothing but an audited DELETE that the schema cascades.
+// inside deleteFamily are both absent by design: this port has no billing.
+// Deleting a family is now nothing but an audited DELETE that the schema
+// cascades.
 //
 // # Auditing
 //
@@ -222,9 +222,9 @@ func (d Deps) DeleteAdminFamily(ctx context.Context, req gen.DeleteAdminFamilyRe
 	return gen.DeleteAdminFamily200JSONResponse{Ok: gen.OkOkTrue}, nil
 }
 
-// ListAdminUsers implements GET /api/admin/users. NEW in Go (REF §A1's
-// "NEW in Go" table): the TypeScript console called better-auth's
-// admin.listUsers from the browser.
+// ListAdminUsers implements GET /api/admin/users. New in Go: the
+// TypeScript console called better-auth's admin.listUsers from the
+// browser.
 func (d Deps) ListAdminUsers(ctx context.Context, req gen.ListAdminUsersRequestObject) (gen.ListAdminUsersResponseObject, error) {
 	cursor, err := decodeAdminCursor(req.Params.Cursor)
 	if err != nil {
@@ -350,8 +350,7 @@ func (d Deps) DeleteAdminUser(ctx context.Context, req gen.DeleteAdminUserReques
 // The flag alone is not a revocation — auth.Service's own doc comment says
 // so — hence the RevokeAllSessions call. The user's API keys stop working
 // too, without anything here doing it: queries/middleware.sql's
-// GetAPIKeyByHash joins on a non-banned creator (the hole Task 6 deferred
-// to this task).
+// GetAPIKeyByHash joins on a non-banned creator.
 //
 // Self-ban is refused. There is no unban endpoint reachable by a banned
 // account, so an admin who banned themselves would have locked the whole
@@ -517,7 +516,7 @@ func (d Deps) RevokeAdminUserSessions(ctx context.Context, req gen.RevokeAdminUs
 //
 // The two guards below are this port's, not auth's: Impersonate refuses
 // self-impersonation with a plain error (a 500 to the caller), and had no
-// banned-target check at all (a gap Task 4's review deferred here). A
+// banned-target check at all. A
 // banned account's sessions have just been revoked on purpose; minting a
 // fresh one for it — which is exactly what impersonation does — would undo
 // that.

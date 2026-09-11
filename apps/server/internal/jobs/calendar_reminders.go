@@ -9,7 +9,7 @@ import (
 	// time.LoadLocation("Europe/Oslo") depends on /usr/share/zoneinfo (or
 	// ZONEINFO) existing on whatever host or container runs the job — a
 	// minimal container image is exactly the case where that is NOT a safe
-	// assumption. REF §A7 / the calendar-reminders.test.ts port both require
+	// assumption. The calendar-reminders.test.ts port requires
 	// Oslo-local formatting to be correct regardless of the runtime image, so
 	// the dependency is removed rather than documented as an operational
 	// requirement.

@@ -223,8 +223,8 @@ func TestIsJob(t *testing.T) {
 	}
 }
 
-// REF §A4: "Each job wrapped in recover/log — a panicking job must not kill
-// the process." runSafely is that wrapper; a panic escaping it would take
+// Each job is wrapped in recover/log — a panicking job must not kill the
+// process. runSafely is that wrapper; a panic escaping it would take
 // down a container that is otherwise healthy.
 func TestRunSafelySwallowsPanics(t *testing.T) {
 	cron.RunSafely(context.Background(), "boom", func(context.Context) error {

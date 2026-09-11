@@ -20,7 +20,7 @@ import (
 const orphanGracePeriod = 7 * 24 * time.Hour
 
 // PurgeOrphanUsers deletes accounts that: are not a system admin (role IS
-// NULL or role != "admin" — REF §A7; broader than the TypeScript
+// NULL or role != "admin" — broader than the TypeScript
 // predecessor's role="user"-or-null check, since this port never stamps a
 // default "user" role at all), are not the tombstone account, were created
 // more than orphanGracePeriod ago, and hold no family membership. Returns

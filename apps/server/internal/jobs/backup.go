@@ -13,7 +13,7 @@ import (
 
 // BackupTables is the Go port of apps/api/src/jobs/backup.ts's BACKUP_TABLES:
 // an ordered, hard-coded list of every table the nightly snapshot dumps.
-// Adapted to the Go schema (REF §A7): better-auth's `user`/`session`/
+// Adapted to the Go schema: better-auth's `user`/`session`/
 // `account`/`verification`/`organization`/`member`/`invitation` become
 // Limen's `users`/`sessions`/`accounts`/`verifications`/`organizations`/
 // `organization_members`/`organization_invitations`; `organization_roles`
@@ -22,7 +22,7 @@ import (
 // admin/member roles — so it is NOT listed, and `organization_member_roles`
 // (Limen's actual role-assignment table, recreated in that same migration)
 // is added in its place. `passkey` and `subscription` are gone entirely —
-// billing and the passkey UI never shipped in this port (REF §A1).
+// billing and the passkey UI never shipped in this port.
 // `impersonation` is NOT listed either — see DeliberatelyExcluded.
 //
 // BackupTablesTest (backup_tables_test.go) asserts this list against the
@@ -251,7 +251,7 @@ func RunBackup(ctx context.Context, d Deps, now time.Time) (string, error) {
 }
 
 // PruneBackups deletes backup snapshots older than backupRetentionDays and
-// returns the keys removed, so the caller (Task 24's cron wiring) can log a
+// returns the keys removed, so the caller (the cron job) can log a
 // count. Mirrors backup.ts's pruneBackups, including the key-date-first,
 // UploadedAt-fallback rule: the date in the key is stable and is what names
 // the snapshot, so it is preferred; an unexpected key (one that does not

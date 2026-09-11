@@ -610,7 +610,7 @@ func TestFamilyNamesMayRepeat(t *testing.T) {
 	oneID, _ := f.signIn("One", "one@example.com")
 	twoID, _ := f.signIn("Two", "two@example.com")
 	// A third, still family-less user for the HTTP-route half of this test:
-	// allowOrgCreation (Task 22 fix) permits self-serve founding only while a
+	// allowOrgCreation (the H2 fix) permits self-serve founding only while a
 	// user holds zero memberships, so reusing oneID/twoID here — both
 	// already admins of a family from the CreateFamily calls below — would
 	// conflate "family names may repeat" with that unrelated gate.
@@ -638,7 +638,7 @@ func TestFamilyNamesMayRepeat(t *testing.T) {
 	}
 }
 
-// TestOrgCreationRouteRestrictedToSysadminOrBootstrap is a Task 22 regression
+// TestOrgCreationRouteRestrictedToSysadminOrBootstrap is a regression
 // test for a real leak found while porting apps/api/test/security.test.ts's
 // "only system admins can create families (H2)": the Go port had NO equivalent
 // of auth.ts's allowUserToCreateOrganization gate. organizations:create stayed

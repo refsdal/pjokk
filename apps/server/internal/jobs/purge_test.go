@@ -12,8 +12,7 @@ import (
 )
 
 // Ports apps/api/test/security.test.ts's "purges week-old accounts with no
-// family; keeps members and admins (H2)" — deferred from Task 22 per the
-// Task 23 brief.
+// family; keeps members and admins (H2)".
 func TestPurgeOrphanUsersKeepsMembersAndAdmins(t *testing.T) {
 	a := testrig.App(t)
 	ctx := context.Background()

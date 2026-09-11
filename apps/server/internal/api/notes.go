@@ -29,7 +29,7 @@ func serNote(row dbgen.GetNoteRow) gen.NoteLog {
 	}
 }
 
-// ListNotes implements GET /api/notes. REF: "NoteLog[] newest first".
+// ListNotes implements GET /api/notes.
 func (d Deps) ListNotes(ctx context.Context, req gen.ListNotesRequestObject) (gen.ListNotesResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	rows, err := d.Q.ListNotes(ctx, dbgen.ListNotesParams{
@@ -47,8 +47,8 @@ func (d Deps) ListNotes(ctx context.Context, req gen.ListNotesRequestObject) (ge
 	return gen.ListNotes200JSONResponse(out), nil
 }
 
-// CreateNote implements POST /api/notes. REF: "{babyId, time, content,
-// notes?} → 201 / 404 unknown baby". Free in Go (see other_logs.go's doc
+// CreateNote implements POST /api/notes. {babyId, time, content,
+// notes?} → 201 / 404 unknown baby. Free in Go (see other_logs.go's doc
 // comment).
 func (d Deps) CreateNote(ctx context.Context, req gen.CreateNoteRequestObject) (gen.CreateNoteResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
@@ -81,8 +81,8 @@ func (d Deps) CreateNote(ctx context.Context, req gen.CreateNoteRequestObject) (
 	return gen.CreateNote201JSONResponse(serNote(row)), nil
 }
 
-// UpdateNote implements PATCH /api/notes/{id}. REF: "partial (nullable
-// clears) → NoteLog / 404".
+// UpdateNote implements PATCH /api/notes/{id}. partial (nullable
+// clears) → NoteLog / 404.
 func (d Deps) UpdateNote(ctx context.Context, req gen.UpdateNoteRequestObject) (gen.UpdateNoteResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 
@@ -126,7 +126,7 @@ func (d Deps) UpdateNote(ctx context.Context, req gen.UpdateNoteRequestObject) (
 	return gen.UpdateNote200JSONResponse(serNote(row)), nil
 }
 
-// DeleteNote implements DELETE /api/notes/{id}. REF: "{ok:true} / 404".
+// DeleteNote implements DELETE /api/notes/{id}.
 func (d Deps) DeleteNote(ctx context.Context, req gen.DeleteNoteRequestObject) (gen.DeleteNoteResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	ok, err := deleteLog(ctx, func(ctx context.Context) (int64, error) {

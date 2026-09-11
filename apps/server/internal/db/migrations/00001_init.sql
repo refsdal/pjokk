@@ -3,13 +3,10 @@
 -- ===========================================================================
 -- Auth tables (Limen-shaped)
 --
--- Limen does not ship a published schema; these are a best-effort port from
--- REF §B4's column lists, using this file's own `id text PRIMARY KEY DEFAULT
--- gen_random_uuid()::text` convention for any table whose PK isn't called out
--- explicitly in the column list. Task 4 runtime-verifies this against actual
--- Limen migrations (`limen generate migrations`) and adds a follow-up
--- migration if the real column set differs — this file stays authoritative
--- until then.
+-- Limen does not ship a published schema; these were a best-effort port,
+-- using this file's own `id text PRIMARY KEY DEFAULT gen_random_uuid()::text`
+-- convention for any table whose PK isn't called out explicitly. The real
+-- column set, read off Limen itself, arrived in 00002_limen_align.sql.
 -- ===========================================================================
 
 CREATE TABLE "users" (
@@ -23,7 +20,7 @@ CREATE TABLE "users" (
 	"created_at" timestamptz NOT NULL DEFAULT now(),
 	"updated_at" timestamptz NOT NULL DEFAULT now(),
 	"deleted_at" timestamptz,
-	-- Our additional fields (REF §A2), not part of Limen's own column set.
+	-- Our additional fields, not part of Limen's own column set.
 	"name" text,
 	"image" text,
 	"role" text,
@@ -40,7 +37,7 @@ CREATE TABLE "organizations" (
 	"slug" text NOT NULL,
 	"logo" text,
 	"metadata" text,
-	-- Our additional field (REF §A2).
+	-- Our additional field.
 	"plan" text NOT NULL DEFAULT 'free',
 	"created_at" timestamptz NOT NULL DEFAULT now(),
 	"updated_at" timestamptz NOT NULL DEFAULT now(),
@@ -55,7 +52,7 @@ CREATE TABLE "sessions" (
 	"expires_at" timestamptz NOT NULL,
 	"last_access" timestamptz,
 	"metadata" text,
-	-- Org plugin's field (REF §A2).
+	-- Org plugin's field.
 	"active_organization_id" text REFERENCES "organizations" ("id") ON DELETE SET NULL,
 	CONSTRAINT "sessions_token_unique" UNIQUE ("token")
 );

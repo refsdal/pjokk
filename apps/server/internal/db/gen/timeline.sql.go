@@ -201,7 +201,7 @@ type ListFeedsPageRow struct {
 	Notes         *string
 }
 
-// Merged-timeline pagination (Task 15; REF §A1 timeline.ts). One "Page"
+// Merged-timeline pagination (timeline.ts). One "Page"
 // query per source, all eleven shaped identically: family+baby scoped
 // (baby_id is REQUIRED here, unlike ListFeeds/ListDiapers/… — the
 // /api/timeline route always has a babyId), an optional keyset cursor via
@@ -216,7 +216,7 @@ type ListFeedsPageRow struct {
 // The cursor args are nullable (sqlc.narg): when the caller sent no ?before,
 // both cursor_time and cursor_id are SQL NULL, the "IS NULL" branch of the
 // OR is true, and the row-comparison clause never runs — i.e. no extra
-// filtering, exactly the brief's "no cursor: no row-comparison clause".
+// filtering: no cursor, no row-comparison clause.
 //
 // ?q (issue #52) is a case-insensitive substring match — an ILIKE against
 // the free-text columns each kind has (notes everywhere; plus the medicine

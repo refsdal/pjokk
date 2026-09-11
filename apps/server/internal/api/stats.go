@@ -22,11 +22,10 @@ import (
 // # The removed premium gate
 //
 // TS: `if (q.days > 7 && !canUse({ plan: c.var.plan }, "statsMonth"))
-// return 402`. This task's route contract removes that gate entirely (see
-// this task's brief: "statsMonth gate REMOVED — days up to 90 free") —
-// every window from 1 to 90 days (the spec's days query param bounds) is
-// free, mirroring the same de-gating this Go port already did for
-// calendar/contacts creation (Task 16).
+// return 402`. That gate is gone: every window from 1 to 90 days (the
+// spec's days query param bounds) is free, mirroring the same de-gating
+// this Go port already did for
+// calendar/contacts creation.
 //
 // # Query reuse, not duplication
 //
@@ -37,9 +36,9 @@ import (
 // way GetSummary (summary.go) reuses sleep.sql's ActiveSleep and
 // play.sql's ActivePlay instead of duplicating them.
 
-// GetStats implements GET /api/stats. REF: "{days:[{date,sleepMin,
+// GetStats implements GET /api/stats. {days:[{date,sleepMin,
 // intakeMl,feeds,diapers}], avgSleepMin, avgIntakeMl, avgFeeds, avgDiapers,
-// weight:{value,time,prevValue,prevTime}|null} / 404 unknown baby".
+// weight:{value,time,prevValue,prevTime}|null} / 404 unknown baby.
 func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.GetStatsResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	babyID := req.Params.BabyId

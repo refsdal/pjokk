@@ -136,7 +136,7 @@ type ListDiapersRow struct {
 	Notes         *string
 }
 
-// Diaper logs (Task 10; REF §A1 diapers.ts — "same skeleton" as feeds.sql,
+// Diaper logs (diapers.ts — "same skeleton" as feeds.sql,
 // minus the feed-only columns). See feeds.sql's header for the UpdateDiaper
 // CASE/set-flag pattern; internal/api/feeds.go documents the handler side
 // in full, internal/api/diapers.go just points back to it.

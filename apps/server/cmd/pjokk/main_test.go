@@ -12,7 +12,7 @@ import (
 // orchestrator: `server` must never migrate, a typo must never boot a web
 // server, and `cron` must never exit 0 having done nothing. parseArgs is
 // where all of that is decided, and it reads nothing and touches nothing, so
-// it can be checked exhaustively here — REF §A4's table, row by row.
+// it can be checked exhaustively here, row by row.
 func TestParseArgs(t *testing.T) {
 	tests := []struct {
 		name string

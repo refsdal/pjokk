@@ -39,8 +39,8 @@ var defaultSleepLocations = []string{"crib", "stroller", "arms", "contact nap"}
 // family.
 const maxCustomSleepLocations = 20
 
-// ListSleepLocations implements GET /api/sleep-locations. REF:
-// "{id,name}[]".
+// ListSleepLocations implements GET /api/sleep-locations.
+// {id,name}[].
 func (d Deps) ListSleepLocations(ctx context.Context, _ gen.ListSleepLocationsRequestObject) (gen.ListSleepLocationsResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	rows, err := d.Q.ListSleepLocations(ctx, fam.FamilyID)
@@ -54,10 +54,10 @@ func (d Deps) ListSleepLocations(ctx context.Context, _ gen.ListSleepLocationsRe
 	return gen.ListSleepLocations200JSONResponse(out), nil
 }
 
-// CreateSleepLocation implements POST /api/sleep-locations. REF: "{name
+// CreateSleepLocation implements POST /api/sleep-locations. {name
 // 1..40 trimmed} → 201; 400 VALIDATION when the name is empty once
 // whitespace is trimmed; 409 DUPLICATE vs a default or existing custom name
-// (case-insensitive); 409 LIMIT_REACHED at 20 custom locations". Reached
+// (case-insensitive); 409 LIMIT_REACHED at 20 custom locations. Reached
 // only via tierAdmin (api.go), so the caller is already known to be a
 // family admin, not an API key.
 func (d Deps) CreateSleepLocation(ctx context.Context, req gen.CreateSleepLocationRequestObject) (gen.CreateSleepLocationResponseObject, error) {
@@ -105,8 +105,8 @@ func (d Deps) CreateSleepLocation(ctx context.Context, req gen.CreateSleepLocati
 	return gen.CreateSleepLocation201JSONResponse{Id: created.ID, Name: created.Name}, nil
 }
 
-// DeleteSleepLocation implements DELETE /api/sleep-locations/{id}. REF:
-// "{ok:true} / 404". Reached only via tierAdmin.
+// DeleteSleepLocation implements DELETE /api/sleep-locations/{id}.
+// {ok:true} / 404. Reached only via tierAdmin.
 func (d Deps) DeleteSleepLocation(ctx context.Context, req gen.DeleteSleepLocationRequestObject) (gen.DeleteSleepLocationResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	n, err := d.Q.DeleteSleepLocation(ctx, dbgen.DeleteSleepLocationParams{FamilyID: fam.FamilyID, ID: req.Id})
