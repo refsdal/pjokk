@@ -1,7 +1,8 @@
 import { ChipGroup } from "@/components/Chips";
 import { Card } from "@/components/ui/card";
 import { useAppearance } from "@/lib/appearance";
-import { t } from "@/lib/i18n";
+import { useSaveLanguage } from "@/lib/data/profile";
+import { resolveLanguage, t } from "@/lib/i18n";
 import { SectionTitle } from "./lib";
 
 export function AppearanceSection() {
@@ -15,6 +16,7 @@ export function AppearanceSection() {
     languageMode,
     setLanguage,
   } = useAppearance();
+  const saveLanguage = useSaveLanguage();
 
   return (
     <>
@@ -40,7 +42,15 @@ export function AppearanceSection() {
             { value: "nb", label: "Norsk" },
           ]}
           value={languageMode}
-          onChange={setLanguage}
+          onChange={(m) => {
+            setLanguage(m);
+            // The choice is the person's: every device they sign in on
+            // follows it, and pushes use what it resolves to here.
+            saveLanguage.mutate({
+              languageMode: m,
+              language: resolveLanguage(m),
+            });
+          }}
         />
       </Card>
 

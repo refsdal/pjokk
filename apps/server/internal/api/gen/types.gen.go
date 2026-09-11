@@ -932,6 +932,45 @@ func (e InviteInfoRole) Valid() bool {
 	}
 }
 
+// Defines values for MeLanguage.
+const (
+	MeLanguageEn MeLanguage = "en"
+	MeLanguageNb MeLanguage = "nb"
+)
+
+// Valid indicates whether the value is a known member of the MeLanguage enum.
+func (e MeLanguage) Valid() bool {
+	switch e {
+	case MeLanguageEn:
+		return true
+	case MeLanguageNb:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MeLanguageMode.
+const (
+	MeLanguageModeAuto MeLanguageMode = "auto"
+	MeLanguageModeEn   MeLanguageMode = "en"
+	MeLanguageModeNb   MeLanguageMode = "nb"
+)
+
+// Valid indicates whether the value is a known member of the MeLanguageMode enum.
+func (e MeLanguageMode) Valid() bool {
+	switch e {
+	case MeLanguageModeAuto:
+		return true
+	case MeLanguageModeEn:
+		return true
+	case MeLanguageModeNb:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for MeUnits.
 const (
 	MeUnitsImperial MeUnits = "imperial"
@@ -1553,6 +1592,45 @@ func (e UpdateFeedType) Valid() bool {
 	case UpdateFeedTypeBreast:
 		return true
 	case UpdateFeedTypeSolids:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateMeLanguage.
+const (
+	UpdateMeLanguageEn UpdateMeLanguage = "en"
+	UpdateMeLanguageNb UpdateMeLanguage = "nb"
+)
+
+// Valid indicates whether the value is a known member of the UpdateMeLanguage enum.
+func (e UpdateMeLanguage) Valid() bool {
+	switch e {
+	case UpdateMeLanguageEn:
+		return true
+	case UpdateMeLanguageNb:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateMeLanguageMode.
+const (
+	UpdateMeLanguageModeAuto UpdateMeLanguageMode = "auto"
+	UpdateMeLanguageModeEn   UpdateMeLanguageMode = "en"
+	UpdateMeLanguageModeNb   UpdateMeLanguageMode = "nb"
+)
+
+// Valid indicates whether the value is a known member of the UpdateMeLanguageMode enum.
+func (e UpdateMeLanguageMode) Valid() bool {
+	switch e {
+	case UpdateMeLanguageModeAuto:
+		return true
+	case UpdateMeLanguageModeEn:
+		return true
+	case UpdateMeLanguageModeNb:
 		return true
 	default:
 		return false
@@ -2775,9 +2853,15 @@ type Me struct {
 	Email          string  `json:"email"`
 	FamilyId       *string `json:"familyId"`
 	ImpersonatedBy *string `json:"impersonatedBy"`
-	MemberRole     *string `json:"memberRole"`
-	Name           string  `json:"name"`
-	Nickname       *string `json:"nickname"`
+
+	// Language The language in effect, as the app last resolved it (`auto` resolved on the device). Server-written text — push notifications — is in this language.
+	Language MeLanguage `json:"language"`
+
+	// LanguageMode The language the person picked in Settings, followed by every device they sign in on; `auto` follows each device's own language. Null until an app has sent one — the SPA then uploads its device-local choice instead of adopting a default.
+	LanguageMode *MeLanguageMode `json:"languageMode"`
+	MemberRole   *string         `json:"memberRole"`
+	Name         string          `json:"name"`
+	Nickname     *string         `json:"nickname"`
 
 	// Phone Private to the user; never on Member.
 	Phone *string `json:"phone"`
@@ -2793,6 +2877,12 @@ type Me struct {
 	// Version The server's build version — the same string the container image is tagged with ("0.8.0", "0.9.0-pr.42.abc1234"), or "dev" for an unstamped build. Shown in the Settings footer.
 	Version string `json:"version"`
 }
+
+// MeLanguage The language in effect, as the app last resolved it (`auto` resolved on the device). Server-written text — push notifications — is in this language.
+type MeLanguage string
+
+// MeLanguageMode The language the person picked in Settings, followed by every device they sign in on; `auto` follows each device's own language. Null until an app has sent one — the SPA then uploads its device-local choice instead of adopting a default.
+type MeLanguageMode string
 
 // MeUnits Display units (issue #53). Stored values are always metric; the SPA converts at the edge. Follows the person across families and devices.
 type MeUnits string
@@ -3339,11 +3429,19 @@ type UpdateFeedType string
 
 // UpdateMe Every field optional. `nickname` and `phone` accept `null` to clear; the handler reads the raw body (internal/api/patch.go) to tell null from absent.
 type UpdateMe struct {
-	Name     *string        `json:"name,omitempty"`
-	Nickname *string        `json:"nickname,omitempty"`
-	Phone    *string        `json:"phone,omitempty"`
-	Units    *UpdateMeUnits `json:"units,omitempty"`
+	Language     *UpdateMeLanguage     `json:"language,omitempty"`
+	LanguageMode *UpdateMeLanguageMode `json:"languageMode,omitempty"`
+	Name         *string               `json:"name,omitempty"`
+	Nickname     *string               `json:"nickname,omitempty"`
+	Phone        *string               `json:"phone,omitempty"`
+	Units        *UpdateMeUnits        `json:"units,omitempty"`
 }
+
+// UpdateMeLanguage defines model for UpdateMe.Language.
+type UpdateMeLanguage string
+
+// UpdateMeLanguageMode defines model for UpdateMe.LanguageMode.
+type UpdateMeLanguageMode string
 
 // UpdateMeUnits defines model for UpdateMe.Units.
 type UpdateMeUnits string

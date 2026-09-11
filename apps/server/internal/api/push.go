@@ -108,18 +108,30 @@ func (d Deps) UnsubscribePush(ctx context.Context, req gen.UnsubscribePushReques
 }
 
 // TestPush implements POST /api/push/test. REF: "{sent: n} via
-// Deps.Push.ToUser(currentUser)". The payload matches
+// Deps.Push.ToUser(currentUser)". In English the payload matches
 // apps/api/src/routes/push.ts's byte-for-byte (title, body, and the /home
-// deep link the frontend's service worker reads on notification click).
+// deep link the frontend's service worker reads on notification click);
+// the body is in the person's language (internal/push/text.go).
 func (d Deps) TestPush(ctx context.Context, _ gen.TestPushRequestObject) (gen.TestPushResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	sent, err := d.Push.ToUser(ctx, fam.UserID, push.PushPayload{
 		Title: "Pjokk",
-		Body:  "Push works on this device ✅",
+		Body:  push.T(d.userLanguage(ctx, fam.UserID), "Push works on this device ✅"),
 		URL:   "/home",
 	})
 	if err != nil {
 		return nil, err
 	}
 	return gen.TestPush200JSONResponse{Sent: sent}, nil
+}
+
+// userLanguage is the language a push to userID is written in
+// (users.language, 00018). English when it cannot be read: a push in the
+// wrong language beats none.
+func (d Deps) userLanguage(ctx context.Context, userID string) string {
+	lang, err := d.Q.GetUserLanguage(ctx, userID)
+	if err != nil {
+		return push.LangEN
+	}
+	return lang
 }

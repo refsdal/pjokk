@@ -5,6 +5,7 @@ import { client, unwrap } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
 import { useAppBadge } from "@/lib/badge";
 import { useMe, useSummary } from "@/lib/data";
+import { useLanguageSync } from "@/lib/data/profile";
 import {
   judgeFamily,
   readFence,
@@ -114,6 +115,7 @@ export function AppShell() {
 
 function AppChrome() {
   const me = useMe();
+  useLanguageSync();
 
   const { impersonatedBy, name } = me.data ?? {};
 

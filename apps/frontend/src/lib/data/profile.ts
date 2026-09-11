@@ -1,6 +1,10 @@
+import { useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { API_BASE, client, unwrap } from "../api";
-import type { Me } from "./family";
+import { useAppearance } from "../appearance";
+import { getLanguageMode, resolveLanguage, type LanguageMode } from "../i18n";
+import { planLanguageSync } from "../language-sync";
+import { type Me, useMe } from "./family";
 import { invalidateLogs } from "./keys";
 
 // The caller's own profile (spec §4/§5). Every write returns the fresh Me,
@@ -13,6 +17,8 @@ export interface UpdateMeVars {
   nickname?: string | null;
   phone?: string | null;
   units?: "metric" | "imperial";
+  languageMode?: LanguageMode;
+  language?: "en" | "nb";
 }
 
 // Every mutation replaces the cached `me` and refreshes `members` (both show
@@ -39,6 +45,40 @@ export function useUpdateMe() {
     (vars: UpdateMeVars) => unwrap<Me>(client.PATCH("/api/me", { body: vars })),
     true,
   );
+}
+
+// The language fields alone: no log row shows them, so no log view is
+// invalidated.
+export function useSaveLanguage() {
+  return useProfileMutation(
+    (vars: Pick<UpdateMeVars, "languageMode" | "language">) =>
+      unwrap<Me>(client.PATCH("/api/me", { body: vars })),
+    false,
+  );
+}
+
+// Keeps this device and the person's stored language in step
+// (lib/language-sync.ts). It runs when the SERVER's copy changes — a fresh
+// me — and never because only the device's did, so a pick in Settings is
+// not undone by the me it was made against; that pick saves itself
+// (screens/settings/AppearanceSection.tsx). Mounted in the signed-in shell:
+// sign-in screens and kiosk tablets have no person to follow.
+export function useLanguageSync() {
+  const me = useMe();
+  const { setLanguage } = useAppearance();
+  const { mutate } = useSaveLanguage();
+  const serverMode = me.data?.languageMode;
+  const serverLanguage = me.data?.language;
+  useEffect(() => {
+    if (serverMode === undefined || serverLanguage === undefined) return;
+    const plan = planLanguageSync(
+      { languageMode: serverMode, language: serverLanguage },
+      getLanguageMode(),
+      resolveLanguage,
+    );
+    if (plan.adopt) setLanguage(plan.adopt);
+    if (plan.patch) mutate(plan.patch);
+  }, [serverMode, serverLanguage, setLanguage, mutate]);
 }
 
 // Multipart and JPEG-streaming routes are outside the OpenAPI spec (see

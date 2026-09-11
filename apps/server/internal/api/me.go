@@ -70,6 +70,8 @@ func (d Deps) UpdateMe(ctx context.Context, _ gen.UpdateMeRequestObject) (gen.Up
 	nickSet, nickVal := patchField[string](p, "nickname")
 	phoneSet, phoneVal := patchField[string](p, "phone")
 	unitsSet, unitsVal := patchField[string](p, "units")
+	modeSet, modeVal := patchField[string](p, "languageMode")
+	langSet, langVal := patchField[string](p, "language")
 	if err := p.Err(); err != nil {
 		return nil, err
 	}
@@ -110,12 +112,34 @@ func (d Deps) UpdateMe(ctx context.Context, _ gen.UpdateMeRequestObject) (gen.Up
 		units = *unitsVal
 	}
 
+	// Language (00018): the Settings choice, which every device follows,
+	// and what the app resolved it to, which pushes are written in. Both
+	// enums are the spec's; neither can be cleared back to null.
+	languageMode := current.LanguageMode
+	if modeSet {
+		if modeVal == nil {
+			return gen.UpdateMe400JSONResponse(gen.Error{Error: "Language mode must be auto, en or nb", Code: "VALIDATION"}), nil
+		}
+		languageMode = modeVal
+	}
+	language := current.Language
+	if langSet {
+		if langVal == nil {
+			return gen.UpdateMe400JSONResponse(gen.Error{Error: "Language must be en or nb", Code: "VALIDATION"}), nil
+		}
+		language = *langVal
+	}
+
 	if err := d.Q.UpdateUserProfile(ctx, dbgen.UpdateUserProfileParams{
 		ID:       session.UserID,
 		Name:     &name,
 		Nickname: nickname,
 		Phone:    phone,
 		Units:    units,
+		// Named per field, not left to zero values: an omitted field here
+		// would write NULL / "" over the person's choice.
+		LanguageMode: languageMode,
+		Language:     language,
 	}); err != nil {
 		return nil, err
 	}
@@ -170,6 +194,9 @@ func (d Deps) buildMe(ctx context.Context, session *auth.Session) (gen.Me, error
 		Email:       session.Email,
 		Version:     d.Version,
 		Units:       gen.MeUnits(profile.Units),
+		Language:    gen.MeLanguage(profile.Language),
+		// *string → *MeLanguageMode: nil stays nil (never sent by an app).
+		LanguageMode: (*gen.MeLanguageMode)(profile.LanguageMode),
 	}
 	if session.Role != "" {
 		role := session.Role

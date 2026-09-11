@@ -90,12 +90,12 @@ func snoozeMAC(key [32]byte, payload string) []byte {
 	return m.Sum(nil)
 }
 
-// SnoozeAction is the notification's Snooze button: a background POST to
-// /api/push/snooze carrying the signed claims.
-func SnoozeAction(key [32]byte, c SnoozeClaims) PushAction {
+// SnoozeAction is the notification's Snooze button, labelled in lang: a
+// background POST to /api/push/snooze carrying the signed claims.
+func SnoozeAction(key [32]byte, lang string, c SnoozeClaims) PushAction {
 	return PushAction{
 		Action: "snooze",
-		Title:  "Snooze 15 min",
+		Title:  T(lang, "Snooze 15 min"),
 		URL:    "/api/push/snooze?t=" + url.QueryEscape(SignSnooze(key, c)),
 		Post:   true,
 	}

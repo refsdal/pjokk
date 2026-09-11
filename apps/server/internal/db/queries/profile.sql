@@ -12,6 +12,8 @@ SELECT
     "phone",
     COALESCE("display_name", '') AS display_name,
     "units",
+    "language_mode",
+    "language",
     "avatar_key",
     "avatar_imported_at",
     "image"
@@ -19,11 +21,16 @@ FROM "users"
 WHERE "id" = $1;
 
 -- name: UpdateUserProfile :exec
--- Full-row write of the three editable fields; the handler resolves the
--- PATCH tri-state (absent / null / value) before calling this.
+-- Full-row write of the editable fields; the handler resolves the PATCH
+-- tri-state (absent / null / value) before calling this.
 UPDATE "users"
-SET "name" = $2, "nickname" = $3, "phone" = $4, "units" = $5, "updated_at" = now()
+SET "name" = $2, "nickname" = $3, "phone" = $4, "units" = $5,
+    "language_mode" = $6, "language" = $7, "updated_at" = now()
 WHERE "id" = $1;
+
+-- name: GetUserLanguage :one
+-- The language a push to this person is written in (internal/push/text.go).
+SELECT "language" FROM "users" WHERE "id" = $1;
 
 -- name: SetUserAvatar :exec
 -- NULL clears the photo. The caller deletes the previous object.

@@ -4004,6 +4004,12 @@ components:
         units:
           type: string
           enum: [metric, imperial]
+        languageMode:
+          type: string
+          enum: [auto, en, nb]
+        language:
+          type: string
+          enum: [en, nb]
     Member:
       type: object
       required: [memberId, userId, name, email, role, avatarUrl, hasPush]
@@ -4068,6 +4074,8 @@ components:
           impersonatedBy,
           version,
           units,
+          language,
+          languageMode,
         ]
       properties:
         userId:
@@ -4081,6 +4089,22 @@ components:
             Display units (issue #53). Stored values are always metric;
             the SPA converts at the edge. Follows the person across
             families and devices.
+        languageMode:
+          type: string
+          enum: [auto, en, nb]
+          nullable: true
+          description: >-
+            The language the person picked in Settings, followed by every
+            device they sign in on; `auto` follows each device's own
+            language. Null until an app has sent one — the SPA then uploads
+            its device-local choice instead of adopting a default.
+        language:
+          type: string
+          enum: [en, nb]
+          description: >-
+            The language in effect, as the app last resolved it (`auto`
+            resolved on the device). Server-written text — push
+            notifications — is in this language.
         displayName:
           type: string
           description: >-
