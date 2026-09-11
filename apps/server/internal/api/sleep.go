@@ -164,8 +164,8 @@ func (d Deps) CreateSleep(ctx context.Context, req gen.CreateSleepRequestObject)
 	return gen.CreateSleep201JSONResponse(serSleep(created)), nil
 }
 
-// GetActiveSleep implements GET /api/sleep/active. —
-// see this file's doc comment, divergence 2, for why the "no active
+// GetActiveSleep implements GET /api/sleep/active: the active session or
+// null. See this file's doc comment, divergence 2, for why the "no active
 // session" branch returns a hand-written response type instead of the
 // generated 200 one.
 func (d Deps) GetActiveSleep(ctx context.Context, req gen.GetActiveSleepRequestObject) (gen.GetActiveSleepResponseObject, error) {

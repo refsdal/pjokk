@@ -37,7 +37,7 @@ import (
 //
 // ListVaccineDismissals/CreateVaccineDismissal/DeleteVaccineDismissal are a
 // separate table (vaccine_dismissal) with its own idempotent-create
-// semantics ( idempotent on unique — returns existing row), not a
+// semantics (idempotent on unique — returns existing row), not a
 // field on VaccineLog. api.go's operationAuthTiers lists all seven
 // operations (four vaccine, three dismissal) as tierFamily; nothing here
 // needs the ordering care api.go's doc comment warns Hono's tree needed —

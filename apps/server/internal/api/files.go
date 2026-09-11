@@ -61,7 +61,7 @@ const (
 )
 
 // allowedVaccineDocTypes is what a phone camera and a helsestasjon card
-// actually produce ( jpeg/png/webp/heic/heif/pdf). Anything else is
+// actually produce (jpeg/png/webp/heic/heif/pdf). Anything else is
 // refused outright rather than stored and served back later.
 var allowedVaccineDocTypes = map[string]bool{
 	"image/jpeg":      true,

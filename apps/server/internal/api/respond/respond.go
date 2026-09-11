@@ -1,6 +1,6 @@
 // Package respond holds the JSON error envelope every hand-written HTTP
-// response in this server uses: `{"error": "...", "code": "..."}` (see
-// CLAUDE.md).
+// response in this server uses: `{"error": "...", "code": "..."}`
+// (see CLAUDE.md).
 //
 // It is its own package rather than a file inside internal/api because the
 // middleware chain writes the same envelope and internal/api imports the

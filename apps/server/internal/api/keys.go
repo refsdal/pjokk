@@ -17,7 +17,7 @@ import (
 
 // This file ports apps/api/src/routes/keys.ts: GET/POST /api/keys, DELETE
 // /api/keys/{id}. Reached only via the tierAdmin entries api.go's
-// operationAuthTiers gives ListApiKeys/ CreateApiKey/RevokeApiKey —
+// operationAuthTiers gives ListApiKeys/CreateApiKey/RevokeApiKey —
 // middleware.RequireAdmin already answers both "not available to API keys" (a
 // key can never mint or manage keys) and "family admin only", so this file,
 // like sleep_locations.go, only has the domain logic RequireAdmin can't
