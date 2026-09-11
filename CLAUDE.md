@@ -248,8 +248,11 @@ separate test deploy).
 
 **Frontend**
 - Vite + React SPA. TanStack Router + TanStack Query + TanStack Table.
-- Forms: react-hook-form + zod (chosen over TanStack Form for shadcn ecosystem
-  velocity).
+- Forms: plain controlled components (`useState` in the sheet), which is
+  what every form in the app has always been. react-hook-form + zod were
+  the plan and were never used; both were removed with the last zod types
+  (2026-09-11). Add a form library when a form outgrows `useState`, not
+  before.
 - Charts: shadcn chart components (Recharts underneath). Do NOT use TanStack
   Charts (perpetual beta). Do NOT add TanStack DB or Store now.
 - UI: Tailwind + shadcn/ui + vaul for bottom sheets. Mobile-first. Crank touch
