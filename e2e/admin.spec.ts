@@ -1,4 +1,5 @@
-import { expect, test } from "./fixtures";
+import type { Browser, TestInfo } from "@playwright/test";
+import { asDevice, expect, seedDayMode, test } from "./fixtures";
 import { apiSignIn, apiSignup, freshEmail, makeSysadmin } from "./helpers";
 
 // First end-to-end coverage of the operator console. /admin had none at all
@@ -123,3 +124,81 @@ test("renames a family and mints an invite for it", async ({
   await page.getByRole("button", { name: "Mint member code" }).click();
   await expect(page.getByRole("img", { name: "Invite QR code" })).toBeVisible();
 });
+
+// --- The user page (docs/superpowers/specs/2026-09-11-admin-user-support-design.md)
+
+/** Another browser, its own client, signed in as `email`. */
+async function signedInElsewhere(browser: Browser, testInfo: TestInfo, device: number, email: string) {
+  const context = await browser.newContext(asDevice(testInfo, device));
+  await seedDayMode(context);
+  const page = await context.newPage();
+  await apiSignIn(page, email);
+  return { context, page };
+}
+
+test("finds a person, signs out one of their sessions and changes their email", async ({
+  page,
+  request,
+  browser,
+}, testInfo) => {
+  await operator(page, request);
+  // Signed in twice: signup signs them in (the `request` client holds that
+  // session), and then on a phone of their own.
+  const person = freshEmail("person");
+  await apiSignup(request, person);
+  const phone = await signedInElsewhere(browser, testInfo, 1, person);
+
+  await page.goto("/admin/users");
+  await page.getByPlaceholder("Search users").fill(person);
+  await page.getByRole("link", { name: new RegExp(person) }).click();
+  await expect(page).toHaveURL(/\/admin\/users\/[^/]+$/);
+
+  const sessions = page.getByTestId("admin-session");
+  await expect(sessions).toHaveCount(2);
+  await sessions.first().getByRole("button", { name: "Sign out" }).click();
+  await sessions.first().getByRole("button", { name: "Tap again to confirm" }).click();
+  await expect(page.getByTestId("admin-session")).toHaveCount(1);
+
+  // Exactly one of the two is signed out; the other carries on.
+  const statuses = await Promise.all(
+    [request, phone.page.request].map(async (r) => (await r.get("/api/me")).status()),
+  );
+  expect(statuses.sort()).toEqual([200, 401]);
+
+  // A new login address: shown on the page, and in its history.
+  const renamed = freshEmail("renamed");
+  await page.getByRole("button", { name: "Change email" }).click();
+  await page.getByLabel("New email").fill(renamed);
+  await page.getByRole("dialog").getByRole("button", { name: "Change email" }).click();
+  await expect(page.getByText(renamed).first()).toBeVisible();
+  await expect(page.getByText("user.email.change")).toBeVisible();
+
+  await phone.context.close();
+});
+
+test("an operator whose role is revoked loses the console at once", async ({
+  page,
+  request,
+  browser,
+}, testInfo) => {
+  await operator(page, request);
+  const second = freshEmail("operator");
+  await apiSignup(request, second);
+  await makeSysadmin(second);
+  const other = await signedInElsewhere(browser, testInfo, 1, second);
+  await other.page.goto("/admin/users");
+  await expect(other.page.getByPlaceholder("Search users")).toBeVisible();
+
+  await page.goto("/admin/users");
+  await page.getByPlaceholder("Search users").fill(second);
+  await page.getByRole("link", { name: new RegExp(second) }).click();
+  await page.getByRole("button", { name: "Revoke system admin" }).click();
+  await page.getByRole("button", { name: "Tap again to confirm" }).click();
+  await expect(page.getByText("System admin revoked")).toBeVisible();
+
+  // No sign-out needed: the role is re-read on every request.
+  await other.page.goto("/admin/users");
+  await expect(other.page).not.toHaveURL(/\/admin/, { timeout: 10_000 });
+  await other.context.close();
+});
+
