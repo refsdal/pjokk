@@ -169,10 +169,15 @@ export default defineConfig({
             // explicitly — exact match, or /api/medicine and
             // /api/measurements would be excluded too.) NetworkFirst for
             // other API GETs so the timeline/home render offline from the
-            // last known state.
+            // last known state. Never the operator console (/api/admin/):
+            // it has no offline use, its responses are other people's
+            // emails and sessions, and a backup download is every family's
+            // data (spec 2026-09-11-admin-ops §3) — none of it may sit in
+            // Cache Storage for 14 days.
             urlPattern: ({ url, request }) =>
               url.pathname.startsWith("/api/") &&
               !url.pathname.startsWith("/api/auth") &&
+              !url.pathname.startsWith("/api/admin/") &&
               url.pathname !== "/api/me" &&
               request.method === "GET",
             handler: "NetworkFirst",
