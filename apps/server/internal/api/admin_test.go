@@ -175,6 +175,8 @@ func TestAdminRoutesRequireSysadmin(t *testing.T) {
 		{http.MethodGet, "/api/admin/ops"},
 		{http.MethodPost, "/api/admin/jobs/frequent/run"},
 		{http.MethodGet, "/api/admin/backups"},
+		// Hand-routed (a streamed body), behind sysadminChain.
+		{http.MethodGet, "/api/admin/backups/2026-08-31"},
 	}
 
 	for _, route := range routes {

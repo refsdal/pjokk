@@ -289,3 +289,62 @@ func TestAdminBackupsListsSnapshotsNewestFirst(t *testing.T) {
 		t.Errorf("photos = %v, want 2 current (12 B) and 1 deleted", photos)
 	}
 }
+
+// The download (spec §3): the snapshot as it is in storage, an attachment
+// nothing caches, and a trail entry naming the night.
+func TestAdminBackupDownloadStreamsTheSnapshotAudited(t *testing.T) {
+	a, _, cookie, adminID := sysadminRig(t, "Ops family")
+	snapshot := `{"exportedAt":"2026-08-31T03:15:00Z","tables":{"baby":[]}}`
+	if err := a.Deps.Storage.Put(context.Background(), "backups/2026-08-31.json",
+		strings.NewReader(snapshot), int64(len(snapshot)), "application/json"); err != nil {
+		t.Fatalf("put: %v", err)
+	}
+
+	res := a.Do(http.MethodGet, "/api/admin/backups/2026-08-31", cookie, nil)
+	if res.Status != http.StatusOK || string(res.Raw) != snapshot {
+		t.Fatalf("download = %d %q, want 200 and the snapshot", res.Status, res.Raw)
+	}
+	for header, want := range map[string]string{
+		"Content-Type":        "application/json",
+		"Content-Disposition": `attachment; filename="pjokk-backup-2026-08-31.json"`,
+		"Cache-Control":       "no-store",
+	} {
+		if got := res.Header.Get(header); got != want {
+			t.Errorf("%s = %q, want %q", header, got, want)
+		}
+	}
+
+	var target string
+	if err := a.Rig.Pool.QueryRow(context.Background(), `
+		SELECT "target" FROM "admin_audit" WHERE "admin_id" = $1 AND "action" = 'backup.download'`,
+		adminID).Scan(&target); err != nil {
+		t.Fatalf("audit row: %v", err)
+	}
+	if target != "2026-08-31" {
+		t.Errorf("audit target = %q, want the date", target)
+	}
+}
+
+// A night with no snapshot is a 404 and not a download, so it leaves no
+// trail entry; a date that is not one never reaches storage.
+func TestAdminBackupDownloadRefusesMissingAndMalformedDates(t *testing.T) {
+	a, _, cookie, _ := sysadminRig(t, "Ops family")
+
+	if res := a.Do(http.MethodGet, "/api/admin/backups/2026-01-01", cookie, nil); res.Status != http.StatusNotFound {
+		t.Errorf("missing snapshot = %d %s, want 404", res.Status, res.Raw)
+	}
+	for _, date := range []string{"latest", "2026-8-1", "2026-08-31.json", "..%2Fsecrets"} {
+		res := a.Do(http.MethodGet, "/api/admin/backups/"+date, cookie, nil)
+		if res.Status != http.StatusBadRequest || res.JSON["code"] != "VALIDATION" {
+			t.Errorf("download %q = %d %s, want 400 VALIDATION", date, res.Status, res.Raw)
+		}
+	}
+	var audits int
+	if err := a.Rig.Pool.QueryRow(context.Background(),
+		`SELECT count(*) FROM "admin_audit" WHERE "action" = 'backup.download'`).Scan(&audits); err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if audits != 0 {
+		t.Errorf("refused downloads left %d audit rows, want none", audits)
+	}
+}
