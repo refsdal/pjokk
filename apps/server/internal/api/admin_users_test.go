@@ -315,3 +315,34 @@ func TestAdminSignsOutOneSession(t *testing.T) {
 		t.Errorf("unknown user = %d, want 404", res.Status)
 	}
 }
+
+// Signing out the ONE session an operator is impersonating from ends the
+// impersonation too (#93). Revoking that session cascades its
+// `impersonation` row away, and the row is the only thing the sweep can
+// find the impersonated session by, so the revoke has to sweep first.
+func TestSigningOutAnOperatorsSessionEndsTheirImpersonation(t *testing.T) {
+	w := newSupportWorld(t)
+	olaID, olaCookie := w.secondOperator(t)
+
+	start := w.a.Do(http.MethodPost, "/api/admin/users/"+w.boID+"/impersonate", olaCookie, nil)
+	if start.Status != http.StatusOK {
+		t.Fatalf("Ola impersonates Bo = %d %s", start.Status, start.Raw)
+	}
+	impersonated := sessionCookieFrom(t, start)
+
+	res := w.a.Do(http.MethodDelete, "/api/admin/users/"+olaID+"/sessions/"+sessionIDOf(t, w.a, olaCookie), w.adminCookie, nil)
+	if res.Status != http.StatusNoContent {
+		t.Fatalf("sign out Ola's session = %d %s", res.Status, res.Raw)
+	}
+
+	// Revoked by the sign-out itself, before anything presents the cookie:
+	// the sweep, not resolveSession's backstop, ended it.
+	assertCount(t, w.a,
+		`SELECT COUNT(*)::int FROM "sessions" WHERE "token" = $1`, 0, tokenOf(impersonated))
+	if signedIn(w.a, impersonated) {
+		t.Error("Ola kept acting as Bo after the session she impersonated from was signed out")
+	}
+	if !signedIn(w.a, w.boCookie) {
+		t.Error("Bo's own session was signed out along with the impersonation")
+	}
+}

@@ -1018,6 +1018,10 @@ func TestAdminActionsUnderImpersonationNameTheRealOperator(t *testing.T) {
 // RevokeAllSessions — which is user-scoped — never sees them: without the
 // impersonation-table sweep, a banned or signed-out admin keeps a fully
 // working session as whoever they were impersonating.
+//
+// A password reset is one of the cuts (#93): it revokes the operator's own
+// sessions, which cascades the `impersonation` rows away, so a sweep that
+// ran AFTER it would find nothing. The reset has to sweep first.
 func TestCuttingOffAnOperatorKillsTheSessionsTheyDrive(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -1033,6 +1037,10 @@ func TestCuttingOffAnOperatorKillsTheSessionsTheyDrive(t *testing.T) {
 		}},
 		{"delete", func(a *testrig.AppRig, cookie, operatorID string) *testrig.Result {
 			return a.Do(http.MethodPost, "/api/admin/users/"+operatorID+"/delete", cookie, nil)
+		}},
+		{"set password", func(a *testrig.AppRig, cookie, operatorID string) *testrig.Result {
+			return a.Do(http.MethodPost, "/api/admin/users/"+operatorID+"/password", cookie,
+				map[string]any{"password": "Reset-after-a-compromise-7"})
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1060,6 +1068,10 @@ func TestCuttingOffAnOperatorKillsTheSessionsTheyDrive(t *testing.T) {
 				t.Fatalf("%s = %d %s, want 200", tc.name, res.Status, res.Raw)
 			}
 
+			// Revoked by the cut itself, before anything presents the
+			// cookie: the sweep, not resolveSession's backstop, ended it.
+			assertCount(t, a,
+				`SELECT COUNT(*)::int FROM "sessions" WHERE "token" = $1`, 0, tokenOf(impersonated))
 			if res := a.Do(http.MethodGet, "/api/me", impersonated, nil); res.Status != http.StatusUnauthorized {
 				t.Errorf("impersonated session after %s = %d %s, want 401 — the operator's "+
 					"driven sessions must die with their own", tc.name, res.Status, res.Raw)
@@ -1070,12 +1082,11 @@ func TestCuttingOffAnOperatorKillsTheSessionsTheyDrive(t *testing.T) {
 	}
 }
 
-// The backstop for the same hazard, one layer down: even with the
-// impersonation row still in place, a session whose operator has been banned
-// must not resolve. Proven by banning the operator's users row directly,
-// which is what a code path that forgot RevokeImpersonatedSessions would
-// leave behind.
-func TestImpersonatedSessionDiesWithABannedOperator(t *testing.T) {
+// impersonating is the setup the backstop tests share: a system admin
+// impersonating an ordinary member of their family. It returns the rig, the
+// operator's own cookie and id, and the impersonated session's cookie.
+func impersonating(t *testing.T) (a *testrig.AppRig, operatorCookie, operatorID, impersonated string) {
+	t.Helper()
 	a, familyID, operatorCookie, operatorID := sysadminRig(t, "Hansen")
 
 	targetID := a.SignUp("Ordinary parent", "target@example.com")
@@ -1085,7 +1096,16 @@ func TestImpersonatedSessionDiesWithABannedOperator(t *testing.T) {
 	if start.Status != http.StatusOK {
 		t.Fatalf("impersonate = %d %s", start.Status, start.Raw)
 	}
-	impersonated := sessionCookieFrom(t, start)
+	return a, operatorCookie, operatorID, sessionCookieFrom(t, start)
+}
+
+// The backstop for the same hazard, one layer down: even with the
+// impersonation row still in place, a session whose operator has been banned
+// must not resolve. Proven by banning the operator's users row directly,
+// which is what a code path that forgot RevokeImpersonatedSessions would
+// leave behind.
+func TestImpersonatedSessionDiesWithABannedOperator(t *testing.T) {
+	a, _, operatorID, impersonated := impersonating(t)
 
 	// The column only — no session revocation, no impersonation-table sweep.
 	if _, err := a.Rig.Pool.Exec(context.Background(),
@@ -1095,6 +1115,57 @@ func TestImpersonatedSessionDiesWithABannedOperator(t *testing.T) {
 
 	if res := a.Do(http.MethodGet, "/api/me", impersonated, nil); res.Status != http.StatusUnauthorized {
 		t.Errorf("impersonated session with a banned operator = %d %s, want 401", res.Status, res.Raw)
+	}
+
+	// Refused once is refused for good: lifting the ban must not bring the
+	// session back.
+	if _, err := a.Rig.Pool.Exec(context.Background(),
+		`UPDATE "users" SET "banned" = false WHERE "id" = $1`, operatorID); err != nil {
+		t.Fatalf("unban the operator: %v", err)
+	}
+	if res := a.Do(http.MethodGet, "/api/me", impersonated, nil); res.Status != http.StatusUnauthorized {
+		t.Errorf("impersonated session after the ban was lifted = %d %s, want 401", res.Status, res.Raw)
+	}
+}
+
+// The same backstop for an operator who is no longer a system admin (#93).
+// Impersonation is a system-admin power, so the session it produced is only
+// valid while its operator still holds the role. Proven, as above, with the
+// column alone and no sweep; re-granting the role must not revive it.
+func TestImpersonatedSessionDiesWithADemotedOperator(t *testing.T) {
+	a, _, operatorID, impersonated := impersonating(t)
+
+	if _, err := a.Rig.Pool.Exec(context.Background(),
+		`UPDATE "users" SET "role" = NULL WHERE "id" = $1`, operatorID); err != nil {
+		t.Fatalf("demote the operator: %v", err)
+	}
+	if res := a.Do(http.MethodGet, "/api/me", impersonated, nil); res.Status != http.StatusUnauthorized {
+		t.Errorf("impersonated session with a demoted operator = %d %s, want 401", res.Status, res.Raw)
+	}
+
+	makeSysadmin(t, a, operatorID)
+	if res := a.Do(http.MethodGet, "/api/me", impersonated, nil); res.Status != http.StatusUnauthorized {
+		t.Errorf("impersonated session after the role came back = %d %s, want 401", res.Status, res.Raw)
+	}
+}
+
+// And for a session whose `impersonation` row is gone (#93). The row is what
+// ties an impersonated session to the operator session that started it, and
+// it cascades away with that session (00003), so a session marked
+// impersonated without one has lost its operator, whatever the operator's
+// account says.
+func TestImpersonatedSessionDiesWithItsImpersonationRecord(t *testing.T) {
+	a, operatorCookie, _, impersonated := impersonating(t)
+
+	if _, err := a.Rig.Pool.Exec(context.Background(),
+		`DELETE FROM "impersonation" WHERE "impersonated_token" = $1`, tokenOf(impersonated)); err != nil {
+		t.Fatalf("delete the impersonation record: %v", err)
+	}
+	if res := a.Do(http.MethodGet, "/api/me", impersonated, nil); res.Status != http.StatusUnauthorized {
+		t.Errorf("impersonated session without its record = %d %s, want 401", res.Status, res.Raw)
+	}
+	if res := a.Do(http.MethodGet, "/api/me", operatorCookie, nil); res.Status != http.StatusOK {
+		t.Errorf("the operator's own session = %d %s, want 200 (only the impersonation ends)", res.Status, res.Raw)
 	}
 }
 
