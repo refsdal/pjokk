@@ -290,7 +290,7 @@ func TestListAdminFamiliesReportsHasAdminAndFilters(t *testing.T) {
 		t.Fatalf("create = %d %s", empty.Status, empty.Raw)
 	}
 
-	all := a.DoArray(http.MethodGet, "/api/admin/families", cookie, nil)
+	all := adminList(t, a, "/api/admin/families", cookie)
 	if all.Status != http.StatusOK {
 		t.Fatalf("list = %d %s", all.Status, all.Raw)
 	}
@@ -307,7 +307,7 @@ func TestListAdminFamiliesReportsHasAdminAndFilters(t *testing.T) {
 		t.Errorf("Stranded hasAdmin = %v, want false", byName["Stranded"]["hasAdmin"])
 	}
 
-	filtered := a.DoArray(http.MethodGet, "/api/admin/families?query=stran", cookie, nil)
+	filtered := adminList(t, a, "/api/admin/families?query=stran", cookie)
 	if len(filtered.JSON) != 1 {
 		t.Fatalf("?query=stran returned %d families, want 1: %s", len(filtered.JSON), filtered.Raw)
 	}

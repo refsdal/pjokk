@@ -1803,6 +1803,14 @@ type AdminFamilyMember struct {
 	UserId   string `json:"userId"`
 }
 
+// AdminFamilyPage One page of families, newest first.
+type AdminFamilyPage struct {
+	Items []AdminFamily `json:"items"`
+
+	// NextCursor Pass as `cursor` for the next page; null on the last one.
+	NextCursor *string `json:"nextCursor"`
+}
+
 // AdminStats Platform totals. Every count is a plain integer — the underlying COUNT(*) is bigint and must be cast (`::int`) in SQL, or the driver hands it back as a string (CLAUDE.md's Postgres notes).
 type AdminStats struct {
 	Babies int `json:"babies"`
@@ -1828,6 +1836,14 @@ type AdminUser struct {
 
 	// Role Ours, system-admin role. "admin" or null.
 	Role *string `json:"role"`
+}
+
+// AdminUserPage One page of accounts, newest first.
+type AdminUserPage struct {
+	Items []AdminUser `json:"items"`
+
+	// NextCursor Pass as `cursor` for the next page; null on the last one.
+	NextCursor *string `json:"nextCursor"`
 }
 
 // ApiKey One bearer API key, key material never included (see ApiKeyCreated for the one response that carries it).
@@ -1877,6 +1893,14 @@ type AuditNote struct {
 	Action string  `json:"action"`
 	Detail *string `json:"detail,omitempty"`
 	Target string  `json:"target"`
+}
+
+// AuditPage One page of admin actions, newest first.
+type AuditPage struct {
+	Items []AuditEntry `json:"items"`
+
+	// NextCursor Pass as `cursor` for the next page; null on the last one.
+	NextCursor *string `json:"nextCursor"`
 }
 
 // Baby defines model for Baby.
@@ -3205,6 +3229,9 @@ type BabyIdQuery = string
 // CodePath defines model for codePath.
 type CodePath = string
 
+// CursorQuery defines model for cursorQuery.
+type CursorQuery = string
+
 // IdPath defines model for idPath.
 type IdPath = string
 
@@ -3217,16 +3244,37 @@ type LimitQuery = int
 // MemberIdPath defines model for memberIdPath.
 type MemberIdPath = string
 
+// ListAdminAuditParams defines parameters for ListAdminAudit.
+type ListAdminAuditParams struct {
+	// Target Only entries whose target is exactly this.
+	Target *string `form:"target,omitempty" json:"target,omitempty"`
+
+	// Cursor The previous page's nextCursor; omit for the first page.
+	Cursor *CursorQuery `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of rows to return.
+	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ListAdminFamiliesParams defines parameters for ListAdminFamilies.
 type ListAdminFamiliesParams struct {
 	// Query Case-insensitive substring match on name or slug.
 	Query *string `form:"query,omitempty" json:"query,omitempty"`
+
+	// Cursor The previous page's nextCursor; omit for the first page.
+	Cursor *CursorQuery `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of rows to return.
+	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // ListAdminUsersParams defines parameters for ListAdminUsers.
 type ListAdminUsersParams struct {
 	// Query Case-insensitive substring match on name or email.
 	Query *string `form:"query,omitempty" json:"query,omitempty"`
+
+	// Cursor The previous page's nextCursor; omit for the first page.
+	Cursor *CursorQuery `form:"cursor,omitempty" json:"cursor,omitempty"`
 
 	// Limit Maximum number of rows to return.
 	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`

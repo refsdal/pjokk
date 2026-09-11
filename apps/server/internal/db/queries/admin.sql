@@ -70,10 +70,18 @@ FROM "organizations" o
 -- Same sqlc.narg pattern as ListAdminUsers: NULL collapses the filter to
 -- true, and the search text stays a bound parameter rather than spliced SQL.
 WHERE
-    sqlc.narg('query')::text IS NULL
-    OR o."name" ILIKE '%' || sqlc.narg('query')::text || '%'
-    OR o."slug" ILIKE '%' || sqlc.narg('query')::text || '%'
-ORDER BY o."created_at" DESC;
+    (
+        sqlc.narg('query')::text IS NULL
+        OR o."name" ILIKE '%' || sqlc.narg('query')::text || '%'
+        OR o."slug" ILIKE '%' || sqlc.narg('query')::text || '%'
+    )
+    -- Keyset paging, as ListAdminUsers.
+    AND (
+        sqlc.narg('before_at')::timestamptz IS NULL
+        OR (o."created_at", o."id") < (sqlc.narg('before_at')::timestamptz, sqlc.narg('before_id')::text)
+    )
+ORDER BY o."created_at" DESC, o."id" DESC
+LIMIT sqlc.arg('lim');
 
 -- name: GetAdminFamilyRow :one
 -- The header of GET /api/admin/families/{id}, and the existence check every
@@ -168,11 +176,22 @@ SELECT
     "ban_reason",
     "created_at"
 FROM "users"
-WHERE
-    sqlc.narg('query')::text IS NULL
-    OR "name" ILIKE '%' || sqlc.narg('query')::text || '%'
-    OR "email" ILIKE '%' || sqlc.narg('query')::text || '%'
-ORDER BY "created_at" DESC
+-- The tombstone is where deleted accounts' records point; it is not a
+-- person, and GET /api/admin/users/{id} answers 404 for it.
+WHERE "id" <> sqlc.arg('tombstone_id')::text
+    AND (
+        sqlc.narg('query')::text IS NULL
+        OR "name" ILIKE '%' || sqlc.narg('query')::text || '%'
+        OR "email" ILIKE '%' || sqlc.narg('query')::text || '%'
+    )
+    -- Keyset paging (internal/api/admin_paging.go): rows strictly after the
+    -- previous page's last one in (created_at, id) order. The handler asks
+    -- for one more than a page to learn whether a next page exists.
+    AND (
+        sqlc.narg('before_at')::timestamptz IS NULL
+        OR ("created_at", "id") < (sqlc.narg('before_at')::timestamptz, sqlc.narg('before_id')::text)
+    )
+ORDER BY "created_at" DESC, "id" DESC
 LIMIT sqlc.arg('lim');
 
 -- name: GetAdminUser :one
@@ -197,7 +216,9 @@ UPDATE "users" SET "banned" = true, "ban_reason" = $2 WHERE "id" = $1;
 UPDATE "users" SET "banned" = false, "ban_reason" = NULL WHERE "id" = $1;
 
 -- name: ListAdminAudit :many
--- The 100 most recent entries in the append-only trail, newest first.
+-- The append-only trail, newest first, a page at a time (keyset, as
+-- ListAdminUsers). `target` narrows it to the entries about one thing — the
+-- user page's history passes a user id.
 --
 -- An INNER JOIN is safe even for a deleted admin: ReassignUserReferences
 -- below points their audit rows at the tombstone user before the account
@@ -212,8 +233,13 @@ SELECT
     a."created_at"
 FROM "admin_audit" a
 JOIN "users" u ON u."id" = a."admin_id"
+WHERE (sqlc.narg('target')::text IS NULL OR a."target" = sqlc.narg('target')::text)
+    AND (
+        sqlc.narg('before_at')::timestamptz IS NULL
+        OR (a."created_at", a."id") < (sqlc.narg('before_at')::timestamptz, sqlc.narg('before_id')::text)
+    )
 ORDER BY a."created_at" DESC, a."id" DESC
-LIMIT 100;
+LIMIT sqlc.arg('lim');
 
 -- name: ReassignUserReferences :exec
 -- The complete set of references a user account must shed before it can be

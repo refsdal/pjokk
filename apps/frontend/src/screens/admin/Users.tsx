@@ -170,9 +170,11 @@ export function AdminUsers() {
     // Newest-first ordering is the server's, not a query parameter:
     // GET /api/admin/users replaced better-auth's client-side listUsers.
     queryFn: async () =>
-      unwrap<AdminUser[]>(
-        client.GET("/api/admin/users", { params: { query: { limit: 200 } } }),
-      ),
+      (
+        await unwrap<{ items: AdminUser[] }>(
+          client.GET("/api/admin/users", { params: { query: { limit: 200 } } }),
+        )
+      ).items,
   });
 
   return (

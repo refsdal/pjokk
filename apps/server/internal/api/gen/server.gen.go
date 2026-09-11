@@ -19,13 +19,13 @@ import (
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// ListAdminAudit The 100 most recent entries in the append-only system-admin trail, newest first. System admin only.
+	// ListAdminAudit The append-only system-admin trail. `target` narrows it to the entries about one thing (the user page's history passes a user id). One page at a time, newest first: pass the previous page's `nextCursor` as `cursor` (`limit` 50 by default, 200 at most); a malformed cursor is a 400. System admin only.
 	// (GET /api/admin/audit)
-	ListAdminAudit(w http.ResponseWriter, r *http.Request)
+	ListAdminAudit(w http.ResponseWriter, r *http.Request, params ListAdminAuditParams)
 	// CreateAdminAuditNote Append an entry to the trail by hand, for an admin action performed outside these routes. System admin only.
 	// (POST /api/admin/audit)
 	CreateAdminAuditNote(w http.ResponseWriter, r *http.Request)
-	// ListAdminFamilies Every family on the platform, newest first, with member and baby counts, whether it still has an admin, and the timestamp of its most recent feed (null when it has never logged one). `query` filters on name or slug (case-insensitive substring). System admin only.
+	// ListAdminFamilies Families on the platform with member and baby counts, whether each still has an admin, and the timestamp of its most recent feed (null when it has never logged one). `query` filters on name or slug (case-insensitive substring). One page at a time, newest first: pass the previous page's `nextCursor` as `cursor` (`limit` 50 by default, 200 at most); a malformed cursor is a 400. System admin only.
 	// (GET /api/admin/families)
 	ListAdminFamilies(w http.ResponseWriter, r *http.Request, params ListAdminFamiliesParams)
 	// CreateAdminFamily Create a family on someone's behalf. Three behaviours, chosen by the body: `adminEmail` naming an existing account makes it the family admin; `adminEmail` with no account is refused with 404 UNLESS `createAccount` is true, which provisions a passwordless account (`adminName` required) that the person later claims by signing in with Google on the same address; no `adminEmail` at all creates an empty family plus an admin-role invite, returned as a join URL.
@@ -65,7 +65,7 @@ type ServerInterface interface {
 	// StopImpersonating End an impersonation and restore the admin's own session cookie. Deliberately session-level, NOT system-admin-gated: while impersonating an ordinary user the current session IS that user's, so a sysadmin gate would trap the operator inside the impersonated session. A caller who is not impersonating gets 400 NOT_IMPERSONATING — which is all an ordinary user can ever reach here. Audited as `impersonation.stop` against the real admin.
 	// (POST /api/admin/stop-impersonating)
 	StopImpersonating(w http.ResponseWriter, r *http.Request)
-	// ListAdminUsers Accounts on the platform, newest first. `query` filters on name or email (case-insensitive substring). NEW in Go — replaces the better-auth admin plugin's client-side listUsers call. System admin only.
+	// ListAdminUsers Accounts on the platform (never the tombstone that deleted accounts' records point at). `query` filters on name or email (case-insensitive substring). One page at a time, newest first: pass the previous page's `nextCursor` as `cursor` (`limit` 50 by default, 200 at most); a malformed cursor is a 400. NEW in Go — replaces the better-auth admin plugin's client-side listUsers call. System admin only.
 	// (GET /api/admin/users)
 	ListAdminUsers(w http.ResponseWriter, r *http.Request, params ListAdminUsersParams)
 	// BanAdminUser Ban an account: sets banned + ban_reason AND revokes every session the user holds, so the ban is enforced by absence rather than by every reader remembering to check a flag. Their API keys stop authenticating too (GetAPIKeyByHash joins on a non-banned creator). Audited as `user.ban`. System admin only.
@@ -439,8 +439,53 @@ type MiddlewareFunc func(http.Handler) http.Handler
 // ListAdminAudit operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminAudit(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminAuditParams
+
+	// ------------- Optional query parameter "target" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "target", r.URL.Query(), &params.Target, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "target"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "target", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListAdminAudit(w, r)
+		siw.Handler.ListAdminAudit(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -482,6 +527,32 @@ func (siw *ServerInterfaceWrapper) ListAdminFamilies(w http.ResponseWriter, r *h
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
 		}
 		return
 	}
@@ -827,6 +898,19 @@ func (siw *ServerInterfaceWrapper) ListAdminUsers(w http.ResponseWriter, r *http
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
 		}
 		return
 	}
@@ -4044,13 +4128,14 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 }
 
 type ListAdminAuditRequestObject struct {
+	Params ListAdminAuditParams
 }
 
 type ListAdminAuditResponseObject interface {
 	VisitListAdminAuditResponse(w http.ResponseWriter) error
 }
 
-type ListAdminAudit200JSONResponse []AuditEntry
+type ListAdminAudit200JSONResponse AuditPage
 
 func (response ListAdminAudit200JSONResponse) VisitListAdminAuditResponse(w http.ResponseWriter) error {
 
@@ -4060,6 +4145,20 @@ func (response ListAdminAudit200JSONResponse) VisitListAdminAuditResponse(w http
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAdminAudit400JSONResponse Error
+
+func (response ListAdminAudit400JSONResponse) VisitListAdminAuditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -4094,7 +4193,7 @@ type ListAdminFamiliesResponseObject interface {
 	VisitListAdminFamiliesResponse(w http.ResponseWriter) error
 }
 
-type ListAdminFamilies200JSONResponse []AdminFamily
+type ListAdminFamilies200JSONResponse AdminFamilyPage
 
 func (response ListAdminFamilies200JSONResponse) VisitListAdminFamiliesResponse(w http.ResponseWriter) error {
 
@@ -4104,6 +4203,20 @@ func (response ListAdminFamilies200JSONResponse) VisitListAdminFamiliesResponse(
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAdminFamilies400JSONResponse Error
+
+func (response ListAdminFamilies400JSONResponse) VisitListAdminFamiliesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -4596,7 +4709,7 @@ type ListAdminUsersResponseObject interface {
 	VisitListAdminUsersResponse(w http.ResponseWriter) error
 }
 
-type ListAdminUsers200JSONResponse []AdminUser
+type ListAdminUsers200JSONResponse AdminUserPage
 
 func (response ListAdminUsers200JSONResponse) VisitListAdminUsersResponse(w http.ResponseWriter) error {
 
@@ -4606,6 +4719,20 @@ func (response ListAdminUsers200JSONResponse) VisitListAdminUsersResponse(w http
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAdminUsers400JSONResponse Error
+
+func (response ListAdminUsers400JSONResponse) VisitListAdminUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -8871,13 +8998,13 @@ func (response Readyz503JSONResponse) VisitReadyzResponse(w http.ResponseWriter)
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
-	// ListAdminAudit The 100 most recent entries in the append-only system-admin trail, newest first. System admin only.
+	// ListAdminAudit The append-only system-admin trail. `target` narrows it to the entries about one thing (the user page's history passes a user id). One page at a time, newest first: pass the previous page's `nextCursor` as `cursor` (`limit` 50 by default, 200 at most); a malformed cursor is a 400. System admin only.
 	// (GET /api/admin/audit)
 	ListAdminAudit(ctx context.Context, request ListAdminAuditRequestObject) (ListAdminAuditResponseObject, error)
 	// CreateAdminAuditNote Append an entry to the trail by hand, for an admin action performed outside these routes. System admin only.
 	// (POST /api/admin/audit)
 	CreateAdminAuditNote(ctx context.Context, request CreateAdminAuditNoteRequestObject) (CreateAdminAuditNoteResponseObject, error)
-	// ListAdminFamilies Every family on the platform, newest first, with member and baby counts, whether it still has an admin, and the timestamp of its most recent feed (null when it has never logged one). `query` filters on name or slug (case-insensitive substring). System admin only.
+	// ListAdminFamilies Families on the platform with member and baby counts, whether each still has an admin, and the timestamp of its most recent feed (null when it has never logged one). `query` filters on name or slug (case-insensitive substring). One page at a time, newest first: pass the previous page's `nextCursor` as `cursor` (`limit` 50 by default, 200 at most); a malformed cursor is a 400. System admin only.
 	// (GET /api/admin/families)
 	ListAdminFamilies(ctx context.Context, request ListAdminFamiliesRequestObject) (ListAdminFamiliesResponseObject, error)
 	// CreateAdminFamily Create a family on someone's behalf. Three behaviours, chosen by the body: `adminEmail` naming an existing account makes it the family admin; `adminEmail` with no account is refused with 404 UNLESS `createAccount` is true, which provisions a passwordless account (`adminName` required) that the person later claims by signing in with Google on the same address; no `adminEmail` at all creates an empty family plus an admin-role invite, returned as a join URL.
@@ -8917,7 +9044,7 @@ type StrictServerInterface interface {
 	// StopImpersonating End an impersonation and restore the admin's own session cookie. Deliberately session-level, NOT system-admin-gated: while impersonating an ordinary user the current session IS that user's, so a sysadmin gate would trap the operator inside the impersonated session. A caller who is not impersonating gets 400 NOT_IMPERSONATING — which is all an ordinary user can ever reach here. Audited as `impersonation.stop` against the real admin.
 	// (POST /api/admin/stop-impersonating)
 	StopImpersonating(ctx context.Context, request StopImpersonatingRequestObject) (StopImpersonatingResponseObject, error)
-	// ListAdminUsers Accounts on the platform, newest first. `query` filters on name or email (case-insensitive substring). NEW in Go — replaces the better-auth admin plugin's client-side listUsers call. System admin only.
+	// ListAdminUsers Accounts on the platform (never the tombstone that deleted accounts' records point at). `query` filters on name or email (case-insensitive substring). One page at a time, newest first: pass the previous page's `nextCursor` as `cursor` (`limit` 50 by default, 200 at most); a malformed cursor is a 400. NEW in Go — replaces the better-auth admin plugin's client-side listUsers call. System admin only.
 	// (GET /api/admin/users)
 	ListAdminUsers(ctx context.Context, request ListAdminUsersRequestObject) (ListAdminUsersResponseObject, error)
 	// BanAdminUser Ban an account: sets banned + ban_reason AND revokes every session the user holds, so the ban is enforced by absence rather than by every reader remembering to check a flag. Their API keys stop authenticating too (GetAPIKeyByHash joins on a non-banned creator). Audited as `user.ban`. System admin only.
@@ -9319,8 +9446,10 @@ type strictHandler struct {
 }
 
 // ListAdminAudit operation middleware
-func (sh *strictHandler) ListAdminAudit(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) ListAdminAudit(w http.ResponseWriter, r *http.Request, params ListAdminAuditParams) {
 	var request ListAdminAuditRequestObject
+
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ListAdminAudit(ctx, request.(ListAdminAuditRequestObject))

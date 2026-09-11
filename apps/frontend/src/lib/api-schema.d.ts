@@ -1341,7 +1341,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every family on the platform, newest first, with member and baby counts, whether it still has an admin, and the timestamp of its most recent feed (null when it has never logged one). `query` filters on name or slug (case-insensitive substring). System admin only. */
+        /** Families on the platform with member and baby counts, whether each still has an admin, and the timestamp of its most recent feed (null when it has never logged one). `query` filters on name or slug (case-insensitive substring). One page at a time, newest first: pass the previous page's `nextCursor` as `cursor` (`limit` 50 by default, 200 at most); a malformed cursor is a 400. System admin only. */
         get: operations["listAdminFamilies"];
         put?: never;
         /**
@@ -1483,7 +1483,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Accounts on the platform, newest first. `query` filters on name or email (case-insensitive substring). NEW in Go — replaces the better-auth admin plugin's client-side listUsers call. System admin only. */
+        /** Accounts on the platform (never the tombstone that deleted accounts' records point at). `query` filters on name or email (case-insensitive substring). One page at a time, newest first: pass the previous page's `nextCursor` as `cursor` (`limit` 50 by default, 200 at most); a malformed cursor is a 400. NEW in Go — replaces the better-auth admin plugin's client-side listUsers call. System admin only. */
         get: operations["listAdminUsers"];
         put?: never;
         post?: never;
@@ -1619,7 +1619,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The 100 most recent entries in the append-only system-admin trail, newest first. System admin only. */
+        /** The append-only system-admin trail. `target` narrows it to the entries about one thing (the user page's history passes a user id). One page at a time, newest first: pass the previous page's `nextCursor` as `cursor` (`limit` 50 by default, 200 at most); a malformed cursor is a 400. System admin only. */
         get: operations["listAdminAudit"];
         put?: never;
         /** Append an entry to the trail by hand, for an admin action performed outside these routes. System admin only. */
@@ -2952,6 +2952,24 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        /** @description One page of admin actions, newest first. */
+        AuditPage: {
+            items: components["schemas"]["AuditEntry"][];
+            /** @description Pass as `cursor` for the next page; null on the last one. */
+            nextCursor: string | null;
+        };
+        /** @description One page of accounts, newest first. */
+        AdminUserPage: {
+            items: components["schemas"]["AdminUser"][];
+            /** @description Pass as `cursor` for the next page; null on the last one. */
+            nextCursor: string | null;
+        };
+        /** @description One page of families, newest first. */
+        AdminFamilyPage: {
+            items: components["schemas"]["AdminFamily"][];
+            /** @description Pass as `cursor` for the next page; null on the last one. */
+            nextCursor: string | null;
+        };
         AuditNote: {
             action: string;
             target: string;
@@ -2974,6 +2992,8 @@ export interface components {
         babyIdQuery: string;
         /** @description Maximum number of rows to return. */
         limitQuery: number;
+        /** @description The previous page's nextCursor; omit for the first page. */
+        cursorQuery: string;
         /** @description Resource id. */
         idPath: string;
         /** @description The family-membership row id (NOT the user id). */
@@ -6675,6 +6695,10 @@ export interface operations {
             query?: {
                 /** @description Case-insensitive substring match on name or slug. */
                 query?: string;
+                /** @description The previous page's nextCursor; omit for the first page. */
+                cursor?: components["parameters"]["cursorQuery"];
+                /** @description Maximum number of rows to return. */
+                limit?: components["parameters"]["limitQuery"];
             };
             header?: never;
             path?: never;
@@ -6682,13 +6706,22 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description All families. */
+            /** @description One page of families. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminFamily"][];
+                    "application/json": components["schemas"]["AdminFamilyPage"];
+                };
+            };
+            /** @description A malformed cursor (VALIDATION). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -7079,6 +7112,8 @@ export interface operations {
             query?: {
                 /** @description Case-insensitive substring match on name or email. */
                 query?: string;
+                /** @description The previous page's nextCursor; omit for the first page. */
+                cursor?: components["parameters"]["cursorQuery"];
                 /** @description Maximum number of rows to return. */
                 limit?: components["parameters"]["limitQuery"];
             };
@@ -7088,13 +7123,22 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Matching accounts. */
+            /** @description One page of matching accounts. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminUser"][];
+                    "application/json": components["schemas"]["AdminUserPage"];
+                };
+            };
+            /** @description A malformed cursor (VALIDATION). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -7366,20 +7410,36 @@ export interface operations {
     };
     listAdminAudit: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only entries whose target is exactly this. */
+                target?: string;
+                /** @description The previous page's nextCursor; omit for the first page. */
+                cursor?: components["parameters"]["cursorQuery"];
+                /** @description Maximum number of rows to return. */
+                limit?: components["parameters"]["limitQuery"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Recent admin actions. */
+            /** @description One page of admin actions. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuditEntry"][];
+                    "application/json": components["schemas"]["AuditPage"];
+                };
+            };
+            /** @description A malformed cursor (VALIDATION). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
