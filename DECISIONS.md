@@ -2670,3 +2670,37 @@ to drift from the spec without anything noticing. This closes it.
   and CI were built against. Bun's "isolated" default for workspaces would
   additionally fail any import a package has not declared — worth having,
   and a change of its own.
+
+## 2026-09-11 — Snooze 15 min on reminder notifications
+
+- **Every reminder notification carries a Snooze 15 min button**, after
+  its Log button where it has one: feed, diaper, pump, medicine, custom
+  and calendar reminders alike. The snoozed reminder comes back to that
+  person only, rebuilt from the reminder or event as it is then, with a
+  Snooze button of its own.
+- **The button is a background POST, not a link.** `PushAction.post` tells
+  `push-sw.js` to `fetch` the URL and open nothing. With no window and no
+  session it can rely on (the session's active family may be another one,
+  or it may have lapsed), the call carries a signed token instead:
+  HMAC-SHA-256 keyed from `AUTH_SECRET` with its own domain separator
+  (`:push-snooze`), naming the person, the family, the reminder (and the
+  calendar occurrence) and when the notification was sent, valid for 12
+  hours. So `POST /api/push/snooze` is tierPublic, and on the public
+  `/api/` allowlist.
+- **Counted from the notification, not the tap.** Due 15 minutes after it
+  was sent, which is exactly one tick of the */15 job later however long
+  the tap took; a two-minute grace absorbs cron jitter. A second tap, or
+  the same notification on another device, replaces the first snooze.
+- **Logging cancels it.** A log of the reminder's kind timed after the
+  notification, or up to 15 minutes before it (the "15 m ago" chip is how
+  a feed given before the tap gets logged after it), drops the snooze, as
+  does a since_last gap back under its interval by any log, or the
+  reminder or event being deleted. A calendar snooze has nothing to log.
+- **Quiet hours hold a snooze** as they hold a reminder: it goes out at
+  the first tick after them. The days mask does not apply; the person
+  asked for this one.
+- **One shot.** The row is deleted before the push goes out, so a failed
+  delivery is not retried every tick.
+- **`push_snooze` is transient**: left out of the nightly backup
+  (`DeliberatelyExcluded`), dropped with its person in a family restore,
+  and its user reference cascades.
