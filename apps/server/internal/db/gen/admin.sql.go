@@ -239,9 +239,21 @@ SELECT
     a."created_at"
 FROM "admin_audit" a
 JOIN "users" u ON u."id" = a."admin_id"
+WHERE ($1::text IS NULL OR a."target" = $1::text)
+    AND (
+        $2::timestamptz IS NULL
+        OR (a."created_at", a."id") < ($2::timestamptz, $3::text)
+    )
 ORDER BY a."created_at" DESC, a."id" DESC
-LIMIT 100
+LIMIT $4
 `
+
+type ListAdminAuditParams struct {
+	Target   *string
+	BeforeAt pgtype.Timestamptz
+	BeforeID *string
+	Lim      int32
+}
 
 type ListAdminAuditRow struct {
 	ID        string
@@ -253,13 +265,20 @@ type ListAdminAuditRow struct {
 	CreatedAt pgtype.Timestamptz
 }
 
-// The 100 most recent entries in the append-only trail, newest first.
+// The append-only trail, newest first, a page at a time (keyset, as
+// ListAdminUsers). `target` narrows it to the entries about one thing — the
+// user page's history passes a user id.
 //
 // An INNER JOIN is safe even for a deleted admin: ReassignUserReferences
 // below points their audit rows at the tombstone user before the account
 // is removed, so every admin_id always resolves.
-func (q *Queries) ListAdminAudit(ctx context.Context) ([]ListAdminAuditRow, error) {
-	rows, err := q.db.Query(ctx, listAdminAudit)
+func (q *Queries) ListAdminAudit(ctx context.Context, arg ListAdminAuditParams) ([]ListAdminAuditRow, error) {
+	rows, err := q.db.Query(ctx, listAdminAudit,
+		arg.Target,
+		arg.BeforeAt,
+		arg.BeforeID,
+		arg.Lim,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -313,11 +332,26 @@ SELECT
     ) AS has_admin
 FROM "organizations" o
 WHERE
-    $1::text IS NULL
-    OR o."name" ILIKE '%' || $1::text || '%'
-    OR o."slug" ILIKE '%' || $1::text || '%'
-ORDER BY o."created_at" DESC
+    (
+        $1::text IS NULL
+        OR o."name" ILIKE '%' || $1::text || '%'
+        OR o."slug" ILIKE '%' || $1::text || '%'
+    )
+    -- Keyset paging, as ListAdminUsers.
+    AND (
+        $2::timestamptz IS NULL
+        OR (o."created_at", o."id") < ($2::timestamptz, $3::text)
+    )
+ORDER BY o."created_at" DESC, o."id" DESC
+LIMIT $4
 `
+
+type ListAdminFamiliesParams struct {
+	Query    *string
+	BeforeAt pgtype.Timestamptz
+	BeforeID *string
+	Lim      int32
+}
 
 type ListAdminFamiliesRow struct {
 	ID         string
@@ -341,8 +375,13 @@ type ListAdminFamiliesRow struct {
 // same thing without the fan-out.
 // Same sqlc.narg pattern as ListAdminUsers: NULL collapses the filter to
 // true, and the search text stays a bound parameter rather than spliced SQL.
-func (q *Queries) ListAdminFamilies(ctx context.Context, query *string) ([]ListAdminFamiliesRow, error) {
-	rows, err := q.db.Query(ctx, listAdminFamilies, query)
+func (q *Queries) ListAdminFamilies(ctx context.Context, arg ListAdminFamiliesParams) ([]ListAdminFamiliesRow, error) {
+	rows, err := q.db.Query(ctx, listAdminFamilies,
+		arg.Query,
+		arg.BeforeAt,
+		arg.BeforeID,
+		arg.Lim,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -451,17 +490,29 @@ SELECT
     "ban_reason",
     "created_at"
 FROM "users"
-WHERE
-    $1::text IS NULL
-    OR "name" ILIKE '%' || $1::text || '%'
-    OR "email" ILIKE '%' || $1::text || '%'
-ORDER BY "created_at" DESC
-LIMIT $2
+WHERE "id" <> $1::text
+    AND (
+        $2::text IS NULL
+        OR "name" ILIKE '%' || $2::text || '%'
+        OR "email" ILIKE '%' || $2::text || '%'
+    )
+    -- Keyset paging (internal/api/admin_paging.go): rows strictly after the
+    -- previous page's last one in (created_at, id) order. The handler asks
+    -- for one more than a page to learn whether a next page exists.
+    AND (
+        $3::timestamptz IS NULL
+        OR ("created_at", "id") < ($3::timestamptz, $4::text)
+    )
+ORDER BY "created_at" DESC, "id" DESC
+LIMIT $5
 `
 
 type ListAdminUsersParams struct {
-	Query *string
-	Lim   int32
+	TombstoneID string
+	Query       *string
+	BeforeAt    pgtype.Timestamptz
+	BeforeID    *string
+	Lim         int32
 }
 
 type ListAdminUsersRow struct {
@@ -484,8 +535,16 @@ type ListAdminUsersRow struct {
 // into SQL. `role` and `name` are nullable columns; COALESCE keeps the
 // generated Go fields plain strings for name (always rendered) while role
 // stays a pointer (the spec's nullable "admin" or null).
+// The tombstone is where deleted accounts' records point; it is not a
+// person, and GET /api/admin/users/{id} answers 404 for it.
 func (q *Queries) ListAdminUsers(ctx context.Context, arg ListAdminUsersParams) ([]ListAdminUsersRow, error) {
-	rows, err := q.db.Query(ctx, listAdminUsers, arg.Query, arg.Lim)
+	rows, err := q.db.Query(ctx, listAdminUsers,
+		arg.TombstoneID,
+		arg.Query,
+		arg.BeforeAt,
+		arg.BeforeID,
+		arg.Lim,
+	)
 	if err != nil {
 		return nil, err
 	}

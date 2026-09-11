@@ -9,7 +9,9 @@ type AuditEntry = components["schemas"]["AuditEntry"];
 export function AdminAudit() {
   const auditLog = useQuery({
     queryKey: ["admin", "audit"],
-    queryFn: async () => unwrap<AuditEntry[]>(client.GET("/api/admin/audit")),
+    queryFn: async () =>
+      (await unwrap<{ items: AuditEntry[] }>(client.GET("/api/admin/audit")))
+        .items,
   });
 
   return (

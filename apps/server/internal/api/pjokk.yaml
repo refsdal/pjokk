@@ -2897,10 +2897,11 @@ paths:
     get:
       operationId: listAdminFamilies
       summary: >-
-        Every family on the platform, newest first, with member and baby
-        counts, whether it still has an admin, and the timestamp of its most
-        recent feed (null when it has never logged one). `query` filters on
-        name or slug (case-insensitive substring). System admin only.
+        Families on the platform with member and baby counts, whether each
+        still has an admin, and the timestamp of its most recent feed (null
+        when it has never logged one). `query` filters on name or slug
+        (case-insensitive substring). One page at a time, newest first: pass the previous page's `nextCursor` as `cursor` (`limit` 50 by default, 200 at most); a malformed cursor is a 400. System admin
+        only.
       tags: [admin]
       parameters:
         - name: query
@@ -2910,15 +2911,21 @@ paths:
           schema:
             type: string
             maxLength: 200
+        - $ref: "#/components/parameters/cursorQuery"
+        - $ref: "#/components/parameters/limitQuery"
       responses:
         "200":
-          description: All families.
+          description: One page of families.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/AdminFamily"
+                $ref: "#/components/schemas/AdminFamilyPage"
+        "400":
+          description: A malformed cursor (VALIDATION).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
     post:
       operationId: createAdminFamily
       summary: >-
@@ -3229,10 +3236,11 @@ paths:
     get:
       operationId: listAdminUsers
       summary: >-
-        Accounts on the platform, newest first. `query` filters on name or
-        email (case-insensitive substring). NEW in Go — replaces the
-        better-auth admin plugin's client-side listUsers call. System admin
-        only.
+        Accounts on the platform (never the tombstone that deleted accounts'
+        records point at). `query` filters on name or email
+        (case-insensitive substring). One page at a time, newest first: pass the previous page's `nextCursor` as `cursor` (`limit` 50 by default, 200 at most); a malformed cursor is a 400. NEW in Go —
+        replaces the better-auth admin plugin's client-side listUsers call.
+        System admin only.
       tags: [admin]
       parameters:
         - name: query
@@ -3242,16 +3250,21 @@ paths:
           schema:
             type: string
             maxLength: 200
+        - $ref: "#/components/parameters/cursorQuery"
         - $ref: "#/components/parameters/limitQuery"
       responses:
         "200":
-          description: Matching accounts.
+          description: One page of matching accounts.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/AdminUser"
+                $ref: "#/components/schemas/AdminUserPage"
+        "400":
+          description: A malformed cursor (VALIDATION).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/admin/users/{id}/delete:
     post:
       operationId: deleteAdminUser
@@ -3475,18 +3488,33 @@ paths:
     get:
       operationId: listAdminAudit
       summary: >-
-        The 100 most recent entries in the append-only system-admin trail,
-        newest first. System admin only.
+        The append-only system-admin trail. `target` narrows it to the
+        entries about one thing (the user page's history passes a user id).
+        One page at a time, newest first: pass the previous page's `nextCursor` as `cursor` (`limit` 50 by default, 200 at most); a malformed cursor is a 400. System admin only.
       tags: [admin]
+      parameters:
+        - name: target
+          in: query
+          description: Only entries whose target is exactly this.
+          required: false
+          schema:
+            type: string
+            maxLength: 200
+        - $ref: "#/components/parameters/cursorQuery"
+        - $ref: "#/components/parameters/limitQuery"
       responses:
         "200":
-          description: Recent admin actions.
+          description: One page of admin actions.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/AuditEntry"
+                $ref: "#/components/schemas/AuditPage"
+        "400":
+          description: A malformed cursor (VALIDATION).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
     post:
       operationId: createAdminAuditNote
       summary: >-
@@ -3525,6 +3553,14 @@ components:
         type: integer
         minimum: 1
         maximum: 200
+    cursorQuery:
+      name: cursor
+      in: query
+      description: The previous page's nextCursor; omit for the first page.
+      required: false
+      schema:
+        type: string
+        maxLength: 200
     idPath:
       name: id
       in: path
@@ -6501,6 +6537,45 @@ components:
         createdAt:
           type: string
           format: date-time
+    AuditPage:
+      type: object
+      description: One page of admin actions, newest first.
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEntry"
+        nextCursor:
+          type: string
+          nullable: true
+          description: Pass as `cursor` for the next page; null on the last one.
+    AdminUserPage:
+      type: object
+      description: One page of accounts, newest first.
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUser"
+        nextCursor:
+          type: string
+          nullable: true
+          description: Pass as `cursor` for the next page; null on the last one.
+    AdminFamilyPage:
+      type: object
+      description: One page of families, newest first.
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminFamily"
+        nextCursor:
+          type: string
+          nullable: true
+          description: Pass as `cursor` for the next page; null on the last one.
     AuditNote:
       type: object
       required: [action, target]

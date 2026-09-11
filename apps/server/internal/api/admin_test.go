@@ -256,7 +256,7 @@ func TestAdminStatsAndFamilyOverview(t *testing.T) {
 		}
 	}
 
-	families := a.DoArray(http.MethodGet, "/api/admin/families", cookie, nil)
+	families := adminList(t, a, "/api/admin/families", cookie)
 	if families.Status != http.StatusOK {
 		t.Fatalf("GET /api/admin/families = %d %s", families.Status, families.Raw)
 	}
@@ -336,7 +336,7 @@ func TestAdminDeleteFamilyCascadesAndAudits(t *testing.T) {
 	}
 
 	// The trail is served too, newest first.
-	list := a.DoArray(http.MethodGet, "/api/admin/audit", cookie, nil)
+	list := adminList(t, a, "/api/admin/audit", cookie)
 	if list.Status != http.StatusOK || len(list.JSON) == 0 {
 		t.Fatalf("GET /api/admin/audit = %d %s", list.Status, list.Raw)
 	}
@@ -617,7 +617,7 @@ func TestAdminAuditNoteIsRecordedAndListed(t *testing.T) {
 		t.Errorf("audit row = %+v", row)
 	}
 
-	list := a.DoArray(http.MethodGet, "/api/admin/audit", cookie, nil)
+	list := adminList(t, a, "/api/admin/audit", cookie)
 	if list.Status != http.StatusOK || len(list.JSON) != 1 {
 		t.Fatalf("GET /api/admin/audit = %d %s", list.Status, list.Raw)
 	}
@@ -646,16 +646,17 @@ func TestAdminListUsersFiltersAndLimits(t *testing.T) {
 	a.AddMember(familyID, bo, auth.RoleMember, "bo@example.com")
 	a.SignUp("Cleo Dahl", "cleo@elsewhere.test")
 
-	all := a.DoArray(http.MethodGet, "/api/admin/users", cookie, nil)
+	all := adminList(t, a, "/api/admin/users", cookie)
 	if all.Status != http.StatusOK {
 		t.Fatalf("GET /api/admin/users = %d %s", all.Status, all.Raw)
 	}
-	// Three accounts plus the tombstone.
-	if len(all.JSON) != 4 {
-		t.Fatalf("users = %v, want 4 rows", all.JSON)
+	// Three accounts. The tombstone deleted accounts' records point at is
+	// not a person, and is never listed.
+	if len(all.JSON) != 3 {
+		t.Fatalf("users = %v, want 3 rows", all.JSON)
 	}
 
-	byName := a.DoArray(http.MethodGet, "/api/admin/users?query=berg", cookie, nil)
+	byName := adminList(t, a, "/api/admin/users?query=berg", cookie)
 	if len(byName.JSON) != 1 {
 		t.Fatalf("query=berg = %v, want 1 row", byName.JSON)
 	}
@@ -667,17 +668,17 @@ func TestAdminListUsersFiltersAndLimits(t *testing.T) {
 		t.Errorf("row = %v, want banned:false banReason:null role:null", row)
 	}
 
-	byEmail := a.DoArray(http.MethodGet, "/api/admin/users?query=elsewhere.test", cookie, nil)
+	byEmail := adminList(t, a, "/api/admin/users?query=elsewhere.test", cookie)
 	if len(byEmail.JSON) != 1 {
 		t.Errorf("query=elsewhere.test = %v, want 1 row", byEmail.JSON)
 	}
 
-	none := a.DoArray(http.MethodGet, "/api/admin/users?query=nobody", cookie, nil)
+	none := adminList(t, a, "/api/admin/users?query=nobody", cookie)
 	if len(none.JSON) != 0 {
 		t.Errorf("query=nobody = %v, want no rows", none.JSON)
 	}
 
-	limited := a.DoArray(http.MethodGet, "/api/admin/users?limit=2", cookie, nil)
+	limited := adminList(t, a, "/api/admin/users?limit=2", cookie)
 	if len(limited.JSON) != 2 {
 		t.Errorf("limit=2 = %v, want 2 rows", limited.JSON)
 	}
@@ -731,7 +732,7 @@ func TestAdminBanKillsSessionsAndAPIKeysUnbanRestores(t *testing.T) {
 		t.Errorf("banned user's fresh session /api/me = %d %s, want 401", res.Status, res.Raw)
 	}
 
-	listed := a.DoArray(http.MethodGet, "/api/admin/users?query=victim@example.com", cookie, nil)
+	listed := adminList(t, a, "/api/admin/users?query=victim@example.com", cookie)
 	row, _ := listed.JSON[0].(map[string]any)
 	if row["banned"] != true || row["banReason"] != "spamming the family" {
 		t.Errorf("listed row = %v, want banned with the reason", row)
@@ -761,7 +762,7 @@ func TestAdminBanKillsSessionsAndAPIKeysUnbanRestores(t *testing.T) {
 	if res := bearerDo(a, http.MethodGet, "/api/babies", key, nil); res.Status != http.StatusOK {
 		t.Errorf("post-unban key = %d %s, want 200", res.Status, res.Raw)
 	}
-	listed = a.DoArray(http.MethodGet, "/api/admin/users?query=victim@example.com", cookie, nil)
+	listed = adminList(t, a, "/api/admin/users?query=victim@example.com", cookie)
 	row, _ = listed.JSON[0].(map[string]any)
 	if row["banned"] != false || row["banReason"] != nil {
 		t.Errorf("listed row = %v, want banned:false with no reason", row)

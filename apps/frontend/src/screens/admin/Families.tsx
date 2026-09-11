@@ -223,11 +223,13 @@ export function AdminFamilies() {
   const families = useQuery({
     queryKey: ["admin", "families", query],
     queryFn: async () =>
-      unwrap<AdminFamily[]>(
-        client.GET("/api/admin/families", {
-          params: { query: query ? { query } : {} },
-        }),
-      ),
+      (
+        await unwrap<{ items: AdminFamily[] }>(
+          client.GET("/api/admin/families", {
+            params: { query: query ? { query } : {} },
+          }),
+        )
+      ).items,
   });
 
   return (

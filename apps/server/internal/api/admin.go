@@ -138,10 +138,23 @@ func (d Deps) GetAdminStats(ctx context.Context, _ gen.GetAdminStatsRequestObjec
 // for everyone in it and silently cannot be administered, which is
 // invisible without this flag.
 func (d Deps) ListAdminFamilies(ctx context.Context, req gen.ListAdminFamiliesRequestObject) (gen.ListAdminFamiliesResponseObject, error) {
-	rows, err := d.Q.ListAdminFamilies(ctx, req.Params.Query)
+	cursor, err := decodeAdminCursor(req.Params.Cursor)
+	if err != nil {
+		return gen.ListAdminFamilies400JSONResponse(badCursor()), nil
+	}
+	limit := adminPageLimit(req.Params.Limit)
+	rows, err := d.Q.ListAdminFamilies(ctx, dbgen.ListAdminFamiliesParams{
+		Query:    req.Params.Query,
+		BeforeAt: cursor.beforeAt(),
+		BeforeID: cursor.beforeID(),
+		Lim:      int32(limit + 1),
+	})
 	if err != nil {
 		return nil, err
 	}
+	rows, next := pageOf(rows, limit, func(r dbgen.ListAdminFamiliesRow) (time.Time, string) {
+		return r.CreatedAt.Time, r.ID
+	})
 	out := make([]gen.AdminFamily, len(rows))
 	for i, row := range rows {
 		out[i] = gen.AdminFamily{
@@ -156,7 +169,7 @@ func (d Deps) ListAdminFamilies(ctx context.Context, req gen.ListAdminFamiliesRe
 			HasAdmin:   row.HasAdmin,
 		}
 	}
-	return gen.ListAdminFamilies200JSONResponse(out), nil
+	return gen.ListAdminFamilies200JSONResponse{Items: out, NextCursor: next}, nil
 }
 
 // DeleteAdminFamily implements DELETE /api/admin/families/{id}: the family
@@ -209,28 +222,28 @@ func (d Deps) DeleteAdminFamily(ctx context.Context, req gen.DeleteAdminFamilyRe
 	return gen.DeleteAdminFamily200JSONResponse{Ok: gen.OkOkTrue}, nil
 }
 
-// adminUsersDefaultLimit is how many accounts GET /api/admin/users returns
-// when the caller names no limit. The console's own list asks for the
-// spec's maximum (200); this default only has to be enough to be useful
-// for a hand-issued request.
-const adminUsersDefaultLimit = 100
-
 // ListAdminUsers implements GET /api/admin/users. NEW in Go (REF §A1's
 // "NEW in Go" table): the TypeScript console called better-auth's
 // admin.listUsers from the browser.
 func (d Deps) ListAdminUsers(ctx context.Context, req gen.ListAdminUsersRequestObject) (gen.ListAdminUsersResponseObject, error) {
-	limit := adminUsersDefaultLimit
-	if req.Params.Limit != nil {
-		limit = int(*req.Params.Limit)
+	cursor, err := decodeAdminCursor(req.Params.Cursor)
+	if err != nil {
+		return gen.ListAdminUsers400JSONResponse(badCursor()), nil
 	}
-
+	limit := adminPageLimit(req.Params.Limit)
 	rows, err := d.Q.ListAdminUsers(ctx, dbgen.ListAdminUsersParams{
-		Query: req.Params.Query,
-		Lim:   int32(limit),
+		TombstoneID: db.TombstoneID,
+		Query:       req.Params.Query,
+		BeforeAt:    cursor.beforeAt(),
+		BeforeID:    cursor.beforeID(),
+		Lim:         int32(limit + 1),
 	})
 	if err != nil {
 		return nil, err
 	}
+	rows, next := pageOf(rows, limit, func(r dbgen.ListAdminUsersRow) (time.Time, string) {
+		return r.CreatedAt.Time, r.ID
+	})
 
 	out := make([]gen.AdminUser, len(rows))
 	for i, row := range rows {
@@ -244,7 +257,7 @@ func (d Deps) ListAdminUsers(ctx context.Context, req gen.ListAdminUsersRequestO
 			CreatedAt: row.CreatedAt.Time,
 		}
 	}
-	return gen.ListAdminUsers200JSONResponse(out), nil
+	return gen.ListAdminUsers200JSONResponse{Items: out, NextCursor: next}, nil
 }
 
 // DeleteAdminUser implements POST /api/admin/users/{id}/delete — the safe
@@ -603,11 +616,24 @@ func (d Deps) StopImpersonating(ctx context.Context, _ gen.StopImpersonatingRequ
 }
 
 // ListAdminAudit implements GET /api/admin/audit.
-func (d Deps) ListAdminAudit(ctx context.Context, _ gen.ListAdminAuditRequestObject) (gen.ListAdminAuditResponseObject, error) {
-	rows, err := d.Q.ListAdminAudit(ctx)
+func (d Deps) ListAdminAudit(ctx context.Context, req gen.ListAdminAuditRequestObject) (gen.ListAdminAuditResponseObject, error) {
+	cursor, err := decodeAdminCursor(req.Params.Cursor)
+	if err != nil {
+		return gen.ListAdminAudit400JSONResponse(badCursor()), nil
+	}
+	limit := adminPageLimit(req.Params.Limit)
+	rows, err := d.Q.ListAdminAudit(ctx, dbgen.ListAdminAuditParams{
+		Target:   req.Params.Target,
+		BeforeAt: cursor.beforeAt(),
+		BeforeID: cursor.beforeID(),
+		Lim:      int32(limit + 1),
+	})
 	if err != nil {
 		return nil, err
 	}
+	rows, next := pageOf(rows, limit, func(r dbgen.ListAdminAuditRow) (time.Time, string) {
+		return r.CreatedAt.Time, r.ID
+	})
 	out := make([]gen.AuditEntry, len(rows))
 	for i, row := range rows {
 		out[i] = gen.AuditEntry{
@@ -620,7 +646,7 @@ func (d Deps) ListAdminAudit(ctx context.Context, _ gen.ListAdminAuditRequestObj
 			CreatedAt: row.CreatedAt.Time,
 		}
 	}
-	return gen.ListAdminAudit200JSONResponse(out), nil
+	return gen.ListAdminAudit200JSONResponse{Items: out, NextCursor: next}, nil
 }
 
 // CreateAdminAuditNote implements POST /api/admin/audit: an entry recorded
