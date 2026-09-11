@@ -186,3 +186,35 @@ test("the awake card counts naps only and adds last night; the timeline gives th
   await page.goto("/timeline");
   await expect(page.getByText(/\b1 night\b/)).toBeVisible({ timeout: 10_000 });
 });
+
+// Last night's longest stretch on Home (DECISIONS 2026-09-11): a broken
+// night adds it to the awake card's single sub-line, which must still fit.
+test("a broken night adds its longest stretch to the awake card, on one line", async ({
+  page,
+  request,
+}) => {
+  await freshFamily(page, request, "sleep-longest");
+  const babyId = await firstBabyId(page);
+  // Anchored on the most recent 06:30, so both sessions fall in one
+  // noon-to-noon night whatever the time of day: 19:30–02:00, a waking,
+  // then 02:30–06:30.
+  const wake = new Date();
+  wake.setHours(6, 30, 0, 0);
+  if (wake.getTime() > Date.now()) wake.setDate(wake.getDate() - 1);
+  const before = (hours: number) => new Date(wake.getTime() - hours * 3600_000).toISOString();
+  for (const [startTime, endTime] of [
+    [before(11), before(4.5)],
+    [before(4), before(0)],
+  ]) {
+    const res = await page.request.post("/api/sleep", {
+      data: { babyId, startTime, endTime, type: "night" },
+    });
+    expect(res.status(), await res.text()).toBe(201);
+  }
+  await page.reload();
+
+  const sub = page.getByText(/· night 10:30 · longest 6:30$/);
+  await expect(sub).toBeVisible({ timeout: 10_000 });
+  // The sub-line truncates: the longest part must fit a phone, not be cut.
+  expect(await sub.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+});
