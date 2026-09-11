@@ -26,6 +26,27 @@ describe("napsLine", () => {
   test("no night part without a recent night", () => {
     expect(napsLine({ naps: 0, napMin: 0 }, null, fmt)).toBe("0 naps today");
   });
+
+  test("a broken night adds its longest stretch", () => {
+    expect(napsLine({ naps: 2, napMin: 105 }, 630, fmt, 390)).toBe(
+      "2 naps · 1:45 today · night 10:30 · longest 6:30",
+    );
+  });
+
+  test("an unbroken night does not repeat its total as the longest", () => {
+    expect(napsLine({ naps: 0, napMin: 0 }, 600, fmt, 600)).toBe(
+      "0 naps today · night 10:00",
+    );
+  });
+
+  test("no longest part without a night, or without the number", () => {
+    expect(napsLine({ naps: 1, napMin: 45 }, null, fmt, 390)).toBe(
+      "1 nap · 0:45 today",
+    );
+    expect(napsLine({ naps: 1, napMin: 45 }, 630, fmt)).toBe(
+      "1 nap · 0:45 today · night 10:30",
+    );
+  });
 });
 
 describe("sleepNoun", () => {

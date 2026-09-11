@@ -11,20 +11,25 @@ export function sleepNoun(type: SleepLog["type"] | undefined): string {
 }
 
 /**
- * The awake card's sub-line: "2 naps · 1:45 today · night 10:30". Before
- * the first nap there are no minutes to show ("0 naps today"); the night
- * part is left out when the server has no recent night (lastNightMin null).
+ * The awake card's sub-line: "2 naps · 1:45 today · night 10:30 · longest
+ * 6:30". Before the first nap there are no minutes to show ("0 naps
+ * today"); the night part is left out when the server has no recent night
+ * (lastNightMin null). The longest stretch rides along only when the night
+ * was broken — for one unbroken session it would repeat the total.
  */
 export function napsLine(
   today: Pick<Summary["today"], "naps" | "napMin">,
   lastNightMin: number | null,
   fmt: (min: number) => string,
+  lastNightLongestMin: number | null = null,
 ): string {
   const naps =
     today.naps === 0
       ? `0 ${t("naps")} ${t("today")}`
       : `${today.naps} ${today.naps === 1 ? t("nap") : t("naps")} · ${fmt(today.napMin)} ${t("today")}`;
-  return lastNightMin == null
-    ? naps
-    : `${naps} · ${t("night")} ${fmt(lastNightMin)}`;
+  if (lastNightMin == null) return naps;
+  const night = `${naps} · ${t("night")} ${fmt(lastNightMin)}`;
+  return lastNightLongestMin != null && lastNightLongestMin < lastNightMin
+    ? `${night} · ${t("longest")} ${fmt(lastNightLongestMin)}`
+    : night;
 }

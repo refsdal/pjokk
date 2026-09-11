@@ -507,6 +507,8 @@ export const SummarySchema = z.object({
   // Minutes asleep last night (every completed night session of the newest
   // night, noon to noon), or null when none ended in the last 24 hours.
   lastNightMin: z.number().int().nullable(),
+  // The longest single session of that night (Stats' longest stretch).
+  lastNightLongestMin: z.number().int().nullable(),
   // The running timed activity (tummy time, a walk), or null.
   activePlay: PlayLogSchema.nullable(),
   // The running nursing / pump timers, or null (issue #44).

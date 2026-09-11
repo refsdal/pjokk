@@ -78,6 +78,10 @@ func TestSummaryNapsExcludeNightAndLastNightSumsItsSessions(t *testing.T) {
 	if res.JSON["lastNightMin"] != float64(390+240) {
 		t.Errorf("lastNightMin = %v, want 630 (19:30–02:00 + 02:30–06:30)", res.JSON["lastNightMin"])
 	}
+	// The longest stretch is the longest single session of that night.
+	if res.JSON["lastNightLongestMin"] != float64(390) {
+		t.Errorf("lastNightLongestMin = %v, want 390 (19:30–02:00)", res.JSON["lastNightLongestMin"])
+	}
 }
 
 // A night that ended more than a day ago is not "last night": the line would
@@ -99,6 +103,9 @@ func TestSummaryLastNightIsNullOnceTheNightIsOverADayOld(t *testing.T) {
 	if v, ok := res.JSON["lastNightMin"]; !ok || v != nil {
 		t.Errorf("lastNightMin = %v (present %v), want null", v, ok)
 	}
+	if v, ok := res.JSON["lastNightLongestMin"]; !ok || v != nil {
+		t.Errorf("lastNightLongestMin = %v (present %v), want null with it", v, ok)
+	}
 }
 
 // A running night has no length yet: tonight's session in progress does not
@@ -119,5 +126,8 @@ func TestSummaryLastNightIgnoresARunningNight(t *testing.T) {
 	}
 	if res.JSON["lastNightMin"] != float64(600) {
 		t.Errorf("lastNightMin = %v, want 600 (last night's 20:00–06:00, not tonight's running one)", res.JSON["lastNightMin"])
+	}
+	if res.JSON["lastNightLongestMin"] != float64(600) {
+		t.Errorf("lastNightLongestMin = %v, want 600 (one unbroken session)", res.JSON["lastNightLongestMin"])
 	}
 }
