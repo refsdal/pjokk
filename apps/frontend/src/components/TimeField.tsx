@@ -1,8 +1,9 @@
+import { IconChevronRight } from "@tabler/icons-react";
 import { useState } from "react";
 import { ChipGroup } from "@/components/Chips";
 import { t } from "@/lib/i18n";
-import { formatClock } from "@/lib/time";
-import { cn } from "@/lib/utils";
+import { describeTime, formatClock } from "@/lib/time";
+import { cn, focusRing } from "@/lib/utils";
 
 // Retroactive logging is the norm (CLAUDE.md §4): every time field offers
 // Now / 15 m ago / Pick time. Value is a Date; "Now" means save-time now
@@ -127,6 +128,56 @@ export function TimeField({
           />
         </div>
       )}
+    </div>
+  );
+}
+
+// TimeRow is TimeField folded into one row for EDIT sheets: "Fell asleep ·
+// Today 13:10 ›". A tap opens the chips beneath it; a second tap folds them
+// away. An edit already has a value, so the chips are only needed when the
+// time is actually wrong — and the sleep sheet carries two of them, which
+// on a phone pushed Save below the fold behind ~300 px of chips nobody had
+// asked for. Create flows keep the bare TimeField: their happy path IS the
+// chips (Now / 15 m ago / Pick time).
+//
+// The TimeField mounts only while open, so each open re-derives its preset
+// from the value — "Now" for null, "Pick time" otherwise — exactly as a
+// fresh sheet would.
+export function TimeRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: Date | null;
+  onChange: (v: Date | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          "flex h-14 w-full items-center justify-between rounded-xl2 border border-line bg-surface px-4 text-left select-none active:bg-surface-2",
+          focusRing,
+        )}
+      >
+        <span className="text-xs font-semibold tracking-wide text-muted uppercase">
+          {label}
+        </span>
+        <span className="flex items-center gap-2 text-base font-semibold text-ink">
+          {describeTime(value)}
+          <IconChevronRight
+            className={cn(
+              "h-5 w-5 text-muted transition-transform",
+              open && "rotate-90",
+            )}
+          />
+        </span>
+      </button>
+      {open && <TimeField value={value} onChange={onChange} className="px-1" />}
     </div>
   );
 }

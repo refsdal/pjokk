@@ -85,6 +85,24 @@ export function formatRelative(date: Date, now = new Date()): string {
   return `${formatDay(date)} ${formatClock(date)}`;
 }
 
+/**
+ * A time as the collapsed edit row reads it: "Now" for the Now preset,
+ * "Today 13:10", "Yesterday 21:05", else the short date and clock. The day
+ * words are the same ones the Pick-time chips use, so the row and the
+ * expanded chips never disagree about which day a time is on.
+ */
+export function describeTime(value: Date | null, now = new Date()): string {
+  if (!value) return t("Now");
+  const clock = formatClock(value);
+  if (value.toDateString() === now.toDateString())
+    return `${t("Today")} ${clock}`;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (value.toDateString() === yesterday.toDateString())
+    return `${t("Yesterday")} ${clock}`;
+  return `${formatDay(value)} ${clock}`;
+}
+
 /** YYYY-MM-DD in LOCAL time, for <input type="date"> value/max (an ISO
  * slice would shift the day near midnight in non-UTC timezones). */
 export function toLocalDateInput(d = new Date()): string {

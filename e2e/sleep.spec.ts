@@ -39,6 +39,16 @@ test("tapping the sleep banner opens the edit sheet for the running session", as
   await expect(page.getByRole("heading", { name: "Edit sleep" })).toBeVisible();
   // A running session has no end time to edit; the sheet says so.
   await expect(page.getByText("Still sleeping")).toBeVisible();
+  // The start time is a folded row: its chips appear only on a tap, so the
+  // sheet fits a phone with Save in reach (there is no Woke up row yet).
+  const fellAsleep = page.getByRole("button", { name: /^Fell asleep/ });
+  await expect(fellAsleep).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("button", { name: "Pick time" })).toHaveCount(0);
+  await fellAsleep.click();
+  await expect(fellAsleep).toHaveAttribute("aria-expanded", "true");
+  await page.getByRole("button", { name: "15 m ago" }).click();
+  await expect(fellAsleep).toContainText(/^Fell asleep\s*Today \d\d:\d\d$/);
+  await expect(page.getByRole("button", { name: /^Woke up/ })).toHaveCount(0);
   await page.getByPlaceholder("Note (optional)").fill("nap after lunch");
   await page.getByRole("button", { name: "Save", exact: true }).click();
 
@@ -127,6 +137,10 @@ test("past the window, only the newest sleep's edit sheet offers Resume", async 
   await expect(page.getByRole("heading", { name: "Edit sleep" })).toBeVisible({
     timeout: 10_000,
   });
+  // Both times folded, the hour-long sleep read out beneath them, and
+  // Resume a text action on that line rather than a button block.
+  await expect(page.getByRole("button", { name: /^Woke up/ })).toBeVisible();
+  await expect(page.getByText("1:00", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Resume sleep" }).click();
   await expect(page.getByRole("heading", { name: "Edit sleep" })).toHaveCount(0);
 
