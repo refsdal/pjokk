@@ -120,9 +120,9 @@ const en: LandingCopy = {
   ctaSignIn: "Sign in",
   ctaGetStarted: "Get started",
   ctaSelfHost: "Run it yourself",
-  heroTitle: "When did the baby last eat?",
+  heroTitle: "When did your baby last eat?",
   heroBody:
-    "Pjokk answers the moment you open it — and logs the next feed in two taps. Built for the whole family, and for the three-in-the-morning version of you.",
+    "Pjokk answers the moment you open it — and logs the next feed in two taps. Built for the whole family, and for the 3 a.m. version of you.",
   freeLine: "Free and self-hosted. All features included.",
   inviteLine:
     "Pjokk is invite-only for now. Invited to a family? Open the link or scan the QR code you were sent. Otherwise it is open source, and runs happily on a server of your own.",
@@ -201,7 +201,7 @@ const en: LandingCopy = {
   ],
   storyTitle: "Built by parents, for parents",
   storyBody: [
-    "When our daughter arrived we were as unsure as everyone else. Was she eating enough? Was it normal to pee this much? Had she taken less today than yesterday — and would we even notice if she had?",
+    "When our daughter arrived we were as unsure as everyone else. Not because we lacked advice, but because we had no way of seeing how one day compared with the next. Had she eaten more or less than yesterday? Slept longer this week than last? We wanted those numbers in front of us, so that we could judge for ourselves how things were going. And we wanted logging them to take seconds, so the time went to her, not to an app.",
     "So we built what we needed ourselves: somewhere to write down what happens, that answers the moment you open the app. We use Pjokk every day with our own daughter, and now we're sharing it with other parents.",
   ],
   storySignature: "— Anders, Oslo",
@@ -253,7 +253,7 @@ const nb: LandingCopy = {
   ctaSignIn: "Logg inn",
   ctaGetStarted: "Kom i gang",
   ctaSelfHost: "Kjør den selv",
-  heroTitle: "Når spiste babyen sist?",
+  heroTitle: "Når spiste babyen din sist?",
   heroBody:
     "Pjokk svarer med én gang du åpner appen — og logger neste måltid på to trykk. Laget for hele familien, og for deg klokka tre om natta.",
   freeLine: "Gratis og selvdrevet. Alle funksjoner inkludert.",
@@ -335,7 +335,7 @@ const nb: LandingCopy = {
   ],
   storyTitle: "Laget av foreldre, for foreldre",
   storyBody: [
-    "Da datteren vår ble født, var vi like usikre som alle andre. Spiste hun nok? Var det normalt at hun tisset så mye? Hadde hun fått i seg mindre i dag enn i går — og ville vi i det hele tatt merket det?",
+    "Da datteren vår ble født, var vi like usikre som alle andre. Ikke fordi vi manglet råd, men fordi vi ikke hadde noen måte å se hvordan én dag sto seg mot den neste. Hadde hun spist mer eller mindre enn i går? Sovet lenger denne uka enn forrige? Vi ville ha de tallene foran oss, så vi kunne vurdere selv hvordan det gikk. Og vi ville at loggingen skulle ta sekunder, så tiden gikk til henne og ikke til en app.",
     "Så vi bygde det vi selv manglet: et sted å notere det som skjer, som svarer med én gang du åpner appen. Vi bruker Pjokk hver dag med vår egen datter, og nå deler vi det med andre foreldre.",
   ],
   storySignature: "— Anders, Oslo",
