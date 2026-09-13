@@ -3,7 +3,7 @@ import type { SleepLog } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet, useSheetReset } from "@/components/Sheet";
-import { TimeField } from "@/components/TimeField";
+import { TimeField, TimeRow } from "@/components/TimeField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,7 +17,9 @@ import {
 import { t } from "@/lib/i18n";
 import { sleepTypeAt } from "@/lib/night";
 import { canResumeEdit } from "@/lib/sleep-resume";
+import { formatDuration } from "@/lib/time";
 import { toast } from "@/lib/toast";
+import { cn, focusRing } from "@/lib/utils";
 
 // ONE component for create and edit. Create starts a session (waking happens
 // on the home banner); edit adjusts times/location/notes of any entry — for
@@ -69,6 +71,15 @@ export function SleepSheet({
   // Timeline, and the summary polls.
   const summary = useSummary(open && edit ? edit.babyId : undefined);
   const resumable = !!edit && canResumeEdit(edit, summary.data);
+
+  // How long the sleep lasted as currently edited — the same reading the
+  // timeline row gives. Nothing while it is running, or once the end has
+  // been dragged before the start.
+  const endsAt = endTime ?? (edit && !isActiveEdit ? new Date() : null);
+  const duration =
+    edit && !isActiveEdit && time && endsAt && endsAt > time
+      ? formatDuration(endsAt.getTime() - time.getTime())
+      : null;
 
   const custom = useSleepLocations().data ?? [];
   const locationOptions = [
@@ -147,35 +158,56 @@ export function SleepSheet({
           onChange={setType}
         />
 
-        {edit && (
-          <p className="text-xs font-semibold tracking-wide text-muted uppercase">
-            {t("Fell asleep")}
-          </p>
-        )}
-        <TimeField key={`s${instance}`} value={time} onChange={setTime} />
-
-        {edit &&
-          (isActiveEdit ? (
-            <p className="text-sm text-muted">
-              {t("Still sleeping — end the session with Wake on Home.")}
-            </p>
-          ) : (
-            <>
-              <p className="text-xs font-semibold tracking-wide text-muted uppercase">
-                {t("Woke up")}
+        {edit ? (
+          // Edit: each time folded into a row (TimeRow) so Save stays on
+          // screen; the times sit in one group with the duration line and
+          // Resume beneath.
+          <div className="space-y-2">
+            <TimeRow
+              key={`s${instance}`}
+              label={t("Fell asleep")}
+              value={time}
+              onChange={setTime}
+            />
+            {isActiveEdit ? (
+              <p className="px-1 py-2 text-sm text-muted">
+                {t("Still sleeping — end the session with Wake on Home.")}
               </p>
-              <TimeField
-                key={`e${instance}`}
-                value={endTime}
-                onChange={setEndTime}
-              />
-              {resumable && (
-                <Button variant="secondary" size="full" onClick={resume}>
-                  {t("Resume sleep")}
-                </Button>
-              )}
-            </>
-          ))}
+            ) : (
+              <>
+                <TimeRow
+                  key={`e${instance}`}
+                  label={t("Woke up")}
+                  value={endTime}
+                  onChange={setEndTime}
+                />
+                {(duration || resumable) && (
+                  <div className="flex items-center gap-1.5 px-1 text-sm text-muted">
+                    {duration && <span>{duration}</span>}
+                    {duration && resumable && <span aria-hidden="true">·</span>}
+                    {resumable && (
+                      // A text action, not a button block: Resume corrects a
+                      // Wake tapped too soon, and must never read as the
+                      // sheet's primary verb next to Save.
+                      <button
+                        type="button"
+                        onClick={resume}
+                        className={cn(
+                          "h-11 rounded-md font-semibold text-accent select-none active:opacity-70",
+                          focusRing,
+                        )}
+                      >
+                        {t("Resume sleep")}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ) : (
+          <TimeField key={`s${instance}`} value={time} onChange={setTime} />
+        )}
 
         <Input
           placeholder={t("Note (optional)")}

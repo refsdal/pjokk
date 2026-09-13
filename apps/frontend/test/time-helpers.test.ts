@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  describeTime,
   formatElapsed,
   formatRelative,
   toLocalDateInput,
@@ -101,5 +102,32 @@ describe("time helpers", () => {
   it("formats date inputs in local time", () => {
     const d = new Date(2026, 7, 25, 0, 30); // local 25 Aug, 00:30
     expect(toLocalDateInput(d)).toBe("2026-08-25");
+  });
+});
+
+// The edit sleep sheet shows each time as a collapsed row ("Fell asleep ·
+// Today 13:10") that opens into the chips on tap, so Save is back above the
+// fold on a phone. The row's wording is the day chip a Pick would land on
+// plus the clock — and "Now" when the value is still the Now preset.
+describe("describeTime", () => {
+  const now = new Date(2026, 8, 13, 15, 0);
+
+  it("reads Now for the Now preset", () => {
+    expect(describeTime(null, now)).toBe("Now");
+  });
+
+  it("names today and yesterday like the day chips", () => {
+    expect(describeTime(new Date(2026, 8, 13, 13, 10), now)).toBe(
+      "Today 13:10",
+    );
+    expect(describeTime(new Date(2026, 8, 12, 21, 5), now)).toBe(
+      "Yesterday 21:05",
+    );
+  });
+
+  it("falls back to the short date for any other day", () => {
+    expect(describeTime(new Date(2026, 8, 1, 8, 30), now)).toBe(
+      `${new Intl.DateTimeFormat("nb-NO", { weekday: "short", day: "numeric", month: "short" }).format(new Date(2026, 8, 1))} 08:30`,
+    );
   });
 });
