@@ -28,6 +28,14 @@ import { apiSignIn, apiSignup, freshEmail, freshFamily } from "./helpers";
 const SHOT_DIR = process.env.E2E_SHOT_DIR ?? "test-results/help-shots";
 const shot = (name: string) => join(SHOT_DIR, name);
 
+// A 1×1 red PNG, the same one profile.spec.ts uploads: enough for the
+// on-device crop to make a JPEG the server accepts, so the target has a
+// face for the sender's Who? chip to show.
+const PNG_1x1 = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==",
+  "base64",
+);
+
 /**
  * The help card element: the `<p>` carrying the state label, two levels up
  * (p → text column → card). Anchoring on the label rather than a class is
@@ -72,6 +80,22 @@ test("a caretaker asks another for help and gets an answer", async ({
   await target.goto(`/join/${code}`);
   await expect(target).toHaveURL(/\/home/, { timeout: 10_000 });
 
+  // The target puts a photo on their profile: the Who? chip carries the
+  // same face as every other place a member is picked (CaretakerChips, the
+  // event sheet's assignees), not a bare name.
+  await target.goto("/profile");
+  await target.getByLabel("Change photo").setInputFiles({
+    name: "me.png",
+    mimeType: "image/png",
+    buffer: PNG_1x1,
+  });
+  await expect(target.getByText("Photo updated")).toBeVisible({
+    timeout: 10_000,
+  });
+  // Back on Home, where the card is expected to land (refetchHome reloads
+  // whatever screen the target is on).
+  await target.goto("/home");
+
   // The sender's tab has been open since before the join, and the members
   // query is cached (staleTime 15 s). A reload is how a real sender's app
   // learns about the new member; it is not what the flow under test is.
@@ -96,6 +120,7 @@ test("a caretaker asks another for help and gets an answer", async ({
   await expect(chip).toBeVisible();
   await expect(chip).toHaveAttribute("aria-pressed", "true");
   await expect(chip).toContainText("No notifications");
+  await expect(chip.locator("img")).toBeVisible();
 
   await sheet.screenshot({ path: shot("sheet.png") });
 
