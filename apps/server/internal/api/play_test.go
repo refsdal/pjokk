@@ -167,8 +167,8 @@ func TestCreatePlayRunningSessionDBEnforcedRace(t *testing.T) {
 		t.Fatalf("find the admin's user id: %v", err)
 	}
 	if _, err := a.Rig.Pool.Exec(ctx, `
-		INSERT INTO "play_log" ("family_id", "baby_id", "caretaker_id", "type", "start_time", "end_time")
-		VALUES ($1, $2, $3, 'tummy', now(), NULL)`,
+		INSERT INTO "play_log" ("family_id", "baby_id", "caretaker_id", "logged_by_id", "type", "start_time", "end_time")
+		VALUES ($1, $2, $3, $3, 'tummy', now(), NULL)`,
 		familyID, babyID, caretakerID); err != nil {
 		t.Fatalf("seed a running play_log row directly: %v", err)
 	}

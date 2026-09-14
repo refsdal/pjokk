@@ -90,8 +90,8 @@ func TestPurgeOrphanUsersSwallowsForeignKeyBlockedDeletes(t *testing.T) {
 	// feed_log.caretaker_id FK has no ON DELETE clause, so it blocks the
 	// delete.
 	if _, err := a.Rig.Pool.Exec(ctx, `
-		INSERT INTO "feed_log" ("family_id", "baby_id", "caretaker_id", "time", "type", "amount_ml")
-		VALUES ($1, $2, $3, now(), 'bottle', 90)`,
+		INSERT INTO "feed_log" ("family_id", "baby_id", "caretaker_id", "logged_by_id", "time", "type", "amount_ml")
+		VALUES ($1, $2, $3, $3, now(), 'bottle', 90)`,
 		familyID, babyID, blockedID); err != nil {
 		t.Fatalf("attribute feed log to orphan: %v", err)
 	}

@@ -65,6 +65,8 @@ func serFeedTimer(r dbgen.GetFeedTimerRow) gen.FeedTimer {
 		BabyId:        r.BabyID,
 		CaretakerId:   r.CaretakerID,
 		CaretakerName: r.CaretakerName,
+		LoggedById:    r.LoggedByID,
+		LoggedByName:  r.LoggedByName,
 		Kind:          gen.FeedTimerKind(r.Kind),
 		StartTime:     r.StartTime.Time,
 		RunningSide:   enumPtr[gen.FeedTimerRunningSide](r.RunningSide),
@@ -164,10 +166,19 @@ func (d Deps) StartFeedTimer(ctx context.Context, req gen.StartFeedTimerRequestO
 		side = string(*body.Side)
 	}
 
+	caretaker, notMember, err := caretakerFor(ctx, d, fam, body.CaretakerId)
+	if err != nil {
+		return nil, err
+	}
+	if notMember {
+		return gen.StartFeedTimer403JSONResponse(notMemberErr()), nil
+	}
+
 	id, err := d.Q.CreateFeedTimer(ctx, dbgen.CreateFeedTimerParams{
 		FamilyID:      fam.FamilyID,
 		BabyID:        body.BabyId,
-		CaretakerID:   fam.UserID,
+		CaretakerID:   caretaker,
+		LoggedByID:    fam.UserID,
 		Kind:          string(body.Kind),
 		StartTime:     ts(start),
 		RunningSide:   &side,
@@ -288,7 +299,8 @@ func (d Deps) StopFeedTimer(ctx context.Context, req gen.StopFeedTimerRequestObj
 		id, err := qtx.CreatePump(ctx, dbgen.CreatePumpParams{
 			FamilyID:    fam.FamilyID,
 			BabyID:      timer.BabyID,
-			CaretakerID: fam.UserID,
+			CaretakerID: timer.CaretakerID,
+			LoggedByID:  fam.UserID,
 			Time:        logged,
 			Side:        &side,
 			AmountMl:    body.AmountMl,
@@ -316,7 +328,8 @@ func (d Deps) StopFeedTimer(ctx context.Context, req gen.StopFeedTimerRequestObj
 		id, err := qtx.CreateFeed(ctx, dbgen.CreateFeedParams{
 			FamilyID:    fam.FamilyID,
 			BabyID:      timer.BabyID,
-			CaretakerID: fam.UserID,
+			CaretakerID: timer.CaretakerID,
+			LoggedByID:  fam.UserID,
 			Time:        logged,
 			Type:        "breast",
 			Side:        &side,

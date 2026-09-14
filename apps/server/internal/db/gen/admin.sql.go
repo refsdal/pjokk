@@ -763,41 +763,109 @@ func (q *Queries) LockActiveSystemAdmins(ctx context.Context) ([]string, error) 
 
 const reassignUserReferences = `-- name: ReassignUserReferences :exec
 WITH
-    sleep AS (UPDATE "sleep_log" SET "caretaker_id" = $1 WHERE "sleep_log"."caretaker_id" = $2),
-    feed AS (UPDATE "feed_log" SET "caretaker_id" = $1 WHERE "feed_log"."caretaker_id" = $2),
-    diaper AS (UPDATE "diaper_log" SET "caretaker_id" = $1 WHERE "diaper_log"."caretaker_id" = $2),
-    medicine AS (UPDATE "medicine_log" SET "caretaker_id" = $1 WHERE "medicine_log"."caretaker_id" = $2),
-    bath AS (UPDATE "bath_log" SET "caretaker_id" = $1 WHERE "bath_log"."caretaker_id" = $2),
-    note AS (UPDATE "note_log" SET "caretaker_id" = $1 WHERE "note_log"."caretaker_id" = $2),
-    milestone AS (UPDATE "milestone_log" SET "caretaker_id" = $1 WHERE "milestone_log"."caretaker_id" = $2),
-    measurement AS (UPDATE "measurement_log" SET "caretaker_id" = $1 WHERE "measurement_log"."caretaker_id" = $2),
-    pump AS (UPDATE "pump_log" SET "caretaker_id" = $1 WHERE "pump_log"."caretaker_id" = $2),
-    play AS (UPDATE "play_log" SET "caretaker_id" = $1 WHERE "play_log"."caretaker_id" = $2),
+    sleep AS (
+        UPDATE "sleep_log"
+        SET "caretaker_id" = CASE WHEN "sleep_log"."caretaker_id" = $1 THEN $2 ELSE "sleep_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "sleep_log"."logged_by_id" = $1 THEN $2 ELSE "sleep_log"."logged_by_id" END
+        WHERE "sleep_log"."caretaker_id" = $1 OR "sleep_log"."logged_by_id" = $1
+    ),
+    feed AS (
+        UPDATE "feed_log"
+        SET "caretaker_id" = CASE WHEN "feed_log"."caretaker_id" = $1 THEN $2 ELSE "feed_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "feed_log"."logged_by_id" = $1 THEN $2 ELSE "feed_log"."logged_by_id" END
+        WHERE "feed_log"."caretaker_id" = $1 OR "feed_log"."logged_by_id" = $1
+    ),
+    diaper AS (
+        UPDATE "diaper_log"
+        SET "caretaker_id" = CASE WHEN "diaper_log"."caretaker_id" = $1 THEN $2 ELSE "diaper_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "diaper_log"."logged_by_id" = $1 THEN $2 ELSE "diaper_log"."logged_by_id" END
+        WHERE "diaper_log"."caretaker_id" = $1 OR "diaper_log"."logged_by_id" = $1
+    ),
+    medicine AS (
+        UPDATE "medicine_log"
+        SET "caretaker_id" = CASE WHEN "medicine_log"."caretaker_id" = $1 THEN $2 ELSE "medicine_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "medicine_log"."logged_by_id" = $1 THEN $2 ELSE "medicine_log"."logged_by_id" END
+        WHERE "medicine_log"."caretaker_id" = $1 OR "medicine_log"."logged_by_id" = $1
+    ),
+    bath AS (
+        UPDATE "bath_log"
+        SET "caretaker_id" = CASE WHEN "bath_log"."caretaker_id" = $1 THEN $2 ELSE "bath_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "bath_log"."logged_by_id" = $1 THEN $2 ELSE "bath_log"."logged_by_id" END
+        WHERE "bath_log"."caretaker_id" = $1 OR "bath_log"."logged_by_id" = $1
+    ),
+    note AS (
+        UPDATE "note_log"
+        SET "caretaker_id" = CASE WHEN "note_log"."caretaker_id" = $1 THEN $2 ELSE "note_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "note_log"."logged_by_id" = $1 THEN $2 ELSE "note_log"."logged_by_id" END
+        WHERE "note_log"."caretaker_id" = $1 OR "note_log"."logged_by_id" = $1
+    ),
+    milestone AS (
+        UPDATE "milestone_log"
+        SET "caretaker_id" = CASE WHEN "milestone_log"."caretaker_id" = $1 THEN $2 ELSE "milestone_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "milestone_log"."logged_by_id" = $1 THEN $2 ELSE "milestone_log"."logged_by_id" END
+        WHERE "milestone_log"."caretaker_id" = $1 OR "milestone_log"."logged_by_id" = $1
+    ),
+    measurement AS (
+        UPDATE "measurement_log"
+        SET "caretaker_id" = CASE WHEN "measurement_log"."caretaker_id" = $1 THEN $2 ELSE "measurement_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "measurement_log"."logged_by_id" = $1 THEN $2 ELSE "measurement_log"."logged_by_id" END
+        WHERE "measurement_log"."caretaker_id" = $1 OR "measurement_log"."logged_by_id" = $1
+    ),
+    pump AS (
+        UPDATE "pump_log"
+        SET "caretaker_id" = CASE WHEN "pump_log"."caretaker_id" = $1 THEN $2 ELSE "pump_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "pump_log"."logged_by_id" = $1 THEN $2 ELSE "pump_log"."logged_by_id" END
+        WHERE "pump_log"."caretaker_id" = $1 OR "pump_log"."logged_by_id" = $1
+    ),
+    play AS (
+        UPDATE "play_log"
+        SET "caretaker_id" = CASE WHEN "play_log"."caretaker_id" = $1 THEN $2 ELSE "play_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "play_log"."logged_by_id" = $1 THEN $2 ELSE "play_log"."logged_by_id" END
+        WHERE "play_log"."caretaker_id" = $1 OR "play_log"."logged_by_id" = $1
+    ),
     -- A running nursing/pump timer is an attribution ("started by"), not an
     -- assignment: the clock belongs to the family and a co-parent may still
     -- be feeding, so it survives the deletion and lands on the tombstone
     -- exactly as the feed it becomes would.
-    feed_timer AS (UPDATE "feed_timer" SET "caretaker_id" = $1 WHERE "feed_timer"."caretaker_id" = $2),
-    vaccine AS (UPDATE "vaccine_log" SET "caretaker_id" = $1 WHERE "vaccine_log"."caretaker_id" = $2),
-    vaccine_doc AS (UPDATE "vaccine_document" SET "uploaded_by" = $1 WHERE "vaccine_document"."uploaded_by" = $2),
-    vaccine_dismissal AS (UPDATE "vaccine_dismissal" SET "dismissed_by" = $1 WHERE "vaccine_dismissal"."dismissed_by" = $2),
-    invite AS (UPDATE "family_invite" SET "created_by" = $1 WHERE "family_invite"."created_by" = $2),
+    --
+    -- Every log table carries TWO attributions since 00019 — caretaker_id
+    -- (who did the care) and logged_by_id (who saved the row) — re-pointed
+    -- in ONE UPDATE per table. Not two CTEs: the sub-statements of a WITH
+    -- run against one snapshot, and a row both columns name would get only
+    -- one of two updates ("attempting to update the same row twice in a
+    -- single statement is not supported"), leaving a dangling reference
+    -- that fails the DELETE.
+    feed_timer AS (
+        UPDATE "feed_timer"
+        SET "caretaker_id" = CASE WHEN "feed_timer"."caretaker_id" = $1 THEN $2 ELSE "feed_timer"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "feed_timer"."logged_by_id" = $1 THEN $2 ELSE "feed_timer"."logged_by_id" END
+        WHERE "feed_timer"."caretaker_id" = $1 OR "feed_timer"."logged_by_id" = $1
+    ),
+    vaccine AS (
+        UPDATE "vaccine_log"
+        SET "caretaker_id" = CASE WHEN "vaccine_log"."caretaker_id" = $1 THEN $2 ELSE "vaccine_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "vaccine_log"."logged_by_id" = $1 THEN $2 ELSE "vaccine_log"."logged_by_id" END
+        WHERE "vaccine_log"."caretaker_id" = $1 OR "vaccine_log"."logged_by_id" = $1
+    ),
+    vaccine_doc AS (UPDATE "vaccine_document" SET "uploaded_by" = $2 WHERE "vaccine_document"."uploaded_by" = $1),
+    vaccine_dismissal AS (UPDATE "vaccine_dismissal" SET "dismissed_by" = $2 WHERE "vaccine_dismissal"."dismissed_by" = $1),
+    invite AS (UPDATE "family_invite" SET "created_by" = $2 WHERE "family_invite"."created_by" = $1),
     key AS (
         UPDATE "api_key"
-        SET "created_by" = $1, "revoked_at" = COALESCE("revoked_at", $3::timestamptz)
-        WHERE "api_key"."created_by" = $2
+        SET "created_by" = $2, "revoked_at" = COALESCE("revoked_at", $3::timestamptz)
+        WHERE "api_key"."created_by" = $1
     ),
     -- A kiosk device belongs to the family, not to the admin who enrolled it:
     -- it keeps working after its creator's account is gone.
-    device AS (UPDATE "device" SET "created_by" = $1 WHERE "device"."created_by" = $2),
-    audit AS (UPDATE "admin_audit" SET "admin_id" = $1 WHERE "admin_audit"."admin_id" = $2),
-    event AS (UPDATE "calendar_event" SET "created_by" = $1 WHERE "calendar_event"."created_by" = $2)
+    device AS (UPDATE "device" SET "created_by" = $2 WHERE "device"."created_by" = $1),
+    audit AS (UPDATE "admin_audit" SET "admin_id" = $2 WHERE "admin_audit"."admin_id" = $1),
+    event AS (UPDATE "calendar_event" SET "created_by" = $2 WHERE "calendar_event"."created_by" = $1)
 SELECT 1
 `
 
 type ReassignUserReferencesParams struct {
-	TombstoneID string
 	UserID      string
+	TombstoneID string
 	Now         pgtype.Timestamptz
 }
 
@@ -847,7 +915,7 @@ type ReassignUserReferencesParams struct {
 // already assigned. Those rows are deleted instead — see
 // DeleteCalendarAssigneesForUser.
 func (q *Queries) ReassignUserReferences(ctx context.Context, arg ReassignUserReferencesParams) error {
-	_, err := q.db.Exec(ctx, reassignUserReferences, arg.TombstoneID, arg.UserID, arg.Now)
+	_, err := q.db.Exec(ctx, reassignUserReferences, arg.UserID, arg.TombstoneID, arg.Now)
 	return err
 }
 

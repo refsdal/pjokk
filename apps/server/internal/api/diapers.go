@@ -21,6 +21,8 @@ func serDiaper(row dbgen.GetDiaperRow) gen.DiaperLog {
 		BabyId:        row.BabyID,
 		CaretakerId:   row.CaretakerID,
 		CaretakerName: row.CaretakerName,
+		LoggedById:    row.LoggedByID,
+		LoggedByName:  row.LoggedByName,
 		Notes:         row.Notes,
 		Time:          row.Time.Time,
 		Type:          gen.DiaperLogType(row.Type),
@@ -57,12 +59,21 @@ func (d Deps) CreateDiaper(ctx context.Context, req gen.CreateDiaperRequestObjec
 	}
 	body := req.Body
 
+	caretaker, notMember, err := caretakerFor(ctx, d, fam, body.CaretakerId)
+	if err != nil {
+		return nil, err
+	}
+	if notMember {
+		return gen.CreateDiaper403JSONResponse(notMemberErr()), nil
+	}
+
 	row, unknownBaby, err := createLog(ctx, d, fam.FamilyID, body.BabyId,
 		func(ctx context.Context) (string, error) {
 			return d.Q.CreateDiaper(ctx, dbgen.CreateDiaperParams{
 				FamilyID:    fam.FamilyID,
 				BabyID:      body.BabyId,
-				CaretakerID: fam.UserID,
+				CaretakerID: caretaker,
+				LoggedByID:  fam.UserID,
 				Time:        ts(body.Time),
 				Type:        string(body.Type),
 				Color:       enumStr(body.Color),
@@ -99,9 +110,17 @@ func (d Deps) UpdateDiaper(ctx context.Context, req gen.UpdateDiaperRequestObjec
 	colorSet, colorVal := patchField[string](p, "color")
 	consistencySet, consistencyVal := patchField[string](p, "consistency")
 	notesSet, notesVal := patchField[string](p, "notes")
+	caretakerSet, caretakerVal := patchField[string](p, "caretakerId")
 
 	if err := p.Err(); err != nil {
 		return nil, err
+	}
+	caretakerSet, caretakerVal, notMember, err := caretakerPatch(ctx, d, fam, caretakerSet, caretakerVal)
+	if err != nil {
+		return nil, err
+	}
+	if notMember {
+		return gen.UpdateDiaper403JSONResponse(notMemberErr()), nil
 	}
 
 	row, found, err := updateLog(ctx,
@@ -121,6 +140,8 @@ func (d Deps) UpdateDiaper(ctx context.Context, req gen.UpdateDiaperRequestObjec
 				ColorVal:       colorVal,
 				ConsistencySet: consistencySet,
 				ConsistencyVal: consistencyVal,
+				CaretakerIDSet: caretakerSet,
+				CaretakerIDVal: caretakerVal,
 				NotesSet:       notesSet,
 				NotesVal:       notesVal,
 			})

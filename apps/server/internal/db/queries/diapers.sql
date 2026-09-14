@@ -7,10 +7,11 @@
 -- COALESCE(u.name, '') — see feeds.sql's ListFeeds for why (sqlc can't prove
 -- an inner-joined column NOT NULL from a bare alias).
 SELECT
-    d."id", d."baby_id", d."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    d."id", d."baby_id", d."caretaker_id", d."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     d."time", d."type", d."color", d."consistency", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
+JOIN "users" lu ON lu."id" = d."logged_by_id"
 WHERE d."family_id" = sqlc.arg(family_id)
   AND (sqlc.narg(baby_id)::text IS NULL OR d."baby_id" = sqlc.narg(baby_id))
 ORDER BY d."time" DESC, d."id" DESC
@@ -18,20 +19,22 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetDiaper :one
 SELECT
-    d."id", d."baby_id", d."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    d."id", d."baby_id", d."caretaker_id", d."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     d."time", d."type", d."color", d."consistency", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
+JOIN "users" lu ON lu."id" = d."logged_by_id"
 WHERE d."family_id" = $1 AND d."id" = $2;
 
 -- name: CreateDiaper :one
-INSERT INTO "diaper_log" ("family_id", "baby_id", "caretaker_id", "time", "type", "color", "consistency", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO "diaper_log" ("family_id", "baby_id", "caretaker_id", "time", "type", "color", "consistency", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING "id";
 
 -- name: UpdateDiaper :execrows
 UPDATE "diaper_log"
 SET
+    "caretaker_id" = CASE WHEN sqlc.arg(caretaker_id_set)::bool THEN sqlc.narg(caretaker_id_val)::text ELSE "caretaker_id" END,
     "time" = CASE WHEN sqlc.arg(time_set)::bool THEN sqlc.narg(time_val)::timestamptz ELSE "time" END,
     "type" = CASE WHEN sqlc.arg(type_set)::bool THEN sqlc.narg(type_val)::text ELSE "type" END,
     "color" = CASE WHEN sqlc.arg(color_set)::bool THEN sqlc.narg(color_val)::text ELSE "color" END,

@@ -12,8 +12,8 @@ import (
 )
 
 const createDiaper = `-- name: CreateDiaper :one
-INSERT INTO "diaper_log" ("family_id", "baby_id", "caretaker_id", "time", "type", "color", "consistency", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO "diaper_log" ("family_id", "baby_id", "caretaker_id", "time", "type", "color", "consistency", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING "id"
 `
 
@@ -26,6 +26,7 @@ type CreateDiaperParams struct {
 	Color       *string
 	Consistency *string
 	Notes       *string
+	LoggedByID  string
 }
 
 func (q *Queries) CreateDiaper(ctx context.Context, arg CreateDiaperParams) (string, error) {
@@ -38,6 +39,7 @@ func (q *Queries) CreateDiaper(ctx context.Context, arg CreateDiaperParams) (str
 		arg.Color,
 		arg.Consistency,
 		arg.Notes,
+		arg.LoggedByID,
 	)
 	var id string
 	err := row.Scan(&id)
@@ -64,10 +66,11 @@ func (q *Queries) DeleteDiaper(ctx context.Context, arg DeleteDiaperParams) (int
 
 const getDiaper = `-- name: GetDiaper :one
 SELECT
-    d."id", d."baby_id", d."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    d."id", d."baby_id", d."caretaker_id", d."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     d."time", d."type", d."color", d."consistency", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
+JOIN "users" lu ON lu."id" = d."logged_by_id"
 WHERE d."family_id" = $1 AND d."id" = $2
 `
 
@@ -80,7 +83,9 @@ type GetDiaperRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Type          string
 	Color         *string
@@ -95,7 +100,9 @@ func (q *Queries) GetDiaper(ctx context.Context, arg GetDiaperParams) (GetDiaper
 		&i.ID,
 		&i.BabyID,
 		&i.CaretakerID,
+		&i.LoggedByID,
 		&i.CaretakerName,
+		&i.LoggedByName,
 		&i.Time,
 		&i.Type,
 		&i.Color,
@@ -108,10 +115,11 @@ func (q *Queries) GetDiaper(ctx context.Context, arg GetDiaperParams) (GetDiaper
 const listDiapers = `-- name: ListDiapers :many
 
 SELECT
-    d."id", d."baby_id", d."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    d."id", d."baby_id", d."caretaker_id", d."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     d."time", d."type", d."color", d."consistency", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
+JOIN "users" lu ON lu."id" = d."logged_by_id"
 WHERE d."family_id" = $1
   AND ($2::text IS NULL OR d."baby_id" = $2)
 ORDER BY d."time" DESC, d."id" DESC
@@ -128,7 +136,9 @@ type ListDiapersRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Type          string
 	Color         *string
@@ -155,7 +165,9 @@ func (q *Queries) ListDiapers(ctx context.Context, arg ListDiapersParams) ([]Lis
 			&i.ID,
 			&i.BabyID,
 			&i.CaretakerID,
+			&i.LoggedByID,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Time,
 			&i.Type,
 			&i.Color,
@@ -175,15 +187,18 @@ func (q *Queries) ListDiapers(ctx context.Context, arg ListDiapersParams) ([]Lis
 const updateDiaper = `-- name: UpdateDiaper :execrows
 UPDATE "diaper_log"
 SET
-    "time" = CASE WHEN $1::bool THEN $2::timestamptz ELSE "time" END,
-    "type" = CASE WHEN $3::bool THEN $4::text ELSE "type" END,
-    "color" = CASE WHEN $5::bool THEN $6::text ELSE "color" END,
-    "consistency" = CASE WHEN $7::bool THEN $8::text ELSE "consistency" END,
-    "notes" = CASE WHEN $9::bool THEN $10::text ELSE "notes" END
-WHERE "family_id" = $11 AND "id" = $12
+    "caretaker_id" = CASE WHEN $1::bool THEN $2::text ELSE "caretaker_id" END,
+    "time" = CASE WHEN $3::bool THEN $4::timestamptz ELSE "time" END,
+    "type" = CASE WHEN $5::bool THEN $6::text ELSE "type" END,
+    "color" = CASE WHEN $7::bool THEN $8::text ELSE "color" END,
+    "consistency" = CASE WHEN $9::bool THEN $10::text ELSE "consistency" END,
+    "notes" = CASE WHEN $11::bool THEN $12::text ELSE "notes" END
+WHERE "family_id" = $13 AND "id" = $14
 `
 
 type UpdateDiaperParams struct {
+	CaretakerIDSet bool
+	CaretakerIDVal *string
 	TimeSet        bool
 	TimeVal        pgtype.Timestamptz
 	TypeSet        bool
@@ -200,6 +215,8 @@ type UpdateDiaperParams struct {
 
 func (q *Queries) UpdateDiaper(ctx context.Context, arg UpdateDiaperParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateDiaper,
+		arg.CaretakerIDSet,
+		arg.CaretakerIDVal,
 		arg.TimeSet,
 		arg.TimeVal,
 		arg.TypeSet,

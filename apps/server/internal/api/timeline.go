@@ -121,19 +121,21 @@ func parseTimelineCursor(before *string) timelineCursor {
 
 // timelineBase builds the six fields every TimelineEntry has regardless of
 // kind: the fields every log schema in openapi/pjokk.yaml shares.
-func timelineBase(kind gen.TimelineEntryKind, id, babyID, caretakerID, caretakerName string, notes *string) gen.TimelineEntry {
+func timelineBase(kind gen.TimelineEntryKind, id, babyID, caretakerID, caretakerName, loggedByID, loggedByName string, notes *string) gen.TimelineEntry {
 	return gen.TimelineEntry{
 		Kind:          kind,
 		Id:            id,
 		BabyId:        babyID,
 		CaretakerId:   caretakerID,
 		CaretakerName: caretakerName,
+		LoggedById:    loggedByID,
+		LoggedByName:  loggedByName,
 		Notes:         notes,
 	}
 }
 
 func timelineFeedRow(r dbgen.ListFeedsPageRow) timelineEntryRow {
-	e := timelineBase(gen.TimelineEntryKindFeed, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.Notes)
+	e := timelineBase(gen.TimelineEntryKindFeed, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.LoggedByID, r.LoggedByName, r.Notes)
 	e.Set("time", r.Time.Time)
 	e.Set("type", r.Type)
 	e.Set("amountMl", r.AmountMl)
@@ -148,7 +150,7 @@ func timelineFeedRow(r dbgen.ListFeedsPageRow) timelineEntryRow {
 }
 
 func timelineDiaperRow(r dbgen.ListDiapersPageRow) timelineEntryRow {
-	e := timelineBase(gen.TimelineEntryKindDiaper, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.Notes)
+	e := timelineBase(gen.TimelineEntryKindDiaper, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.LoggedByID, r.LoggedByName, r.Notes)
 	e.Set("time", r.Time.Time)
 	e.Set("type", r.Type)
 	e.Set("color", r.Color)
@@ -157,7 +159,7 @@ func timelineDiaperRow(r dbgen.ListDiapersPageRow) timelineEntryRow {
 }
 
 func timelineSleepRow(r dbgen.ListSleepsPageRow) timelineEntryRow {
-	e := timelineBase(gen.TimelineEntryKindSleep, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.Notes)
+	e := timelineBase(gen.TimelineEntryKindSleep, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.LoggedByID, r.LoggedByName, r.Notes)
 	e.Set("startTime", r.StartTime.Time)
 	e.Set("endTime", tsPtr(r.EndTime))
 	e.Set("location", r.Location)
@@ -166,7 +168,7 @@ func timelineSleepRow(r dbgen.ListSleepsPageRow) timelineEntryRow {
 }
 
 func timelineMedicineRow(r dbgen.ListMedicinePageRow) timelineEntryRow {
-	e := timelineBase(gen.TimelineEntryKindMedicine, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.Notes)
+	e := timelineBase(gen.TimelineEntryKindMedicine, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.LoggedByID, r.LoggedByName, r.Notes)
 	e.Set("time", r.Time.Time)
 	e.Set("name", r.Name)
 	e.Set("amount", r.Amount)
@@ -176,20 +178,20 @@ func timelineMedicineRow(r dbgen.ListMedicinePageRow) timelineEntryRow {
 }
 
 func timelineBathRow(r dbgen.ListBathsPageRow) timelineEntryRow {
-	e := timelineBase(gen.TimelineEntryKindBath, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.Notes)
+	e := timelineBase(gen.TimelineEntryKindBath, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.LoggedByID, r.LoggedByName, r.Notes)
 	e.Set("time", r.Time.Time)
 	return timelineEntryRow{sortKey: r.Time.Time.UnixMilli(), entry: e}
 }
 
 func timelineNoteRow(r dbgen.ListNotesPageRow) timelineEntryRow {
-	e := timelineBase(gen.TimelineEntryKindNote, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.Notes)
+	e := timelineBase(gen.TimelineEntryKindNote, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.LoggedByID, r.LoggedByName, r.Notes)
 	e.Set("time", r.Time.Time)
 	e.Set("content", r.Content)
 	return timelineEntryRow{sortKey: r.Time.Time.UnixMilli(), entry: e}
 }
 
 func timelineMilestoneRow(r dbgen.ListMilestonesPageRow, photos []dbgen.ListMilestonePhotosForLogRow) timelineEntryRow {
-	e := timelineBase(gen.TimelineEntryKindMilestone, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.Notes)
+	e := timelineBase(gen.TimelineEntryKindMilestone, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.LoggedByID, r.LoggedByName, r.Notes)
 	e.Set("time", r.Time.Time)
 	e.Set("title", r.Title)
 	e.Set("photos", serMilestonePhotos(photos))
@@ -197,7 +199,7 @@ func timelineMilestoneRow(r dbgen.ListMilestonesPageRow, photos []dbgen.ListMile
 }
 
 func timelineMeasurementRow(r dbgen.ListMeasurementsPageRow) timelineEntryRow {
-	e := timelineBase(gen.TimelineEntryKindMeasurement, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.Notes)
+	e := timelineBase(gen.TimelineEntryKindMeasurement, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.LoggedByID, r.LoggedByName, r.Notes)
 	e.Set("time", r.Time.Time)
 	e.Set("type", r.Type)
 	e.Set("value", r.Value)
@@ -205,7 +207,7 @@ func timelineMeasurementRow(r dbgen.ListMeasurementsPageRow) timelineEntryRow {
 }
 
 func timelinePumpRow(r dbgen.ListPumpsPageRow) timelineEntryRow {
-	e := timelineBase(gen.TimelineEntryKindPump, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.Notes)
+	e := timelineBase(gen.TimelineEntryKindPump, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.LoggedByID, r.LoggedByName, r.Notes)
 	e.Set("time", r.Time.Time)
 	e.Set("side", r.Side)
 	e.Set("amountMl", r.AmountMl)
@@ -214,7 +216,7 @@ func timelinePumpRow(r dbgen.ListPumpsPageRow) timelineEntryRow {
 }
 
 func timelinePlayRow(r dbgen.ListPlaysPageRow) timelineEntryRow {
-	e := timelineBase(gen.TimelineEntryKindPlay, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.Notes)
+	e := timelineBase(gen.TimelineEntryKindPlay, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.LoggedByID, r.LoggedByName, r.Notes)
 	e.Set("type", r.Type)
 	e.Set("startTime", r.StartTime.Time)
 	e.Set("endTime", tsPtr(r.EndTime))
@@ -226,7 +228,7 @@ func timelinePlayRow(r dbgen.ListPlaysPageRow) timelineEntryRow {
 // batches ListVaccinesPage's whole page through ONE
 // ListVaccineDocumentsForLogs call rather than running N+1.
 func timelineVaccineRow(r dbgen.ListVaccinesPageRow, docs []dbgen.ListVaccineDocumentsForLogRow) timelineEntryRow {
-	e := timelineBase(gen.TimelineEntryKindVaccine, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.Notes)
+	e := timelineBase(gen.TimelineEntryKindVaccine, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.LoggedByID, r.LoggedByName, r.Notes)
 	e.Set("time", r.Time.Time)
 	e.Set("name", r.Name)
 	e.Set("doseNumber", r.DoseNumber)

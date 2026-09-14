@@ -33,6 +33,8 @@ func serMedicine(row dbgen.GetMedicineRow) gen.MedicineLog {
 		BabyId:        row.BabyID,
 		CaretakerId:   row.CaretakerID,
 		CaretakerName: row.CaretakerName,
+		LoggedById:    row.LoggedByID,
+		LoggedByName:  row.LoggedByName,
 		Time:          row.Time.Time,
 		Name:          row.Name,
 		Amount:        row.Amount,
@@ -81,12 +83,21 @@ func (d Deps) CreateMedicine(ctx context.Context, req gen.CreateMedicineRequestO
 		return gen.CreateMedicine404JSONResponse{Error: "Unknown medicine", Code: "NOT_FOUND"}, nil
 	}
 
+	caretaker, notMember, err := caretakerFor(ctx, d, fam, body.CaretakerId)
+	if err != nil {
+		return nil, err
+	}
+	if notMember {
+		return gen.CreateMedicine403JSONResponse(notMemberErr()), nil
+	}
+
 	row, unknownBaby, err := createLog(ctx, d, fam.FamilyID, body.BabyId,
 		func(ctx context.Context) (string, error) {
 			return d.Q.CreateMedicine(ctx, dbgen.CreateMedicineParams{
 				FamilyID:    fam.FamilyID,
 				BabyID:      body.BabyId,
-				CaretakerID: fam.UserID,
+				CaretakerID: caretaker,
+				LoggedByID:  fam.UserID,
 				Time:        ts(body.Time),
 				Name:        body.Name,
 				Amount:      body.Amount,
@@ -134,8 +145,16 @@ func (d Deps) UpdateMedicine(ctx context.Context, req gen.UpdateMedicineRequestO
 		}
 	}
 	notesSet, notesVal := patchField[string](p, "notes")
+	caretakerSet, caretakerVal := patchField[string](p, "caretakerId")
 	if err := p.Err(); err != nil {
 		return nil, err
+	}
+	caretakerSet, caretakerVal, notMember, err := caretakerPatch(ctx, d, fam, caretakerSet, caretakerVal)
+	if err != nil {
+		return nil, err
+	}
+	if notMember {
+		return gen.UpdateMedicine403JSONResponse(notMemberErr()), nil
 	}
 
 	row, found, err := updateLog(ctx,
@@ -145,20 +164,22 @@ func (d Deps) UpdateMedicine(ctx context.Context, req gen.UpdateMedicineRequestO
 		p.Any(),
 		func(ctx context.Context) error {
 			_, err := d.Q.UpdateMedicine(ctx, dbgen.UpdateMedicineParams{
-				FamilyID:      fam.FamilyID,
-				ID:            req.Id,
-				TimeSet:       timeSet,
-				TimeVal:       tsFrom(timeVal),
-				NameSet:       nameSet,
-				NameVal:       nameVal,
-				AmountSet:     amountSet,
-				AmountVal:     amountVal,
-				UnitSet:       unitSet,
-				UnitVal:       unitVal,
-				MedicineIDSet: medicineSet,
-				MedicineIDVal: medicineVal,
-				NotesSet:      notesSet,
-				NotesVal:      notesVal,
+				FamilyID:       fam.FamilyID,
+				ID:             req.Id,
+				TimeSet:        timeSet,
+				TimeVal:        tsFrom(timeVal),
+				NameSet:        nameSet,
+				NameVal:        nameVal,
+				AmountSet:      amountSet,
+				AmountVal:      amountVal,
+				UnitSet:        unitSet,
+				UnitVal:        unitVal,
+				MedicineIDSet:  medicineSet,
+				MedicineIDVal:  medicineVal,
+				CaretakerIDSet: caretakerSet,
+				CaretakerIDVal: caretakerVal,
+				NotesSet:       notesSet,
+				NotesVal:       notesVal,
 			})
 			return err
 		},

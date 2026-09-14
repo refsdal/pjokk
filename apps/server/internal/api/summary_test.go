@@ -234,8 +234,8 @@ func TestSummaryActivePlayField(t *testing.T) {
 	}
 	var playID string
 	if err := a.Rig.Pool.QueryRow(ctx, `
-		INSERT INTO "play_log" ("family_id", "baby_id", "caretaker_id", "type", "start_time", "end_time")
-		VALUES ($1, $2, $3, 'tummy', now(), NULL) RETURNING "id"`,
+		INSERT INTO "play_log" ("family_id", "baby_id", "caretaker_id", "logged_by_id", "type", "start_time", "end_time")
+		VALUES ($1, $2, $3, $3, 'tummy', now(), NULL) RETURNING "id"`,
 		familyID, babyID, caretakerID,
 	).Scan(&playID); err != nil {
 		t.Fatalf("seed an active play_log row directly: %v", err)

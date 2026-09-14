@@ -14,11 +14,12 @@ import (
 const activeFeedTimer = `-- name: ActiveFeedTimer :one
 
 SELECT
-    ft."id", ft."baby_id", ft."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    ft."id", ft."baby_id", ft."caretaker_id", ft."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     ft."kind", ft."start_time", ft."running_side", ft."side_started_at",
     ft."left_sec", ft."right_sec"
 FROM "feed_timer" ft
 JOIN "users" u ON u."id" = ft."caretaker_id"
+JOIN "users" lu ON lu."id" = ft."logged_by_id"
 WHERE ft."family_id" = $1
   AND ft."baby_id" = $2
   AND ft."kind" = $3
@@ -34,7 +35,9 @@ type ActiveFeedTimerRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Kind          string
 	StartTime     pgtype.Timestamptz
 	RunningSide   *string
@@ -56,7 +59,9 @@ func (q *Queries) ActiveFeedTimer(ctx context.Context, arg ActiveFeedTimerParams
 		&i.ID,
 		&i.BabyID,
 		&i.CaretakerID,
+		&i.LoggedByID,
 		&i.CaretakerName,
+		&i.LoggedByName,
 		&i.Kind,
 		&i.StartTime,
 		&i.RunningSide,
@@ -69,8 +74,8 @@ func (q *Queries) ActiveFeedTimer(ctx context.Context, arg ActiveFeedTimerParams
 
 const createFeedTimer = `-- name: CreateFeedTimer :one
 INSERT INTO "feed_timer"
-    ("family_id", "baby_id", "caretaker_id", "kind", "start_time", "running_side", "side_started_at")
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+    ("family_id", "baby_id", "caretaker_id", "kind", "start_time", "running_side", "side_started_at", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING "id"
 `
 
@@ -82,6 +87,7 @@ type CreateFeedTimerParams struct {
 	StartTime     pgtype.Timestamptz
 	RunningSide   *string
 	SideStartedAt pgtype.Timestamptz
+	LoggedByID    string
 }
 
 func (q *Queries) CreateFeedTimer(ctx context.Context, arg CreateFeedTimerParams) (string, error) {
@@ -93,6 +99,7 @@ func (q *Queries) CreateFeedTimer(ctx context.Context, arg CreateFeedTimerParams
 		arg.StartTime,
 		arg.RunningSide,
 		arg.SideStartedAt,
+		arg.LoggedByID,
 	)
 	var id string
 	err := row.Scan(&id)
@@ -122,11 +129,12 @@ func (q *Queries) DeleteFeedTimer(ctx context.Context, arg DeleteFeedTimerParams
 
 const getFeedTimer = `-- name: GetFeedTimer :one
 SELECT
-    ft."id", ft."baby_id", ft."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    ft."id", ft."baby_id", ft."caretaker_id", ft."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     ft."kind", ft."start_time", ft."running_side", ft."side_started_at",
     ft."left_sec", ft."right_sec"
 FROM "feed_timer" ft
 JOIN "users" u ON u."id" = ft."caretaker_id"
+JOIN "users" lu ON lu."id" = ft."logged_by_id"
 WHERE ft."family_id" = $1 AND ft."id" = $2
 `
 
@@ -139,7 +147,9 @@ type GetFeedTimerRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Kind          string
 	StartTime     pgtype.Timestamptz
 	RunningSide   *string
@@ -155,7 +165,9 @@ func (q *Queries) GetFeedTimer(ctx context.Context, arg GetFeedTimerParams) (Get
 		&i.ID,
 		&i.BabyID,
 		&i.CaretakerID,
+		&i.LoggedByID,
 		&i.CaretakerName,
+		&i.LoggedByName,
 		&i.Kind,
 		&i.StartTime,
 		&i.RunningSide,

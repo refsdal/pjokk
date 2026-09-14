@@ -12,10 +12,11 @@
 -- COALESCE(u.name, '') — see feeds.sql's ListFeeds for why (sqlc can't prove
 -- an inner-joined column NOT NULL from a bare alias).
 SELECT
-    s."id", s."baby_id", s."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
+JOIN "users" lu ON lu."id" = s."logged_by_id"
 WHERE s."family_id" = sqlc.arg(family_id)
   AND (sqlc.narg(baby_id)::text IS NULL OR s."baby_id" = sqlc.narg(baby_id))
 ORDER BY s."start_time" DESC, s."id" DESC
@@ -23,10 +24,11 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetSleep :one
 SELECT
-    s."id", s."baby_id", s."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
+JOIN "users" lu ON lu."id" = s."logged_by_id"
 WHERE s."family_id" = $1 AND s."id" = $2;
 
 -- name: ActiveSleep :one
@@ -36,10 +38,11 @@ WHERE s."family_id" = $1 AND s."id" = $2;
 -- recently, mirroring the TS behaviour exactly rather than restricting to
 -- one baby.
 SELECT
-    s."id", s."baby_id", s."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
+JOIN "users" lu ON lu."id" = s."logged_by_id"
 WHERE s."family_id" = sqlc.arg(family_id)
   AND (sqlc.narg(baby_id)::text IS NULL OR s."baby_id" = sqlc.narg(baby_id))
   AND s."end_time" IS NULL
@@ -47,8 +50,8 @@ ORDER BY s."start_time" DESC
 LIMIT 1;
 
 -- name: CreateSleep :one
-INSERT INTO "sleep_log" ("family_id", "baby_id", "caretaker_id", "start_time", "end_time", "location", "type", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO "sleep_log" ("family_id", "baby_id", "caretaker_id", "start_time", "end_time", "location", "type", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING "id";
 
 -- name: WakeSleep :execrows
@@ -63,6 +66,7 @@ WHERE "family_id" = $1 AND "id" = $2 AND "end_time" IS NULL;
 -- name: UpdateSleep :execrows
 UPDATE "sleep_log"
 SET
+    "caretaker_id" = CASE WHEN sqlc.arg(caretaker_id_set)::bool THEN sqlc.narg(caretaker_id_val)::text ELSE "caretaker_id" END,
     "start_time" = CASE WHEN sqlc.arg(start_time_set)::bool THEN sqlc.narg(start_time_val)::timestamptz ELSE "start_time" END,
     "end_time" = CASE WHEN sqlc.arg(end_time_set)::bool THEN sqlc.narg(end_time_val)::timestamptz ELSE "end_time" END,
     "location" = CASE WHEN sqlc.arg(location_set)::bool THEN sqlc.narg(location_val)::text ELSE "location" END,

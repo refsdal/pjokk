@@ -14,8 +14,8 @@ import (
 const createFeed = `-- name: CreateFeed :one
 INSERT INTO "feed_log"
     ("family_id", "baby_id", "caretaker_id", "time", "type", "amount_ml",
-     "side", "duration_min", "left_min", "right_min", "contents", "food", "reaction", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+     "side", "duration_min", "left_min", "right_min", "contents", "food", "reaction", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 RETURNING "id"
 `
 
@@ -34,6 +34,7 @@ type CreateFeedParams struct {
 	Food        *string
 	Reaction    *bool
 	Notes       *string
+	LoggedByID  string
 }
 
 func (q *Queries) CreateFeed(ctx context.Context, arg CreateFeedParams) (string, error) {
@@ -52,6 +53,7 @@ func (q *Queries) CreateFeed(ctx context.Context, arg CreateFeedParams) (string,
 		arg.Food,
 		arg.Reaction,
 		arg.Notes,
+		arg.LoggedByID,
 	)
 	var id string
 	err := row.Scan(&id)
@@ -78,11 +80,12 @@ func (q *Queries) DeleteFeed(ctx context.Context, arg DeleteFeedParams) (int64, 
 
 const getFeed = `-- name: GetFeed :one
 SELECT
-    f."id", f."baby_id", f."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    f."id", f."baby_id", f."caretaker_id", f."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
     f."left_min", f."right_min", f."contents", f."food", f."reaction", f."notes"
 FROM "feed_log" f
 JOIN "users" u ON u."id" = f."caretaker_id"
+JOIN "users" lu ON lu."id" = f."logged_by_id"
 WHERE f."family_id" = $1 AND f."id" = $2
 `
 
@@ -95,7 +98,9 @@ type GetFeedRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Type          string
 	AmountMl      *int32
@@ -116,7 +121,9 @@ func (q *Queries) GetFeed(ctx context.Context, arg GetFeedParams) (GetFeedRow, e
 		&i.ID,
 		&i.BabyID,
 		&i.CaretakerID,
+		&i.LoggedByID,
 		&i.CaretakerName,
+		&i.LoggedByName,
 		&i.Time,
 		&i.Type,
 		&i.AmountMl,
@@ -135,11 +142,12 @@ func (q *Queries) GetFeed(ctx context.Context, arg GetFeedParams) (GetFeedRow, e
 const listFeeds = `-- name: ListFeeds :many
 
 SELECT
-    f."id", f."baby_id", f."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    f."id", f."baby_id", f."caretaker_id", f."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
     f."left_min", f."right_min", f."contents", f."food", f."reaction", f."notes"
 FROM "feed_log" f
 JOIN "users" u ON u."id" = f."caretaker_id"
+JOIN "users" lu ON lu."id" = f."logged_by_id"
 WHERE f."family_id" = $1
   AND ($2::text IS NULL OR f."baby_id" = $2)
 ORDER BY f."time" DESC, f."id" DESC
@@ -156,7 +164,9 @@ type ListFeedsRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Type          string
 	AmountMl      *int32
@@ -197,7 +207,9 @@ func (q *Queries) ListFeeds(ctx context.Context, arg ListFeedsParams) ([]ListFee
 			&i.ID,
 			&i.BabyID,
 			&i.CaretakerID,
+			&i.LoggedByID,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Time,
 			&i.Type,
 			&i.AmountMl,
@@ -223,21 +235,24 @@ func (q *Queries) ListFeeds(ctx context.Context, arg ListFeedsParams) ([]ListFee
 const updateFeed = `-- name: UpdateFeed :execrows
 UPDATE "feed_log"
 SET
-    "time" = CASE WHEN $1::bool THEN $2::timestamptz ELSE "time" END,
-    "type" = CASE WHEN $3::bool THEN $4::text ELSE "type" END,
-    "amount_ml" = CASE WHEN $5::bool THEN $6::integer ELSE "amount_ml" END,
-    "side" = CASE WHEN $7::bool THEN $8::text ELSE "side" END,
-    "duration_min" = CASE WHEN $9::bool THEN $10::integer ELSE "duration_min" END,
-    "left_min" = CASE WHEN $11::bool THEN $12::integer ELSE "left_min" END,
-    "right_min" = CASE WHEN $13::bool THEN $14::integer ELSE "right_min" END,
-    "contents" = CASE WHEN $15::bool THEN $16::text ELSE "contents" END,
-    "food" = CASE WHEN $17::bool THEN $18::text ELSE "food" END,
-    "reaction" = CASE WHEN $19::bool THEN $20::boolean ELSE "reaction" END,
-    "notes" = CASE WHEN $21::bool THEN $22::text ELSE "notes" END
-WHERE "family_id" = $23 AND "id" = $24
+    "caretaker_id" = CASE WHEN $1::bool THEN $2::text ELSE "caretaker_id" END,
+    "time" = CASE WHEN $3::bool THEN $4::timestamptz ELSE "time" END,
+    "type" = CASE WHEN $5::bool THEN $6::text ELSE "type" END,
+    "amount_ml" = CASE WHEN $7::bool THEN $8::integer ELSE "amount_ml" END,
+    "side" = CASE WHEN $9::bool THEN $10::text ELSE "side" END,
+    "duration_min" = CASE WHEN $11::bool THEN $12::integer ELSE "duration_min" END,
+    "left_min" = CASE WHEN $13::bool THEN $14::integer ELSE "left_min" END,
+    "right_min" = CASE WHEN $15::bool THEN $16::integer ELSE "right_min" END,
+    "contents" = CASE WHEN $17::bool THEN $18::text ELSE "contents" END,
+    "food" = CASE WHEN $19::bool THEN $20::text ELSE "food" END,
+    "reaction" = CASE WHEN $21::bool THEN $22::boolean ELSE "reaction" END,
+    "notes" = CASE WHEN $23::bool THEN $24::text ELSE "notes" END
+WHERE "family_id" = $25 AND "id" = $26
 `
 
 type UpdateFeedParams struct {
+	CaretakerIDSet bool
+	CaretakerIDVal *string
 	TimeSet        bool
 	TimeVal        pgtype.Timestamptz
 	TypeSet        bool
@@ -266,6 +281,8 @@ type UpdateFeedParams struct {
 
 func (q *Queries) UpdateFeed(ctx context.Context, arg UpdateFeedParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateFeed,
+		arg.CaretakerIDSet,
+		arg.CaretakerIDVal,
 		arg.TimeSet,
 		arg.TimeVal,
 		arg.TypeSet,

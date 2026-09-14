@@ -1907,6 +1907,9 @@ export interface components {
             babyId: string;
             caretakerId: string;
             caretakerName: string;
+            /** @description Who saved the row; set by the server, never by a client. */
+            loggedById: string;
+            loggedByName: string;
             notes: string | null;
             /** Format: date-time */
             time: string;
@@ -1933,6 +1936,8 @@ export interface components {
             reaction: boolean | null;
         };
         CreateFeed: {
+            /** @description Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller. */
+            caretakerId?: string;
             babyId: string;
             /** Format: date-time */
             time: string;
@@ -1956,6 +1961,8 @@ export interface components {
         };
         /** @description Every field is optional; an empty object is a no-op. `amountMl`, `side`, `durationMin`, `leftMin`, `rightMin` and `notes` may also be sent as `null` to CLEAR that column; `time`/`type` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs, which the generated request type alone cannot provide). */
         UpdateFeed: {
+            /** @description Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged. */
+            caretakerId?: string;
             /** Format: date-time */
             time?: string;
             /** @enum {string} */
@@ -1982,6 +1989,9 @@ export interface components {
             babyId: string;
             caretakerId: string;
             caretakerName: string;
+            /** @description Who saved the row; set by the server, never by a client. */
+            loggedById: string;
+            loggedByName: string;
             /** @enum {string} */
             kind: "breast" | "pump";
             /** Format: date-time */
@@ -2006,6 +2016,8 @@ export interface components {
             pump: components["schemas"]["FeedTimer"] | null;
         };
         StartFeedTimer: {
+            /** @description Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller. */
+            caretakerId?: string;
             babyId: string;
             /** @enum {string} */
             kind: "breast" | "pump";
@@ -2061,6 +2073,9 @@ export interface components {
             babyId: string;
             caretakerId: string;
             caretakerName: string;
+            /** @description Who saved the row; set by the server, never by a client. */
+            loggedById: string;
+            loggedByName: string;
             notes: string | null;
             /** Format: date-time */
             time: string;
@@ -2081,6 +2096,8 @@ export interface components {
             consistency: "normal" | "loose" | "firm" | null;
         };
         CreateDiaper: {
+            /** @description Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller. */
+            caretakerId?: string;
             babyId: string;
             /** Format: date-time */
             time: string;
@@ -2094,6 +2111,8 @@ export interface components {
         };
         /** @description Every field is optional; an empty object is a no-op. `color`, `consistency` and `notes` may also be sent as `null` to CLEAR them; `time`/`type` are not nullable — only settable or omitted (see internal/api/feeds.go for the presence-detection pattern this endpoint shares with UpdateFeed). */
         UpdateDiaper: {
+            /** @description Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged. */
+            caretakerId?: string;
             /** Format: date-time */
             time?: string;
             /** @enum {string} */
@@ -2109,6 +2128,9 @@ export interface components {
             babyId: string;
             caretakerId: string;
             caretakerName: string;
+            /** @description Who saved the row; set by the server, never by a client. */
+            loggedById: string;
+            loggedByName: string;
             notes: string | null;
             /** Format: date-time */
             startTime: string;
@@ -2125,6 +2147,8 @@ export interface components {
             type: "nap" | "night" | null;
         };
         CreateSleep: {
+            /** @description Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller. */
+            caretakerId?: string;
             babyId: string;
             /** Format: date-time */
             startTime: string;
@@ -2140,6 +2164,8 @@ export interface components {
         };
         /** @description Every field is optional; an empty object is a no-op. `endTime`, `location` and `notes` may also be sent as `null` to CLEAR that column — clearing `endTime` reopens the session and can 409 if another session for the same baby is already active (see internal/api/sleep.go). `startTime` is not nullable — only settable or omitted. */
         UpdateSleep: {
+            /** @description Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged. */
+            caretakerId?: string;
             /** Format: date-time */
             startTime?: string;
             /** Format: date-time */
@@ -2167,6 +2193,9 @@ export interface components {
             babyId: string;
             caretakerId: string;
             caretakerName: string;
+            /** @description Who saved the row; set by the server, never by a client. */
+            loggedById: string;
+            loggedByName: string;
             notes: string | null;
             /** @enum {string} */
             type: "tummy" | "walk" | "play";
@@ -2179,6 +2208,8 @@ export interface components {
             endTime: string | null;
         };
         CreatePlay: {
+            /** @description Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller. */
+            caretakerId?: string;
             babyId: string;
             /** @enum {string} */
             type: "tummy" | "walk" | "play";
@@ -2193,6 +2224,8 @@ export interface components {
         };
         /** @description Every field is optional; an empty object is a no-op. `endTime` and `notes` may also be sent as `null` to CLEAR that column — clearing `endTime` reopens the session and can 409 if another session for the same baby is already running (see internal/api/play.go). `type`/`startTime` are not nullable — only settable or omitted. */
         UpdatePlay: {
+            /** @description Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged. */
+            caretakerId?: string;
             /** @enum {string} */
             type?: "tummy" | "walk" | "play";
             /** Format: date-time */
@@ -2220,6 +2253,9 @@ export interface components {
             babyId: string;
             caretakerId: string;
             caretakerName: string;
+            /** @description Who saved the row; set by the server, never by a client. */
+            loggedById: string;
+            loggedByName: string;
             notes: string | null;
             /** Format: date-time */
             time: string;
@@ -2240,6 +2276,8 @@ export interface components {
             slotKey: string;
         };
         CreateVaccine: {
+            /** @description Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller. */
+            caretakerId?: string;
             babyId: string;
             /** Format: date-time */
             time: string;
@@ -2250,6 +2288,8 @@ export interface components {
         };
         /** @description Every field is optional; an empty object is a no-op. `doseNumber`, `scheduleSlot` and `notes` may also be sent as `null` to CLEAR that column; `time`/`name` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs). */
         UpdateVaccine: {
+            /** @description Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged. */
+            caretakerId?: string;
             /** Format: date-time */
             time?: string;
             name?: string;
@@ -2265,6 +2305,9 @@ export interface components {
             babyId: string;
             caretakerId: string;
             caretakerName: string;
+            /** @description Who saved the row; set by the server, never by a client. */
+            loggedById: string;
+            loggedByName: string;
             notes: string | null;
         } & {
             [key: string]: unknown;
@@ -2483,6 +2526,9 @@ export interface components {
             babyId: string;
             caretakerId: string;
             caretakerName: string;
+            /** @description Who saved the row; set by the server, never by a client. */
+            loggedById: string;
+            loggedByName: string;
             notes: string | null;
             /** Format: date-time */
             time: string;
@@ -2495,6 +2541,8 @@ export interface components {
             medicineId: string | null;
         };
         CreateMedicine: {
+            /** @description Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller. */
+            caretakerId?: string;
             babyId: string;
             /** Format: date-time */
             time: string;
@@ -2508,6 +2556,8 @@ export interface components {
         };
         /** @description Every field is optional; an empty object is a no-op. `amount`, `unit` and `notes` may also be sent as `null` to CLEAR that column; `time`/`name` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs). */
         UpdateMedicine: {
+            /** @description Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged. */
+            caretakerId?: string;
             /** Format: date-time */
             time?: string;
             name?: string;
@@ -2523,11 +2573,16 @@ export interface components {
             babyId: string;
             caretakerId: string;
             caretakerName: string;
+            /** @description Who saved the row; set by the server, never by a client. */
+            loggedById: string;
+            loggedByName: string;
             notes: string | null;
             /** Format: date-time */
             time: string;
         };
         CreateBath: {
+            /** @description Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller. */
+            caretakerId?: string;
             babyId: string;
             /** Format: date-time */
             time: string;
@@ -2535,6 +2590,8 @@ export interface components {
         };
         /** @description Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time` is not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs). */
         UpdateBath: {
+            /** @description Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged. */
+            caretakerId?: string;
             /** Format: date-time */
             time?: string;
             notes?: string | null;
@@ -2544,12 +2601,17 @@ export interface components {
             babyId: string;
             caretakerId: string;
             caretakerName: string;
+            /** @description Who saved the row; set by the server, never by a client. */
+            loggedById: string;
+            loggedByName: string;
             notes: string | null;
             /** Format: date-time */
             time: string;
             content: string;
         };
         CreateNote: {
+            /** @description Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller. */
+            caretakerId?: string;
             babyId: string;
             /** Format: date-time */
             time: string;
@@ -2558,6 +2620,8 @@ export interface components {
         };
         /** @description Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time`/`content` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs). */
         UpdateNote: {
+            /** @description Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged. */
+            caretakerId?: string;
             /** Format: date-time */
             time?: string;
             content?: string;
@@ -2582,6 +2646,9 @@ export interface components {
             babyId: string;
             caretakerId: string;
             caretakerName: string;
+            /** @description Who saved the row; set by the server, never by a client. */
+            loggedById: string;
+            loggedByName: string;
             notes: string | null;
             /** Format: date-time */
             time: string;
@@ -2589,6 +2656,8 @@ export interface components {
             photos: components["schemas"]["MilestonePhoto"][];
         };
         CreateMilestone: {
+            /** @description Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller. */
+            caretakerId?: string;
             babyId: string;
             /** Format: date-time */
             time: string;
@@ -2597,6 +2666,8 @@ export interface components {
         };
         /** @description Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time`/`title` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs). */
         UpdateMilestone: {
+            /** @description Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged. */
+            caretakerId?: string;
             /** Format: date-time */
             time?: string;
             title?: string;
@@ -2607,6 +2678,9 @@ export interface components {
             babyId: string;
             caretakerId: string;
             caretakerName: string;
+            /** @description Who saved the row; set by the server, never by a client. */
+            loggedById: string;
+            loggedByName: string;
             notes: string | null;
             /** Format: date-time */
             time: string;
@@ -2616,6 +2690,8 @@ export interface components {
             value: number;
         };
         CreateMeasurement: {
+            /** @description Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller. */
+            caretakerId?: string;
             babyId: string;
             /** Format: date-time */
             time: string;
@@ -2627,6 +2703,8 @@ export interface components {
         };
         /** @description Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time`/`type`/`value` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs). */
         UpdateMeasurement: {
+            /** @description Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged. */
+            caretakerId?: string;
             /** Format: date-time */
             time?: string;
             /** @enum {string} */
@@ -2640,6 +2718,9 @@ export interface components {
             babyId: string;
             caretakerId: string;
             caretakerName: string;
+            /** @description Who saved the row; set by the server, never by a client. */
+            loggedById: string;
+            loggedByName: string;
             notes: string | null;
             /** Format: date-time */
             time: string;
@@ -2651,6 +2732,8 @@ export interface components {
             durationMin: number | null;
         };
         CreatePump: {
+            /** @description Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller. */
+            caretakerId?: string;
             babyId: string;
             /** Format: date-time */
             time: string;
@@ -2664,6 +2747,8 @@ export interface components {
         };
         /** @description Every field is optional; an empty object is a no-op. `side`, `amountMl`, `durationMin` and `notes` may also be sent as `null` to CLEAR that column; `time` is not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs). */
         UpdatePump: {
+            /** @description Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged. */
+            caretakerId?: string;
             /** Format: date-time */
             time?: string;
             /** @enum {string|null} */
@@ -3767,6 +3852,15 @@ export interface operations {
                     "application/json": components["schemas"]["FeedLog"];
                 };
             };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unknown baby. */
             404: {
                 headers: {
@@ -3835,6 +3929,15 @@ export interface operations {
                     "application/json": components["schemas"]["FeedLog"];
                 };
             };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description No feed with this id in the caller's family. */
             404: {
                 headers: {
@@ -3897,6 +4000,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeedTimer"];
+                };
+            };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unknown baby. */
@@ -4079,6 +4191,15 @@ export interface operations {
                     "application/json": components["schemas"]["DiaperLog"];
                 };
             };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unknown baby. */
             404: {
                 headers: {
@@ -4147,6 +4268,15 @@ export interface operations {
                     "application/json": components["schemas"]["DiaperLog"];
                 };
             };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description No diaper log with this id in the caller's family. */
             404: {
                 headers: {
@@ -4203,6 +4333,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SleepLog"];
+                };
+            };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unknown baby. */
@@ -4339,6 +4478,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SleepLog"];
+                };
+            };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description No sleep log with this id in the caller's family. */
@@ -4553,6 +4701,15 @@ export interface operations {
                     "application/json": components["schemas"]["MedicineLog"];
                 };
             };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unknown baby. */
             404: {
                 headers: {
@@ -4619,6 +4776,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MedicineLog"];
+                };
+            };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description No medicine log with this id in the caller's family. */
@@ -4812,6 +4978,15 @@ export interface operations {
                     "application/json": components["schemas"]["BathLog"];
                 };
             };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unknown baby. */
             404: {
                 headers: {
@@ -4880,6 +5055,15 @@ export interface operations {
                     "application/json": components["schemas"]["BathLog"];
                 };
             };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description No bath log with this id in the caller's family. */
             404: {
                 headers: {
@@ -4936,6 +5120,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NoteLog"];
+                };
+            };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unknown baby. */
@@ -5006,6 +5199,15 @@ export interface operations {
                     "application/json": components["schemas"]["NoteLog"];
                 };
             };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description No note log with this id in the caller's family. */
             404: {
                 headers: {
@@ -5062,6 +5264,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MilestoneLog"];
+                };
+            };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unknown baby. */
@@ -5132,6 +5343,15 @@ export interface operations {
                     "application/json": components["schemas"]["MilestoneLog"];
                 };
             };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description No milestone log with this id in the caller's family. */
             404: {
                 headers: {
@@ -5188,6 +5408,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeasurementLog"];
+                };
+            };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unknown baby. */
@@ -5258,6 +5487,15 @@ export interface operations {
                     "application/json": components["schemas"]["MeasurementLog"];
                 };
             };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description No measurement log with this id in the caller's family. */
             404: {
                 headers: {
@@ -5314,6 +5552,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PumpLog"];
+                };
+            };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unknown baby. */
@@ -5384,6 +5631,15 @@ export interface operations {
                     "application/json": components["schemas"]["PumpLog"];
                 };
             };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description No pump log with this id in the caller's family. */
             404: {
                 headers: {
@@ -5440,6 +5696,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlayLog"];
+                };
+            };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unknown baby. */
@@ -5576,6 +5841,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlayLog"];
+                };
+            };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description No play log with this id in the caller's family. */
@@ -5733,6 +6007,15 @@ export interface operations {
                     "application/json": components["schemas"]["VaccineLog"];
                 };
             };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unknown baby. */
             404: {
                 headers: {
@@ -5799,6 +6082,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VaccineLog"];
+                };
+            };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description No vaccine log with this id in the caller's family. */

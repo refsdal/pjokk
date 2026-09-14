@@ -15,11 +15,12 @@
 -- alias would come back as a *string; the family.sql ListFamilyMembers query
 -- uses the same trick for the same reason.
 SELECT
-    f."id", f."baby_id", f."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    f."id", f."baby_id", f."caretaker_id", f."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
     f."left_min", f."right_min", f."contents", f."food", f."reaction", f."notes"
 FROM "feed_log" f
 JOIN "users" u ON u."id" = f."caretaker_id"
+JOIN "users" lu ON lu."id" = f."logged_by_id"
 WHERE f."family_id" = sqlc.arg(family_id)
   AND (sqlc.narg(baby_id)::text IS NULL OR f."baby_id" = sqlc.narg(baby_id))
 ORDER BY f."time" DESC, f."id" DESC
@@ -27,23 +28,25 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetFeed :one
 SELECT
-    f."id", f."baby_id", f."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    f."id", f."baby_id", f."caretaker_id", f."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
     f."left_min", f."right_min", f."contents", f."food", f."reaction", f."notes"
 FROM "feed_log" f
 JOIN "users" u ON u."id" = f."caretaker_id"
+JOIN "users" lu ON lu."id" = f."logged_by_id"
 WHERE f."family_id" = $1 AND f."id" = $2;
 
 -- name: CreateFeed :one
 INSERT INTO "feed_log"
     ("family_id", "baby_id", "caretaker_id", "time", "type", "amount_ml",
-     "side", "duration_min", "left_min", "right_min", "contents", "food", "reaction", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+     "side", "duration_min", "left_min", "right_min", "contents", "food", "reaction", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 RETURNING "id";
 
 -- name: UpdateFeed :execrows
 UPDATE "feed_log"
 SET
+    "caretaker_id" = CASE WHEN sqlc.arg(caretaker_id_set)::bool THEN sqlc.narg(caretaker_id_val)::text ELSE "caretaker_id" END,
     "time" = CASE WHEN sqlc.arg(time_set)::bool THEN sqlc.narg(time_val)::timestamptz ELSE "time" END,
     "type" = CASE WHEN sqlc.arg(type_set)::bool THEN sqlc.narg(type_val)::text ELSE "type" END,
     "amount_ml" = CASE WHEN sqlc.arg(amount_ml_set)::bool THEN sqlc.narg(amount_ml_val)::integer ELSE "amount_ml" END,

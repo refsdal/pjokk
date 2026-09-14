@@ -87,6 +87,8 @@ func serFeed(row dbgen.GetFeedRow) gen.FeedLog {
 		BabyId:        row.BabyID,
 		CaretakerId:   row.CaretakerID,
 		CaretakerName: row.CaretakerName,
+		LoggedById:    row.LoggedByID,
+		LoggedByName:  row.LoggedByName,
 		Notes:         row.Notes,
 		Time:          row.Time.Time,
 		Type:          gen.FeedLogType(row.Type),
@@ -130,12 +132,21 @@ func (d Deps) CreateFeed(ctx context.Context, req gen.CreateFeedRequestObject) (
 	}
 	body := req.Body
 
+	caretaker, notMember, err := caretakerFor(ctx, d, fam, body.CaretakerId)
+	if err != nil {
+		return nil, err
+	}
+	if notMember {
+		return gen.CreateFeed403JSONResponse(notMemberErr()), nil
+	}
+
 	row, unknownBaby, err := createLog(ctx, d, fam.FamilyID, body.BabyId,
 		func(ctx context.Context) (string, error) {
 			return d.Q.CreateFeed(ctx, dbgen.CreateFeedParams{
 				FamilyID:    fam.FamilyID,
 				BabyID:      body.BabyId,
-				CaretakerID: fam.UserID,
+				CaretakerID: caretaker,
+				LoggedByID:  fam.UserID,
 				Time:        ts(body.Time),
 				Type:        string(body.Type),
 				AmountMl:    body.AmountMl,
@@ -187,9 +198,17 @@ func (d Deps) UpdateFeed(ctx context.Context, req gen.UpdateFeedRequestObject) (
 	foodSet, foodVal := patchField[string](p, "food")
 	reactionSet, reactionVal := patchField[bool](p, "reaction")
 	notesSet, notesVal := patchField[string](p, "notes")
+	caretakerSet, caretakerVal := patchField[string](p, "caretakerId")
 
 	if err := p.Err(); err != nil {
 		return nil, err
+	}
+	caretakerSet, caretakerVal, notMember, err := caretakerPatch(ctx, d, fam, caretakerSet, caretakerVal)
+	if err != nil {
+		return nil, err
+	}
+	if notMember {
+		return gen.UpdateFeed403JSONResponse(notMemberErr()), nil
 	}
 
 	row, found, err := updateLog(ctx,
@@ -221,6 +240,8 @@ func (d Deps) UpdateFeed(ctx context.Context, req gen.UpdateFeedRequestObject) (
 				FoodVal:        foodVal,
 				ReactionSet:    reactionSet,
 				ReactionVal:    reactionVal,
+				CaretakerIDSet: caretakerSet,
+				CaretakerIDVal: caretakerVal,
 				NotesSet:       notesSet,
 				NotesVal:       notesVal,
 			})

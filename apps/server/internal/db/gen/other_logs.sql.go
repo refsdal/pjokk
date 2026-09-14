@@ -12,8 +12,8 @@ import (
 )
 
 const createBath = `-- name: CreateBath :one
-INSERT INTO "bath_log" ("family_id", "baby_id", "caretaker_id", "time", "notes")
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO "bath_log" ("family_id", "baby_id", "caretaker_id", "time", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING "id"
 `
 
@@ -23,6 +23,7 @@ type CreateBathParams struct {
 	CaretakerID string
 	Time        pgtype.Timestamptz
 	Notes       *string
+	LoggedByID  string
 }
 
 func (q *Queries) CreateBath(ctx context.Context, arg CreateBathParams) (string, error) {
@@ -32,6 +33,7 @@ func (q *Queries) CreateBath(ctx context.Context, arg CreateBathParams) (string,
 		arg.CaretakerID,
 		arg.Time,
 		arg.Notes,
+		arg.LoggedByID,
 	)
 	var id string
 	err := row.Scan(&id)
@@ -39,8 +41,8 @@ func (q *Queries) CreateBath(ctx context.Context, arg CreateBathParams) (string,
 }
 
 const createMeasurement = `-- name: CreateMeasurement :one
-INSERT INTO "measurement_log" ("family_id", "baby_id", "caretaker_id", "time", "type", "value", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO "measurement_log" ("family_id", "baby_id", "caretaker_id", "time", "type", "value", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING "id"
 `
 
@@ -52,6 +54,7 @@ type CreateMeasurementParams struct {
 	Type        string
 	Value       float64
 	Notes       *string
+	LoggedByID  string
 }
 
 func (q *Queries) CreateMeasurement(ctx context.Context, arg CreateMeasurementParams) (string, error) {
@@ -63,6 +66,7 @@ func (q *Queries) CreateMeasurement(ctx context.Context, arg CreateMeasurementPa
 		arg.Type,
 		arg.Value,
 		arg.Notes,
+		arg.LoggedByID,
 	)
 	var id string
 	err := row.Scan(&id)
@@ -71,8 +75,8 @@ func (q *Queries) CreateMeasurement(ctx context.Context, arg CreateMeasurementPa
 
 const createMedicine = `-- name: CreateMedicine :one
 INSERT INTO "medicine_log"
-    ("family_id", "baby_id", "caretaker_id", "time", "name", "amount", "unit", "medicine_id", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    ("family_id", "baby_id", "caretaker_id", "time", "name", "amount", "unit", "medicine_id", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING "id"
 `
 
@@ -86,6 +90,7 @@ type CreateMedicineParams struct {
 	Unit        *string
 	MedicineID  *string
 	Notes       *string
+	LoggedByID  string
 }
 
 func (q *Queries) CreateMedicine(ctx context.Context, arg CreateMedicineParams) (string, error) {
@@ -99,6 +104,7 @@ func (q *Queries) CreateMedicine(ctx context.Context, arg CreateMedicineParams) 
 		arg.Unit,
 		arg.MedicineID,
 		arg.Notes,
+		arg.LoggedByID,
 	)
 	var id string
 	err := row.Scan(&id)
@@ -106,8 +112,8 @@ func (q *Queries) CreateMedicine(ctx context.Context, arg CreateMedicineParams) 
 }
 
 const createMilestone = `-- name: CreateMilestone :one
-INSERT INTO "milestone_log" ("family_id", "baby_id", "caretaker_id", "time", "title", "notes")
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO "milestone_log" ("family_id", "baby_id", "caretaker_id", "time", "title", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING "id"
 `
 
@@ -118,6 +124,7 @@ type CreateMilestoneParams struct {
 	Time        pgtype.Timestamptz
 	Title       string
 	Notes       *string
+	LoggedByID  string
 }
 
 func (q *Queries) CreateMilestone(ctx context.Context, arg CreateMilestoneParams) (string, error) {
@@ -128,6 +135,7 @@ func (q *Queries) CreateMilestone(ctx context.Context, arg CreateMilestoneParams
 		arg.Time,
 		arg.Title,
 		arg.Notes,
+		arg.LoggedByID,
 	)
 	var id string
 	err := row.Scan(&id)
@@ -135,8 +143,8 @@ func (q *Queries) CreateMilestone(ctx context.Context, arg CreateMilestoneParams
 }
 
 const createNote = `-- name: CreateNote :one
-INSERT INTO "note_log" ("family_id", "baby_id", "caretaker_id", "time", "content", "notes")
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO "note_log" ("family_id", "baby_id", "caretaker_id", "time", "content", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING "id"
 `
 
@@ -147,6 +155,7 @@ type CreateNoteParams struct {
 	Time        pgtype.Timestamptz
 	Content     string
 	Notes       *string
+	LoggedByID  string
 }
 
 func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (string, error) {
@@ -157,6 +166,7 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (string,
 		arg.Time,
 		arg.Content,
 		arg.Notes,
+		arg.LoggedByID,
 	)
 	var id string
 	err := row.Scan(&id)
@@ -165,8 +175,8 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (string,
 
 const createPump = `-- name: CreatePump :one
 INSERT INTO "pump_log"
-    ("family_id", "baby_id", "caretaker_id", "time", "side", "amount_ml", "duration_min", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    ("family_id", "baby_id", "caretaker_id", "time", "side", "amount_ml", "duration_min", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING "id"
 `
 
@@ -179,6 +189,7 @@ type CreatePumpParams struct {
 	AmountMl    *int32
 	DurationMin *int32
 	Notes       *string
+	LoggedByID  string
 }
 
 func (q *Queries) CreatePump(ctx context.Context, arg CreatePumpParams) (string, error) {
@@ -191,6 +202,7 @@ func (q *Queries) CreatePump(ctx context.Context, arg CreatePumpParams) (string,
 		arg.AmountMl,
 		arg.DurationMin,
 		arg.Notes,
+		arg.LoggedByID,
 	)
 	var id string
 	err := row.Scan(&id)
@@ -307,10 +319,11 @@ func (q *Queries) DeletePump(ctx context.Context, arg DeletePumpParams) (int64, 
 
 const getBath = `-- name: GetBath :one
 SELECT
-    b."id", b."baby_id", b."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    b."id", b."baby_id", b."caretaker_id", b."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     b."time", b."notes"
 FROM "bath_log" b
 JOIN "users" u ON u."id" = b."caretaker_id"
+JOIN "users" lu ON lu."id" = b."logged_by_id"
 WHERE b."family_id" = $1 AND b."id" = $2
 `
 
@@ -323,7 +336,9 @@ type GetBathRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Notes         *string
 }
@@ -335,7 +350,9 @@ func (q *Queries) GetBath(ctx context.Context, arg GetBathParams) (GetBathRow, e
 		&i.ID,
 		&i.BabyID,
 		&i.CaretakerID,
+		&i.LoggedByID,
 		&i.CaretakerName,
+		&i.LoggedByName,
 		&i.Time,
 		&i.Notes,
 	)
@@ -344,10 +361,11 @@ func (q *Queries) GetBath(ctx context.Context, arg GetBathParams) (GetBathRow, e
 
 const getMeasurement = `-- name: GetMeasurement :one
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", m."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     m."time", m."type", m."value", m."notes"
 FROM "measurement_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = $1 AND m."id" = $2
 `
 
@@ -360,7 +378,9 @@ type GetMeasurementRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Type          string
 	Value         float64
@@ -374,7 +394,9 @@ func (q *Queries) GetMeasurement(ctx context.Context, arg GetMeasurementParams) 
 		&i.ID,
 		&i.BabyID,
 		&i.CaretakerID,
+		&i.LoggedByID,
 		&i.CaretakerName,
+		&i.LoggedByName,
 		&i.Time,
 		&i.Type,
 		&i.Value,
@@ -385,10 +407,11 @@ func (q *Queries) GetMeasurement(ctx context.Context, arg GetMeasurementParams) 
 
 const getMedicine = `-- name: GetMedicine :one
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", m."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     m."time", m."name", m."amount", m."unit", m."medicine_id", m."notes"
 FROM "medicine_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = $1 AND m."id" = $2
 `
 
@@ -401,7 +424,9 @@ type GetMedicineRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Name          string
 	Amount        *float64
@@ -417,7 +442,9 @@ func (q *Queries) GetMedicine(ctx context.Context, arg GetMedicineParams) (GetMe
 		&i.ID,
 		&i.BabyID,
 		&i.CaretakerID,
+		&i.LoggedByID,
 		&i.CaretakerName,
+		&i.LoggedByName,
 		&i.Time,
 		&i.Name,
 		&i.Amount,
@@ -430,10 +457,11 @@ func (q *Queries) GetMedicine(ctx context.Context, arg GetMedicineParams) (GetMe
 
 const getMilestone = `-- name: GetMilestone :one
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", m."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     m."time", m."title", m."notes"
 FROM "milestone_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = $1 AND m."id" = $2
 `
 
@@ -446,7 +474,9 @@ type GetMilestoneRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Title         string
 	Notes         *string
@@ -459,7 +489,9 @@ func (q *Queries) GetMilestone(ctx context.Context, arg GetMilestoneParams) (Get
 		&i.ID,
 		&i.BabyID,
 		&i.CaretakerID,
+		&i.LoggedByID,
 		&i.CaretakerName,
+		&i.LoggedByName,
 		&i.Time,
 		&i.Title,
 		&i.Notes,
@@ -469,10 +501,11 @@ func (q *Queries) GetMilestone(ctx context.Context, arg GetMilestoneParams) (Get
 
 const getNote = `-- name: GetNote :one
 SELECT
-    n."id", n."baby_id", n."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    n."id", n."baby_id", n."caretaker_id", n."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     n."time", n."content", n."notes"
 FROM "note_log" n
 JOIN "users" u ON u."id" = n."caretaker_id"
+JOIN "users" lu ON lu."id" = n."logged_by_id"
 WHERE n."family_id" = $1 AND n."id" = $2
 `
 
@@ -485,7 +518,9 @@ type GetNoteRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Content       string
 	Notes         *string
@@ -498,7 +533,9 @@ func (q *Queries) GetNote(ctx context.Context, arg GetNoteParams) (GetNoteRow, e
 		&i.ID,
 		&i.BabyID,
 		&i.CaretakerID,
+		&i.LoggedByID,
 		&i.CaretakerName,
+		&i.LoggedByName,
 		&i.Time,
 		&i.Content,
 		&i.Notes,
@@ -508,10 +545,11 @@ func (q *Queries) GetNote(ctx context.Context, arg GetNoteParams) (GetNoteRow, e
 
 const getPump = `-- name: GetPump :one
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", p."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     p."time", p."side", p."amount_ml", p."duration_min", p."notes"
 FROM "pump_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"
+JOIN "users" lu ON lu."id" = p."logged_by_id"
 WHERE p."family_id" = $1 AND p."id" = $2
 `
 
@@ -524,7 +562,9 @@ type GetPumpRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Side          *string
 	AmountMl      *int32
@@ -539,7 +579,9 @@ func (q *Queries) GetPump(ctx context.Context, arg GetPumpParams) (GetPumpRow, e
 		&i.ID,
 		&i.BabyID,
 		&i.CaretakerID,
+		&i.LoggedByID,
 		&i.CaretakerName,
+		&i.LoggedByName,
 		&i.Time,
 		&i.Side,
 		&i.AmountMl,
@@ -552,10 +594,11 @@ func (q *Queries) GetPump(ctx context.Context, arg GetPumpParams) (GetPumpRow, e
 const listBaths = `-- name: ListBaths :many
 
 SELECT
-    b."id", b."baby_id", b."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    b."id", b."baby_id", b."caretaker_id", b."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     b."time", b."notes"
 FROM "bath_log" b
 JOIN "users" u ON u."id" = b."caretaker_id"
+JOIN "users" lu ON lu."id" = b."logged_by_id"
 WHERE b."family_id" = $1
   AND ($2::text IS NULL OR b."baby_id" = $2)
 ORDER BY b."time" DESC, b."id" DESC
@@ -572,7 +615,9 @@ type ListBathsRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Notes         *string
 }
@@ -591,7 +636,9 @@ func (q *Queries) ListBaths(ctx context.Context, arg ListBathsParams) ([]ListBat
 			&i.ID,
 			&i.BabyID,
 			&i.CaretakerID,
+			&i.LoggedByID,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Time,
 			&i.Notes,
 		); err != nil {
@@ -608,10 +655,11 @@ func (q *Queries) ListBaths(ctx context.Context, arg ListBathsParams) ([]ListBat
 const listMeasurements = `-- name: ListMeasurements :many
 
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", m."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     m."time", m."type", m."value", m."notes"
 FROM "measurement_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = $1
   AND ($2::text IS NULL OR m."baby_id" = $2)
 ORDER BY m."time" DESC, m."id" DESC
@@ -628,7 +676,9 @@ type ListMeasurementsRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Type          string
 	Value         float64
@@ -649,7 +699,9 @@ func (q *Queries) ListMeasurements(ctx context.Context, arg ListMeasurementsPara
 			&i.ID,
 			&i.BabyID,
 			&i.CaretakerID,
+			&i.LoggedByID,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Time,
 			&i.Type,
 			&i.Value,
@@ -669,10 +721,11 @@ const listMedicine = `-- name: ListMedicine :many
 
 
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", m."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     m."time", m."name", m."amount", m."unit", m."medicine_id", m."notes"
 FROM "medicine_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = $1
   AND ($2::text IS NULL OR m."baby_id" = $2)
 ORDER BY m."time" DESC, m."id" DESC
@@ -689,7 +742,9 @@ type ListMedicineRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Name          string
 	Amount        *float64
@@ -722,7 +777,9 @@ func (q *Queries) ListMedicine(ctx context.Context, arg ListMedicineParams) ([]L
 			&i.ID,
 			&i.BabyID,
 			&i.CaretakerID,
+			&i.LoggedByID,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Time,
 			&i.Name,
 			&i.Amount,
@@ -743,10 +800,11 @@ func (q *Queries) ListMedicine(ctx context.Context, arg ListMedicineParams) ([]L
 const listMilestones = `-- name: ListMilestones :many
 
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", m."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     m."time", m."title", m."notes"
 FROM "milestone_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = $1
   AND ($2::text IS NULL OR m."baby_id" = $2)
 ORDER BY m."time" DESC, m."id" DESC
@@ -763,7 +821,9 @@ type ListMilestonesRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Title         string
 	Notes         *string
@@ -783,7 +843,9 @@ func (q *Queries) ListMilestones(ctx context.Context, arg ListMilestonesParams) 
 			&i.ID,
 			&i.BabyID,
 			&i.CaretakerID,
+			&i.LoggedByID,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Time,
 			&i.Title,
 			&i.Notes,
@@ -801,10 +863,11 @@ func (q *Queries) ListMilestones(ctx context.Context, arg ListMilestonesParams) 
 const listNotes = `-- name: ListNotes :many
 
 SELECT
-    n."id", n."baby_id", n."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    n."id", n."baby_id", n."caretaker_id", n."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     n."time", n."content", n."notes"
 FROM "note_log" n
 JOIN "users" u ON u."id" = n."caretaker_id"
+JOIN "users" lu ON lu."id" = n."logged_by_id"
 WHERE n."family_id" = $1
   AND ($2::text IS NULL OR n."baby_id" = $2)
 ORDER BY n."time" DESC, n."id" DESC
@@ -821,7 +884,9 @@ type ListNotesRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Content       string
 	Notes         *string
@@ -841,7 +906,9 @@ func (q *Queries) ListNotes(ctx context.Context, arg ListNotesParams) ([]ListNot
 			&i.ID,
 			&i.BabyID,
 			&i.CaretakerID,
+			&i.LoggedByID,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Time,
 			&i.Content,
 			&i.Notes,
@@ -859,10 +926,11 @@ func (q *Queries) ListNotes(ctx context.Context, arg ListNotesParams) ([]ListNot
 const listPumps = `-- name: ListPumps :many
 
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", p."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     p."time", p."side", p."amount_ml", p."duration_min", p."notes"
 FROM "pump_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"
+JOIN "users" lu ON lu."id" = p."logged_by_id"
 WHERE p."family_id" = $1
   AND ($2::text IS NULL OR p."baby_id" = $2)
 ORDER BY p."time" DESC, p."id" DESC
@@ -879,7 +947,9 @@ type ListPumpsRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Side          *string
 	AmountMl      *int32
@@ -901,7 +971,9 @@ func (q *Queries) ListPumps(ctx context.Context, arg ListPumpsParams) ([]ListPum
 			&i.ID,
 			&i.BabyID,
 			&i.CaretakerID,
+			&i.LoggedByID,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Time,
 			&i.Side,
 			&i.AmountMl,
@@ -921,22 +993,27 @@ func (q *Queries) ListPumps(ctx context.Context, arg ListPumpsParams) ([]ListPum
 const updateBath = `-- name: UpdateBath :execrows
 UPDATE "bath_log"
 SET
-    "time" = CASE WHEN $1::bool THEN $2::timestamptz ELSE "time" END,
-    "notes" = CASE WHEN $3::bool THEN $4::text ELSE "notes" END
-WHERE "family_id" = $5 AND "id" = $6
+    "caretaker_id" = CASE WHEN $1::bool THEN $2::text ELSE "caretaker_id" END,
+    "time" = CASE WHEN $3::bool THEN $4::timestamptz ELSE "time" END,
+    "notes" = CASE WHEN $5::bool THEN $6::text ELSE "notes" END
+WHERE "family_id" = $7 AND "id" = $8
 `
 
 type UpdateBathParams struct {
-	TimeSet  bool
-	TimeVal  pgtype.Timestamptz
-	NotesSet bool
-	NotesVal *string
-	FamilyID string
-	ID       string
+	CaretakerIDSet bool
+	CaretakerIDVal *string
+	TimeSet        bool
+	TimeVal        pgtype.Timestamptz
+	NotesSet       bool
+	NotesVal       *string
+	FamilyID       string
+	ID             string
 }
 
 func (q *Queries) UpdateBath(ctx context.Context, arg UpdateBathParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateBath,
+		arg.CaretakerIDSet,
+		arg.CaretakerIDVal,
 		arg.TimeSet,
 		arg.TimeVal,
 		arg.NotesSet,
@@ -953,28 +1030,33 @@ func (q *Queries) UpdateBath(ctx context.Context, arg UpdateBathParams) (int64, 
 const updateMeasurement = `-- name: UpdateMeasurement :execrows
 UPDATE "measurement_log"
 SET
-    "time" = CASE WHEN $1::bool THEN $2::timestamptz ELSE "time" END,
-    "type" = CASE WHEN $3::bool THEN $4::text ELSE "type" END,
-    "value" = CASE WHEN $5::bool THEN $6::double precision ELSE "value" END,
-    "notes" = CASE WHEN $7::bool THEN $8::text ELSE "notes" END
-WHERE "family_id" = $9 AND "id" = $10
+    "caretaker_id" = CASE WHEN $1::bool THEN $2::text ELSE "caretaker_id" END,
+    "time" = CASE WHEN $3::bool THEN $4::timestamptz ELSE "time" END,
+    "type" = CASE WHEN $5::bool THEN $6::text ELSE "type" END,
+    "value" = CASE WHEN $7::bool THEN $8::double precision ELSE "value" END,
+    "notes" = CASE WHEN $9::bool THEN $10::text ELSE "notes" END
+WHERE "family_id" = $11 AND "id" = $12
 `
 
 type UpdateMeasurementParams struct {
-	TimeSet  bool
-	TimeVal  pgtype.Timestamptz
-	TypeSet  bool
-	TypeVal  *string
-	ValueSet bool
-	ValueVal *float64
-	NotesSet bool
-	NotesVal *string
-	FamilyID string
-	ID       string
+	CaretakerIDSet bool
+	CaretakerIDVal *string
+	TimeSet        bool
+	TimeVal        pgtype.Timestamptz
+	TypeSet        bool
+	TypeVal        *string
+	ValueSet       bool
+	ValueVal       *float64
+	NotesSet       bool
+	NotesVal       *string
+	FamilyID       string
+	ID             string
 }
 
 func (q *Queries) UpdateMeasurement(ctx context.Context, arg UpdateMeasurementParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateMeasurement,
+		arg.CaretakerIDSet,
+		arg.CaretakerIDVal,
 		arg.TimeSet,
 		arg.TimeVal,
 		arg.TypeSet,
@@ -995,34 +1077,39 @@ func (q *Queries) UpdateMeasurement(ctx context.Context, arg UpdateMeasurementPa
 const updateMedicine = `-- name: UpdateMedicine :execrows
 UPDATE "medicine_log"
 SET
-    "time" = CASE WHEN $1::bool THEN $2::timestamptz ELSE "time" END,
-    "name" = CASE WHEN $3::bool THEN $4::text ELSE "name" END,
-    "amount" = CASE WHEN $5::bool THEN $6::double precision ELSE "amount" END,
-    "unit" = CASE WHEN $7::bool THEN $8::text ELSE "unit" END,
-    "medicine_id" = CASE WHEN $9::bool THEN $10::text ELSE "medicine_id" END,
-    "notes" = CASE WHEN $11::bool THEN $12::text ELSE "notes" END
-WHERE "family_id" = $13 AND "id" = $14
+    "caretaker_id" = CASE WHEN $1::bool THEN $2::text ELSE "caretaker_id" END,
+    "time" = CASE WHEN $3::bool THEN $4::timestamptz ELSE "time" END,
+    "name" = CASE WHEN $5::bool THEN $6::text ELSE "name" END,
+    "amount" = CASE WHEN $7::bool THEN $8::double precision ELSE "amount" END,
+    "unit" = CASE WHEN $9::bool THEN $10::text ELSE "unit" END,
+    "medicine_id" = CASE WHEN $11::bool THEN $12::text ELSE "medicine_id" END,
+    "notes" = CASE WHEN $13::bool THEN $14::text ELSE "notes" END
+WHERE "family_id" = $15 AND "id" = $16
 `
 
 type UpdateMedicineParams struct {
-	TimeSet       bool
-	TimeVal       pgtype.Timestamptz
-	NameSet       bool
-	NameVal       *string
-	AmountSet     bool
-	AmountVal     *float64
-	UnitSet       bool
-	UnitVal       *string
-	MedicineIDSet bool
-	MedicineIDVal *string
-	NotesSet      bool
-	NotesVal      *string
-	FamilyID      string
-	ID            string
+	CaretakerIDSet bool
+	CaretakerIDVal *string
+	TimeSet        bool
+	TimeVal        pgtype.Timestamptz
+	NameSet        bool
+	NameVal        *string
+	AmountSet      bool
+	AmountVal      *float64
+	UnitSet        bool
+	UnitVal        *string
+	MedicineIDSet  bool
+	MedicineIDVal  *string
+	NotesSet       bool
+	NotesVal       *string
+	FamilyID       string
+	ID             string
 }
 
 func (q *Queries) UpdateMedicine(ctx context.Context, arg UpdateMedicineParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateMedicine,
+		arg.CaretakerIDSet,
+		arg.CaretakerIDVal,
 		arg.TimeSet,
 		arg.TimeVal,
 		arg.NameSet,
@@ -1047,25 +1134,30 @@ func (q *Queries) UpdateMedicine(ctx context.Context, arg UpdateMedicineParams) 
 const updateMilestone = `-- name: UpdateMilestone :execrows
 UPDATE "milestone_log"
 SET
-    "time" = CASE WHEN $1::bool THEN $2::timestamptz ELSE "time" END,
-    "title" = CASE WHEN $3::bool THEN $4::text ELSE "title" END,
-    "notes" = CASE WHEN $5::bool THEN $6::text ELSE "notes" END
-WHERE "family_id" = $7 AND "id" = $8
+    "caretaker_id" = CASE WHEN $1::bool THEN $2::text ELSE "caretaker_id" END,
+    "time" = CASE WHEN $3::bool THEN $4::timestamptz ELSE "time" END,
+    "title" = CASE WHEN $5::bool THEN $6::text ELSE "title" END,
+    "notes" = CASE WHEN $7::bool THEN $8::text ELSE "notes" END
+WHERE "family_id" = $9 AND "id" = $10
 `
 
 type UpdateMilestoneParams struct {
-	TimeSet  bool
-	TimeVal  pgtype.Timestamptz
-	TitleSet bool
-	TitleVal *string
-	NotesSet bool
-	NotesVal *string
-	FamilyID string
-	ID       string
+	CaretakerIDSet bool
+	CaretakerIDVal *string
+	TimeSet        bool
+	TimeVal        pgtype.Timestamptz
+	TitleSet       bool
+	TitleVal       *string
+	NotesSet       bool
+	NotesVal       *string
+	FamilyID       string
+	ID             string
 }
 
 func (q *Queries) UpdateMilestone(ctx context.Context, arg UpdateMilestoneParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateMilestone,
+		arg.CaretakerIDSet,
+		arg.CaretakerIDVal,
 		arg.TimeSet,
 		arg.TimeVal,
 		arg.TitleSet,
@@ -1084,25 +1176,30 @@ func (q *Queries) UpdateMilestone(ctx context.Context, arg UpdateMilestoneParams
 const updateNote = `-- name: UpdateNote :execrows
 UPDATE "note_log"
 SET
-    "time" = CASE WHEN $1::bool THEN $2::timestamptz ELSE "time" END,
-    "content" = CASE WHEN $3::bool THEN $4::text ELSE "content" END,
-    "notes" = CASE WHEN $5::bool THEN $6::text ELSE "notes" END
-WHERE "family_id" = $7 AND "id" = $8
+    "caretaker_id" = CASE WHEN $1::bool THEN $2::text ELSE "caretaker_id" END,
+    "time" = CASE WHEN $3::bool THEN $4::timestamptz ELSE "time" END,
+    "content" = CASE WHEN $5::bool THEN $6::text ELSE "content" END,
+    "notes" = CASE WHEN $7::bool THEN $8::text ELSE "notes" END
+WHERE "family_id" = $9 AND "id" = $10
 `
 
 type UpdateNoteParams struct {
-	TimeSet    bool
-	TimeVal    pgtype.Timestamptz
-	ContentSet bool
-	ContentVal *string
-	NotesSet   bool
-	NotesVal   *string
-	FamilyID   string
-	ID         string
+	CaretakerIDSet bool
+	CaretakerIDVal *string
+	TimeSet        bool
+	TimeVal        pgtype.Timestamptz
+	ContentSet     bool
+	ContentVal     *string
+	NotesSet       bool
+	NotesVal       *string
+	FamilyID       string
+	ID             string
 }
 
 func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateNote,
+		arg.CaretakerIDSet,
+		arg.CaretakerIDVal,
 		arg.TimeSet,
 		arg.TimeVal,
 		arg.ContentSet,
@@ -1121,15 +1218,18 @@ func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) (int64, 
 const updatePump = `-- name: UpdatePump :execrows
 UPDATE "pump_log"
 SET
-    "time" = CASE WHEN $1::bool THEN $2::timestamptz ELSE "time" END,
-    "side" = CASE WHEN $3::bool THEN $4::text ELSE "side" END,
-    "amount_ml" = CASE WHEN $5::bool THEN $6::integer ELSE "amount_ml" END,
-    "duration_min" = CASE WHEN $7::bool THEN $8::integer ELSE "duration_min" END,
-    "notes" = CASE WHEN $9::bool THEN $10::text ELSE "notes" END
-WHERE "family_id" = $11 AND "id" = $12
+    "caretaker_id" = CASE WHEN $1::bool THEN $2::text ELSE "caretaker_id" END,
+    "time" = CASE WHEN $3::bool THEN $4::timestamptz ELSE "time" END,
+    "side" = CASE WHEN $5::bool THEN $6::text ELSE "side" END,
+    "amount_ml" = CASE WHEN $7::bool THEN $8::integer ELSE "amount_ml" END,
+    "duration_min" = CASE WHEN $9::bool THEN $10::integer ELSE "duration_min" END,
+    "notes" = CASE WHEN $11::bool THEN $12::text ELSE "notes" END
+WHERE "family_id" = $13 AND "id" = $14
 `
 
 type UpdatePumpParams struct {
+	CaretakerIDSet bool
+	CaretakerIDVal *string
 	TimeSet        bool
 	TimeVal        pgtype.Timestamptz
 	SideSet        bool
@@ -1146,6 +1246,8 @@ type UpdatePumpParams struct {
 
 func (q *Queries) UpdatePump(ctx context.Context, arg UpdatePumpParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updatePump,
+		arg.CaretakerIDSet,
+		arg.CaretakerIDVal,
 		arg.TimeSet,
 		arg.TimeVal,
 		arg.SideSet,

@@ -81,6 +81,8 @@ func serPlay(row dbgen.GetPlayRow) gen.PlayLog {
 		BabyId:        row.BabyID,
 		CaretakerId:   row.CaretakerID,
 		CaretakerName: row.CaretakerName,
+		LoggedById:    row.LoggedByID,
+		LoggedByName:  row.LoggedByName,
 		Notes:         row.Notes,
 		Type:          gen.PlayLogType(row.Type),
 		StartTime:     row.StartTime.Time,
@@ -120,6 +122,14 @@ func (d Deps) CreatePlay(ctx context.Context, req gen.CreatePlayRequestObject) (
 	}
 	body := req.Body
 
+	caretaker, notMember, err := caretakerFor(ctx, d, fam, body.CaretakerId)
+	if err != nil {
+		return nil, err
+	}
+	if notMember {
+		return gen.CreatePlay403JSONResponse(notMemberErr()), nil
+	}
+
 	// Not createLog, for the reason CreateSleep gives: the ALREADY_ACTIVE
 	// pre-check and the 23505 mapping do not fit a create closure that can
 	// only answer (id, error). The baby check itself is still shared.
@@ -148,7 +158,8 @@ func (d Deps) CreatePlay(ctx context.Context, req gen.CreatePlayRequestObject) (
 	id, err := d.Q.CreatePlay(ctx, dbgen.CreatePlayParams{
 		FamilyID:    fam.FamilyID,
 		BabyID:      body.BabyId,
-		CaretakerID: fam.UserID,
+		CaretakerID: caretaker,
+		LoggedByID:  fam.UserID,
 		Type:        string(body.Type),
 		StartTime:   ts(body.StartTime),
 		EndTime:     endTime,
@@ -236,9 +247,17 @@ func (d Deps) UpdatePlay(ctx context.Context, req gen.UpdatePlayRequestObject) (
 	startSet, startVal := patchField[time.Time](p, "startTime")
 	endSet, endVal := patchField[time.Time](p, "endTime")
 	notesSet, notesVal := patchField[string](p, "notes")
+	caretakerSet, caretakerVal := patchField[string](p, "caretakerId")
 
 	if err := p.Err(); err != nil {
 		return nil, err
+	}
+	caretakerSet, caretakerVal, notMember, err := caretakerPatch(ctx, d, fam, caretakerSet, caretakerVal)
+	if err != nil {
+		return nil, err
+	}
+	if notMember {
+		return gen.UpdatePlay403JSONResponse(notMemberErr()), nil
 	}
 
 	// reopening is "endTime present and explicitly null" — the one write
@@ -253,16 +272,18 @@ func (d Deps) UpdatePlay(ctx context.Context, req gen.UpdatePlayRequestObject) (
 		p.Any(),
 		func(ctx context.Context) error {
 			_, err := d.Q.UpdatePlay(ctx, dbgen.UpdatePlayParams{
-				FamilyID:     fam.FamilyID,
-				ID:           req.Id,
-				TypeSet:      typeSet,
-				TypeVal:      typeVal,
-				StartTimeSet: startSet,
-				StartTimeVal: tsFrom(startVal),
-				EndTimeSet:   endSet,
-				EndTimeVal:   tsFrom(endVal),
-				NotesSet:     notesSet,
-				NotesVal:     notesVal,
+				FamilyID:       fam.FamilyID,
+				ID:             req.Id,
+				TypeSet:        typeSet,
+				TypeVal:        typeVal,
+				StartTimeSet:   startSet,
+				StartTimeVal:   tsFrom(startVal),
+				EndTimeSet:     endSet,
+				EndTimeVal:     tsFrom(endVal),
+				CaretakerIDSet: caretakerSet,
+				CaretakerIDVal: caretakerVal,
+				NotesSet:       notesSet,
+				NotesVal:       notesVal,
 			})
 			return err
 		},

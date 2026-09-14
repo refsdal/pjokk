@@ -2214,12 +2214,16 @@ type BanUser struct {
 
 // BathLog defines model for BathLog.
 type BathLog struct {
-	BabyId        string    `json:"babyId"`
-	CaretakerId   string    `json:"caretakerId"`
-	CaretakerName string    `json:"caretakerName"`
-	Id            string    `json:"id"`
-	Notes         *string   `json:"notes"`
-	Time          time.Time `json:"time"`
+	BabyId        string `json:"babyId"`
+	CaretakerId   string `json:"caretakerId"`
+	CaretakerName string `json:"caretakerName"`
+	Id            string `json:"id"`
+
+	// LoggedById Who saved the row; set by the server, never by a client.
+	LoggedById   string    `json:"loggedById"`
+	LoggedByName string    `json:"loggedByName"`
+	Notes        *string   `json:"notes"`
+	Time         time.Time `json:"time"`
 }
 
 // CalendarEvent A family-wide (or baby-specific) planned event. Free (no plan gate — creation was premium in the TS predecessor; this port removes that gate).
@@ -2317,9 +2321,12 @@ type CreateBabySex string
 
 // CreateBath defines model for CreateBath.
 type CreateBath struct {
-	BabyId string    `json:"babyId"`
-	Notes  *string   `json:"notes,omitempty"`
-	Time   time.Time `json:"time"`
+	BabyId string `json:"babyId"`
+
+	// CaretakerId Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller.
+	CaretakerId *string   `json:"caretakerId,omitempty"`
+	Notes       *string   `json:"notes,omitempty"`
+	Time        time.Time `json:"time"`
 }
 
 // CreateCalendarEvent defines model for CreateCalendarEvent.
@@ -2373,7 +2380,10 @@ type CreateDevice struct {
 
 // CreateDiaper defines model for CreateDiaper.
 type CreateDiaper struct {
-	BabyId      string                   `json:"babyId"`
+	BabyId string `json:"babyId"`
+
+	// CaretakerId Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller.
+	CaretakerId *string                  `json:"caretakerId,omitempty"`
 	Color       *CreateDiaperColor       `json:"color,omitempty"`
 	Consistency *CreateDiaperConsistency `json:"consistency,omitempty"`
 	Notes       *string                  `json:"notes,omitempty"`
@@ -2392,8 +2402,11 @@ type CreateDiaperType string
 
 // CreateFeed defines model for CreateFeed.
 type CreateFeed struct {
-	AmountMl    *int32              `json:"amountMl,omitempty"`
-	BabyId      string              `json:"babyId"`
+	AmountMl *int32 `json:"amountMl,omitempty"`
+	BabyId   string `json:"babyId"`
+
+	// CaretakerId Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller.
+	CaretakerId *string             `json:"caretakerId,omitempty"`
 	Contents    *CreateFeedContents `json:"contents,omitempty"`
 	DurationMin *int32              `json:"durationMin,omitempty"`
 	Food        *string             `json:"food,omitempty"`
@@ -2434,11 +2447,14 @@ type CreateInviteRole string
 
 // CreateMeasurement defines model for CreateMeasurement.
 type CreateMeasurement struct {
-	BabyId string                `json:"babyId"`
-	Notes  *string               `json:"notes,omitempty"`
-	Time   time.Time             `json:"time"`
-	Type   CreateMeasurementType `json:"type"`
-	Value  float64               `json:"value"`
+	BabyId string `json:"babyId"`
+
+	// CaretakerId Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller.
+	CaretakerId *string               `json:"caretakerId,omitempty"`
+	Notes       *string               `json:"notes,omitempty"`
+	Time        time.Time             `json:"time"`
+	Type        CreateMeasurementType `json:"type"`
+	Value       float64               `json:"value"`
 }
 
 // CreateMeasurementType defines model for CreateMeasurement.Type.
@@ -2446,13 +2462,16 @@ type CreateMeasurementType string
 
 // CreateMedicine defines model for CreateMedicine.
 type CreateMedicine struct {
-	Amount     *float64            `json:"amount,omitempty"`
-	BabyId     string              `json:"babyId"`
-	MedicineId *string             `json:"medicineId,omitempty"`
-	Name       string              `json:"name"`
-	Notes      *string             `json:"notes,omitempty"`
-	Time       time.Time           `json:"time"`
-	Unit       *CreateMedicineUnit `json:"unit,omitempty"`
+	Amount *float64 `json:"amount,omitempty"`
+	BabyId string   `json:"babyId"`
+
+	// CaretakerId Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller.
+	CaretakerId *string             `json:"caretakerId,omitempty"`
+	MedicineId  *string             `json:"medicineId,omitempty"`
+	Name        string              `json:"name"`
+	Notes       *string             `json:"notes,omitempty"`
+	Time        time.Time           `json:"time"`
+	Unit        *CreateMedicineUnit `json:"unit,omitempty"`
 }
 
 // CreateMedicineUnit defines model for CreateMedicine.Unit.
@@ -2472,23 +2491,32 @@ type CreateMedicineCatalogueEntryUnit string
 
 // CreateMilestone defines model for CreateMilestone.
 type CreateMilestone struct {
-	BabyId string    `json:"babyId"`
-	Notes  *string   `json:"notes,omitempty"`
-	Time   time.Time `json:"time"`
-	Title  string    `json:"title"`
+	BabyId string `json:"babyId"`
+
+	// CaretakerId Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller.
+	CaretakerId *string   `json:"caretakerId,omitempty"`
+	Notes       *string   `json:"notes,omitempty"`
+	Time        time.Time `json:"time"`
+	Title       string    `json:"title"`
 }
 
 // CreateNote defines model for CreateNote.
 type CreateNote struct {
-	BabyId  string    `json:"babyId"`
-	Content string    `json:"content"`
-	Notes   *string   `json:"notes,omitempty"`
-	Time    time.Time `json:"time"`
+	BabyId string `json:"babyId"`
+
+	// CaretakerId Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller.
+	CaretakerId *string   `json:"caretakerId,omitempty"`
+	Content     string    `json:"content"`
+	Notes       *string   `json:"notes,omitempty"`
+	Time        time.Time `json:"time"`
 }
 
 // CreatePlay defines model for CreatePlay.
 type CreatePlay struct {
 	BabyId string `json:"babyId"`
+
+	// CaretakerId Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller.
+	CaretakerId *string `json:"caretakerId,omitempty"`
 
 	// EndTime Omit to start a running session.
 	EndTime   *time.Time     `json:"endTime,omitempty"`
@@ -2502,8 +2530,11 @@ type CreatePlayType string
 
 // CreatePump defines model for CreatePump.
 type CreatePump struct {
-	AmountMl    *int32          `json:"amountMl,omitempty"`
-	BabyId      string          `json:"babyId"`
+	AmountMl *int32 `json:"amountMl,omitempty"`
+	BabyId   string `json:"babyId"`
+
+	// CaretakerId Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller.
+	CaretakerId *string         `json:"caretakerId,omitempty"`
 	DurationMin *int32          `json:"durationMin,omitempty"`
 	Notes       *string         `json:"notes,omitempty"`
 	Side        *CreatePumpSide `json:"side,omitempty"`
@@ -2537,6 +2568,9 @@ type CreateReminderMode string
 type CreateSleep struct {
 	BabyId string `json:"babyId"`
 
+	// CaretakerId Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller.
+	CaretakerId *string `json:"caretakerId,omitempty"`
+
 	// EndTime Omit to start an active sleep session.
 	EndTime   *time.Time       `json:"endTime,omitempty"`
 	Location  *string          `json:"location,omitempty"`
@@ -2555,7 +2589,10 @@ type CreateSleepLocation struct {
 
 // CreateVaccine defines model for CreateVaccine.
 type CreateVaccine struct {
-	BabyId       string    `json:"babyId"`
+	BabyId string `json:"babyId"`
+
+	// CaretakerId Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller.
+	CaretakerId  *string   `json:"caretakerId,omitempty"`
 	DoseNumber   *int      `json:"doseNumber,omitempty"`
 	Name         string    `json:"name"`
 	Notes        *string   `json:"notes,omitempty"`
@@ -2647,8 +2684,12 @@ type DiaperLog struct {
 	// Consistency Stool consistency. Only meaningful for dirty/both.
 	Consistency *DiaperLogConsistency `json:"consistency"`
 	Id          string                `json:"id"`
-	Notes       *string               `json:"notes"`
-	Time        time.Time             `json:"time"`
+
+	// LoggedById Who saved the row; set by the server, never by a client.
+	LoggedById   string    `json:"loggedById"`
+	LoggedByName string    `json:"loggedByName"`
+	Notes        *string   `json:"notes"`
+	Time         time.Time `json:"time"`
 
 	// Type `dry` is a checked-and-clean diaper; it is counted separately so a dry check never inflates the wet count.
 	Type DiaperLogType `json:"type"`
@@ -2730,7 +2771,11 @@ type FeedLog struct {
 	Food    *string `json:"food"`
 	Id      string  `json:"id"`
 	LeftMin *int32  `json:"leftMin"`
-	Notes   *string `json:"notes"`
+
+	// LoggedById Who saved the row; set by the server, never by a client.
+	LoggedById   string  `json:"loggedById"`
+	LoggedByName string  `json:"loggedByName"`
+	Notes        *string `json:"notes"`
 
 	// Reaction Whether a solids feed produced a reaction (details go in `notes`). null = not recorded, which is not the same as false.
 	Reaction *bool        `json:"reaction"`
@@ -2757,6 +2802,10 @@ type FeedTimer struct {
 	Id            string        `json:"id"`
 	Kind          FeedTimerKind `json:"kind"`
 	LeftSec       int32         `json:"leftSec"`
+
+	// LoggedById Who saved the row; set by the server, never by a client.
+	LoggedById   string `json:"loggedById"`
+	LoggedByName string `json:"loggedByName"`
 
 	// RightSec For a pump timer everything banks into leftSec.
 	RightSec int32 `json:"rightSec"`
@@ -2889,14 +2938,18 @@ type MeUnits string
 
 // MeasurementLog defines model for MeasurementLog.
 type MeasurementLog struct {
-	BabyId        string             `json:"babyId"`
-	CaretakerId   string             `json:"caretakerId"`
-	CaretakerName string             `json:"caretakerName"`
-	Id            string             `json:"id"`
-	Notes         *string            `json:"notes"`
-	Time          time.Time          `json:"time"`
-	Type          MeasurementLogType `json:"type"`
-	Value         float64            `json:"value"`
+	BabyId        string `json:"babyId"`
+	CaretakerId   string `json:"caretakerId"`
+	CaretakerName string `json:"caretakerName"`
+	Id            string `json:"id"`
+
+	// LoggedById Who saved the row; set by the server, never by a client.
+	LoggedById   string             `json:"loggedById"`
+	LoggedByName string             `json:"loggedByName"`
+	Notes        *string            `json:"notes"`
+	Time         time.Time          `json:"time"`
+	Type         MeasurementLogType `json:"type"`
+	Value        float64            `json:"value"`
 }
 
 // MeasurementLogType defines model for MeasurementLog.Type.
@@ -2927,6 +2980,10 @@ type MedicineLog struct {
 	CaretakerName string   `json:"caretakerName"`
 	Id            string   `json:"id"`
 
+	// LoggedById Who saved the row; set by the server, never by a client.
+	LoggedById   string `json:"loggedById"`
+	LoggedByName string `json:"loggedByName"`
+
 	// MedicineId The catalogue entry this dose was picked from, or null.
 	MedicineId *string          `json:"medicineId"`
 	Name       string           `json:"name"`
@@ -2956,14 +3013,18 @@ type Member struct {
 
 // MilestoneLog defines model for MilestoneLog.
 type MilestoneLog struct {
-	BabyId        string           `json:"babyId"`
-	CaretakerId   string           `json:"caretakerId"`
-	CaretakerName string           `json:"caretakerName"`
-	Id            string           `json:"id"`
-	Notes         *string          `json:"notes"`
-	Photos        []MilestonePhoto `json:"photos"`
-	Time          time.Time        `json:"time"`
-	Title         string           `json:"title"`
+	BabyId        string `json:"babyId"`
+	CaretakerId   string `json:"caretakerId"`
+	CaretakerName string `json:"caretakerName"`
+	Id            string `json:"id"`
+
+	// LoggedById Who saved the row; set by the server, never by a client.
+	LoggedById   string           `json:"loggedById"`
+	LoggedByName string           `json:"loggedByName"`
+	Notes        *string          `json:"notes"`
+	Photos       []MilestonePhoto `json:"photos"`
+	Time         time.Time        `json:"time"`
+	Title        string           `json:"title"`
 }
 
 // MilestonePhoto One photo attached to a milestone (issue #48): a server re-encoded JPEG, fetched through `/api/photos/{id}` — the object store is never public. Uploaded as multipart to `POST /api/milestones/{id}/photos` (hand-routed, see internal/api/photos.go); at most three per milestone and a per-family quota (PHOTO_QUOTA_MB).
@@ -2979,13 +3040,17 @@ type MilestonePhoto struct {
 
 // NoteLog defines model for NoteLog.
 type NoteLog struct {
-	BabyId        string    `json:"babyId"`
-	CaretakerId   string    `json:"caretakerId"`
-	CaretakerName string    `json:"caretakerName"`
-	Content       string    `json:"content"`
-	Id            string    `json:"id"`
-	Notes         *string   `json:"notes"`
-	Time          time.Time `json:"time"`
+	BabyId        string `json:"babyId"`
+	CaretakerId   string `json:"caretakerId"`
+	CaretakerName string `json:"caretakerName"`
+	Content       string `json:"content"`
+	Id            string `json:"id"`
+
+	// LoggedById Who saved the row; set by the server, never by a client.
+	LoggedById   string    `json:"loggedById"`
+	LoggedByName string    `json:"loggedByName"`
+	Notes        *string   `json:"notes"`
+	Time         time.Time `json:"time"`
 }
 
 // Ok The standard `{ok:true}` success body for actions with no other payload.
@@ -3003,11 +3068,15 @@ type PlayLog struct {
 	CaretakerName string `json:"caretakerName"`
 
 	// EndTime null while the activity is running.
-	EndTime   *time.Time  `json:"endTime"`
-	Id        string      `json:"id"`
-	Notes     *string     `json:"notes"`
-	StartTime time.Time   `json:"startTime"`
-	Type      PlayLogType `json:"type"`
+	EndTime *time.Time `json:"endTime"`
+	Id      string     `json:"id"`
+
+	// LoggedById Who saved the row; set by the server, never by a client.
+	LoggedById   string      `json:"loggedById"`
+	LoggedByName string      `json:"loggedByName"`
+	Notes        *string     `json:"notes"`
+	StartTime    time.Time   `json:"startTime"`
+	Type         PlayLogType `json:"type"`
 }
 
 // PlayLogType defines model for PlayLog.Type.
@@ -3015,15 +3084,19 @@ type PlayLogType string
 
 // PumpLog defines model for PumpLog.
 type PumpLog struct {
-	AmountMl      *int32       `json:"amountMl"`
-	BabyId        string       `json:"babyId"`
-	CaretakerId   string       `json:"caretakerId"`
-	CaretakerName string       `json:"caretakerName"`
-	DurationMin   *int32       `json:"durationMin"`
-	Id            string       `json:"id"`
-	Notes         *string      `json:"notes"`
-	Side          *PumpLogSide `json:"side"`
-	Time          time.Time    `json:"time"`
+	AmountMl      *int32 `json:"amountMl"`
+	BabyId        string `json:"babyId"`
+	CaretakerId   string `json:"caretakerId"`
+	CaretakerName string `json:"caretakerName"`
+	DurationMin   *int32 `json:"durationMin"`
+	Id            string `json:"id"`
+
+	// LoggedById Who saved the row; set by the server, never by a client.
+	LoggedById   string       `json:"loggedById"`
+	LoggedByName string       `json:"loggedByName"`
+	Notes        *string      `json:"notes"`
+	Side         *PumpLogSide `json:"side"`
+	Time         time.Time    `json:"time"`
 }
 
 // PumpLogSide defines model for PumpLog.Side.
@@ -3125,11 +3198,15 @@ type SleepLog struct {
 	CaretakerName string `json:"caretakerName"`
 
 	// EndTime null while the session is active.
-	EndTime   *time.Time `json:"endTime"`
-	Id        string     `json:"id"`
-	Location  *string    `json:"location"`
-	Notes     *string    `json:"notes"`
-	StartTime time.Time  `json:"startTime"`
+	EndTime  *time.Time `json:"endTime"`
+	Id       string     `json:"id"`
+	Location *string    `json:"location"`
+
+	// LoggedById Who saved the row; set by the server, never by a client.
+	LoggedById   string    `json:"loggedById"`
+	LoggedByName string    `json:"loggedByName"`
+	Notes        *string   `json:"notes"`
+	StartTime    time.Time `json:"startTime"`
 
 	// Type Nap or night sleep. The client defaults it from the device's night-mode schedule; the server never guesses (it has no timezone), so an omitted type stays null. (Named `type` like the feed and diaper enums; `kind` is the timeline's discriminator and must stay free.)
 	Type *SleepLogType `json:"type"`
@@ -3140,8 +3217,11 @@ type SleepLogType string
 
 // StartFeedTimer defines model for StartFeedTimer.
 type StartFeedTimer struct {
-	BabyId string             `json:"babyId"`
-	Kind   StartFeedTimerKind `json:"kind"`
+	BabyId string `json:"babyId"`
+
+	// CaretakerId Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller.
+	CaretakerId *string            `json:"caretakerId,omitempty"`
+	Kind        StartFeedTimerKind `json:"kind"`
 
 	// Side Defaults to left for nursing, both for pumping.
 	Side *StartFeedTimerSide `json:"side,omitempty"`
@@ -3305,11 +3385,15 @@ type Timeline struct {
 
 // TimelineEntry One row in the merged timeline. `kind`, `id`, `babyId`, `caretakerId`, `caretakerName` and `notes` are present on every entry regardless of kind; everything else is kind-specific and only present for the kinds that have it (e.g. `startTime`/`endTime` on sleep and play, `time` on the other nine, `documents` only on vaccine) — see internal/api/timeline.go's per-kind entry builders, ported field-for-field from apps/api/src/routes/timeline.ts's merge. Modeled as an open object (kind + a handful of always-present fields typed, everything else additionalProperties) rather than a oneOf discriminated union: oapi-codegen has no clean Go representation for eleven structurally different variants sharing one JSON shape.
 type TimelineEntry struct {
-	BabyId               string                 `json:"babyId"`
-	CaretakerId          string                 `json:"caretakerId"`
-	CaretakerName        string                 `json:"caretakerName"`
-	Id                   string                 `json:"id"`
-	Kind                 TimelineEntryKind      `json:"kind"`
+	BabyId        string            `json:"babyId"`
+	CaretakerId   string            `json:"caretakerId"`
+	CaretakerName string            `json:"caretakerName"`
+	Id            string            `json:"id"`
+	Kind          TimelineEntryKind `json:"kind"`
+
+	// LoggedById Who saved the row; set by the server, never by a client.
+	LoggedById           string                 `json:"loggedById"`
+	LoggedByName         string                 `json:"loggedByName"`
 	Notes                *string                `json:"notes"`
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
@@ -3344,8 +3428,10 @@ type UpdateBabySex string
 
 // UpdateBath Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time` is not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
 type UpdateBath struct {
-	Notes *string    `json:"notes,omitempty"`
-	Time  *time.Time `json:"time,omitempty"`
+	// CaretakerId Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged.
+	CaretakerId *string    `json:"caretakerId,omitempty"`
+	Notes       *string    `json:"notes,omitempty"`
+	Time        *time.Time `json:"time,omitempty"`
 }
 
 // UpdateCalendarEvent Every field is optional; an empty object is a no-op. `description`/`location`/`durationMin`/`remindMinutesBefore` may also be sent as `null` to CLEAR that column; `title`/`category`/ `startTime`/`allDay` are not nullable — only settable or omitted. `babyIds`/`assigneeUserIds`, when present, REPLACE the link set; omitted leaves it untouched (see internal/api/calendar.go).
@@ -3387,6 +3473,8 @@ type UpdateContactIcon string
 
 // UpdateDiaper Every field is optional; an empty object is a no-op. `color`, `consistency` and `notes` may also be sent as `null` to CLEAR them; `time`/`type` are not nullable — only settable or omitted (see internal/api/feeds.go for the presence-detection pattern this endpoint shares with UpdateFeed).
 type UpdateDiaper struct {
+	// CaretakerId Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged.
+	CaretakerId *string                  `json:"caretakerId,omitempty"`
 	Color       *UpdateDiaperColor       `json:"color,omitempty"`
 	Consistency *UpdateDiaperConsistency `json:"consistency,omitempty"`
 	Notes       *string                  `json:"notes,omitempty"`
@@ -3405,7 +3493,10 @@ type UpdateDiaperType string
 
 // UpdateFeed Every field is optional; an empty object is a no-op. `amountMl`, `side`, `durationMin`, `leftMin`, `rightMin` and `notes` may also be sent as `null` to CLEAR that column; `time`/`type` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs, which the generated request type alone cannot provide).
 type UpdateFeed struct {
-	AmountMl    *int32              `json:"amountMl,omitempty"`
+	AmountMl *int32 `json:"amountMl,omitempty"`
+
+	// CaretakerId Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged.
+	CaretakerId *string             `json:"caretakerId,omitempty"`
 	Contents    *UpdateFeedContents `json:"contents,omitempty"`
 	DurationMin *int32              `json:"durationMin,omitempty"`
 	Food        *string             `json:"food,omitempty"`
@@ -3448,10 +3539,12 @@ type UpdateMeUnits string
 
 // UpdateMeasurement Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time`/`type`/`value` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
 type UpdateMeasurement struct {
-	Notes *string                `json:"notes,omitempty"`
-	Time  *time.Time             `json:"time,omitempty"`
-	Type  *UpdateMeasurementType `json:"type,omitempty"`
-	Value *float64               `json:"value,omitempty"`
+	// CaretakerId Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged.
+	CaretakerId *string                `json:"caretakerId,omitempty"`
+	Notes       *string                `json:"notes,omitempty"`
+	Time        *time.Time             `json:"time,omitempty"`
+	Type        *UpdateMeasurementType `json:"type,omitempty"`
+	Value       *float64               `json:"value,omitempty"`
 }
 
 // UpdateMeasurementType defines model for UpdateMeasurement.Type.
@@ -3459,12 +3552,15 @@ type UpdateMeasurementType string
 
 // UpdateMedicine Every field is optional; an empty object is a no-op. `amount`, `unit` and `notes` may also be sent as `null` to CLEAR that column; `time`/`name` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
 type UpdateMedicine struct {
-	Amount     *float64            `json:"amount,omitempty"`
-	MedicineId *string             `json:"medicineId,omitempty"`
-	Name       *string             `json:"name,omitempty"`
-	Notes      *string             `json:"notes,omitempty"`
-	Time       *time.Time          `json:"time,omitempty"`
-	Unit       *UpdateMedicineUnit `json:"unit,omitempty"`
+	Amount *float64 `json:"amount,omitempty"`
+
+	// CaretakerId Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged.
+	CaretakerId *string             `json:"caretakerId,omitempty"`
+	MedicineId  *string             `json:"medicineId,omitempty"`
+	Name        *string             `json:"name,omitempty"`
+	Notes       *string             `json:"notes,omitempty"`
+	Time        *time.Time          `json:"time,omitempty"`
+	Unit        *UpdateMedicineUnit `json:"unit,omitempty"`
 }
 
 // UpdateMedicineUnit defines model for UpdateMedicine.Unit.
@@ -3485,24 +3581,30 @@ type UpdateMedicineCatalogueEntryUnit string
 
 // UpdateMilestone Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time`/`title` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
 type UpdateMilestone struct {
-	Notes *string    `json:"notes,omitempty"`
-	Time  *time.Time `json:"time,omitempty"`
-	Title *string    `json:"title,omitempty"`
+	// CaretakerId Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged.
+	CaretakerId *string    `json:"caretakerId,omitempty"`
+	Notes       *string    `json:"notes,omitempty"`
+	Time        *time.Time `json:"time,omitempty"`
+	Title       *string    `json:"title,omitempty"`
 }
 
 // UpdateNote Every field is optional; an empty object is a no-op. `notes` may also be sent as `null` to CLEAR it; `time`/`content` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
 type UpdateNote struct {
-	Content *string    `json:"content,omitempty"`
-	Notes   *string    `json:"notes,omitempty"`
-	Time    *time.Time `json:"time,omitempty"`
+	// CaretakerId Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged.
+	CaretakerId *string    `json:"caretakerId,omitempty"`
+	Content     *string    `json:"content,omitempty"`
+	Notes       *string    `json:"notes,omitempty"`
+	Time        *time.Time `json:"time,omitempty"`
 }
 
 // UpdatePlay Every field is optional; an empty object is a no-op. `endTime` and `notes` may also be sent as `null` to CLEAR that column — clearing `endTime` reopens the session and can 409 if another session for the same baby is already running (see internal/api/play.go). `type`/`startTime` are not nullable — only settable or omitted.
 type UpdatePlay struct {
-	EndTime   *time.Time      `json:"endTime,omitempty"`
-	Notes     *string         `json:"notes,omitempty"`
-	StartTime *time.Time      `json:"startTime,omitempty"`
-	Type      *UpdatePlayType `json:"type,omitempty"`
+	// CaretakerId Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged.
+	CaretakerId *string         `json:"caretakerId,omitempty"`
+	EndTime     *time.Time      `json:"endTime,omitempty"`
+	Notes       *string         `json:"notes,omitempty"`
+	StartTime   *time.Time      `json:"startTime,omitempty"`
+	Type        *UpdatePlayType `json:"type,omitempty"`
 }
 
 // UpdatePlayType defines model for UpdatePlay.Type.
@@ -3510,7 +3612,10 @@ type UpdatePlayType string
 
 // UpdatePump Every field is optional; an empty object is a no-op. `side`, `amountMl`, `durationMin` and `notes` may also be sent as `null` to CLEAR that column; `time` is not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
 type UpdatePump struct {
-	AmountMl    *int32          `json:"amountMl,omitempty"`
+	AmountMl *int32 `json:"amountMl,omitempty"`
+
+	// CaretakerId Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged.
+	CaretakerId *string         `json:"caretakerId,omitempty"`
 	DurationMin *int32          `json:"durationMin,omitempty"`
 	Notes       *string         `json:"notes,omitempty"`
 	Side        *UpdatePumpSide `json:"side,omitempty"`
@@ -3522,11 +3627,13 @@ type UpdatePumpSide string
 
 // UpdateSleep Every field is optional; an empty object is a no-op. `endTime`, `location` and `notes` may also be sent as `null` to CLEAR that column — clearing `endTime` reopens the session and can 409 if another session for the same baby is already active (see internal/api/sleep.go). `startTime` is not nullable — only settable or omitted.
 type UpdateSleep struct {
-	EndTime   *time.Time       `json:"endTime,omitempty"`
-	Location  *string          `json:"location,omitempty"`
-	Notes     *string          `json:"notes,omitempty"`
-	StartTime *time.Time       `json:"startTime,omitempty"`
-	Type      *UpdateSleepType `json:"type,omitempty"`
+	// CaretakerId Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged.
+	CaretakerId *string          `json:"caretakerId,omitempty"`
+	EndTime     *time.Time       `json:"endTime,omitempty"`
+	Location    *string          `json:"location,omitempty"`
+	Notes       *string          `json:"notes,omitempty"`
+	StartTime   *time.Time       `json:"startTime,omitempty"`
+	Type        *UpdateSleepType `json:"type,omitempty"`
 }
 
 // UpdateSleepType defines model for UpdateSleep.Type.
@@ -3534,6 +3641,8 @@ type UpdateSleepType string
 
 // UpdateVaccine Every field is optional; an empty object is a no-op. `doseNumber`, `scheduleSlot` and `notes` may also be sent as `null` to CLEAR that column; `time`/`name` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs).
 type UpdateVaccine struct {
+	// CaretakerId Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged.
+	CaretakerId  *string    `json:"caretakerId,omitempty"`
 	DoseNumber   *int       `json:"doseNumber,omitempty"`
 	Name         *string    `json:"name,omitempty"`
 	Notes        *string    `json:"notes,omitempty"`
@@ -3565,8 +3674,12 @@ type VaccineLog struct {
 	Documents     []VaccineDocument `json:"documents"`
 	DoseNumber    *int              `json:"doseNumber"`
 	Id            string            `json:"id"`
-	Name          string            `json:"name"`
-	Notes         *string           `json:"notes"`
+
+	// LoggedById Who saved the row; set by the server, never by a client.
+	LoggedById   string  `json:"loggedById"`
+	LoggedByName string  `json:"loggedByName"`
+	Name         string  `json:"name"`
+	Notes        *string `json:"notes"`
 
 	// ScheduleSlot Slot key from the bundled programme ("mmr:1"), or null for an off-programme dose.
 	ScheduleSlot *string   `json:"scheduleSlot"`
@@ -4079,6 +4192,22 @@ func (a *TimelineEntry) UnmarshalJSON(b []byte) error {
 		delete(object, "kind")
 	}
 
+	if raw, found := object["loggedById"]; found {
+		err = json.Unmarshal(raw, &a.LoggedById)
+		if err != nil {
+			return fmt.Errorf("error reading 'loggedById': %w", err)
+		}
+		delete(object, "loggedById")
+	}
+
+	if raw, found := object["loggedByName"]; found {
+		err = json.Unmarshal(raw, &a.LoggedByName)
+		if err != nil {
+			return fmt.Errorf("error reading 'loggedByName': %w", err)
+		}
+		delete(object, "loggedByName")
+	}
+
 	if raw, found := object["notes"]; found {
 		err = json.Unmarshal(raw, &a.Notes)
 		if err != nil {
@@ -4129,6 +4258,16 @@ func (a TimelineEntry) MarshalJSON() ([]byte, error) {
 	object["kind"], err = json.Marshal(a.Kind)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling 'kind': %w", err)
+	}
+
+	object["loggedById"], err = json.Marshal(a.LoggedById)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'loggedById': %w", err)
+	}
+
+	object["loggedByName"], err = json.Marshal(a.LoggedByName)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'loggedByName': %w", err)
 	}
 
 	object["notes"], err = json.Marshal(a.Notes)

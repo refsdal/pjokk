@@ -74,7 +74,7 @@ func TestExportCSVOrderingEscapingFamilyScoped(t *testing.T) {
 
 	csv := string(res.Raw)
 	lines := strings.Split(csv, "\n")
-	want := "kind,baby,time,end_time,type,detail,amount,unit,side,duration_min,value,location,caretaker,notes"
+	want := "kind,baby,time,end_time,type,detail,amount,unit,side,duration_min,value,location,caretaker,logged_by,notes"
 	if lines[0] != want {
 		t.Errorf("header = %q, want %q", lines[0], want)
 	}

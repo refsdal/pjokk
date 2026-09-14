@@ -63,6 +63,7 @@ type BathLog struct {
 	Time        pgtype.Timestamptz
 	Notes       *string
 	CreatedAt   pgtype.Timestamptz
+	LoggedByID  string
 }
 
 type CalendarAssignee struct {
@@ -144,6 +145,7 @@ type DiaperLog struct {
 	CreatedAt   pgtype.Timestamptz
 	Color       *string
 	Consistency *string
+	LoggedByID  string
 }
 
 type FamilyInvite struct {
@@ -175,6 +177,7 @@ type FeedLog struct {
 	Contents    *string
 	Food        *string
 	Reaction    *bool
+	LoggedByID  string
 }
 
 type FeedTimer struct {
@@ -189,6 +192,7 @@ type FeedTimer struct {
 	LeftSec       int32
 	RightSec      int32
 	CreatedAt     pgtype.Timestamptz
+	LoggedByID    string
 }
 
 type HelpRequest struct {
@@ -229,6 +233,7 @@ type MeasurementLog struct {
 	Value       float64
 	Notes       *string
 	CreatedAt   pgtype.Timestamptz
+	LoggedByID  string
 }
 
 type Medicine struct {
@@ -255,6 +260,7 @@ type MedicineLog struct {
 	Notes       *string
 	CreatedAt   pgtype.Timestamptz
 	MedicineID  *string
+	LoggedByID  string
 }
 
 type MilestoneLog struct {
@@ -266,6 +272,7 @@ type MilestoneLog struct {
 	Title       string
 	Notes       *string
 	CreatedAt   pgtype.Timestamptz
+	LoggedByID  string
 }
 
 type MilestonePhoto struct {
@@ -288,6 +295,7 @@ type NoteLog struct {
 	Content     string
 	Notes       *string
 	CreatedAt   pgtype.Timestamptz
+	LoggedByID  string
 }
 
 type OrganizationInvitations struct {
@@ -340,6 +348,7 @@ type PlayLog struct {
 	EndTime     pgtype.Timestamptz
 	Notes       *string
 	CreatedAt   pgtype.Timestamptz
+	LoggedByID  string
 }
 
 type PumpLog struct {
@@ -353,6 +362,7 @@ type PumpLog struct {
 	DurationMin *int32
 	Notes       *string
 	CreatedAt   pgtype.Timestamptz
+	LoggedByID  string
 }
 
 type PushSnooze struct {
@@ -437,6 +447,7 @@ type SleepLog struct {
 	Notes       *string
 	CreatedAt   pgtype.Timestamptz
 	Type        *string
+	LoggedByID  string
 }
 
 type Users struct {
@@ -497,6 +508,7 @@ type VaccineLog struct {
 	ScheduleSlot *string
 	Notes        *string
 	CreatedAt    pgtype.Timestamptz
+	LoggedByID   string
 }
 
 type Verifications struct {

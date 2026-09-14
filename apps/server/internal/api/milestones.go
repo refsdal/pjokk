@@ -26,6 +26,8 @@ func serMilestone(row dbgen.GetMilestoneRow, photos []dbgen.ListMilestonePhotosF
 		BabyId:        row.BabyID,
 		CaretakerId:   row.CaretakerID,
 		CaretakerName: row.CaretakerName,
+		LoggedById:    row.LoggedByID,
+		LoggedByName:  row.LoggedByName,
 		Time:          row.Time.Time,
 		Title:         row.Title,
 		Notes:         row.Notes,
@@ -69,12 +71,21 @@ func (d Deps) CreateMilestone(ctx context.Context, req gen.CreateMilestoneReques
 	}
 	body := req.Body
 
+	caretaker, notMember, err := caretakerFor(ctx, d, fam, body.CaretakerId)
+	if err != nil {
+		return nil, err
+	}
+	if notMember {
+		return gen.CreateMilestone403JSONResponse(notMemberErr()), nil
+	}
+
 	row, unknownBaby, err := createLog(ctx, d, fam.FamilyID, body.BabyId,
 		func(ctx context.Context) (string, error) {
 			return d.Q.CreateMilestone(ctx, dbgen.CreateMilestoneParams{
 				FamilyID:    fam.FamilyID,
 				BabyID:      body.BabyId,
-				CaretakerID: fam.UserID,
+				CaretakerID: caretaker,
+				LoggedByID:  fam.UserID,
 				Time:        ts(body.Time),
 				Title:       body.Title,
 				Notes:       body.Notes,
@@ -106,8 +117,16 @@ func (d Deps) UpdateMilestone(ctx context.Context, req gen.UpdateMilestoneReques
 	timeSet, timeVal := patchField[time.Time](p, "time")
 	titleSet, titleVal := patchField[string](p, "title")
 	notesSet, notesVal := patchField[string](p, "notes")
+	caretakerSet, caretakerVal := patchField[string](p, "caretakerId")
 	if err := p.Err(); err != nil {
 		return nil, err
+	}
+	caretakerSet, caretakerVal, notMember, err := caretakerPatch(ctx, d, fam, caretakerSet, caretakerVal)
+	if err != nil {
+		return nil, err
+	}
+	if notMember {
+		return gen.UpdateMilestone403JSONResponse(notMemberErr()), nil
 	}
 
 	row, found, err := updateLog(ctx,
@@ -117,14 +136,16 @@ func (d Deps) UpdateMilestone(ctx context.Context, req gen.UpdateMilestoneReques
 		p.Any(),
 		func(ctx context.Context) error {
 			_, err := d.Q.UpdateMilestone(ctx, dbgen.UpdateMilestoneParams{
-				FamilyID: fam.FamilyID,
-				ID:       req.Id,
-				TimeSet:  timeSet,
-				TimeVal:  tsFrom(timeVal),
-				TitleSet: titleSet,
-				TitleVal: titleVal,
-				NotesSet: notesSet,
-				NotesVal: notesVal,
+				FamilyID:       fam.FamilyID,
+				ID:             req.Id,
+				TimeSet:        timeSet,
+				TimeVal:        tsFrom(timeVal),
+				TitleSet:       titleSet,
+				TitleVal:       titleVal,
+				CaretakerIDSet: caretakerSet,
+				CaretakerIDVal: caretakerVal,
+				NotesSet:       notesSet,
+				NotesVal:       notesVal,
 			})
 			return err
 		},
