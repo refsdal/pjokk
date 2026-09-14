@@ -1,5 +1,12 @@
+import { join } from "node:path";
 import { asDevice, expect, seedDayMode, test } from "./fixtures";
 import { apiSignIn, apiSignup, freshEmail, freshFamily } from "./helpers";
+
+// Screenshots of the chips and the "Logged by" line, for a human to look
+// at. Off in the repo by default (test-results/ is gitignored); point
+// E2E_SHOT_DIR somewhere else when the shots are the deliverable.
+const SHOT_DIR = process.env.E2E_SHOT_DIR ?? "test-results/who-did-it-shots";
+const shot = (name: string) => join(SHOT_DIR, name);
 
 // Who did the care, not only who logged it (spec 2026-09-14-who-did-it):
 // a two-parent family, a diaper logged by one for the other. The timeline
@@ -50,6 +57,7 @@ test("a diaper logged for a partner shows the partner on the timeline", async ({
   await expect(me).toHaveAttribute("aria-pressed", "true");
   await bo.click();
   await expect(bo).toHaveAttribute("aria-pressed", "true");
+  await sheet.screenshot({ path: shot("create.png") });
   await sheet.getByRole("button", { name: "Save" }).click();
 
   await page.goto("/timeline");
@@ -63,4 +71,5 @@ test("a diaper logged for a partner shows the partner on the timeline", async ({
     edit.getByTestId("caretaker-chips").getByRole("button", { name: /Bo/ }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(edit.getByTestId("logged-by")).toHaveText("Logged by Anne Admin");
+  await edit.screenshot({ path: shot("edit.png") });
 });
