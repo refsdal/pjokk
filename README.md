@@ -28,7 +28,8 @@ one-handed, at 03:00, holding a baby. Pjokk is built around that reality:
   screen — no blue light, no hunting for buttons.
 - **A family, not an account.** Caretakers share one family (multi-tenant to
   the bone), join via QR invite codes at the Sunday dinner table, and every
-  timeline entry says who logged it. Signup is invite-only.
+  timeline entry says who did it — yourself by default, or the partner you
+  pick on the sheet. Signup is invite-only.
 - **Works in the dead zone.** Offline-first PWA: the last known state renders
   instantly, and entries logged without signal sync when it returns.
 

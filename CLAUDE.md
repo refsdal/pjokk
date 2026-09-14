@@ -50,8 +50,13 @@ separate test deploy).
 7. **Calm, not cute.** One accent color + per-category tints used ONLY on icons
    and badges, never as backgrounds. Category colors: sleep=purple, feeds=blue,
    diapers=teal, growth/measurements=coral.
-8. **Attribution is ambient.** Timeline entries show "by <caretaker>" from the
-   session. Useful the morning after; free from the auth model. Attribution
+8. **Attribution is ambient.** Timeline entries show "by <caretaker>": the
+   person who DID the care, which defaults to the session but can be a
+   partner chosen on the sheet (spec
+   `docs/superpowers/specs/2026-09-14-who-did-it-design.md`). Every log row
+   also keeps `loggedById`, who saved it — set by the server, never by a
+   client — shown only as a muted "Logged by" line on an edit when the two
+   differ. Useful the morning after; free from the auth model. Attribution
    uses the display name (nickname, else full name) and the caretaker's
    avatar.
 
@@ -436,8 +441,14 @@ the library rather than guessed, and they are NOT the better-auth names the
 Bun-era schema used. Domain tables kept their singular names:
 
 - `baby(id, familyId, name, birthDate, …)`
-- `sleep_log(id, familyId, babyId, caretakerId, startTime, endTime NULL while
-  active, location?, type nap|night?, notes?)`
+- Every log table carries two people (00019): `caretakerId`, who did the
+  care — optional on every create and update body, must be a family member
+  (403 `NOT_MEMBER`), defaults to the caller — and `loggedById`, who saved
+  the row, always the family context's user. `internal/api/caretaker.go`
+  is the one rule; a kiosk's chosen face is both. The columns are listed
+  once here and implied below.
+- `sleep_log(id, familyId, babyId, caretakerId, loggedById, startTime,
+  endTime NULL while active, location?, type nap|night?, notes?)`
 - `feed_log(id, familyId, babyId, caretakerId, time, type bottle|breast|solids,
   amountMl?, side?, durationMin?, contents formula|breast_milk|mixed?,
   food?, reaction bool?, notes?)`

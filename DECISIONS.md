@@ -2748,3 +2748,32 @@ to drift from the spec without anything noticing. This closes it.
   app no longer has (Stripe billing and the entitlement rework). The other
   specs stay: they are the designs of what the app does, and CLAUDE.md
   links to them. Git keeps everything removed here.
+
+## 2026-09-14 — who did the care, not only who logged it
+
+- **`caretaker_id` keeps its name and now means who did the care.** The
+  word already described that person, and every reader — the timeline, the
+  CSV, the PDF, the kiosk's caretaker row, a future leaderboard — keeps
+  reading the column it reads today. Rejected: a new `performed_by` beside
+  an unchanged `caretaker_id`, which would have moved every reader and left
+  API-key integrations with a field whose meaning no longer matched the
+  app. Spec: `docs/superpowers/specs/2026-09-14-who-did-it-design.md`.
+- **`logged_by_id` is the audit half**, NOT NULL on every log table and the
+  feed timer, backfilled from `caretaker_id` (every old row reads "did it
+  and logged it"), set from the family context and never client-settable.
+  Visible in exactly one place: a muted "Logged by" line in the edit sheet
+  when it differs from the chips (chosen over nowhere, and over the
+  timeline row).
+- **The chips only render for a family of two or more**, yourself first
+  and preselected, so a single parent never sees the row and an untouched
+  sheet sends the body it always sent. A running nursing or pump timer
+  hides them: the row the stop writes inherits the timer's caretaker, and
+  the stopper becomes the logger.
+- **Creates send the caretaker in the body and as the kiosk header.** The
+  kiosk's chosen face is who did it and who logged it at once, so the two
+  never disagree; on a person's session the header is ignored.
+- **Account deletion re-points both columns in ONE update per table.**
+  Two data-modifying CTEs on the same table see one snapshot and only one
+  of them lands on a row both name — the FK violation surfaced in the
+  suite, not in production.
+
