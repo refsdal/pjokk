@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Avatar } from "@/components/Avatar";
 import { ChipGroup } from "@/components/Chips";
 import { Sheet, useSheetReset } from "@/components/Sheet";
 import { Button } from "@/components/ui/button";
@@ -83,8 +84,11 @@ export function HelpSheet({
           <ChipGroup
             options={others.map((m) => ({
               value: m.memberId,
+              leading: (
+                <Avatar src={m.avatarUrl} name={m.name || m.email} size={8} />
+              ),
               label: (
-                <span>
+                <span className="text-left">
                   {m.name || m.email}
                   {!m.hasPush && (
                     <span className="block text-[10px] font-normal leading-tight">
