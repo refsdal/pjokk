@@ -3,11 +3,14 @@ import { QueryClient } from "@tanstack/react-query";
 import { CARETAKER_HEADER, caretakerInit, client } from "../src/lib/api";
 import { registerMutationDefaults } from "../src/lib/data";
 
-// A kiosk write names who is logging (spec 2026-09-10-kiosk-devices §6). The
-// caretaker rides in the mutation's VARIABLES — persisted with a paused
-// mutation, so a feed queued offline still carries the person who tapped it
-// — and the request function turns it into a header. It must never reach
-// the body: the server validates bodies against the spec.
+// A write that names who did the care (spec 2026-09-14-who-did-it; on a
+// kiosk, who is logging — spec 2026-09-10-kiosk-devices §6). The caretaker
+// rides in the mutation's VARIABLES — persisted with a paused mutation, so
+// a feed queued offline still carries the person who tapped it. A create's
+// request function sends it in the body (what the server writes to
+// caretaker_id) AND as the kiosk header (who a device's write is credited
+// to); a body-less write — wake, resume, the Undo deletes — sends the
+// header alone.
 
 const ok = (data: unknown = { id: "x1" }) =>
   ({ data, error: undefined, response: new Response(null) }) as never;
@@ -34,7 +37,7 @@ describe("caretakerInit", () => {
   });
 });
 
-describe("kiosk writes carry the caretaker as a header, never in the body", () => {
+describe("a create carries the caretaker in the body and the header; a body-less write, the header alone", () => {
   test("logDiaper", async () => {
     const post = spyOn(client, "POST").mockResolvedValue(ok());
     await run("logDiaper", {
@@ -44,7 +47,7 @@ describe("kiosk writes carry the caretaker as a header, never in the body", () =
       caretakerId: "u1",
     });
     expect(post).toHaveBeenCalledWith("/api/diapers", {
-      body: { babyId: "b1", time: "t", type: "wet" },
+      body: { babyId: "b1", time: "t", type: "wet", caretakerId: "u1" },
       headers: { [CARETAKER_HEADER]: "u1" },
     });
   });
@@ -67,7 +70,13 @@ describe("kiosk writes carry the caretaker as a header, never in the body", () =
       caretakerId: "u1",
     });
     expect(post).toHaveBeenCalledWith("/api/feeds", {
-      body: { babyId: "b1", time: "t", type: "bottle", amountMl: 120 },
+      body: {
+        babyId: "b1",
+        time: "t",
+        type: "bottle",
+        amountMl: 120,
+        caretakerId: "u1",
+      },
       headers: { [CARETAKER_HEADER]: "u1" },
     });
   });
@@ -80,7 +89,7 @@ describe("kiosk writes carry the caretaker as a header, never in the body", () =
       caretakerId: "u1",
     });
     expect(post).toHaveBeenCalledWith("/api/sleep", {
-      body: { babyId: "b1", startTime: "t" },
+      body: { babyId: "b1", startTime: "t", caretakerId: "u1" },
       headers: { [CARETAKER_HEADER]: "u1" },
     });
     await run("wakeSleep", { id: "s1", endTime: "t2", caretakerId: "u2" });
@@ -125,7 +134,7 @@ describe("kiosk writes carry the caretaker as a header, never in the body", () =
       caretakerId: "u1",
     });
     expect(post).toHaveBeenCalledWith("/api/medicine", {
-      body: { babyId: "b1", time: "t", name: "Paracet" },
+      body: { babyId: "b1", time: "t", name: "Paracet", caretakerId: "u1" },
       headers: { [CARETAKER_HEADER]: "u1" },
     });
   });
@@ -140,7 +149,13 @@ describe("kiosk writes carry the caretaker as a header, never in the body", () =
       caretakerId: "u1",
     });
     expect(post).toHaveBeenCalledWith("/api/feeds/timer", {
-      body: { babyId: "b1", kind: "breast", side: "left", startTime: "t" },
+      body: {
+        babyId: "b1",
+        kind: "breast",
+        side: "left",
+        startTime: "t",
+        caretakerId: "u1",
+      },
       headers: { [CARETAKER_HEADER]: "u1" },
     });
     await run("setFeedTimerSide", {

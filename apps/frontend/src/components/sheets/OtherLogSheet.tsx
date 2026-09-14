@@ -24,6 +24,10 @@ import type {
   PlayType,
   TimelineEntry,
 } from "@pjokk/shared";
+import {
+  CaretakerChips,
+  useCaretakerChoice,
+} from "@/components/CaretakerChips";
 import { ChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet, useSheetReset } from "@/components/Sheet";
@@ -222,6 +226,7 @@ export function OtherLogSheet({
 
   const [time, setTime] = useState<Date | null>(null);
   const [notes, setNotes] = useState("");
+  const who = useCaretakerChoice(edit);
   const [name, setName] = useState("");
   const [amount, setAmount] = useState(2.5);
   const [unit, setUnit] = useState<MedicineUnit>("ml");
@@ -279,6 +284,7 @@ export function OtherLogSheet({
 
   const instance = useSheetReset(open, () => {
     setNotes(edit && "notes" in edit ? (edit.notes ?? "") : "");
+    who.reset();
     setPendingPhoto(null);
     setTime(edit ? new Date(edit.time) : null);
     if (edit) {
@@ -377,6 +383,7 @@ export function OtherLogSheet({
       kind: "pump",
       side,
       startTime: new Date().toISOString(),
+      ...who.field(),
     });
     if (!navigator.onLine) toast(t("Saved offline — will sync"));
     onOpenChange(false);
@@ -424,7 +431,12 @@ export function OtherLogSheet({
       updateOther.mutate({
         kind,
         id: edit.id,
-        patch: { ...fields, time: when, notes: trimmedNotes || null },
+        patch: {
+          ...fields,
+          time: when,
+          notes: trimmedNotes || null,
+          ...who.field(),
+        },
       });
     } else if (kind === "milestone" && pendingPhoto) {
       // The photo needs the row's id, and a connection: the create is
@@ -437,6 +449,7 @@ export function OtherLogSheet({
         time: when,
         ...fields,
         ...(trimmedNotes ? { notes: trimmedNotes } : {}),
+        ...who.field(),
       } as CreateOtherVars;
       if (!navigator.onLine) {
         toast(t("Saved offline — add the photo from the timeline later"));
@@ -463,6 +476,7 @@ export function OtherLogSheet({
         time: when,
         ...fields,
         ...(trimmedNotes ? { notes: trimmedNotes } : {}),
+        ...who.field(),
       } as CreateOtherVars);
     }
     if (!navigator.onLine) toast(t("Saved offline — will sync"));
@@ -705,6 +719,11 @@ export function OtherLogSheet({
         {kind !== "measurement" && (
           <TimeField key={instance} value={time} onChange={setTime} />
         )}
+
+        {/* A running pump timer already carries its caretaker; the row it
+            becomes inherits it, so the chips would promise a choice the
+            stop cannot send. */}
+        {!pumpTimer && <CaretakerChips choice={who} edit={edit} />}
 
         {kind !== "note" && (
           <Input

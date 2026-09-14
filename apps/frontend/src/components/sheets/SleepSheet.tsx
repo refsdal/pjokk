@@ -1,5 +1,9 @@
 import { useState } from "react";
 import type { SleepLog } from "@pjokk/shared";
+import {
+  CaretakerChips,
+  useCaretakerChoice,
+} from "@/components/CaretakerChips";
 import { ChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet, useSheetReset } from "@/components/Sheet";
@@ -45,9 +49,11 @@ export function SleepSheet({
   const [time, setTime] = useState<Date | null>(null);
   const [endTime, setEndTime] = useState<Date | null>(null);
   const [notes, setNotes] = useState("");
+  const who = useCaretakerChoice(edit);
 
   const instance = useSheetReset(open, () => {
     setNotes(edit?.notes ?? "");
+    who.reset();
     if (edit) {
       setLocation(edit.location ?? null);
       setType(edit.type ?? null);
@@ -108,6 +114,7 @@ export function SleepSheet({
           location,
           type,
           notes: trimmedNotes || null,
+          ...who.field(),
         },
       });
     } else {
@@ -116,6 +123,7 @@ export function SleepSheet({
         startTime: (time ?? new Date()).toISOString(),
         ...(location ? { location } : {}),
         ...(type ? { type } : {}),
+        ...who.field(),
       });
     }
     if (!navigator.onLine) toast(t("Saved offline — will sync"));
@@ -208,6 +216,8 @@ export function SleepSheet({
         ) : (
           <TimeField key={`s${instance}`} value={time} onChange={setTime} />
         )}
+
+        <CaretakerChips choice={who} edit={edit} />
 
         <Input
           placeholder={t("Note (optional)")}

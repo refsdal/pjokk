@@ -1,6 +1,6 @@
 import { useMutation, type QueryClient } from "@tanstack/react-query";
 import type { FeedLog, FeedTimer, PumpLog, Summary } from "@pjokk/shared";
-import { caretakerInit, client, unwrap } from "../api";
+import { caretakerCreate, caretakerInit, client, unwrap } from "../api";
 import { sideSeconds } from "../feed-timer-ui";
 import { t } from "../i18n";
 import { toast } from "../toast";
@@ -93,10 +93,7 @@ export function registerFeedTimerMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["startFeedTimer"], {
     mutationFn: async ({ caretakerId, ...body }: StartFeedTimerVars) =>
       unwrap<FeedTimer>(
-        client.POST("/api/feeds/timer", {
-          body,
-          ...caretakerInit(caretakerId),
-        }),
+        client.POST("/api/feeds/timer", caretakerCreate(body, caretakerId)),
       ),
     onMutate: (vars: StartFeedTimerVars) =>
       patchTimer(qc, vars.babyId, vars.kind, {
@@ -104,6 +101,8 @@ export function registerFeedTimerMutationDefaults(qc: QueryClient) {
         babyId: vars.babyId,
         caretakerId: "",
         caretakerName: "",
+        loggedById: "",
+        loggedByName: "",
         kind: vars.kind,
         startTime: vars.startTime,
         runningSide: vars.side ?? (vars.kind === "pump" ? "both" : "left"),

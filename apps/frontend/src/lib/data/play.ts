@@ -17,6 +17,8 @@ export type StartPlayVars = {
   type: PlayType;
   startTime: string;
   notes?: string;
+  // Who did the care (spec 2026-09-14-who-did-it); the caller by default.
+  caretakerId?: string;
 };
 export type LogPlayVars = StartPlayVars & { endTime: string };
 export type StopPlayVars = { id: string; endTime?: string };
@@ -27,6 +29,7 @@ export type UpdatePlayVars = {
     startTime?: string;
     endTime?: string | null;
     notes?: string | null;
+    caretakerId?: string;
   };
 };
 export type DeletePlayVars = { id: string };
@@ -59,6 +62,8 @@ export function registerPlayMutationDefaults(qc: QueryClient) {
                 babyId: vars.babyId,
                 caretakerId: "",
                 caretakerName: "",
+                loggedById: "",
+                loggedByName: "",
                 type: vars.type,
                 startTime: vars.startTime,
                 endTime: null,

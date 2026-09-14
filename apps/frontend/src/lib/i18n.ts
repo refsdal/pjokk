@@ -667,6 +667,10 @@ const nb: Record<string, string> = {
   "last dose": "siste dose",
   "Log dose": "Logg dose",
   "Leave kiosk mode": "Forlat kioskmodus",
+  // Who did it (spec 2026-09-14-who-did-it)
+  Who: "Hvem",
+  "Logged by": "Loggført av",
+
   // Kiosk devices (spec 2026-09-10-kiosk-devices)
   "Set up as kiosk": "Sett opp som kiosk",
   "Who's logging?": "Hvem logger?",
