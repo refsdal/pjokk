@@ -108,7 +108,7 @@ describe("import-babybuddy", () => {
       `'bb-medication-71', family_id, 'bb-child-1', caretaker_id, '2026-09-01T06:30:00.000Z', 'Vitamin D', 1, 'dose', NULL, NULL`,
     );
     expect(sql).toContain(
-      `INSERT INTO "play_log" (id, family_id, baby_id, caretaker_id, type, start_time, end_time, notes, created_at) SELECT 'bb-tummytime-80', family_id, 'bb-child-1', caretaker_id, 'tummy', '2026-09-01T08:00:00.000Z', '2026-09-01T08:10:00.000Z', 'Lifted her head'`,
+      `INSERT INTO "play_log" (id, family_id, baby_id, caretaker_id, type, start_time, end_time, notes, created_at, logged_by_id) SELECT 'bb-tummytime-80', family_id, 'bb-child-1', caretaker_id, 'tummy', '2026-09-01T08:00:00.000Z', '2026-09-01T08:10:00.000Z', 'Lifted her head'`,
     );
     for (const line of sql.split("\n").filter((l) => l.startsWith("INSERT"))) {
       expect(line.endsWith("ON CONFLICT DO NOTHING;")).toBe(true);
@@ -130,7 +130,7 @@ describe("import-babybuddy", () => {
     expect(r.code, r.stderr).toBe(0);
     expect(r.sql.startsWith("BEGIN;")).toBe(false);
     expect(r.sql).toContain(
-      `INSERT INTO "feed_log" (id, family_id, baby_id, caretaker_id, time, type, amount_ml, side, duration_min, contents, food, reaction, notes, created_at) VALUES ('bb-feeding-10', 'fam1', 'baby_nora', 'user1', '2026-09-01T08:00:00.000Z', 'bottle', 4,`,
+      `INSERT INTO "feed_log" (id, family_id, baby_id, caretaker_id, time, type, amount_ml, side, duration_min, contents, food, reaction, notes, created_at, logged_by_id) VALUES ('bb-feeding-10', 'fam1', 'baby_nora', 'user1', '2026-09-01T08:00:00.000Z', 'bottle', 4,`,
     );
     expect(r.sql).not.toContain("bb-child-2");
     expect(r.stdout).toContain("1 × unmapped child");

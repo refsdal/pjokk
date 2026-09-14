@@ -122,6 +122,15 @@ export function createWriter({
     resolveEmail ? CARETAKER_REF : esc(id);
 
   const insert = (table, cols, vals) => {
+    // Every log row carries who did the care AND who saved it
+    // (00019_logged_by.sql). An import knows one person, so a table with a
+    // caretaker gets the same expression as its logger, appended here so no
+    // reader has to know the column exists.
+    const who = cols.indexOf("caretaker_id");
+    if (who >= 0 && !cols.includes("logged_by_id")) {
+      cols = [...cols, "logged_by_id"];
+      vals = [...vals, vals[who]];
+    }
     const exprs = cols.map((col, i) => render(col, vals[i])).join(", ");
     const head = `INSERT INTO "${table}" (${cols.join(", ")})`;
     out.push(
