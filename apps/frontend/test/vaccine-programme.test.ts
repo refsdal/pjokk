@@ -13,6 +13,8 @@ const entry = (over: Partial<VaccineLog>): VaccineLog => ({
   babyId: "b1",
   caretakerId: "u1",
   caretakerName: "Parent",
+  loggedById: "u1",
+  loggedByName: "Parent",
   time: "2026-01-01T10:00:00.000Z",
   name: "MMR",
   doseNumber: 1,

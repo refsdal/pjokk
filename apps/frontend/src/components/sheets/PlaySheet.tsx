@@ -1,5 +1,9 @@
 import { useState } from "react";
 import type { PlayLog, PlayType } from "@pjokk/shared";
+import {
+  CaretakerChips,
+  useCaretakerChoice,
+} from "@/components/CaretakerChips";
 import { ChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet, useSheetReset } from "@/components/Sheet";
@@ -37,9 +41,11 @@ export function PlaySheet({
   const [time, setTime] = useState<Date | null>(null);
   const [endTime, setEndTime] = useState<Date | null>(null);
   const [notes, setNotes] = useState("");
+  const who = useCaretakerChoice(edit);
 
   const instance = useSheetReset(open, () => {
     setNotes(edit?.notes ?? "");
+    who.reset();
     setType(edit?.type ?? initialType);
     setTime(edit ? new Date(edit.startTime) : null);
     setEndTime(edit?.endTime ? new Date(edit.endTime) : null);
@@ -62,6 +68,7 @@ export function PlaySheet({
       type,
       startTime: (time ?? new Date()).toISOString(),
       ...(notes.trim() ? { notes: notes.trim() } : {}),
+      ...who.field(),
     });
     offlineNote();
   };
@@ -79,6 +86,7 @@ export function PlaySheet({
             ? {}
             : { endTime: (endTime ?? new Date()).toISOString() }),
           notes: trimmedNotes || null,
+          ...who.field(),
         },
       });
     } else {
@@ -90,6 +98,7 @@ export function PlaySheet({
         startTime: start.toISOString(),
         endTime: end.toISOString(),
         ...(trimmedNotes ? { notes: trimmedNotes } : {}),
+        ...who.field(),
       });
     }
     offlineNote();
@@ -142,6 +151,8 @@ export function PlaySheet({
             />
           </>
         )}
+
+        <CaretakerChips choice={who} edit={edit} />
 
         <Input
           placeholder={t("Note (optional)")}

@@ -6,6 +6,10 @@ import {
 } from "@tabler/icons-react";
 import { useState } from "react";
 import type { VaccineLog } from "@pjokk/shared";
+import {
+  CaretakerChips,
+  useCaretakerChoice,
+} from "@/components/CaretakerChips";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet, useSheetReset } from "@/components/Sheet";
 import { ChipGroup } from "@/components/Chips";
@@ -55,8 +59,10 @@ export function VaccineSheet({
   const [dose, setDose] = useState(1);
   const [time, setTime] = useState<Date | null>(null);
   const [notes, setNotes] = useState("");
+  const who = useCaretakerChoice(edit);
 
   const instance = useSheetReset(open, () => {
+    who.reset();
     setName(edit?.name ?? slot?.name ?? "");
     setDose(edit?.doseNumber ?? slot?.dose ?? 1);
     setTime(edit ? new Date(edit.time) : null);
@@ -85,6 +91,7 @@ export function VaccineSheet({
             name: name.trim(),
             doseNumber: dose,
             notes: trimmed || null,
+            ...who.field(),
           },
         },
         { onError: (err) => toast(err.message, "error") },
@@ -98,6 +105,7 @@ export function VaccineSheet({
           doseNumber: dose,
           ...(slot ? { scheduleSlot: slot.key } : {}),
           ...(trimmed ? { notes: trimmed } : {}),
+          ...who.field(),
         },
         { onError: (err) => toast(err.message, "error") },
       );
@@ -148,6 +156,8 @@ export function VaccineSheet({
         )}
 
         <TimeField key={`v${instance}`} value={time} onChange={setTime} />
+
+        <CaretakerChips choice={who} edit={edit} />
 
         <Input
           placeholder={t("Note (optional)")}

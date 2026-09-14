@@ -1,7 +1,7 @@
 import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
 import type { DiaperLog, FeedLog, SleepLog, Summary } from "@pjokk/shared";
 import type { components } from "@pjokk/shared";
-import { caretakerInit, client, unwrap } from "../api";
+import { caretakerCreate, caretakerInit, client, unwrap } from "../api";
 import { t } from "../i18n";
 import { toast } from "../toast";
 import { invalidateLogs } from "./keys";
@@ -96,9 +96,10 @@ export function useDiapers(babyId: string | undefined, limit = 25) {
 // and not here.
 type Schemas = components["schemas"];
 
-// A kiosk write names who is logging (lib/api.ts's caretakerInit); Home
-// leaves it out. It travels in the variables — so a paused mutation keeps
-// it — and each request function strips it from the body into a header.
+// Who did the care (lib/api.ts's caretakerCreate): a sheet names a partner,
+// a kiosk names the face on its row, Home leaves it out. It travels in the
+// variables — so a paused mutation keeps it — and each create's request
+// function sends it in the body and as the kiosk header.
 type Caretaker = { caretakerId?: string };
 
 export type LogFeedVars = Schemas["CreateFeed"] & Caretaker;
@@ -149,7 +150,7 @@ export function registerLogMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["logFeed"], {
     mutationFn: async ({ caretakerId, ...body }: LogFeedVars) =>
       unwrap<FeedLog>(
-        client.POST("/api/feeds", { body, ...caretakerInit(caretakerId) }),
+        client.POST("/api/feeds", caretakerCreate(body, caretakerId)),
       ),
     onMutate: (vars: LogFeedVars) => {
       const snap = snapshotSummary(qc, vars.babyId);
@@ -162,6 +163,8 @@ export function registerLogMutationDefaults(qc: QueryClient) {
                 babyId: vars.babyId,
                 caretakerId: "",
                 caretakerName: "",
+                loggedById: "",
+                loggedByName: "",
                 time: vars.time,
                 type: vars.type,
                 amountMl: vars.amountMl ?? null,
@@ -188,7 +191,7 @@ export function registerLogMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["logDiaper"], {
     mutationFn: async ({ caretakerId, ...body }: LogDiaperVars) =>
       unwrap<DiaperLog>(
-        client.POST("/api/diapers", { body, ...caretakerInit(caretakerId) }),
+        client.POST("/api/diapers", caretakerCreate(body, caretakerId)),
       ),
     onMutate: (vars: LogDiaperVars) => {
       const snap = snapshotSummary(qc, vars.babyId);
@@ -201,6 +204,8 @@ export function registerLogMutationDefaults(qc: QueryClient) {
                 babyId: vars.babyId,
                 caretakerId: "",
                 caretakerName: "",
+                loggedById: "",
+                loggedByName: "",
                 time: vars.time,
                 type: vars.type,
                 color: vars.color ?? null,
@@ -221,7 +226,7 @@ export function registerLogMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["startSleep"], {
     mutationFn: async ({ caretakerId, ...body }: StartSleepVars) =>
       unwrap<SleepLog>(
-        client.POST("/api/sleep", { body, ...caretakerInit(caretakerId) }),
+        client.POST("/api/sleep", caretakerCreate(body, caretakerId)),
       ),
     onMutate: (vars: StartSleepVars) => {
       const snap = snapshotSummary(qc, vars.babyId);
@@ -232,6 +237,8 @@ export function registerLogMutationDefaults(qc: QueryClient) {
           babyId: vars.babyId,
           caretakerId: "",
           caretakerName: "",
+          loggedById: "",
+          loggedByName: "",
           startTime: vars.startTime,
           endTime: null,
           location: vars.location ?? null,

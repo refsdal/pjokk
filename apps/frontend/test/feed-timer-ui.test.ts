@@ -13,6 +13,8 @@ const timer = (over: Partial<FeedTimer>): FeedTimer => ({
   babyId: "b",
   caretakerId: "u",
   caretakerName: "Anders",
+  loggedById: "u1",
+  loggedByName: "Anders",
   kind: "breast",
   startTime: new Date(t0).toISOString(),
   runningSide: "left",

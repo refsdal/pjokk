@@ -1,5 +1,6 @@
 import type { Member } from "@pjokk/shared";
 import { Avatar } from "@/components/Avatar";
+import { firstName } from "@/lib/caretaker-ui";
 import { t } from "@/lib/i18n";
 import { cn, focusRing } from "@/lib/utils";
 
@@ -8,15 +9,8 @@ import { cn, focusRing } from "@/lib/utils";
 // nothing, and there is no per-person PIN. The choice clears when the kiosk
 // dims; with nobody chosen, an action asks first (KioskWhoPrompt).
 
-// A first name is what a finger looks for across the room. Someone who
-// signed up without a name (the e-mail signup path has none) still needs a
-// label, so they get the part of their address before the @.
-function label(m: Member): string {
-  const name = m.name.trim();
-  return name
-    ? (name.split(/\s+/)[0] ?? name)
-    : (m.email.split("@")[0] ?? m.email);
-}
+// The first-name label is lib/caretaker-ui's firstName, shared with the
+// sheets' own caretaker chips (spec 2026-09-14-who-did-it).
 
 export function KioskCaretakers({
   members,
@@ -54,7 +48,7 @@ export function KioskCaretakers({
           >
             <Avatar src={m.avatarUrl} name={m.name || m.email} size={11} />
             <span className="text-[15px] font-semibold text-ink">
-              {label(m)}
+              {firstName(m)}
             </span>
           </button>
         );
@@ -96,7 +90,7 @@ export function KioskWhoPrompt({
             >
               <Avatar src={m.avatarUrl} name={m.name || m.email} size={20} />
               <span className="max-w-full truncate text-[15px] font-semibold text-ink">
-                {label(m)}
+                {firstName(m)}
               </span>
             </button>
           ))}

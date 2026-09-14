@@ -1,7 +1,7 @@
 import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
 import type { MeasurementType } from "@pjokk/shared";
 import type { components } from "@pjokk/shared";
-import { caretakerInit, client, unwrap } from "../api";
+import { caretakerCreate, caretakerInit, client, unwrap } from "../api";
 import { t } from "../i18n";
 import { toast } from "../toast";
 import { invalidateLogs } from "./keys";
@@ -50,10 +50,10 @@ function otherGet(kind: OtherKind, babyId: string, limit: number) {
     } as never,
   );
 }
-function otherPost(kind: OtherKind, body: unknown, caretakerId?: string) {
+function otherPost(kind: OtherKind, body: object, caretakerId?: string) {
   return client.POST(
     otherListPath[kind] as never,
-    { body, ...caretakerInit(caretakerId) } as never,
+    caretakerCreate(body, caretakerId) as never,
   );
 }
 function otherPatch(kind: OtherKind, id: string, body: unknown) {

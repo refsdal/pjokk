@@ -1,5 +1,9 @@
 import { useState } from "react";
 import type { DiaperLog } from "@pjokk/shared";
+import {
+  CaretakerChips,
+  useCaretakerChoice,
+} from "@/components/CaretakerChips";
 import { ChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet, useSheetReset } from "@/components/Sheet";
@@ -43,9 +47,11 @@ export function DiaperSheet({
   const [showDetail, setShowDetail] = useState(false);
   const [time, setTime] = useState<Date | null>(null);
   const [notes, setNotes] = useState("");
+  const who = useCaretakerChoice(edit);
 
   const instance = useSheetReset(open, () => {
     setNotes(edit?.notes ?? "");
+    who.reset();
     if (edit) {
       setType(edit.type);
       setColor(edit.color ?? null);
@@ -82,6 +88,7 @@ export function DiaperSheet({
           color: colorOut,
           consistency: consistencyOut,
           notes: trimmedNotes || null,
+          ...who.field(),
         },
       });
     } else {
@@ -89,6 +96,7 @@ export function DiaperSheet({
         babyId,
         time: when,
         type,
+        ...who.field(),
         ...(colorOut ? { color: colorOut } : {}),
         ...(consistencyOut ? { consistency: consistencyOut } : {}),
         ...(trimmedNotes ? { notes: trimmedNotes } : {}),
@@ -160,6 +168,7 @@ export function DiaperSheet({
           ))}
 
         <TimeField key={instance} value={time} onChange={setTime} />
+        <CaretakerChips choice={who} edit={edit} />
         <Input
           placeholder={t("Note (optional)")}
           value={notes}

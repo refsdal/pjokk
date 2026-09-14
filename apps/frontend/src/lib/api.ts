@@ -24,6 +24,21 @@ export function caretakerInit(caretakerId?: string): {
   return caretakerId ? { headers: { [CARETAKER_HEADER]: caretakerId } } : {};
 }
 
+// A create that names who did the care (spec 2026-09-14-who-did-it) sends
+// the person twice: in the body, which is what the server writes to
+// caretaker_id, and as the kiosk header above, which is who a DEVICE's
+// write is credited to (and ignored on a person's session). The kiosk's
+// chosen face is both people at once, so the two never disagree.
+export function caretakerCreate<T extends object>(
+  body: T,
+  caretakerId?: string,
+): { body: T & { caretakerId?: string }; headers?: Record<string, string> } {
+  return {
+    body: caretakerId ? { ...body, caretakerId } : body,
+    ...caretakerInit(caretakerId),
+  };
+}
+
 export class ApiError extends Error {
   status: number;
   code?: string;

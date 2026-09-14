@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FeedLog, FeedTimer } from "@pjokk/shared";
+import {
+  CaretakerChips,
+  useCaretakerChoice,
+} from "@/components/CaretakerChips";
 import { ChipGroup } from "@/components/Chips";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet, useSheetReset } from "@/components/Sheet";
@@ -108,6 +112,7 @@ export function FeedSheet({
   const [now, setNow] = useState(() => Date.now());
   const [time, setTime] = useState<Date | null>(null);
   const [notes, setNotes] = useState("");
+  const who = useCaretakerChoice(edit);
 
   // The timer only matters on the create path: editing a past entry must
   // never touch a clock that is running for the CURRENT feed.
@@ -146,6 +151,7 @@ export function FeedSheet({
   // values — see useSheetReset.
   const instance = useSheetReset(open, () => {
     setNotes(edit?.notes ?? "");
+    who.reset();
     setNow(Date.now());
     if (edit) {
       setType(edit.type);
@@ -186,6 +192,7 @@ export function FeedSheet({
         kind: "breast",
         side,
         startTime: new Date().toISOString(),
+        ...who.field(),
       });
       return;
     }
@@ -244,6 +251,7 @@ export function FeedSheet({
           food: type === "solids" ? trimmedFood || null : null,
           reaction: type === "solids" && reaction ? true : null,
           notes: trimmedNotes || null,
+          ...who.field(),
         },
       });
     } else if (type === "breast" && timer) {
@@ -277,6 +285,7 @@ export function FeedSheet({
         ...(type === "solids" && trimmedFood ? { food: trimmedFood } : {}),
         ...(type === "solids" && reaction ? { reaction: true } : {}),
         ...(trimmedNotes ? { notes: trimmedNotes } : {}),
+        ...who.field(),
       });
     }
     if (!navigator.onLine) toast(t("Saved offline — will sync"));
@@ -427,6 +436,10 @@ export function FeedSheet({
         )}
 
         <TimeField key={instance} value={time} onChange={setTime} />
+
+        {/* A running nursing timer already carries its caretaker (chosen when
+            it started); the feed it becomes inherits it. */}
+        {!timer && <CaretakerChips choice={who} edit={edit} />}
 
         <Input
           placeholder={t("Note (optional)")}
