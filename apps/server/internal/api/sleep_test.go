@@ -113,8 +113,8 @@ func TestCreateSleepActiveSessionDBEnforcedRace(t *testing.T) {
 		t.Fatalf("find the admin's user id: %v", err)
 	}
 	if _, err := a.Rig.Pool.Exec(ctx, `
-		INSERT INTO "sleep_log" ("family_id", "baby_id", "caretaker_id", "start_time", "end_time")
-		VALUES ($1, $2, $3, now(), NULL)`,
+		INSERT INTO "sleep_log" ("family_id", "baby_id", "caretaker_id", "logged_by_id", "start_time", "end_time")
+		VALUES ($1, $2, $3, $3, now(), NULL)`,
 		familyID, babyID, caretakerID); err != nil {
 		t.Fatalf("seed an active sleep_log row directly: %v", err)
 	}

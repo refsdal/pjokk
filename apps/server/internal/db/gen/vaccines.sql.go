@@ -36,8 +36,8 @@ func (q *Queries) CountVaccineDocuments(ctx context.Context, arg CountVaccineDoc
 
 const createVaccine = `-- name: CreateVaccine :one
 INSERT INTO "vaccine_log"
-    ("family_id", "baby_id", "caretaker_id", "time", "name", "dose_number", "schedule_slot", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    ("family_id", "baby_id", "caretaker_id", "time", "name", "dose_number", "schedule_slot", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING "id"
 `
 
@@ -50,6 +50,7 @@ type CreateVaccineParams struct {
 	DoseNumber   *int32
 	ScheduleSlot *string
 	Notes        *string
+	LoggedByID   string
 }
 
 func (q *Queries) CreateVaccine(ctx context.Context, arg CreateVaccineParams) (string, error) {
@@ -62,6 +63,7 @@ func (q *Queries) CreateVaccine(ctx context.Context, arg CreateVaccineParams) (s
 		arg.DoseNumber,
 		arg.ScheduleSlot,
 		arg.Notes,
+		arg.LoggedByID,
 	)
 	var id string
 	err := row.Scan(&id)
@@ -197,10 +199,11 @@ func (q *Queries) DeleteVaccineDocument(ctx context.Context, arg DeleteVaccineDo
 
 const getVaccine = `-- name: GetVaccine :one
 SELECT
-    v."id", v."baby_id", v."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    v."id", v."baby_id", v."caretaker_id", v."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     v."time", v."name", v."dose_number", v."schedule_slot", v."notes"
 FROM "vaccine_log" v
 JOIN "users" u ON u."id" = v."caretaker_id"
+JOIN "users" lu ON lu."id" = v."logged_by_id"
 WHERE v."family_id" = $1 AND v."id" = $2
 `
 
@@ -213,7 +216,9 @@ type GetVaccineRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Name          string
 	DoseNumber    *int32
@@ -228,7 +233,9 @@ func (q *Queries) GetVaccine(ctx context.Context, arg GetVaccineParams) (GetVacc
 		&i.ID,
 		&i.BabyID,
 		&i.CaretakerID,
+		&i.LoggedByID,
 		&i.CaretakerName,
+		&i.LoggedByName,
 		&i.Time,
 		&i.Name,
 		&i.DoseNumber,
@@ -434,10 +441,11 @@ func (q *Queries) ListVaccineDocumentsForLogs(ctx context.Context, arg ListVacci
 const listVaccines = `-- name: ListVaccines :many
 
 SELECT
-    v."id", v."baby_id", v."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    v."id", v."baby_id", v."caretaker_id", v."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     v."time", v."name", v."dose_number", v."schedule_slot", v."notes"
 FROM "vaccine_log" v
 JOIN "users" u ON u."id" = v."caretaker_id"
+JOIN "users" lu ON lu."id" = v."logged_by_id"
 WHERE v."family_id" = $1
   AND ($2::text IS NULL OR v."baby_id" = $2)
 ORDER BY v."time" DESC, v."id" DESC
@@ -454,7 +462,9 @@ type ListVaccinesRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Name          string
 	DoseNumber    *int32
@@ -490,7 +500,9 @@ func (q *Queries) ListVaccines(ctx context.Context, arg ListVaccinesParams) ([]L
 			&i.ID,
 			&i.BabyID,
 			&i.CaretakerID,
+			&i.LoggedByID,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Time,
 			&i.Name,
 			&i.DoseNumber,
@@ -510,15 +522,18 @@ func (q *Queries) ListVaccines(ctx context.Context, arg ListVaccinesParams) ([]L
 const updateVaccine = `-- name: UpdateVaccine :execrows
 UPDATE "vaccine_log"
 SET
-    "time" = CASE WHEN $1::bool THEN $2::timestamptz ELSE "time" END,
-    "name" = CASE WHEN $3::bool THEN $4::text ELSE "name" END,
-    "dose_number" = CASE WHEN $5::bool THEN $6::int ELSE "dose_number" END,
-    "schedule_slot" = CASE WHEN $7::bool THEN $8::text ELSE "schedule_slot" END,
-    "notes" = CASE WHEN $9::bool THEN $10::text ELSE "notes" END
-WHERE "family_id" = $11 AND "id" = $12
+    "caretaker_id" = CASE WHEN $1::bool THEN $2::text ELSE "caretaker_id" END,
+    "time" = CASE WHEN $3::bool THEN $4::timestamptz ELSE "time" END,
+    "name" = CASE WHEN $5::bool THEN $6::text ELSE "name" END,
+    "dose_number" = CASE WHEN $7::bool THEN $8::int ELSE "dose_number" END,
+    "schedule_slot" = CASE WHEN $9::bool THEN $10::text ELSE "schedule_slot" END,
+    "notes" = CASE WHEN $11::bool THEN $12::text ELSE "notes" END
+WHERE "family_id" = $13 AND "id" = $14
 `
 
 type UpdateVaccineParams struct {
+	CaretakerIDSet  bool
+	CaretakerIDVal  *string
 	TimeSet         bool
 	TimeVal         pgtype.Timestamptz
 	NameSet         bool
@@ -535,6 +550,8 @@ type UpdateVaccineParams struct {
 
 func (q *Queries) UpdateVaccine(ctx context.Context, arg UpdateVaccineParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateVaccine,
+		arg.CaretakerIDSet,
+		arg.CaretakerIDVal,
 		arg.TimeSet,
 		arg.TimeVal,
 		arg.NameSet,

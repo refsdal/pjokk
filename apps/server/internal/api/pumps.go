@@ -24,6 +24,8 @@ func serPump(row dbgen.GetPumpRow) gen.PumpLog {
 		BabyId:        row.BabyID,
 		CaretakerId:   row.CaretakerID,
 		CaretakerName: row.CaretakerName,
+		LoggedById:    row.LoggedByID,
+		LoggedByName:  row.LoggedByName,
 		Time:          row.Time.Time,
 		Side:          enumPtr[gen.PumpLogSide](row.Side),
 		AmountMl:      row.AmountMl,
@@ -60,12 +62,21 @@ func (d Deps) CreatePump(ctx context.Context, req gen.CreatePumpRequestObject) (
 	}
 	body := req.Body
 
+	caretaker, notMember, err := caretakerFor(ctx, d, fam, body.CaretakerId)
+	if err != nil {
+		return nil, err
+	}
+	if notMember {
+		return gen.CreatePump403JSONResponse(notMemberErr()), nil
+	}
+
 	row, unknownBaby, err := createLog(ctx, d, fam.FamilyID, body.BabyId,
 		func(ctx context.Context) (string, error) {
 			return d.Q.CreatePump(ctx, dbgen.CreatePumpParams{
 				FamilyID:    fam.FamilyID,
 				BabyID:      body.BabyId,
-				CaretakerID: fam.UserID,
+				CaretakerID: caretaker,
+				LoggedByID:  fam.UserID,
 				Time:        ts(body.Time),
 				Side:        enumStr(body.Side),
 				AmountMl:    body.AmountMl,
@@ -101,8 +112,16 @@ func (d Deps) UpdatePump(ctx context.Context, req gen.UpdatePumpRequestObject) (
 	amountSet, amountVal := patchField[int32](p, "amountMl")
 	durationSet, durationVal := patchField[int32](p, "durationMin")
 	notesSet, notesVal := patchField[string](p, "notes")
+	caretakerSet, caretakerVal := patchField[string](p, "caretakerId")
 	if err := p.Err(); err != nil {
 		return nil, err
+	}
+	caretakerSet, caretakerVal, notMember, err := caretakerPatch(ctx, d, fam, caretakerSet, caretakerVal)
+	if err != nil {
+		return nil, err
+	}
+	if notMember {
+		return gen.UpdatePump403JSONResponse(notMemberErr()), nil
 	}
 
 	row, found, err := updateLog(ctx,
@@ -122,6 +141,8 @@ func (d Deps) UpdatePump(ctx context.Context, req gen.UpdatePumpRequestObject) (
 				AmountMlVal:    amountVal,
 				DurationMinSet: durationSet,
 				DurationMinVal: durationVal,
+				CaretakerIDSet: caretakerSet,
+				CaretakerIDVal: caretakerVal,
 				NotesSet:       notesSet,
 				NotesVal:       notesVal,
 			})

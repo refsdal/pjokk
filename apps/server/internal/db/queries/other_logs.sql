@@ -13,10 +13,11 @@
 
 -- name: ListMedicine :many
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", m."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     m."time", m."name", m."amount", m."unit", m."medicine_id", m."notes"
 FROM "medicine_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = sqlc.arg(family_id)
   AND (sqlc.narg(baby_id)::text IS NULL OR m."baby_id" = sqlc.narg(baby_id))
 ORDER BY m."time" DESC, m."id" DESC
@@ -24,21 +25,23 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetMedicine :one
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", m."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     m."time", m."name", m."amount", m."unit", m."medicine_id", m."notes"
 FROM "medicine_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = $1 AND m."id" = $2;
 
 -- name: CreateMedicine :one
 INSERT INTO "medicine_log"
-    ("family_id", "baby_id", "caretaker_id", "time", "name", "amount", "unit", "medicine_id", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    ("family_id", "baby_id", "caretaker_id", "time", "name", "amount", "unit", "medicine_id", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING "id";
 
 -- name: UpdateMedicine :execrows
 UPDATE "medicine_log"
 SET
+    "caretaker_id" = CASE WHEN sqlc.arg(caretaker_id_set)::bool THEN sqlc.narg(caretaker_id_val)::text ELSE "caretaker_id" END,
     "time" = CASE WHEN sqlc.arg(time_set)::bool THEN sqlc.narg(time_val)::timestamptz ELSE "time" END,
     "name" = CASE WHEN sqlc.arg(name_set)::bool THEN sqlc.narg(name_val)::text ELSE "name" END,
     "amount" = CASE WHEN sqlc.arg(amount_set)::bool THEN sqlc.narg(amount_val)::double precision ELSE "amount" END,
@@ -55,10 +58,11 @@ WHERE "family_id" = $1 AND "id" = $2;
 
 -- name: ListBaths :many
 SELECT
-    b."id", b."baby_id", b."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    b."id", b."baby_id", b."caretaker_id", b."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     b."time", b."notes"
 FROM "bath_log" b
 JOIN "users" u ON u."id" = b."caretaker_id"
+JOIN "users" lu ON lu."id" = b."logged_by_id"
 WHERE b."family_id" = sqlc.arg(family_id)
   AND (sqlc.narg(baby_id)::text IS NULL OR b."baby_id" = sqlc.narg(baby_id))
 ORDER BY b."time" DESC, b."id" DESC
@@ -66,20 +70,22 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetBath :one
 SELECT
-    b."id", b."baby_id", b."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    b."id", b."baby_id", b."caretaker_id", b."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     b."time", b."notes"
 FROM "bath_log" b
 JOIN "users" u ON u."id" = b."caretaker_id"
+JOIN "users" lu ON lu."id" = b."logged_by_id"
 WHERE b."family_id" = $1 AND b."id" = $2;
 
 -- name: CreateBath :one
-INSERT INTO "bath_log" ("family_id", "baby_id", "caretaker_id", "time", "notes")
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO "bath_log" ("family_id", "baby_id", "caretaker_id", "time", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING "id";
 
 -- name: UpdateBath :execrows
 UPDATE "bath_log"
 SET
+    "caretaker_id" = CASE WHEN sqlc.arg(caretaker_id_set)::bool THEN sqlc.narg(caretaker_id_val)::text ELSE "caretaker_id" END,
     "time" = CASE WHEN sqlc.arg(time_set)::bool THEN sqlc.narg(time_val)::timestamptz ELSE "time" END,
     "notes" = CASE WHEN sqlc.arg(notes_set)::bool THEN sqlc.narg(notes_val)::text ELSE "notes" END
 WHERE "family_id" = sqlc.arg(family_id) AND "id" = sqlc.arg(id);
@@ -92,10 +98,11 @@ WHERE "family_id" = $1 AND "id" = $2;
 
 -- name: ListNotes :many
 SELECT
-    n."id", n."baby_id", n."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    n."id", n."baby_id", n."caretaker_id", n."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     n."time", n."content", n."notes"
 FROM "note_log" n
 JOIN "users" u ON u."id" = n."caretaker_id"
+JOIN "users" lu ON lu."id" = n."logged_by_id"
 WHERE n."family_id" = sqlc.arg(family_id)
   AND (sqlc.narg(baby_id)::text IS NULL OR n."baby_id" = sqlc.narg(baby_id))
 ORDER BY n."time" DESC, n."id" DESC
@@ -103,20 +110,22 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetNote :one
 SELECT
-    n."id", n."baby_id", n."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    n."id", n."baby_id", n."caretaker_id", n."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     n."time", n."content", n."notes"
 FROM "note_log" n
 JOIN "users" u ON u."id" = n."caretaker_id"
+JOIN "users" lu ON lu."id" = n."logged_by_id"
 WHERE n."family_id" = $1 AND n."id" = $2;
 
 -- name: CreateNote :one
-INSERT INTO "note_log" ("family_id", "baby_id", "caretaker_id", "time", "content", "notes")
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO "note_log" ("family_id", "baby_id", "caretaker_id", "time", "content", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING "id";
 
 -- name: UpdateNote :execrows
 UPDATE "note_log"
 SET
+    "caretaker_id" = CASE WHEN sqlc.arg(caretaker_id_set)::bool THEN sqlc.narg(caretaker_id_val)::text ELSE "caretaker_id" END,
     "time" = CASE WHEN sqlc.arg(time_set)::bool THEN sqlc.narg(time_val)::timestamptz ELSE "time" END,
     "content" = CASE WHEN sqlc.arg(content_set)::bool THEN sqlc.narg(content_val)::text ELSE "content" END,
     "notes" = CASE WHEN sqlc.arg(notes_set)::bool THEN sqlc.narg(notes_val)::text ELSE "notes" END
@@ -130,10 +139,11 @@ WHERE "family_id" = $1 AND "id" = $2;
 
 -- name: ListMilestones :many
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", m."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     m."time", m."title", m."notes"
 FROM "milestone_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = sqlc.arg(family_id)
   AND (sqlc.narg(baby_id)::text IS NULL OR m."baby_id" = sqlc.narg(baby_id))
 ORDER BY m."time" DESC, m."id" DESC
@@ -141,20 +151,22 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetMilestone :one
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", m."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     m."time", m."title", m."notes"
 FROM "milestone_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = $1 AND m."id" = $2;
 
 -- name: CreateMilestone :one
-INSERT INTO "milestone_log" ("family_id", "baby_id", "caretaker_id", "time", "title", "notes")
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO "milestone_log" ("family_id", "baby_id", "caretaker_id", "time", "title", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING "id";
 
 -- name: UpdateMilestone :execrows
 UPDATE "milestone_log"
 SET
+    "caretaker_id" = CASE WHEN sqlc.arg(caretaker_id_set)::bool THEN sqlc.narg(caretaker_id_val)::text ELSE "caretaker_id" END,
     "time" = CASE WHEN sqlc.arg(time_set)::bool THEN sqlc.narg(time_val)::timestamptz ELSE "time" END,
     "title" = CASE WHEN sqlc.arg(title_set)::bool THEN sqlc.narg(title_val)::text ELSE "title" END,
     "notes" = CASE WHEN sqlc.arg(notes_set)::bool THEN sqlc.narg(notes_val)::text ELSE "notes" END
@@ -168,10 +180,11 @@ WHERE "family_id" = $1 AND "id" = $2;
 
 -- name: ListMeasurements :many
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", m."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     m."time", m."type", m."value", m."notes"
 FROM "measurement_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = sqlc.arg(family_id)
   AND (sqlc.narg(baby_id)::text IS NULL OR m."baby_id" = sqlc.narg(baby_id))
 ORDER BY m."time" DESC, m."id" DESC
@@ -179,20 +192,22 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetMeasurement :one
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", m."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     m."time", m."type", m."value", m."notes"
 FROM "measurement_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = $1 AND m."id" = $2;
 
 -- name: CreateMeasurement :one
-INSERT INTO "measurement_log" ("family_id", "baby_id", "caretaker_id", "time", "type", "value", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO "measurement_log" ("family_id", "baby_id", "caretaker_id", "time", "type", "value", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING "id";
 
 -- name: UpdateMeasurement :execrows
 UPDATE "measurement_log"
 SET
+    "caretaker_id" = CASE WHEN sqlc.arg(caretaker_id_set)::bool THEN sqlc.narg(caretaker_id_val)::text ELSE "caretaker_id" END,
     "time" = CASE WHEN sqlc.arg(time_set)::bool THEN sqlc.narg(time_val)::timestamptz ELSE "time" END,
     "type" = CASE WHEN sqlc.arg(type_set)::bool THEN sqlc.narg(type_val)::text ELSE "type" END,
     "value" = CASE WHEN sqlc.arg(value_set)::bool THEN sqlc.narg(value_val)::double precision ELSE "value" END,
@@ -207,10 +222,11 @@ WHERE "family_id" = $1 AND "id" = $2;
 
 -- name: ListPumps :many
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", p."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     p."time", p."side", p."amount_ml", p."duration_min", p."notes"
 FROM "pump_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"
+JOIN "users" lu ON lu."id" = p."logged_by_id"
 WHERE p."family_id" = sqlc.arg(family_id)
   AND (sqlc.narg(baby_id)::text IS NULL OR p."baby_id" = sqlc.narg(baby_id))
 ORDER BY p."time" DESC, p."id" DESC
@@ -218,21 +234,23 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetPump :one
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", p."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     p."time", p."side", p."amount_ml", p."duration_min", p."notes"
 FROM "pump_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"
+JOIN "users" lu ON lu."id" = p."logged_by_id"
 WHERE p."family_id" = $1 AND p."id" = $2;
 
 -- name: CreatePump :one
 INSERT INTO "pump_log"
-    ("family_id", "baby_id", "caretaker_id", "time", "side", "amount_ml", "duration_min", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    ("family_id", "baby_id", "caretaker_id", "time", "side", "amount_ml", "duration_min", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING "id";
 
 -- name: UpdatePump :execrows
 UPDATE "pump_log"
 SET
+    "caretaker_id" = CASE WHEN sqlc.arg(caretaker_id_set)::bool THEN sqlc.narg(caretaker_id_val)::text ELSE "caretaker_id" END,
     "time" = CASE WHEN sqlc.arg(time_set)::bool THEN sqlc.narg(time_val)::timestamptz ELSE "time" END,
     "side" = CASE WHEN sqlc.arg(side_set)::bool THEN sqlc.narg(side_val)::text ELSE "side" END,
     "amount_ml" = CASE WHEN sqlc.arg(amount_ml_set)::bool THEN sqlc.narg(amount_ml_val)::integer ELSE "amount_ml" END,

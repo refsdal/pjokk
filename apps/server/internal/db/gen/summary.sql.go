@@ -114,10 +114,11 @@ func (q *Queries) FeedsInRange(ctx context.Context, arg FeedsInRangeParams) ([]F
 
 const lastMeasurementOfType = `-- name: LastMeasurementOfType :many
 SELECT
-    m."id", m."baby_id", m."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    m."id", m."baby_id", m."caretaker_id", m."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     m."time", m."type", m."value", m."notes"
 FROM "measurement_log" m
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = $1
   AND m."baby_id" = $2
   AND m."type" = $3
@@ -135,7 +136,9 @@ type LastMeasurementOfTypeRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Time          pgtype.Timestamptz
 	Type          string
 	Value         float64
@@ -160,7 +163,9 @@ func (q *Queries) LastMeasurementOfType(ctx context.Context, arg LastMeasurement
 			&i.ID,
 			&i.BabyID,
 			&i.CaretakerID,
+			&i.LoggedByID,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Time,
 			&i.Type,
 			&i.Value,

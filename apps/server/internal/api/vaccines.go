@@ -85,6 +85,8 @@ func serVaccine(row dbgen.GetVaccineRow, docs []dbgen.ListVaccineDocumentsForLog
 		BabyId:        row.BabyID,
 		CaretakerId:   row.CaretakerID,
 		CaretakerName: row.CaretakerName,
+		LoggedById:    row.LoggedByID,
+		LoggedByName:  row.LoggedByName,
 		Time:          row.Time.Time,
 		Name:          row.Name,
 		DoseNumber:    doseNumberPtr(row.DoseNumber),
@@ -153,6 +155,14 @@ func (d Deps) CreateVaccine(ctx context.Context, req gen.CreateVaccineRequestObj
 	}
 	body := req.Body
 
+	caretaker, notMember, err := caretakerFor(ctx, d, fam, body.CaretakerId)
+	if err != nil {
+		return nil, err
+	}
+	if notMember {
+		return gen.CreateVaccine403JSONResponse(notMemberErr()), nil
+	}
+
 	row, unknownBaby, err := createLog(ctx, d, fam.FamilyID, body.BabyId,
 		func(ctx context.Context) (string, error) {
 			var doseNumber *int32
@@ -163,7 +173,8 @@ func (d Deps) CreateVaccine(ctx context.Context, req gen.CreateVaccineRequestObj
 			return d.Q.CreateVaccine(ctx, dbgen.CreateVaccineParams{
 				FamilyID:     fam.FamilyID,
 				BabyID:       body.BabyId,
-				CaretakerID:  fam.UserID,
+				CaretakerID:  caretaker,
+				LoggedByID:   fam.UserID,
 				Time:         ts(body.Time),
 				Name:         body.Name,
 				DoseNumber:   doseNumber,
@@ -201,8 +212,16 @@ func (d Deps) UpdateVaccine(ctx context.Context, req gen.UpdateVaccineRequestObj
 	doseNumberSet, doseNumberVal := patchField[int32](p, "doseNumber")
 	scheduleSlotSet, scheduleSlotVal := patchField[string](p, "scheduleSlot")
 	notesSet, notesVal := patchField[string](p, "notes")
+	caretakerSet, caretakerVal := patchField[string](p, "caretakerId")
 	if err := p.Err(); err != nil {
 		return nil, err
+	}
+	caretakerSet, caretakerVal, notMember, err := caretakerPatch(ctx, d, fam, caretakerSet, caretakerVal)
+	if err != nil {
+		return nil, err
+	}
+	if notMember {
+		return gen.UpdateVaccine403JSONResponse(notMemberErr()), nil
 	}
 
 	row, found, err := updateLog(ctx,
@@ -222,6 +241,8 @@ func (d Deps) UpdateVaccine(ctx context.Context, req gen.UpdateVaccineRequestObj
 				DoseNumberVal:   doseNumberVal,
 				ScheduleSlotSet: scheduleSlotSet,
 				ScheduleSlotVal: scheduleSlotVal,
+				CaretakerIDSet:  caretakerSet,
+				CaretakerIDVal:  caretakerVal,
 				NotesSet:        notesSet,
 				NotesVal:        notesVal,
 			})

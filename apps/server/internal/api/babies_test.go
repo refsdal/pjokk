@@ -84,8 +84,8 @@ func TestDeleteBabyRequiresAdminAndCascadesLogs(t *testing.T) {
 		t.Fatalf("find the admin's user id: %v", err)
 	}
 	if _, err := a.Rig.Pool.Exec(ctx, `
-		INSERT INTO "feed_log" ("family_id", "baby_id", "caretaker_id", "time", "type", "amount_ml")
-		VALUES ($1, $2, $3, now(), 'bottle', 50)`,
+		INSERT INTO "feed_log" ("family_id", "baby_id", "caretaker_id", "logged_by_id", "time", "type", "amount_ml")
+		VALUES ($1, $2, $3, $3, now(), 'bottle', 50)`,
 		familyID, babyID, caretakerID); err != nil {
 		t.Fatalf("seed feed_log: %v", err)
 	}

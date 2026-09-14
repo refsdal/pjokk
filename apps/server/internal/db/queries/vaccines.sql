@@ -16,10 +16,11 @@
 
 -- name: ListVaccines :many
 SELECT
-    v."id", v."baby_id", v."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    v."id", v."baby_id", v."caretaker_id", v."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     v."time", v."name", v."dose_number", v."schedule_slot", v."notes"
 FROM "vaccine_log" v
 JOIN "users" u ON u."id" = v."caretaker_id"
+JOIN "users" lu ON lu."id" = v."logged_by_id"
 WHERE v."family_id" = sqlc.arg(family_id)
   AND (sqlc.narg(baby_id)::text IS NULL OR v."baby_id" = sqlc.narg(baby_id))
 ORDER BY v."time" DESC, v."id" DESC
@@ -27,10 +28,11 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetVaccine :one
 SELECT
-    v."id", v."baby_id", v."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    v."id", v."baby_id", v."caretaker_id", v."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     v."time", v."name", v."dose_number", v."schedule_slot", v."notes"
 FROM "vaccine_log" v
 JOIN "users" u ON u."id" = v."caretaker_id"
+JOIN "users" lu ON lu."id" = v."logged_by_id"
 WHERE v."family_id" = $1 AND v."id" = $2;
 
 -- name: ListVaccineDocumentsForLogs :many
@@ -52,13 +54,14 @@ ORDER BY "created_at" ASC;
 
 -- name: CreateVaccine :one
 INSERT INTO "vaccine_log"
-    ("family_id", "baby_id", "caretaker_id", "time", "name", "dose_number", "schedule_slot", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    ("family_id", "baby_id", "caretaker_id", "time", "name", "dose_number", "schedule_slot", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING "id";
 
 -- name: UpdateVaccine :execrows
 UPDATE "vaccine_log"
 SET
+    "caretaker_id" = CASE WHEN sqlc.arg(caretaker_id_set)::bool THEN sqlc.narg(caretaker_id_val)::text ELSE "caretaker_id" END,
     "time" = CASE WHEN sqlc.arg(time_set)::bool THEN sqlc.narg(time_val)::timestamptz ELSE "time" END,
     "name" = CASE WHEN sqlc.arg(name_set)::bool THEN sqlc.narg(name_val)::text ELSE "name" END,
     "dose_number" = CASE WHEN sqlc.arg(dose_number_set)::bool THEN sqlc.narg(dose_number_val)::int ELSE "dose_number" END,

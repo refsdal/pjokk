@@ -71,6 +71,8 @@ func serSleep(row dbgen.GetSleepRow) gen.SleepLog {
 		BabyId:        row.BabyID,
 		CaretakerId:   row.CaretakerID,
 		CaretakerName: row.CaretakerName,
+		LoggedById:    row.LoggedByID,
+		LoggedByName:  row.LoggedByName,
 		Notes:         row.Notes,
 		StartTime:     row.StartTime.Time,
 		EndTime:       tsPtr(row.EndTime),
@@ -111,6 +113,14 @@ func (d Deps) CreateSleep(ctx context.Context, req gen.CreateSleepRequestObject)
 	}
 	body := req.Body
 
+	caretaker, notMember, err := caretakerFor(ctx, d, fam, body.CaretakerId)
+	if err != nil {
+		return nil, err
+	}
+	if notMember {
+		return gen.CreateSleep403JSONResponse(notMemberErr()), nil
+	}
+
 	// Not createLog: this handler has an ALREADY_ACTIVE pre-check between
 	// the baby check and the insert, and maps a unique violation from the
 	// insert to a 409 — neither of which fits an engine whose create closure
@@ -140,7 +150,8 @@ func (d Deps) CreateSleep(ctx context.Context, req gen.CreateSleepRequestObject)
 	id, err := d.Q.CreateSleep(ctx, dbgen.CreateSleepParams{
 		FamilyID:    fam.FamilyID,
 		BabyID:      body.BabyId,
-		CaretakerID: fam.UserID,
+		CaretakerID: caretaker,
+		LoggedByID:  fam.UserID,
 		StartTime:   ts(body.StartTime),
 		EndTime:     endTime,
 		Location:    body.Location,
@@ -230,9 +241,17 @@ func (d Deps) UpdateSleep(ctx context.Context, req gen.UpdateSleepRequestObject)
 	locationSet, locationVal := patchField[string](p, "location")
 	typeSet, typeVal := patchField[string](p, "type")
 	notesSet, notesVal := patchField[string](p, "notes")
+	caretakerSet, caretakerVal := patchField[string](p, "caretakerId")
 
 	if err := p.Err(); err != nil {
 		return nil, err
+	}
+	caretakerSet, caretakerVal, notMember, err := caretakerPatch(ctx, d, fam, caretakerSet, caretakerVal)
+	if err != nil {
+		return nil, err
+	}
+	if notMember {
+		return gen.UpdateSleep403JSONResponse(notMemberErr()), nil
 	}
 
 	// reopening is "endTime present and explicitly null" — the one write
@@ -247,18 +266,20 @@ func (d Deps) UpdateSleep(ctx context.Context, req gen.UpdateSleepRequestObject)
 		p.Any(),
 		func(ctx context.Context) error {
 			_, err := d.Q.UpdateSleep(ctx, dbgen.UpdateSleepParams{
-				FamilyID:     fam.FamilyID,
-				ID:           req.Id,
-				StartTimeSet: startSet,
-				StartTimeVal: tsFrom(startVal),
-				EndTimeSet:   endSet,
-				EndTimeVal:   tsFrom(endVal),
-				LocationSet:  locationSet,
-				LocationVal:  locationVal,
-				TypeSet:      typeSet,
-				TypeVal:      typeVal,
-				NotesSet:     notesSet,
-				NotesVal:     notesVal,
+				FamilyID:       fam.FamilyID,
+				ID:             req.Id,
+				StartTimeSet:   startSet,
+				StartTimeVal:   tsFrom(startVal),
+				EndTimeSet:     endSet,
+				EndTimeVal:     tsFrom(endVal),
+				LocationSet:    locationSet,
+				LocationVal:    locationVal,
+				TypeSet:        typeSet,
+				TypeVal:        typeVal,
+				CaretakerIDSet: caretakerSet,
+				CaretakerIDVal: caretakerVal,
+				NotesSet:       notesSet,
+				NotesVal:       notesVal,
 			})
 			return err
 		},

@@ -18,10 +18,11 @@
 -- COALESCE(u.name, '') — see feeds.sql's ListFeeds for why (sqlc can't prove
 -- an inner-joined column NOT NULL from a bare alias).
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", p."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     p."type", p."start_time", p."end_time", p."notes"
 FROM "play_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"
+JOIN "users" lu ON lu."id" = p."logged_by_id"
 WHERE p."family_id" = sqlc.arg(family_id)
   AND (sqlc.narg(baby_id)::text IS NULL OR p."baby_id" = sqlc.narg(baby_id))
 ORDER BY p."start_time" DESC, p."id" DESC
@@ -29,10 +30,11 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetPlay :one
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", p."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     p."type", p."start_time", p."end_time", p."notes"
 FROM "play_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"
+JOIN "users" lu ON lu."id" = p."logged_by_id"
 WHERE p."family_id" = $1 AND p."id" = $2;
 
 -- name: ActivePlay :one
@@ -41,10 +43,11 @@ WHERE p."family_id" = $1 AND p."id" = $2;
 -- returns whichever running session across the family started most
 -- recently, mirroring sleep.sql's ActiveSleep exactly.
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", p."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     p."type", p."start_time", p."end_time", p."notes"
 FROM "play_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"
+JOIN "users" lu ON lu."id" = p."logged_by_id"
 WHERE p."family_id" = sqlc.arg(family_id)
   AND (sqlc.narg(baby_id)::text IS NULL OR p."baby_id" = sqlc.narg(baby_id))
   AND p."end_time" IS NULL
@@ -52,8 +55,8 @@ ORDER BY p."start_time" DESC
 LIMIT 1;
 
 -- name: CreatePlay :one
-INSERT INTO "play_log" ("family_id", "baby_id", "caretaker_id", "type", "start_time", "end_time", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO "play_log" ("family_id", "baby_id", "caretaker_id", "type", "start_time", "end_time", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING "id";
 
 -- name: StopPlay :execrows
@@ -68,6 +71,7 @@ WHERE "family_id" = $1 AND "id" = $2 AND "end_time" IS NULL;
 -- name: UpdatePlay :execrows
 UPDATE "play_log"
 SET
+    "caretaker_id" = CASE WHEN sqlc.arg(caretaker_id_set)::bool THEN sqlc.narg(caretaker_id_val)::text ELSE "caretaker_id" END,
     "type" = CASE WHEN sqlc.arg(type_set)::bool THEN sqlc.narg(type_val)::text ELSE "type" END,
     "start_time" = CASE WHEN sqlc.arg(start_time_set)::bool THEN sqlc.narg(start_time_val)::timestamptz ELSE "start_time" END,
     "end_time" = CASE WHEN sqlc.arg(end_time_set)::bool THEN sqlc.narg(end_time_val)::timestamptz ELSE "end_time" END,

@@ -13,10 +13,11 @@ import (
 
 const activePlay = `-- name: ActivePlay :one
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", p."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     p."type", p."start_time", p."end_time", p."notes"
 FROM "play_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"
+JOIN "users" lu ON lu."id" = p."logged_by_id"
 WHERE p."family_id" = $1
   AND ($2::text IS NULL OR p."baby_id" = $2)
   AND p."end_time" IS NULL
@@ -33,7 +34,9 @@ type ActivePlayRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Type          string
 	StartTime     pgtype.Timestamptz
 	EndTime       pgtype.Timestamptz
@@ -51,7 +54,9 @@ func (q *Queries) ActivePlay(ctx context.Context, arg ActivePlayParams) (ActiveP
 		&i.ID,
 		&i.BabyID,
 		&i.CaretakerID,
+		&i.LoggedByID,
 		&i.CaretakerName,
+		&i.LoggedByName,
 		&i.Type,
 		&i.StartTime,
 		&i.EndTime,
@@ -61,8 +66,8 @@ func (q *Queries) ActivePlay(ctx context.Context, arg ActivePlayParams) (ActiveP
 }
 
 const createPlay = `-- name: CreatePlay :one
-INSERT INTO "play_log" ("family_id", "baby_id", "caretaker_id", "type", "start_time", "end_time", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO "play_log" ("family_id", "baby_id", "caretaker_id", "type", "start_time", "end_time", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING "id"
 `
 
@@ -74,6 +79,7 @@ type CreatePlayParams struct {
 	StartTime   pgtype.Timestamptz
 	EndTime     pgtype.Timestamptz
 	Notes       *string
+	LoggedByID  string
 }
 
 func (q *Queries) CreatePlay(ctx context.Context, arg CreatePlayParams) (string, error) {
@@ -85,6 +91,7 @@ func (q *Queries) CreatePlay(ctx context.Context, arg CreatePlayParams) (string,
 		arg.StartTime,
 		arg.EndTime,
 		arg.Notes,
+		arg.LoggedByID,
 	)
 	var id string
 	err := row.Scan(&id)
@@ -111,10 +118,11 @@ func (q *Queries) DeletePlay(ctx context.Context, arg DeletePlayParams) (int64, 
 
 const getPlay = `-- name: GetPlay :one
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", p."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     p."type", p."start_time", p."end_time", p."notes"
 FROM "play_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"
+JOIN "users" lu ON lu."id" = p."logged_by_id"
 WHERE p."family_id" = $1 AND p."id" = $2
 `
 
@@ -127,7 +135,9 @@ type GetPlayRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Type          string
 	StartTime     pgtype.Timestamptz
 	EndTime       pgtype.Timestamptz
@@ -141,7 +151,9 @@ func (q *Queries) GetPlay(ctx context.Context, arg GetPlayParams) (GetPlayRow, e
 		&i.ID,
 		&i.BabyID,
 		&i.CaretakerID,
+		&i.LoggedByID,
 		&i.CaretakerName,
+		&i.LoggedByName,
 		&i.Type,
 		&i.StartTime,
 		&i.EndTime,
@@ -153,10 +165,11 @@ func (q *Queries) GetPlay(ctx context.Context, arg GetPlayParams) (GetPlayRow, e
 const listPlays = `-- name: ListPlays :many
 
 SELECT
-    p."id", p."baby_id", p."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    p."id", p."baby_id", p."caretaker_id", p."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     p."type", p."start_time", p."end_time", p."notes"
 FROM "play_log" p
 JOIN "users" u ON u."id" = p."caretaker_id"
+JOIN "users" lu ON lu."id" = p."logged_by_id"
 WHERE p."family_id" = $1
   AND ($2::text IS NULL OR p."baby_id" = $2)
 ORDER BY p."start_time" DESC, p."id" DESC
@@ -173,7 +186,9 @@ type ListPlaysRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	Type          string
 	StartTime     pgtype.Timestamptz
 	EndTime       pgtype.Timestamptz
@@ -210,7 +225,9 @@ func (q *Queries) ListPlays(ctx context.Context, arg ListPlaysParams) ([]ListPla
 			&i.ID,
 			&i.BabyID,
 			&i.CaretakerID,
+			&i.LoggedByID,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Type,
 			&i.StartTime,
 			&i.EndTime,
@@ -253,28 +270,33 @@ func (q *Queries) StopPlay(ctx context.Context, arg StopPlayParams) (int64, erro
 const updatePlay = `-- name: UpdatePlay :execrows
 UPDATE "play_log"
 SET
-    "type" = CASE WHEN $1::bool THEN $2::text ELSE "type" END,
-    "start_time" = CASE WHEN $3::bool THEN $4::timestamptz ELSE "start_time" END,
-    "end_time" = CASE WHEN $5::bool THEN $6::timestamptz ELSE "end_time" END,
-    "notes" = CASE WHEN $7::bool THEN $8::text ELSE "notes" END
-WHERE "family_id" = $9 AND "id" = $10
+    "caretaker_id" = CASE WHEN $1::bool THEN $2::text ELSE "caretaker_id" END,
+    "type" = CASE WHEN $3::bool THEN $4::text ELSE "type" END,
+    "start_time" = CASE WHEN $5::bool THEN $6::timestamptz ELSE "start_time" END,
+    "end_time" = CASE WHEN $7::bool THEN $8::timestamptz ELSE "end_time" END,
+    "notes" = CASE WHEN $9::bool THEN $10::text ELSE "notes" END
+WHERE "family_id" = $11 AND "id" = $12
 `
 
 type UpdatePlayParams struct {
-	TypeSet      bool
-	TypeVal      *string
-	StartTimeSet bool
-	StartTimeVal pgtype.Timestamptz
-	EndTimeSet   bool
-	EndTimeVal   pgtype.Timestamptz
-	NotesSet     bool
-	NotesVal     *string
-	FamilyID     string
-	ID           string
+	CaretakerIDSet bool
+	CaretakerIDVal *string
+	TypeSet        bool
+	TypeVal        *string
+	StartTimeSet   bool
+	StartTimeVal   pgtype.Timestamptz
+	EndTimeSet     bool
+	EndTimeVal     pgtype.Timestamptz
+	NotesSet       bool
+	NotesVal       *string
+	FamilyID       string
+	ID             string
 }
 
 func (q *Queries) UpdatePlay(ctx context.Context, arg UpdatePlayParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updatePlay,
+		arg.CaretakerIDSet,
+		arg.CaretakerIDVal,
 		arg.TypeSet,
 		arg.TypeVal,
 		arg.StartTimeSet,

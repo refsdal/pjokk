@@ -13,10 +13,11 @@ import (
 
 const activeSleep = `-- name: ActiveSleep :one
 SELECT
-    s."id", s."baby_id", s."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
+JOIN "users" lu ON lu."id" = s."logged_by_id"
 WHERE s."family_id" = $1
   AND ($2::text IS NULL OR s."baby_id" = $2)
   AND s."end_time" IS NULL
@@ -33,7 +34,9 @@ type ActiveSleepRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	StartTime     pgtype.Timestamptz
 	EndTime       pgtype.Timestamptz
 	Location      *string
@@ -53,7 +56,9 @@ func (q *Queries) ActiveSleep(ctx context.Context, arg ActiveSleepParams) (Activ
 		&i.ID,
 		&i.BabyID,
 		&i.CaretakerID,
+		&i.LoggedByID,
 		&i.CaretakerName,
+		&i.LoggedByName,
 		&i.StartTime,
 		&i.EndTime,
 		&i.Location,
@@ -64,8 +69,8 @@ func (q *Queries) ActiveSleep(ctx context.Context, arg ActiveSleepParams) (Activ
 }
 
 const createSleep = `-- name: CreateSleep :one
-INSERT INTO "sleep_log" ("family_id", "baby_id", "caretaker_id", "start_time", "end_time", "location", "type", "notes")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO "sleep_log" ("family_id", "baby_id", "caretaker_id", "start_time", "end_time", "location", "type", "notes", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING "id"
 `
 
@@ -78,6 +83,7 @@ type CreateSleepParams struct {
 	Location    *string
 	Type        *string
 	Notes       *string
+	LoggedByID  string
 }
 
 func (q *Queries) CreateSleep(ctx context.Context, arg CreateSleepParams) (string, error) {
@@ -90,6 +96,7 @@ func (q *Queries) CreateSleep(ctx context.Context, arg CreateSleepParams) (strin
 		arg.Location,
 		arg.Type,
 		arg.Notes,
+		arg.LoggedByID,
 	)
 	var id string
 	err := row.Scan(&id)
@@ -116,10 +123,11 @@ func (q *Queries) DeleteSleep(ctx context.Context, arg DeleteSleepParams) (int64
 
 const getSleep = `-- name: GetSleep :one
 SELECT
-    s."id", s."baby_id", s."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
+JOIN "users" lu ON lu."id" = s."logged_by_id"
 WHERE s."family_id" = $1 AND s."id" = $2
 `
 
@@ -132,7 +140,9 @@ type GetSleepRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	StartTime     pgtype.Timestamptz
 	EndTime       pgtype.Timestamptz
 	Location      *string
@@ -147,7 +157,9 @@ func (q *Queries) GetSleep(ctx context.Context, arg GetSleepParams) (GetSleepRow
 		&i.ID,
 		&i.BabyID,
 		&i.CaretakerID,
+		&i.LoggedByID,
 		&i.CaretakerName,
+		&i.LoggedByName,
 		&i.StartTime,
 		&i.EndTime,
 		&i.Location,
@@ -160,10 +172,11 @@ func (q *Queries) GetSleep(ctx context.Context, arg GetSleepParams) (GetSleepRow
 const listSleeps = `-- name: ListSleeps :many
 
 SELECT
-    s."id", s."baby_id", s."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
+JOIN "users" lu ON lu."id" = s."logged_by_id"
 WHERE s."family_id" = $1
   AND ($2::text IS NULL OR s."baby_id" = $2)
 ORDER BY s."start_time" DESC, s."id" DESC
@@ -180,7 +193,9 @@ type ListSleepsRow struct {
 	ID            string
 	BabyID        string
 	CaretakerID   string
+	LoggedByID    string
 	CaretakerName string
+	LoggedByName  string
 	StartTime     pgtype.Timestamptz
 	EndTime       pgtype.Timestamptz
 	Location      *string
@@ -212,7 +227,9 @@ func (q *Queries) ListSleeps(ctx context.Context, arg ListSleepsParams) ([]ListS
 			&i.ID,
 			&i.BabyID,
 			&i.CaretakerID,
+			&i.LoggedByID,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.StartTime,
 			&i.EndTime,
 			&i.Location,
@@ -232,31 +249,36 @@ func (q *Queries) ListSleeps(ctx context.Context, arg ListSleepsParams) ([]ListS
 const updateSleep = `-- name: UpdateSleep :execrows
 UPDATE "sleep_log"
 SET
-    "start_time" = CASE WHEN $1::bool THEN $2::timestamptz ELSE "start_time" END,
-    "end_time" = CASE WHEN $3::bool THEN $4::timestamptz ELSE "end_time" END,
-    "location" = CASE WHEN $5::bool THEN $6::text ELSE "location" END,
-    "type" = CASE WHEN $7::bool THEN $8::text ELSE "type" END,
-    "notes" = CASE WHEN $9::bool THEN $10::text ELSE "notes" END
-WHERE "family_id" = $11 AND "id" = $12
+    "caretaker_id" = CASE WHEN $1::bool THEN $2::text ELSE "caretaker_id" END,
+    "start_time" = CASE WHEN $3::bool THEN $4::timestamptz ELSE "start_time" END,
+    "end_time" = CASE WHEN $5::bool THEN $6::timestamptz ELSE "end_time" END,
+    "location" = CASE WHEN $7::bool THEN $8::text ELSE "location" END,
+    "type" = CASE WHEN $9::bool THEN $10::text ELSE "type" END,
+    "notes" = CASE WHEN $11::bool THEN $12::text ELSE "notes" END
+WHERE "family_id" = $13 AND "id" = $14
 `
 
 type UpdateSleepParams struct {
-	StartTimeSet bool
-	StartTimeVal pgtype.Timestamptz
-	EndTimeSet   bool
-	EndTimeVal   pgtype.Timestamptz
-	LocationSet  bool
-	LocationVal  *string
-	TypeSet      bool
-	TypeVal      *string
-	NotesSet     bool
-	NotesVal     *string
-	FamilyID     string
-	ID           string
+	CaretakerIDSet bool
+	CaretakerIDVal *string
+	StartTimeSet   bool
+	StartTimeVal   pgtype.Timestamptz
+	EndTimeSet     bool
+	EndTimeVal     pgtype.Timestamptz
+	LocationSet    bool
+	LocationVal    *string
+	TypeSet        bool
+	TypeVal        *string
+	NotesSet       bool
+	NotesVal       *string
+	FamilyID       string
+	ID             string
 }
 
 func (q *Queries) UpdateSleep(ctx context.Context, arg UpdateSleepParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateSleep,
+		arg.CaretakerIDSet,
+		arg.CaretakerIDVal,
 		arg.StartTimeSet,
 		arg.StartTimeVal,
 		arg.EndTimeSet,

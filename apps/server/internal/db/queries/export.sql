@@ -17,10 +17,11 @@
 SELECT
     f."baby_id", bb."name" AS baby_name, f."time", f."type", f."amount_ml",
     f."side", f."duration_min", f."contents", f."food", f."reaction",
-    COALESCE(u."display_name", '') AS caretaker_name, f."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, f."notes"
 FROM "feed_log" f
 JOIN "baby" bb ON bb."id" = f."baby_id"
 JOIN "users" u ON u."id" = f."caretaker_id"
+JOIN "users" lu ON lu."id" = f."logged_by_id"
 WHERE f."family_id" = sqlc.arg(family_id)
 ORDER BY f."time" ASC, f."id" ASC
 LIMIT sqlc.arg(lim);
@@ -28,10 +29,11 @@ LIMIT sqlc.arg(lim);
 -- name: ExportDiapers :many
 SELECT
     d."baby_id", bb."name" AS baby_name, d."time", d."type", d."color", d."consistency",
-    COALESCE(u."display_name", '') AS caretaker_name, d."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, d."notes"
 FROM "diaper_log" d
 JOIN "baby" bb ON bb."id" = d."baby_id"
 JOIN "users" u ON u."id" = d."caretaker_id"
+JOIN "users" lu ON lu."id" = d."logged_by_id"
 WHERE d."family_id" = sqlc.arg(family_id)
 ORDER BY d."time" ASC, d."id" ASC
 LIMIT sqlc.arg(lim);
@@ -39,10 +41,11 @@ LIMIT sqlc.arg(lim);
 -- name: ExportSleeps :many
 SELECT
     s."baby_id", bb."name" AS baby_name, s."start_time", s."end_time",
-    s."location", s."type", COALESCE(u."display_name", '') AS caretaker_name, s."notes"
+    s."location", s."type", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, s."notes"
 FROM "sleep_log" s
 JOIN "baby" bb ON bb."id" = s."baby_id"
 JOIN "users" u ON u."id" = s."caretaker_id"
+JOIN "users" lu ON lu."id" = s."logged_by_id"
 WHERE s."family_id" = sqlc.arg(family_id)
 ORDER BY s."start_time" ASC, s."id" ASC
 LIMIT sqlc.arg(lim);
@@ -50,10 +53,11 @@ LIMIT sqlc.arg(lim);
 -- name: ExportMedicine :many
 SELECT
     m."baby_id", bb."name" AS baby_name, m."time", m."name", m."amount", m."unit",
-    COALESCE(u."display_name", '') AS caretaker_name, m."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, m."notes"
 FROM "medicine_log" m
 JOIN "baby" bb ON bb."id" = m."baby_id"
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = sqlc.arg(family_id)
 ORDER BY m."time" ASC, m."id" ASC
 LIMIT sqlc.arg(lim);
@@ -61,10 +65,11 @@ LIMIT sqlc.arg(lim);
 -- name: ExportBaths :many
 SELECT
     b."baby_id", bb."name" AS baby_name, b."time",
-    COALESCE(u."display_name", '') AS caretaker_name, b."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, b."notes"
 FROM "bath_log" b
 JOIN "baby" bb ON bb."id" = b."baby_id"
 JOIN "users" u ON u."id" = b."caretaker_id"
+JOIN "users" lu ON lu."id" = b."logged_by_id"
 WHERE b."family_id" = sqlc.arg(family_id)
 ORDER BY b."time" ASC, b."id" ASC
 LIMIT sqlc.arg(lim);
@@ -72,10 +77,11 @@ LIMIT sqlc.arg(lim);
 -- name: ExportNotes :many
 SELECT
     n."baby_id", bb."name" AS baby_name, n."time", n."content",
-    COALESCE(u."display_name", '') AS caretaker_name, n."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, n."notes"
 FROM "note_log" n
 JOIN "baby" bb ON bb."id" = n."baby_id"
 JOIN "users" u ON u."id" = n."caretaker_id"
+JOIN "users" lu ON lu."id" = n."logged_by_id"
 WHERE n."family_id" = sqlc.arg(family_id)
 ORDER BY n."time" ASC, n."id" ASC
 LIMIT sqlc.arg(lim);
@@ -83,10 +89,11 @@ LIMIT sqlc.arg(lim);
 -- name: ExportMilestones :many
 SELECT
     m."baby_id", bb."name" AS baby_name, m."time", m."title",
-    COALESCE(u."display_name", '') AS caretaker_name, m."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, m."notes"
 FROM "milestone_log" m
 JOIN "baby" bb ON bb."id" = m."baby_id"
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = sqlc.arg(family_id)
 ORDER BY m."time" ASC, m."id" ASC
 LIMIT sqlc.arg(lim);
@@ -94,10 +101,11 @@ LIMIT sqlc.arg(lim);
 -- name: ExportMeasurements :many
 SELECT
     m."baby_id", bb."name" AS baby_name, m."time", m."type", m."value",
-    COALESCE(u."display_name", '') AS caretaker_name, m."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, m."notes"
 FROM "measurement_log" m
 JOIN "baby" bb ON bb."id" = m."baby_id"
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = sqlc.arg(family_id)
 ORDER BY m."time" ASC, m."id" ASC
 LIMIT sqlc.arg(lim);
@@ -105,10 +113,11 @@ LIMIT sqlc.arg(lim);
 -- name: ExportPumps :many
 SELECT
     p."baby_id", bb."name" AS baby_name, p."time", p."amount_ml", p."side", p."duration_min",
-    COALESCE(u."display_name", '') AS caretaker_name, p."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, p."notes"
 FROM "pump_log" p
 JOIN "baby" bb ON bb."id" = p."baby_id"
 JOIN "users" u ON u."id" = p."caretaker_id"
+JOIN "users" lu ON lu."id" = p."logged_by_id"
 WHERE p."family_id" = sqlc.arg(family_id)
 ORDER BY p."time" ASC, p."id" ASC
 LIMIT sqlc.arg(lim);
@@ -116,10 +125,11 @@ LIMIT sqlc.arg(lim);
 -- name: ExportPlays :many
 SELECT
     p."baby_id", bb."name" AS baby_name, p."start_time", p."end_time", p."type",
-    COALESCE(u."display_name", '') AS caretaker_name, p."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, p."notes"
 FROM "play_log" p
 JOIN "baby" bb ON bb."id" = p."baby_id"
 JOIN "users" u ON u."id" = p."caretaker_id"
+JOIN "users" lu ON lu."id" = p."logged_by_id"
 WHERE p."family_id" = sqlc.arg(family_id)
 ORDER BY p."start_time" ASC, p."id" ASC
 LIMIT sqlc.arg(lim);
@@ -127,10 +137,11 @@ LIMIT sqlc.arg(lim);
 -- name: ExportVaccines :many
 SELECT
     v."baby_id", bb."name" AS baby_name, v."time", v."name", v."dose_number",
-    COALESCE(u."display_name", '') AS caretaker_name, v."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, v."notes"
 FROM "vaccine_log" v
 JOIN "baby" bb ON bb."id" = v."baby_id"
 JOIN "users" u ON u."id" = v."caretaker_id"
+JOIN "users" lu ON lu."id" = v."logged_by_id"
 WHERE v."family_id" = sqlc.arg(family_id)
 ORDER BY v."time" ASC, v."id" ASC
 LIMIT sqlc.arg(lim);

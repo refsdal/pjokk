@@ -7,28 +7,30 @@
 -- name: ActiveFeedTimer :one
 -- COALESCE(u."display_name", '') — see feeds.sql's ListFeeds for why.
 SELECT
-    ft."id", ft."baby_id", ft."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    ft."id", ft."baby_id", ft."caretaker_id", ft."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     ft."kind", ft."start_time", ft."running_side", ft."side_started_at",
     ft."left_sec", ft."right_sec"
 FROM "feed_timer" ft
 JOIN "users" u ON u."id" = ft."caretaker_id"
+JOIN "users" lu ON lu."id" = ft."logged_by_id"
 WHERE ft."family_id" = sqlc.arg(family_id)
   AND ft."baby_id" = sqlc.arg(baby_id)
   AND ft."kind" = sqlc.arg(kind);
 
 -- name: GetFeedTimer :one
 SELECT
-    ft."id", ft."baby_id", ft."caretaker_id", COALESCE(u."display_name", '') AS caretaker_name,
+    ft."id", ft."baby_id", ft."caretaker_id", ft."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     ft."kind", ft."start_time", ft."running_side", ft."side_started_at",
     ft."left_sec", ft."right_sec"
 FROM "feed_timer" ft
 JOIN "users" u ON u."id" = ft."caretaker_id"
+JOIN "users" lu ON lu."id" = ft."logged_by_id"
 WHERE ft."family_id" = $1 AND ft."id" = $2;
 
 -- name: CreateFeedTimer :one
 INSERT INTO "feed_timer"
-    ("family_id", "baby_id", "caretaker_id", "kind", "start_time", "running_side", "side_started_at")
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+    ("family_id", "baby_id", "caretaker_id", "kind", "start_time", "running_side", "side_started_at", "logged_by_id")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING "id";
 
 -- name: SetFeedTimerSides :execrows

@@ -287,22 +287,90 @@ LIMIT sqlc.arg('lim');
 -- already assigned. Those rows are deleted instead — see
 -- DeleteCalendarAssigneesForUser.
 WITH
-    sleep AS (UPDATE "sleep_log" SET "caretaker_id" = @tombstone_id WHERE "sleep_log"."caretaker_id" = @user_id),
-    feed AS (UPDATE "feed_log" SET "caretaker_id" = @tombstone_id WHERE "feed_log"."caretaker_id" = @user_id),
-    diaper AS (UPDATE "diaper_log" SET "caretaker_id" = @tombstone_id WHERE "diaper_log"."caretaker_id" = @user_id),
-    medicine AS (UPDATE "medicine_log" SET "caretaker_id" = @tombstone_id WHERE "medicine_log"."caretaker_id" = @user_id),
-    bath AS (UPDATE "bath_log" SET "caretaker_id" = @tombstone_id WHERE "bath_log"."caretaker_id" = @user_id),
-    note AS (UPDATE "note_log" SET "caretaker_id" = @tombstone_id WHERE "note_log"."caretaker_id" = @user_id),
-    milestone AS (UPDATE "milestone_log" SET "caretaker_id" = @tombstone_id WHERE "milestone_log"."caretaker_id" = @user_id),
-    measurement AS (UPDATE "measurement_log" SET "caretaker_id" = @tombstone_id WHERE "measurement_log"."caretaker_id" = @user_id),
-    pump AS (UPDATE "pump_log" SET "caretaker_id" = @tombstone_id WHERE "pump_log"."caretaker_id" = @user_id),
-    play AS (UPDATE "play_log" SET "caretaker_id" = @tombstone_id WHERE "play_log"."caretaker_id" = @user_id),
+    sleep AS (
+        UPDATE "sleep_log"
+        SET "caretaker_id" = CASE WHEN "sleep_log"."caretaker_id" = @user_id THEN @tombstone_id ELSE "sleep_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "sleep_log"."logged_by_id" = @user_id THEN @tombstone_id ELSE "sleep_log"."logged_by_id" END
+        WHERE "sleep_log"."caretaker_id" = @user_id OR "sleep_log"."logged_by_id" = @user_id
+    ),
+    feed AS (
+        UPDATE "feed_log"
+        SET "caretaker_id" = CASE WHEN "feed_log"."caretaker_id" = @user_id THEN @tombstone_id ELSE "feed_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "feed_log"."logged_by_id" = @user_id THEN @tombstone_id ELSE "feed_log"."logged_by_id" END
+        WHERE "feed_log"."caretaker_id" = @user_id OR "feed_log"."logged_by_id" = @user_id
+    ),
+    diaper AS (
+        UPDATE "diaper_log"
+        SET "caretaker_id" = CASE WHEN "diaper_log"."caretaker_id" = @user_id THEN @tombstone_id ELSE "diaper_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "diaper_log"."logged_by_id" = @user_id THEN @tombstone_id ELSE "diaper_log"."logged_by_id" END
+        WHERE "diaper_log"."caretaker_id" = @user_id OR "diaper_log"."logged_by_id" = @user_id
+    ),
+    medicine AS (
+        UPDATE "medicine_log"
+        SET "caretaker_id" = CASE WHEN "medicine_log"."caretaker_id" = @user_id THEN @tombstone_id ELSE "medicine_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "medicine_log"."logged_by_id" = @user_id THEN @tombstone_id ELSE "medicine_log"."logged_by_id" END
+        WHERE "medicine_log"."caretaker_id" = @user_id OR "medicine_log"."logged_by_id" = @user_id
+    ),
+    bath AS (
+        UPDATE "bath_log"
+        SET "caretaker_id" = CASE WHEN "bath_log"."caretaker_id" = @user_id THEN @tombstone_id ELSE "bath_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "bath_log"."logged_by_id" = @user_id THEN @tombstone_id ELSE "bath_log"."logged_by_id" END
+        WHERE "bath_log"."caretaker_id" = @user_id OR "bath_log"."logged_by_id" = @user_id
+    ),
+    note AS (
+        UPDATE "note_log"
+        SET "caretaker_id" = CASE WHEN "note_log"."caretaker_id" = @user_id THEN @tombstone_id ELSE "note_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "note_log"."logged_by_id" = @user_id THEN @tombstone_id ELSE "note_log"."logged_by_id" END
+        WHERE "note_log"."caretaker_id" = @user_id OR "note_log"."logged_by_id" = @user_id
+    ),
+    milestone AS (
+        UPDATE "milestone_log"
+        SET "caretaker_id" = CASE WHEN "milestone_log"."caretaker_id" = @user_id THEN @tombstone_id ELSE "milestone_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "milestone_log"."logged_by_id" = @user_id THEN @tombstone_id ELSE "milestone_log"."logged_by_id" END
+        WHERE "milestone_log"."caretaker_id" = @user_id OR "milestone_log"."logged_by_id" = @user_id
+    ),
+    measurement AS (
+        UPDATE "measurement_log"
+        SET "caretaker_id" = CASE WHEN "measurement_log"."caretaker_id" = @user_id THEN @tombstone_id ELSE "measurement_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "measurement_log"."logged_by_id" = @user_id THEN @tombstone_id ELSE "measurement_log"."logged_by_id" END
+        WHERE "measurement_log"."caretaker_id" = @user_id OR "measurement_log"."logged_by_id" = @user_id
+    ),
+    pump AS (
+        UPDATE "pump_log"
+        SET "caretaker_id" = CASE WHEN "pump_log"."caretaker_id" = @user_id THEN @tombstone_id ELSE "pump_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "pump_log"."logged_by_id" = @user_id THEN @tombstone_id ELSE "pump_log"."logged_by_id" END
+        WHERE "pump_log"."caretaker_id" = @user_id OR "pump_log"."logged_by_id" = @user_id
+    ),
+    play AS (
+        UPDATE "play_log"
+        SET "caretaker_id" = CASE WHEN "play_log"."caretaker_id" = @user_id THEN @tombstone_id ELSE "play_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "play_log"."logged_by_id" = @user_id THEN @tombstone_id ELSE "play_log"."logged_by_id" END
+        WHERE "play_log"."caretaker_id" = @user_id OR "play_log"."logged_by_id" = @user_id
+    ),
     -- A running nursing/pump timer is an attribution ("started by"), not an
     -- assignment: the clock belongs to the family and a co-parent may still
     -- be feeding, so it survives the deletion and lands on the tombstone
     -- exactly as the feed it becomes would.
-    feed_timer AS (UPDATE "feed_timer" SET "caretaker_id" = @tombstone_id WHERE "feed_timer"."caretaker_id" = @user_id),
-    vaccine AS (UPDATE "vaccine_log" SET "caretaker_id" = @tombstone_id WHERE "vaccine_log"."caretaker_id" = @user_id),
+    --
+    -- Every log table carries TWO attributions since 00019 — caretaker_id
+    -- (who did the care) and logged_by_id (who saved the row) — re-pointed
+    -- in ONE UPDATE per table. Not two CTEs: the sub-statements of a WITH
+    -- run against one snapshot, and a row both columns name would get only
+    -- one of two updates ("attempting to update the same row twice in a
+    -- single statement is not supported"), leaving a dangling reference
+    -- that fails the DELETE.
+    feed_timer AS (
+        UPDATE "feed_timer"
+        SET "caretaker_id" = CASE WHEN "feed_timer"."caretaker_id" = @user_id THEN @tombstone_id ELSE "feed_timer"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "feed_timer"."logged_by_id" = @user_id THEN @tombstone_id ELSE "feed_timer"."logged_by_id" END
+        WHERE "feed_timer"."caretaker_id" = @user_id OR "feed_timer"."logged_by_id" = @user_id
+    ),
+    vaccine AS (
+        UPDATE "vaccine_log"
+        SET "caretaker_id" = CASE WHEN "vaccine_log"."caretaker_id" = @user_id THEN @tombstone_id ELSE "vaccine_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "vaccine_log"."logged_by_id" = @user_id THEN @tombstone_id ELSE "vaccine_log"."logged_by_id" END
+        WHERE "vaccine_log"."caretaker_id" = @user_id OR "vaccine_log"."logged_by_id" = @user_id
+    ),
     vaccine_doc AS (UPDATE "vaccine_document" SET "uploaded_by" = @tombstone_id WHERE "vaccine_document"."uploaded_by" = @user_id),
     vaccine_dismissal AS (UPDATE "vaccine_dismissal" SET "dismissed_by" = @tombstone_id WHERE "vaccine_dismissal"."dismissed_by" = @user_id),
     invite AS (UPDATE "family_invite" SET "created_by" = @tombstone_id WHERE "family_invite"."created_by" = @user_id),

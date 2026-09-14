@@ -75,7 +75,7 @@ func esc(v *string) string {
 // the CSV's first line and the render loop's column order.
 var exportHeaders = []string{
 	"kind", "baby", "time", "end_time", "type", "detail", "amount", "unit",
-	"side", "duration_min", "value", "location", "caretaker", "notes",
+	"side", "duration_min", "value", "location", "caretaker", "logged_by", "notes",
 }
 
 // exportRow is one CSV data row: every cell is pre-formatted to its final
@@ -157,6 +157,7 @@ func rowFeed(r dbgen.ExportFeedsRow) exportRow {
 			"side":         r.Side,
 			"duration_min": fmtInt32(r.DurationMin),
 			"caretaker":    str(r.CaretakerName),
+			"logged_by":    str(r.LoggedByName),
 			"notes":        r.Notes,
 		},
 	}
@@ -172,6 +173,7 @@ func rowDiaper(r dbgen.ExportDiapersRow) exportRow {
 			"type":      str(r.Type),
 			"detail":    joinDetail(r.Color, r.Consistency),
 			"caretaker": str(r.CaretakerName),
+			"logged_by": str(r.LoggedByName),
 			"notes":     r.Notes,
 		},
 	}
@@ -188,6 +190,7 @@ func rowSleep(r dbgen.ExportSleepsRow) exportRow {
 			"detail":    r.Type,
 			"location":  r.Location,
 			"caretaker": str(r.CaretakerName),
+			"logged_by": str(r.LoggedByName),
 			"notes":     r.Notes,
 		},
 	}
@@ -208,6 +211,7 @@ func rowMedicine(r dbgen.ExportMedicineRow) exportRow {
 			"amount":    amount,
 			"unit":      r.Unit,
 			"caretaker": str(r.CaretakerName),
+			"logged_by": str(r.LoggedByName),
 			"notes":     r.Notes,
 		},
 	}
@@ -221,6 +225,7 @@ func rowBath(r dbgen.ExportBathsRow) exportRow {
 			"baby":      str(r.BabyName),
 			"time":      fmtTS(r.Time),
 			"caretaker": str(r.CaretakerName),
+			"logged_by": str(r.LoggedByName),
 			"notes":     r.Notes,
 		},
 	}
@@ -235,6 +240,7 @@ func rowNote(r dbgen.ExportNotesRow) exportRow {
 			"time":      fmtTS(r.Time),
 			"detail":    str(r.Content),
 			"caretaker": str(r.CaretakerName),
+			"logged_by": str(r.LoggedByName),
 			"notes":     r.Notes,
 		},
 	}
@@ -249,6 +255,7 @@ func rowMilestone(r dbgen.ExportMilestonesRow) exportRow {
 			"time":      fmtTS(r.Time),
 			"detail":    str(r.Title),
 			"caretaker": str(r.CaretakerName),
+			"logged_by": str(r.LoggedByName),
 			"notes":     r.Notes,
 		},
 	}
@@ -266,6 +273,7 @@ func rowMeasurement(r dbgen.ExportMeasurementsRow) exportRow {
 			"value":     fmtFloat64(r.Value),
 			"unit":      str(unit),
 			"caretaker": str(r.CaretakerName),
+			"logged_by": str(r.LoggedByName),
 			"notes":     r.Notes,
 		},
 	}
@@ -287,6 +295,7 @@ func rowPump(r dbgen.ExportPumpsRow) exportRow {
 			"side":         r.Side,
 			"duration_min": fmtInt32(r.DurationMin),
 			"caretaker":    str(r.CaretakerName),
+			"logged_by":    str(r.LoggedByName),
 			"notes":        r.Notes,
 		},
 	}
@@ -308,6 +317,7 @@ func rowPlay(r dbgen.ExportPlaysRow) exportRow {
 			"type":         str(r.Type),
 			"duration_min": durationMin,
 			"caretaker":    str(r.CaretakerName),
+			"logged_by":    str(r.LoggedByName),
 			"notes":        r.Notes,
 		},
 	}
@@ -323,6 +333,7 @@ func rowVaccine(r dbgen.ExportVaccinesRow) exportRow {
 			"detail":    str(r.Name),
 			"value":     fmtInt32(r.DoseNumber),
 			"caretaker": str(r.CaretakerName),
+			"logged_by": str(r.LoggedByName),
 			"notes":     r.Notes,
 		},
 	}

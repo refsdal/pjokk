@@ -14,10 +14,11 @@ import (
 const exportBaths = `-- name: ExportBaths :many
 SELECT
     b."baby_id", bb."name" AS baby_name, b."time",
-    COALESCE(u."display_name", '') AS caretaker_name, b."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, b."notes"
 FROM "bath_log" b
 JOIN "baby" bb ON bb."id" = b."baby_id"
 JOIN "users" u ON u."id" = b."caretaker_id"
+JOIN "users" lu ON lu."id" = b."logged_by_id"
 WHERE b."family_id" = $1
 ORDER BY b."time" ASC, b."id" ASC
 LIMIT $2
@@ -33,6 +34,7 @@ type ExportBathsRow struct {
 	BabyName      string
 	Time          pgtype.Timestamptz
 	CaretakerName string
+	LoggedByName  string
 	Notes         *string
 }
 
@@ -50,6 +52,7 @@ func (q *Queries) ExportBaths(ctx context.Context, arg ExportBathsParams) ([]Exp
 			&i.BabyName,
 			&i.Time,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Notes,
 		); err != nil {
 			return nil, err
@@ -65,10 +68,11 @@ func (q *Queries) ExportBaths(ctx context.Context, arg ExportBathsParams) ([]Exp
 const exportDiapers = `-- name: ExportDiapers :many
 SELECT
     d."baby_id", bb."name" AS baby_name, d."time", d."type", d."color", d."consistency",
-    COALESCE(u."display_name", '') AS caretaker_name, d."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, d."notes"
 FROM "diaper_log" d
 JOIN "baby" bb ON bb."id" = d."baby_id"
 JOIN "users" u ON u."id" = d."caretaker_id"
+JOIN "users" lu ON lu."id" = d."logged_by_id"
 WHERE d."family_id" = $1
 ORDER BY d."time" ASC, d."id" ASC
 LIMIT $2
@@ -87,6 +91,7 @@ type ExportDiapersRow struct {
 	Color         *string
 	Consistency   *string
 	CaretakerName string
+	LoggedByName  string
 	Notes         *string
 }
 
@@ -107,6 +112,7 @@ func (q *Queries) ExportDiapers(ctx context.Context, arg ExportDiapersParams) ([
 			&i.Color,
 			&i.Consistency,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Notes,
 		); err != nil {
 			return nil, err
@@ -124,10 +130,11 @@ const exportFeeds = `-- name: ExportFeeds :many
 SELECT
     f."baby_id", bb."name" AS baby_name, f."time", f."type", f."amount_ml",
     f."side", f."duration_min", f."contents", f."food", f."reaction",
-    COALESCE(u."display_name", '') AS caretaker_name, f."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, f."notes"
 FROM "feed_log" f
 JOIN "baby" bb ON bb."id" = f."baby_id"
 JOIN "users" u ON u."id" = f."caretaker_id"
+JOIN "users" lu ON lu."id" = f."logged_by_id"
 WHERE f."family_id" = $1
 ORDER BY f."time" ASC, f."id" ASC
 LIMIT $2
@@ -150,6 +157,7 @@ type ExportFeedsRow struct {
 	Food          *string
 	Reaction      *bool
 	CaretakerName string
+	LoggedByName  string
 	Notes         *string
 }
 
@@ -188,6 +196,7 @@ func (q *Queries) ExportFeeds(ctx context.Context, arg ExportFeedsParams) ([]Exp
 			&i.Food,
 			&i.Reaction,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Notes,
 		); err != nil {
 			return nil, err
@@ -203,10 +212,11 @@ func (q *Queries) ExportFeeds(ctx context.Context, arg ExportFeedsParams) ([]Exp
 const exportMeasurements = `-- name: ExportMeasurements :many
 SELECT
     m."baby_id", bb."name" AS baby_name, m."time", m."type", m."value",
-    COALESCE(u."display_name", '') AS caretaker_name, m."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, m."notes"
 FROM "measurement_log" m
 JOIN "baby" bb ON bb."id" = m."baby_id"
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = $1
 ORDER BY m."time" ASC, m."id" ASC
 LIMIT $2
@@ -224,6 +234,7 @@ type ExportMeasurementsRow struct {
 	Type          string
 	Value         float64
 	CaretakerName string
+	LoggedByName  string
 	Notes         *string
 }
 
@@ -243,6 +254,7 @@ func (q *Queries) ExportMeasurements(ctx context.Context, arg ExportMeasurements
 			&i.Type,
 			&i.Value,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Notes,
 		); err != nil {
 			return nil, err
@@ -258,10 +270,11 @@ func (q *Queries) ExportMeasurements(ctx context.Context, arg ExportMeasurements
 const exportMedicine = `-- name: ExportMedicine :many
 SELECT
     m."baby_id", bb."name" AS baby_name, m."time", m."name", m."amount", m."unit",
-    COALESCE(u."display_name", '') AS caretaker_name, m."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, m."notes"
 FROM "medicine_log" m
 JOIN "baby" bb ON bb."id" = m."baby_id"
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = $1
 ORDER BY m."time" ASC, m."id" ASC
 LIMIT $2
@@ -280,6 +293,7 @@ type ExportMedicineRow struct {
 	Amount        *float64
 	Unit          *string
 	CaretakerName string
+	LoggedByName  string
 	Notes         *string
 }
 
@@ -300,6 +314,7 @@ func (q *Queries) ExportMedicine(ctx context.Context, arg ExportMedicineParams) 
 			&i.Amount,
 			&i.Unit,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Notes,
 		); err != nil {
 			return nil, err
@@ -315,10 +330,11 @@ func (q *Queries) ExportMedicine(ctx context.Context, arg ExportMedicineParams) 
 const exportMilestones = `-- name: ExportMilestones :many
 SELECT
     m."baby_id", bb."name" AS baby_name, m."time", m."title",
-    COALESCE(u."display_name", '') AS caretaker_name, m."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, m."notes"
 FROM "milestone_log" m
 JOIN "baby" bb ON bb."id" = m."baby_id"
 JOIN "users" u ON u."id" = m."caretaker_id"
+JOIN "users" lu ON lu."id" = m."logged_by_id"
 WHERE m."family_id" = $1
 ORDER BY m."time" ASC, m."id" ASC
 LIMIT $2
@@ -335,6 +351,7 @@ type ExportMilestonesRow struct {
 	Time          pgtype.Timestamptz
 	Title         string
 	CaretakerName string
+	LoggedByName  string
 	Notes         *string
 }
 
@@ -353,6 +370,7 @@ func (q *Queries) ExportMilestones(ctx context.Context, arg ExportMilestonesPara
 			&i.Time,
 			&i.Title,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Notes,
 		); err != nil {
 			return nil, err
@@ -368,10 +386,11 @@ func (q *Queries) ExportMilestones(ctx context.Context, arg ExportMilestonesPara
 const exportNotes = `-- name: ExportNotes :many
 SELECT
     n."baby_id", bb."name" AS baby_name, n."time", n."content",
-    COALESCE(u."display_name", '') AS caretaker_name, n."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, n."notes"
 FROM "note_log" n
 JOIN "baby" bb ON bb."id" = n."baby_id"
 JOIN "users" u ON u."id" = n."caretaker_id"
+JOIN "users" lu ON lu."id" = n."logged_by_id"
 WHERE n."family_id" = $1
 ORDER BY n."time" ASC, n."id" ASC
 LIMIT $2
@@ -388,6 +407,7 @@ type ExportNotesRow struct {
 	Time          pgtype.Timestamptz
 	Content       string
 	CaretakerName string
+	LoggedByName  string
 	Notes         *string
 }
 
@@ -406,6 +426,7 @@ func (q *Queries) ExportNotes(ctx context.Context, arg ExportNotesParams) ([]Exp
 			&i.Time,
 			&i.Content,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Notes,
 		); err != nil {
 			return nil, err
@@ -421,10 +442,11 @@ func (q *Queries) ExportNotes(ctx context.Context, arg ExportNotesParams) ([]Exp
 const exportPlays = `-- name: ExportPlays :many
 SELECT
     p."baby_id", bb."name" AS baby_name, p."start_time", p."end_time", p."type",
-    COALESCE(u."display_name", '') AS caretaker_name, p."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, p."notes"
 FROM "play_log" p
 JOIN "baby" bb ON bb."id" = p."baby_id"
 JOIN "users" u ON u."id" = p."caretaker_id"
+JOIN "users" lu ON lu."id" = p."logged_by_id"
 WHERE p."family_id" = $1
 ORDER BY p."start_time" ASC, p."id" ASC
 LIMIT $2
@@ -442,6 +464,7 @@ type ExportPlaysRow struct {
 	EndTime       pgtype.Timestamptz
 	Type          string
 	CaretakerName string
+	LoggedByName  string
 	Notes         *string
 }
 
@@ -461,6 +484,7 @@ func (q *Queries) ExportPlays(ctx context.Context, arg ExportPlaysParams) ([]Exp
 			&i.EndTime,
 			&i.Type,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Notes,
 		); err != nil {
 			return nil, err
@@ -476,10 +500,11 @@ func (q *Queries) ExportPlays(ctx context.Context, arg ExportPlaysParams) ([]Exp
 const exportPumps = `-- name: ExportPumps :many
 SELECT
     p."baby_id", bb."name" AS baby_name, p."time", p."amount_ml", p."side", p."duration_min",
-    COALESCE(u."display_name", '') AS caretaker_name, p."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, p."notes"
 FROM "pump_log" p
 JOIN "baby" bb ON bb."id" = p."baby_id"
 JOIN "users" u ON u."id" = p."caretaker_id"
+JOIN "users" lu ON lu."id" = p."logged_by_id"
 WHERE p."family_id" = $1
 ORDER BY p."time" ASC, p."id" ASC
 LIMIT $2
@@ -498,6 +523,7 @@ type ExportPumpsRow struct {
 	Side          *string
 	DurationMin   *int32
 	CaretakerName string
+	LoggedByName  string
 	Notes         *string
 }
 
@@ -518,6 +544,7 @@ func (q *Queries) ExportPumps(ctx context.Context, arg ExportPumpsParams) ([]Exp
 			&i.Side,
 			&i.DurationMin,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Notes,
 		); err != nil {
 			return nil, err
@@ -533,10 +560,11 @@ func (q *Queries) ExportPumps(ctx context.Context, arg ExportPumpsParams) ([]Exp
 const exportSleeps = `-- name: ExportSleeps :many
 SELECT
     s."baby_id", bb."name" AS baby_name, s."start_time", s."end_time",
-    s."location", s."type", COALESCE(u."display_name", '') AS caretaker_name, s."notes"
+    s."location", s."type", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, s."notes"
 FROM "sleep_log" s
 JOIN "baby" bb ON bb."id" = s."baby_id"
 JOIN "users" u ON u."id" = s."caretaker_id"
+JOIN "users" lu ON lu."id" = s."logged_by_id"
 WHERE s."family_id" = $1
 ORDER BY s."start_time" ASC, s."id" ASC
 LIMIT $2
@@ -555,6 +583,7 @@ type ExportSleepsRow struct {
 	Location      *string
 	Type          *string
 	CaretakerName string
+	LoggedByName  string
 	Notes         *string
 }
 
@@ -575,6 +604,7 @@ func (q *Queries) ExportSleeps(ctx context.Context, arg ExportSleepsParams) ([]E
 			&i.Location,
 			&i.Type,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Notes,
 		); err != nil {
 			return nil, err
@@ -590,10 +620,11 @@ func (q *Queries) ExportSleeps(ctx context.Context, arg ExportSleepsParams) ([]E
 const exportVaccines = `-- name: ExportVaccines :many
 SELECT
     v."baby_id", bb."name" AS baby_name, v."time", v."name", v."dose_number",
-    COALESCE(u."display_name", '') AS caretaker_name, v."notes"
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, v."notes"
 FROM "vaccine_log" v
 JOIN "baby" bb ON bb."id" = v."baby_id"
 JOIN "users" u ON u."id" = v."caretaker_id"
+JOIN "users" lu ON lu."id" = v."logged_by_id"
 WHERE v."family_id" = $1
 ORDER BY v."time" ASC, v."id" ASC
 LIMIT $2
@@ -611,6 +642,7 @@ type ExportVaccinesRow struct {
 	Name          string
 	DoseNumber    *int32
 	CaretakerName string
+	LoggedByName  string
 	Notes         *string
 }
 
@@ -630,6 +662,7 @@ func (q *Queries) ExportVaccines(ctx context.Context, arg ExportVaccinesParams) 
 			&i.Name,
 			&i.DoseNumber,
 			&i.CaretakerName,
+			&i.LoggedByName,
 			&i.Notes,
 		); err != nil {
 			return nil, err
