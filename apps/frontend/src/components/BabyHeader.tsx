@@ -41,9 +41,12 @@ export function BabyRow({
     );
   }
   return (
+    // p-0.5 -m-0.5: the row scrolls (a fifth baby), so it clips, and the
+    // selected pill's 2 px ring is drawn outside its box — the padding is
+    // the ring's room on every side, the negative margin keeps the layout.
     <fieldset
       aria-label={t("Babies")}
-      className="flex min-w-0 items-center gap-2 overflow-x-auto"
+      className="-m-0.5 flex min-w-0 items-center gap-2 overflow-x-auto p-0.5"
     >
       {babies.map((b) => {
         const on = b.id === selectedId;
