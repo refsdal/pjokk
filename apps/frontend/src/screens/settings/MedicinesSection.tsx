@@ -1,11 +1,14 @@
-import { IconPill, IconPlus } from "@tabler/icons-react";
+import { IconFileTypePdf, IconPill, IconPlus } from "@tabler/icons-react";
 import { useState } from "react";
 import type { MedicineCatalogueEntry } from "@pjokk/shared";
 import { MedicineSheet } from "@/components/sheets/MedicineSheet";
 import { Card } from "@/components/ui/card";
 import { useMedicineCatalogue } from "@/lib/data";
 import { t } from "@/lib/i18n";
+import { medicineSheetRows } from "@/lib/medicine-sheet";
 import { medicineDetail } from "@/lib/medicine-ui";
+import { useSelectedBaby } from "@/lib/selected-baby";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { SectionTitle } from "./lib";
 
@@ -18,6 +21,26 @@ export function MedicinesSection() {
     null,
   );
   const [adding, setAdding] = useState(false);
+  // A sheet for the barnehage (issue #113): staff may not give medicine
+  // without the parents' written instructions.
+  const { baby } = useSelectedBaby();
+  const [building, setBuilding] = useState(false);
+  const sheetRows = medicineSheetRows(medicines.data ?? [], t);
+  const makeSheet = async () => {
+    if (!baby) return;
+    setBuilding(true);
+    try {
+      const { buildMedicineSheet } = await import("@/lib/medicine-sheet");
+      await buildMedicineSheet({ baby, rows: sheetRows, t });
+    } catch (err) {
+      toast(
+        `${t("Could not build the page")}: ${err instanceof Error ? err.message : String(err)}`,
+        "error",
+      );
+    } finally {
+      setBuilding(false);
+    }
+  };
 
   const rows = medicines.data ?? [];
 
@@ -70,6 +93,17 @@ export function MedicinesSection() {
           <IconPlus className="h-5 w-5" />
           {t("Add medicine")}
         </button>
+        {baby && sheetRows.length > 0 && (
+          <button
+            type="button"
+            disabled={building}
+            onClick={() => void makeSheet()}
+            className="flex w-full items-center gap-2 border-t border-line px-4 py-3 text-left font-semibold text-ink-soft active:bg-surface-2"
+          >
+            <IconFileTypePdf className="h-5 w-5" />
+            {building ? t("Building…") : t("Sheet for daycare (PDF)")}
+          </button>
+        )}
       </Card>
 
       <MedicineSheet
