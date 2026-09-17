@@ -1,5 +1,5 @@
 -- Merged-timeline pagination (timeline.ts). One "Page"
--- query per source, all eleven shaped identically: family+baby scoped
+-- query per source, all twelve shaped identically: family+baby scoped
 -- (baby_id is REQUIRED here, unlike ListFeeds/ListDiapers/… — the
 -- /api/timeline route always has a babyId), an optional keyset cursor via
 -- ROW COMPARISON "(t, id) < (cursor_t, cursor_id)" — never two separate
@@ -22,8 +22,8 @@
 -- term (backslash is ILIKE's default escape) and wraps it in %…% before
 -- it gets here; NULL means "no search".
 --
--- Sleep and play sort by start_time (see sleep.sql's ActiveSleep /
--- play.sql's ActivePlay for why — both are session tables where the natural
+-- Sleep, play and daycare sort by start_time (see sleep.sql's ActiveSleep /
+-- play.sql's ActivePlay for why — all are session tables where the natural
 -- timeline position is when the session STARTED, not the row's other
 -- timestamp); every other source sorts by time.
 
@@ -196,6 +196,25 @@ WHERE p."family_id" = sqlc.arg(family_id)
   )
   AND (sqlc.narg(q)::text IS NULL OR p."notes" ILIKE sqlc.narg(q)::text)
 ORDER BY p."start_time" DESC, p."id" DESC
+LIMIT sqlc.arg(lim);
+
+-- name: ListDaycaresPage :many
+SELECT
+    d."id", d."baby_id", d."caretaker_id", d."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    d."pickup_caretaker_id", pu."display_name" AS pickup_caretaker_name,
+    d."start_time", d."end_time", d."notes"
+FROM "daycare_log" d
+JOIN "users" u ON u."id" = d."caretaker_id"
+JOIN "users" lu ON lu."id" = d."logged_by_id"
+LEFT JOIN "users" pu ON pu."id" = d."pickup_caretaker_id"
+WHERE d."family_id" = sqlc.arg(family_id)
+  AND d."baby_id" = sqlc.arg(baby_id)
+  AND (
+    sqlc.narg(cursor_time)::timestamptz IS NULL
+    OR (d."start_time", d."id") < (sqlc.narg(cursor_time)::timestamptz, sqlc.narg(cursor_id)::text)
+  )
+  AND (sqlc.narg(q)::text IS NULL OR d."notes" ILIKE sqlc.narg(q)::text)
+ORDER BY d."start_time" DESC, d."id" DESC
 LIMIT sqlc.arg(lim);
 
 -- name: ListVaccinesPage :many

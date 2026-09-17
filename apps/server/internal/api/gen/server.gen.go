@@ -89,7 +89,7 @@ type ServerInterface interface {
 	// BanAdminUser Ban an account: sets banned + ban_reason AND revokes every session the user holds, so the ban is enforced by absence rather than by every reader remembering to check a flag. Their API keys stop authenticating too (GetAPIKeyByHash joins on a non-banned creator). Audited as `user.ban`. System admin only.
 	// (POST /api/admin/users/{id}/ban)
 	BanAdminUser(w http.ResponseWriter, r *http.Request, id IdPath)
-	// DeleteAdminUser Delete an account safely. Every non-cascading reference to the user (log attribution on all eleven log kinds, vaccine documents and dismissals, invites, API keys, calendar events and audit rows) is reassigned to the tombstone "Deleted user" in ONE transaction, calendar assignments are dropped, the user's API keys are revoked, and only then is the account removed (sessions, memberships and push subscriptions cascade). POST rather than DELETE, matching the TypeScript predecessor's route. Audited as `user.delete`. System admin only.
+	// DeleteAdminUser Delete an account safely. Every non-cascading reference to the user (log attribution on all twelve log kinds, vaccine documents and dismissals, invites, API keys, calendar events and audit rows) is reassigned to the tombstone "Deleted user" in ONE transaction, calendar assignments are dropped, the user's API keys are revoked, and only then is the account removed (sessions, memberships and push subscriptions cascade). POST rather than DELETE, matching the TypeScript predecessor's route. Audited as `user.delete`. System admin only.
 	// (POST /api/admin/users/{id}/delete)
 	DeleteAdminUser(w http.ResponseWriter, r *http.Request, id IdPath)
 	// ChangeAdminUserEmail Change a person's login address. Their sessions and a linked Google account stay (Google sign-in follows the Google account's id, not the address); password sign-in uses the new address from then on. Audited old → new. 409 EMAIL_TAKEN when another account holds it, 400 UNCHANGED when it is already theirs. System admin only.
@@ -164,6 +164,24 @@ type ServerInterface interface {
 	// UpdateContact Partial update. `role`/`icon`/`phone`/`email`/`website`/`notes` may be sent as `null` to CLEAR that column; `name` is not nullable — only settable or omitted. `babyIds`, when present, REPLACES the link set; omitted leaves it untouched.
 	// (PATCH /api/contacts/{id})
 	UpdateContact(w http.ResponseWriter, r *http.Request, id IdPath)
+	// ListDaycares Days at barnehage in the caller's active family, newest first (by startTime).
+	// (GET /api/daycare)
+	ListDaycares(w http.ResponseWriter, r *http.Request, params ListDaycaresParams)
+	// CreateDaycare Drop off (issue #105). Omit endTime to start a running session — "she is there now"; a baby can only have one at a time, enforced by a partial unique index (see internal/api/daycare.go) as well as the pre-check this endpoint does. With an endTime it logs a finished day after the fact.
+	// (POST /api/daycare)
+	CreateDaycare(w http.ResponseWriter, r *http.Request)
+	// GetActiveDaycare The running daycare session for a baby, or null.
+	// (GET /api/daycare/active)
+	GetActiveDaycare(w http.ResponseWriter, r *http.Request, params GetActiveDaycareParams)
+	// DeleteDaycare Delete a daycare log.
+	// (DELETE /api/daycare/{id})
+	DeleteDaycare(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdateDaycare Partial update. `endTime` sent as `null` CLEARS it, reopening the session — subject to the same one-running-session-per-baby constraint as create, so this can also 409. `pickupCaretakerId` and `notes` may be sent as `null` to clear them; `caretakerId` and `startTime` are settable or omitted.
+	// (PATCH /api/daycare/{id})
+	UpdateDaycare(w http.ResponseWriter, r *http.Request, id IdPath)
+	// PickupDaycare Pick up: end the running session. endTime defaults to now and the pick-up person to the caller. A replay answers 404 rather than moving the end a first call already set.
+	// (POST /api/daycare/{id}/pickup)
+	PickupDaycare(w http.ResponseWriter, r *http.Request, id IdPath)
 	// GetDevice The kiosk device behind this request's pjokk_device cookie. Anyone who is not an enrolled device gets 401 NOT_A_DEVICE.
 	// (GET /api/device)
 	GetDevice(w http.ResponseWriter, r *http.Request)
@@ -425,7 +443,7 @@ type ServerInterface interface {
 	// GetSummary Everything the home screen needs in one call: last feed, last diaper, active + last sleep, active play, and today's local-day totals.
 	// (GET /api/summary)
 	GetSummary(w http.ResponseWriter, r *http.Request, params GetSummaryParams)
-	// ListTimeline The merged feed of everything, newest first. Sleep and play entries sort by their startTime (active sessions have endTime null); every other kind sorts by time. filter=other selects the eight non-core kinds (medicine, bath, note, milestone, measurement, pump, play, vaccine) together; omitting filter returns all eleven.
+	// ListTimeline The merged feed of everything, newest first. Sleep, play and daycare entries sort by their startTime (active sessions have endTime null); every other kind sorts by time. filter=other selects the nine non-core kinds (medicine, bath, note, milestone, measurement, pump, play, daycare, vaccine) together; omitting filter returns all twelve.
 	// (GET /api/timeline)
 	ListTimeline(w http.ResponseWriter, r *http.Request, params ListTimelineParams)
 	// ListVaccines Vaccine logs in the caller's active family, newest first. Each entry's `documents` array carries `url: "/api/files/{docId}"` for any attached file (see internal/api/files.go — uploading is disabled today, but existing documents still stream).
@@ -1774,6 +1792,177 @@ func (siw *ServerInterfaceWrapper) UpdateContact(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateContact(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDaycares operation middleware
+func (siw *ServerInterfaceWrapper) ListDaycares(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListDaycaresParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDaycares(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateDaycare operation middleware
+func (siw *ServerInterfaceWrapper) CreateDaycare(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateDaycare(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetActiveDaycare operation middleware
+func (siw *ServerInterfaceWrapper) GetActiveDaycare(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetActiveDaycareParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetActiveDaycare(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteDaycare operation middleware
+func (siw *ServerInterfaceWrapper) DeleteDaycare(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteDaycare(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateDaycare operation middleware
+func (siw *ServerInterfaceWrapper) UpdateDaycare(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateDaycare(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PickupDaycare operation middleware
+func (siw *ServerInterfaceWrapper) PickupDaycare(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PickupDaycare(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4379,6 +4568,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/play/{id}/stop", wrapper.StopPlay)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/play/{id}", wrapper.DeletePlay)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/play/{id}", wrapper.UpdatePlay)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/daycare", wrapper.ListDaycares)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/daycare", wrapper.CreateDaycare)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/daycare/active", wrapper.GetActiveDaycare)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/daycare/{id}/pickup", wrapper.PickupDaycare)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/daycare/{id}", wrapper.DeleteDaycare)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/daycare/{id}", wrapper.UpdateDaycare)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/vaccines/dismissals", wrapper.ListVaccineDismissals)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/vaccines/dismissals", wrapper.CreateVaccineDismissal)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/vaccines/dismissals/{id}", wrapper.DeleteVaccineDismissal)
@@ -6320,6 +6515,266 @@ func (response UpdateContact400JSONResponse) VisitUpdateContactResponse(w http.R
 type UpdateContact404JSONResponse Error
 
 func (response UpdateContact404JSONResponse) VisitUpdateContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDaycaresRequestObject struct {
+	Params ListDaycaresParams
+}
+
+type ListDaycaresResponseObject interface {
+	VisitListDaycaresResponse(w http.ResponseWriter) error
+}
+
+type ListDaycares200JSONResponse []DaycareLog
+
+func (response ListDaycares200JSONResponse) VisitListDaycaresResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDaycareRequestObject struct {
+	Body *CreateDaycareJSONRequestBody
+}
+
+type CreateDaycareResponseObject interface {
+	VisitCreateDaycareResponse(w http.ResponseWriter) error
+}
+
+type CreateDaycare201JSONResponse DaycareLog
+
+func (response CreateDaycare201JSONResponse) VisitCreateDaycareResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDaycare403JSONResponse Error
+
+func (response CreateDaycare403JSONResponse) VisitCreateDaycareResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDaycare404JSONResponse Error
+
+func (response CreateDaycare404JSONResponse) VisitCreateDaycareResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDaycare409JSONResponse Error
+
+func (response CreateDaycare409JSONResponse) VisitCreateDaycareResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetActiveDaycareRequestObject struct {
+	Params GetActiveDaycareParams
+}
+
+type GetActiveDaycareResponseObject interface {
+	VisitGetActiveDaycareResponse(w http.ResponseWriter) error
+}
+
+type GetActiveDaycare200JSONResponse DaycareLog
+
+func (response GetActiveDaycare200JSONResponse) VisitGetActiveDaycareResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteDaycareRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteDaycareResponseObject interface {
+	VisitDeleteDaycareResponse(w http.ResponseWriter) error
+}
+
+type DeleteDaycare200JSONResponse Ok
+
+func (response DeleteDaycare200JSONResponse) VisitDeleteDaycareResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteDaycare404JSONResponse Error
+
+func (response DeleteDaycare404JSONResponse) VisitDeleteDaycareResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDaycareRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdateDaycareJSONRequestBody
+}
+
+type UpdateDaycareResponseObject interface {
+	VisitUpdateDaycareResponse(w http.ResponseWriter) error
+}
+
+type UpdateDaycare200JSONResponse DaycareLog
+
+func (response UpdateDaycare200JSONResponse) VisitUpdateDaycareResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDaycare403JSONResponse Error
+
+func (response UpdateDaycare403JSONResponse) VisitUpdateDaycareResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDaycare404JSONResponse Error
+
+func (response UpdateDaycare404JSONResponse) VisitUpdateDaycareResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDaycare409JSONResponse Error
+
+func (response UpdateDaycare409JSONResponse) VisitUpdateDaycareResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PickupDaycareRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *PickupDaycareJSONRequestBody
+}
+
+type PickupDaycareResponseObject interface {
+	VisitPickupDaycareResponse(w http.ResponseWriter) error
+}
+
+type PickupDaycare200JSONResponse DaycareLog
+
+func (response PickupDaycare200JSONResponse) VisitPickupDaycareResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PickupDaycare403JSONResponse Error
+
+func (response PickupDaycare403JSONResponse) VisitPickupDaycareResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PickupDaycare404JSONResponse Error
+
+func (response PickupDaycare404JSONResponse) VisitPickupDaycareResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -10130,7 +10585,7 @@ type StrictServerInterface interface {
 	// BanAdminUser Ban an account: sets banned + ban_reason AND revokes every session the user holds, so the ban is enforced by absence rather than by every reader remembering to check a flag. Their API keys stop authenticating too (GetAPIKeyByHash joins on a non-banned creator). Audited as `user.ban`. System admin only.
 	// (POST /api/admin/users/{id}/ban)
 	BanAdminUser(ctx context.Context, request BanAdminUserRequestObject) (BanAdminUserResponseObject, error)
-	// DeleteAdminUser Delete an account safely. Every non-cascading reference to the user (log attribution on all eleven log kinds, vaccine documents and dismissals, invites, API keys, calendar events and audit rows) is reassigned to the tombstone "Deleted user" in ONE transaction, calendar assignments are dropped, the user's API keys are revoked, and only then is the account removed (sessions, memberships and push subscriptions cascade). POST rather than DELETE, matching the TypeScript predecessor's route. Audited as `user.delete`. System admin only.
+	// DeleteAdminUser Delete an account safely. Every non-cascading reference to the user (log attribution on all twelve log kinds, vaccine documents and dismissals, invites, API keys, calendar events and audit rows) is reassigned to the tombstone "Deleted user" in ONE transaction, calendar assignments are dropped, the user's API keys are revoked, and only then is the account removed (sessions, memberships and push subscriptions cascade). POST rather than DELETE, matching the TypeScript predecessor's route. Audited as `user.delete`. System admin only.
 	// (POST /api/admin/users/{id}/delete)
 	DeleteAdminUser(ctx context.Context, request DeleteAdminUserRequestObject) (DeleteAdminUserResponseObject, error)
 	// ChangeAdminUserEmail Change a person's login address. Their sessions and a linked Google account stay (Google sign-in follows the Google account's id, not the address); password sign-in uses the new address from then on. Audited old → new. 409 EMAIL_TAKEN when another account holds it, 400 UNCHANGED when it is already theirs. System admin only.
@@ -10205,6 +10660,24 @@ type StrictServerInterface interface {
 	// UpdateContact Partial update. `role`/`icon`/`phone`/`email`/`website`/`notes` may be sent as `null` to CLEAR that column; `name` is not nullable — only settable or omitted. `babyIds`, when present, REPLACES the link set; omitted leaves it untouched.
 	// (PATCH /api/contacts/{id})
 	UpdateContact(ctx context.Context, request UpdateContactRequestObject) (UpdateContactResponseObject, error)
+	// ListDaycares Days at barnehage in the caller's active family, newest first (by startTime).
+	// (GET /api/daycare)
+	ListDaycares(ctx context.Context, request ListDaycaresRequestObject) (ListDaycaresResponseObject, error)
+	// CreateDaycare Drop off (issue #105). Omit endTime to start a running session — "she is there now"; a baby can only have one at a time, enforced by a partial unique index (see internal/api/daycare.go) as well as the pre-check this endpoint does. With an endTime it logs a finished day after the fact.
+	// (POST /api/daycare)
+	CreateDaycare(ctx context.Context, request CreateDaycareRequestObject) (CreateDaycareResponseObject, error)
+	// GetActiveDaycare The running daycare session for a baby, or null.
+	// (GET /api/daycare/active)
+	GetActiveDaycare(ctx context.Context, request GetActiveDaycareRequestObject) (GetActiveDaycareResponseObject, error)
+	// DeleteDaycare Delete a daycare log.
+	// (DELETE /api/daycare/{id})
+	DeleteDaycare(ctx context.Context, request DeleteDaycareRequestObject) (DeleteDaycareResponseObject, error)
+	// UpdateDaycare Partial update. `endTime` sent as `null` CLEARS it, reopening the session — subject to the same one-running-session-per-baby constraint as create, so this can also 409. `pickupCaretakerId` and `notes` may be sent as `null` to clear them; `caretakerId` and `startTime` are settable or omitted.
+	// (PATCH /api/daycare/{id})
+	UpdateDaycare(ctx context.Context, request UpdateDaycareRequestObject) (UpdateDaycareResponseObject, error)
+	// PickupDaycare Pick up: end the running session. endTime defaults to now and the pick-up person to the caller. A replay answers 404 rather than moving the end a first call already set.
+	// (POST /api/daycare/{id}/pickup)
+	PickupDaycare(ctx context.Context, request PickupDaycareRequestObject) (PickupDaycareResponseObject, error)
 	// GetDevice The kiosk device behind this request's pjokk_device cookie. Anyone who is not an enrolled device gets 401 NOT_A_DEVICE.
 	// (GET /api/device)
 	GetDevice(ctx context.Context, request GetDeviceRequestObject) (GetDeviceResponseObject, error)
@@ -10466,7 +10939,7 @@ type StrictServerInterface interface {
 	// GetSummary Everything the home screen needs in one call: last feed, last diaper, active + last sleep, active play, and today's local-day totals.
 	// (GET /api/summary)
 	GetSummary(ctx context.Context, request GetSummaryRequestObject) (GetSummaryResponseObject, error)
-	// ListTimeline The merged feed of everything, newest first. Sleep and play entries sort by their startTime (active sessions have endTime null); every other kind sorts by time. filter=other selects the eight non-core kinds (medicine, bath, note, milestone, measurement, pump, play, vaccine) together; omitting filter returns all eleven.
+	// ListTimeline The merged feed of everything, newest first. Sleep, play and daycare entries sort by their startTime (active sessions have endTime null); every other kind sorts by time. filter=other selects the nine non-core kinds (medicine, bath, note, milestone, measurement, pump, play, daycare, vaccine) together; omitting filter returns all twelve.
 	// (GET /api/timeline)
 	ListTimeline(ctx context.Context, request ListTimelineRequestObject) (ListTimelineResponseObject, error)
 	// ListVaccines Vaccine logs in the caller's active family, newest first. Each entry's `documents` array carries `url: "/api/files/{docId}"` for any attached file (see internal/api/files.go — uploading is disabled today, but existing documents still stream).
@@ -11885,6 +12358,184 @@ func (sh *strictHandler) UpdateContact(w http.ResponseWriter, r *http.Request, i
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateContactResponseObject); ok {
 		if err := validResponse.VisitUpdateContactResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDaycares operation middleware
+func (sh *strictHandler) ListDaycares(w http.ResponseWriter, r *http.Request, params ListDaycaresParams) {
+	var request ListDaycaresRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDaycares(ctx, request.(ListDaycaresRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDaycares")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDaycaresResponseObject); ok {
+		if err := validResponse.VisitListDaycaresResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateDaycare operation middleware
+func (sh *strictHandler) CreateDaycare(w http.ResponseWriter, r *http.Request) {
+	var request CreateDaycareRequestObject
+
+	var body CreateDaycareJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateDaycare(ctx, request.(CreateDaycareRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateDaycare")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateDaycareResponseObject); ok {
+		if err := validResponse.VisitCreateDaycareResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetActiveDaycare operation middleware
+func (sh *strictHandler) GetActiveDaycare(w http.ResponseWriter, r *http.Request, params GetActiveDaycareParams) {
+	var request GetActiveDaycareRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetActiveDaycare(ctx, request.(GetActiveDaycareRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetActiveDaycare")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetActiveDaycareResponseObject); ok {
+		if err := validResponse.VisitGetActiveDaycareResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteDaycare operation middleware
+func (sh *strictHandler) DeleteDaycare(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteDaycareRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteDaycare(ctx, request.(DeleteDaycareRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteDaycare")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteDaycareResponseObject); ok {
+		if err := validResponse.VisitDeleteDaycareResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateDaycare operation middleware
+func (sh *strictHandler) UpdateDaycare(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdateDaycareRequestObject
+
+	request.Id = id
+
+	var body UpdateDaycareJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateDaycare(ctx, request.(UpdateDaycareRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateDaycare")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateDaycareResponseObject); ok {
+		if err := validResponse.VisitUpdateDaycareResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PickupDaycare operation middleware
+func (sh *strictHandler) PickupDaycare(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request PickupDaycareRequestObject
+
+	request.Id = id
+
+	var body PickupDaycareJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PickupDaycare(ctx, request.(PickupDaycareRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PickupDaycare")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PickupDaycareResponseObject); ok {
+		if err := validResponse.VisitPickupDaycareResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

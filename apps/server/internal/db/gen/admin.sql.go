@@ -823,6 +823,16 @@ WITH
             "logged_by_id" = CASE WHEN "play_log"."logged_by_id" = $1 THEN $2 ELSE "play_log"."logged_by_id" END
         WHERE "play_log"."caretaker_id" = $1 OR "play_log"."logged_by_id" = $1
     ),
+    -- Three people on one row (00020): the drop-off, the logger and the
+    -- pick-up. ONE update, as everywhere here — two CTEs on one table apply
+    -- only one of them.
+    daycare AS (
+        UPDATE "daycare_log"
+        SET "caretaker_id" = CASE WHEN "daycare_log"."caretaker_id" = $1 THEN $2 ELSE "daycare_log"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "daycare_log"."logged_by_id" = $1 THEN $2 ELSE "daycare_log"."logged_by_id" END,
+            "pickup_caretaker_id" = CASE WHEN "daycare_log"."pickup_caretaker_id" = $1 THEN $2 ELSE "daycare_log"."pickup_caretaker_id" END
+        WHERE "daycare_log"."caretaker_id" = $1 OR "daycare_log"."logged_by_id" = $1 OR "daycare_log"."pickup_caretaker_id" = $1
+    ),
     -- A running nursing/pump timer is an attribution ("started by"), not an
     -- assignment: the clock belongs to the family and a co-parent may still
     -- be feeding, so it survives the deletion and lands on the tombstone

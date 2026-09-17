@@ -61,9 +61,12 @@ func RunReminders(ctx context.Context, d Deps, now time.Time) (int, error) {
 		var gap time.Duration
 		switch r.Mode {
 		case "since_last":
-			last, err := d.lastLogTime(ctx, r)
+			last, atDaycare, err := d.sinceLastAnchor(ctx, r)
 			if err != nil {
 				return sent, err
+			}
+			if atDaycare {
+				continue // held, like quiet hours: nobody at home can answer it
 			}
 			if !last.Valid {
 				continue // never logged: nothing to gap against
@@ -164,6 +167,35 @@ func (d Deps) lastLogTime(ctx context.Context, r dbgen.Reminder) (pgtype.Timesta
 		return d.Q.LastMedicineTime(ctx, dbgen.LastMedicineTimeParams{FamilyID: r.FamilyID, BabyID: r.BabyID, Name: r.Label})
 	}
 	return pgtype.Timestamptz{}, nil
+}
+
+// holdsAtDaycare names the since_last kinds barnehage holds (issue #105):
+// the two a parent cannot answer while she is there. Pump is about the
+// parent; a missed medicine dose is worth knowing about wherever she is.
+func holdsAtDaycare(kind string) bool {
+	return kind == "feed" || kind == "diaper"
+}
+
+// sinceLastAnchor is what a since_last gap is measured from, and whether
+// the reminder is held because the baby it is about is at barnehage (a
+// family-wide reminder: any baby of the family). A pick-up ANSWERS the
+// reminder as a log would: the anchor is the later of the last log and the
+// last pick-up, so 15:30 is not greeted with "no feed for 8 h" about a
+// child who ate lunch there. Never-logged stays never-logged — a pick-up
+// alone is not something to gap against.
+func (d Deps) sinceLastAnchor(ctx context.Context, r dbgen.Reminder) (pgtype.Timestamptz, bool, error) {
+	last, err := d.lastLogTime(ctx, r)
+	if err != nil || !holdsAtDaycare(r.Kind) {
+		return last, false, err
+	}
+	hold, err := d.Q.DaycareHold(ctx, dbgen.DaycareHoldParams{FamilyID: r.FamilyID, BabyID: r.BabyID})
+	if err != nil {
+		return last, false, fmt.Errorf("jobs: daycare hold for reminder %s: %w", r.ID, err)
+	}
+	if last.Valid && hold.LastPickup.Valid && hold.LastPickup.Time.After(last.Time) {
+		last = hold.LastPickup
+	}
+	return last, hold.ThereNow, nil
 }
 
 func (d Deps) stampReminder(ctx context.Context, id string, now time.Time) error {

@@ -35,7 +35,7 @@ import (
 // are therefore allowed, matching /api/files.
 
 // exportMaxRows is apps/api/src/routes/export.ts's `MAX = 100_000`, applied
-// per kind (eleven queries below, LIMIT sqlc.arg(lim) each).
+// per kind (twelve queries below, LIMIT sqlc.arg(lim) each).
 const exportMaxRows = 100_000
 
 // formulaGuard/needsQuoting/esc port export.ts's esc() byte for byte,
@@ -82,7 +82,7 @@ var exportHeaders = []string{
 // string (or nil for an empty cell) at construction time in the rowX
 // functions below, so the render loop is pure string-joining + esc(),
 // identical for every kind. sortTime is the row's chronological key (never
-// itself rendered) — "time" for every kind except sleep/play, which sort
+// itself rendered) — "time" for every kind except sleep/play/daycare, which sort
 // by start_time (mirrors export.ts's `sortMs`).
 type exportRow struct {
 	sortTime time.Time
@@ -301,6 +301,34 @@ func rowPump(r dbgen.ExportPumpsRow) exportRow {
 	}
 }
 
+// rowDaycare is a day at barnehage (issue #105): a session row like sleep
+// and play, with the pick-up person in "detail" — the one column free to
+// carry a second name without widening the file for one kind.
+func rowDaycare(r dbgen.ExportDaycaresRow) exportRow {
+	var durationMin, detail *string
+	if r.EndTime.Valid {
+		mins := int64(r.EndTime.Time.Sub(r.StartTime.Time).Round(time.Minute) / time.Minute)
+		durationMin = str(strconv.FormatInt(mins, 10))
+	}
+	if r.PickupCaretakerName != "" {
+		detail = str("picked up by " + r.PickupCaretakerName)
+	}
+	return exportRow{
+		sortTime: r.StartTime.Time,
+		cells: map[string]*string{
+			"kind":         str("daycare"),
+			"baby":         str(r.BabyName),
+			"time":         fmtTS(r.StartTime),
+			"end_time":     fmtTS(r.EndTime),
+			"detail":       detail,
+			"duration_min": durationMin,
+			"caretaker":    str(r.CaretakerName),
+			"logged_by":    str(r.LoggedByName),
+			"notes":        r.Notes,
+		},
+	}
+}
+
 func rowPlay(r dbgen.ExportPlaysRow) exportRow {
 	var durationMin *string
 	if r.EndTime.Valid {
@@ -440,6 +468,15 @@ func (d Deps) exportCSV(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, rowPlay(v))
 	}
 
+	daycares, err := d.Q.ExportDaycares(ctx, dbgen.ExportDaycaresParams{FamilyID: fam.FamilyID, Lim: lim})
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+	for _, v := range daycares {
+		rows = append(rows, rowDaycare(v))
+	}
+
 	vaccines, err := d.Q.ExportVaccines(ctx, dbgen.ExportVaccinesParams{FamilyID: fam.FamilyID, Lim: lim})
 	if err != nil {
 		internalError(w, r, err)
@@ -453,7 +490,8 @@ func (d Deps) exportCSV(w http.ResponseWriter, r *http.Request) {
 	// queries/export.sql's ORDER BY on each — and appended here in the
 	// SAME kind order export.ts's `rows` array literal uses (feed, diaper,
 	// sleep, medicine, bath, note, milestone, measurement, pump, play,
-	// vaccine). A stable sort by sortTime then reproduces a single
+	// vaccine), with daycare — which has no TypeScript ancestor — before
+	// vaccine. A stable sort by sortTime then reproduces a single
 	// ascending-by-time file: ties (rows from different kinds sharing an
 	// exact timestamp) keep that kind order, which is a deterministic
 	// choice this port makes rather than one export.ts's own JS-stable-sort

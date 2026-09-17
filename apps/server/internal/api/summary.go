@@ -143,6 +143,15 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		return nil, err
 	}
 
+	// At barnehage right now, or not (daycare.go, issue #105).
+	var activeDaycare *gen.DaycareLog
+	if day, err := d.Q.ActiveDaycare(ctx, dbgen.ActiveDaycareParams{FamilyID: fam.FamilyID, BabyID: &babyID}); err == nil {
+		v := serDaycare(dbgen.GetDaycareRow(day))
+		activeDaycare = &v
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+
 	// The shared nursing / pump timers (feed_timer.go), read the same way
 	// activeSleep / activePlay are: state, not screens.
 	activeFeed, err := d.activeFeedTimer(ctx, fam.FamilyID, babyID, "breast")
@@ -297,6 +306,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		LastNightMin:        lastNightMin,
 		LastNightLongestMin: lastNightLongestMin,
 		ActivePlay:          activePlay,
+		ActiveDaycare:       activeDaycare,
 		ActiveFeed:          activeFeed,
 		ActivePump:          activePump,
 		LastTemperature:     lastTemperature,

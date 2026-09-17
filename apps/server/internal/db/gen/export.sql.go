@@ -65,6 +65,66 @@ func (q *Queries) ExportBaths(ctx context.Context, arg ExportBathsParams) ([]Exp
 	return items, nil
 }
 
+const exportDaycares = `-- name: ExportDaycares :many
+SELECT
+    d."baby_id", bb."name" AS baby_name, d."start_time", d."end_time",
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    COALESCE(pu."display_name", '') AS pickup_caretaker_name, d."notes"
+FROM "daycare_log" d
+JOIN "baby" bb ON bb."id" = d."baby_id"
+JOIN "users" u ON u."id" = d."caretaker_id"
+JOIN "users" lu ON lu."id" = d."logged_by_id"
+LEFT JOIN "users" pu ON pu."id" = d."pickup_caretaker_id"
+WHERE d."family_id" = $1
+ORDER BY d."start_time" ASC, d."id" ASC
+LIMIT $2
+`
+
+type ExportDaycaresParams struct {
+	FamilyID string
+	Lim      int32
+}
+
+type ExportDaycaresRow struct {
+	BabyID              string
+	BabyName            string
+	StartTime           pgtype.Timestamptz
+	EndTime             pgtype.Timestamptz
+	CaretakerName       string
+	LoggedByName        string
+	PickupCaretakerName string
+	Notes               *string
+}
+
+func (q *Queries) ExportDaycares(ctx context.Context, arg ExportDaycaresParams) ([]ExportDaycaresRow, error) {
+	rows, err := q.db.Query(ctx, exportDaycares, arg.FamilyID, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ExportDaycaresRow
+	for rows.Next() {
+		var i ExportDaycaresRow
+		if err := rows.Scan(
+			&i.BabyID,
+			&i.BabyName,
+			&i.StartTime,
+			&i.EndTime,
+			&i.CaretakerName,
+			&i.LoggedByName,
+			&i.PickupCaretakerName,
+			&i.Notes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const exportDiapers = `-- name: ExportDiapers :many
 SELECT
     d."baby_id", bb."name" AS baby_name, d."time", d."type", d."color", d."consistency",

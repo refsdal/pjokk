@@ -95,8 +95,9 @@ the logged lunch usually wins anyway.
 Left alone on purpose: `pump` (about the parent, not the child),
 `medicine` (a missed dose is worth knowing about wherever she is; a parent
 can ring the barnehage), `at_time` and `custom` (the parent chose the
-clock), and calendar reminders. A snoozed feed or diaper reminder holds
-the same way.
+clock), and calendar reminders. A snoozed feed or diaper reminder that
+comes due while she is there is dropped rather than held: by pick-up it
+has been answered.
 
 ## The SPA
 
