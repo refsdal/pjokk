@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path"
 	"regexp"
 	"strings"
 
@@ -162,7 +161,7 @@ func avatarURL(userID string, key *string) *string {
 	if key == nil || *key == "" {
 		return nil
 	}
-	u := "/api/users/" + userID + "/avatar?v=" + path.Base(*key)
+	u := "/api/users/" + userID + "/avatar?v=" + avatarVersion(*key)
 	return &u
 }
 

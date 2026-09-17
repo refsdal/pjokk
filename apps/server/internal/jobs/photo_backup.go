@@ -26,6 +26,16 @@ import (
 // is the same promise the privacy policy makes for rows — and no longer,
 // because that promise is also an erasure promise.
 //
+// Two source trees since the babies got photos (00032_baby_avatar.sql):
+// milestone photos and baby photos, each "live" while a row names it. A
+// milestone photo's copy keeps the BARE key under the backup trees
+// (<family>/<uuid>.jpg — that tree came first and its copies stay where
+// they are); a baby photo's copy keeps its full key (baby-avatars/…), which
+// can never collide with a family id. PhotoBackupRest and PhotoSourceKey
+// are the two directions of that mapping, and internal/restore uses the
+// same pair to find a copy. A person's photo (users.avatar_key) is NOT
+// here: a profile picture is re-uploadable, a baby's is family data.
+//
 // "Live" means a milestone_photo ROW names the object, not that the object
 // is in the store (issue #95). Deleting a family or a baby removes the rows
 // and then the objects; if the second half fails — or the object predates
@@ -40,9 +50,10 @@ import (
 // current copies of every photo older than a month.
 
 const (
-	photoSourcePrefix  = "milestone-photos/"
-	photoCurrentPrefix = "photo-backups/current/"
-	photoDeletedPrefix = "photo-backups/deleted/"
+	photoSourcePrefix      = "milestone-photos/"
+	babyAvatarSourcePrefix = "baby-avatars/"
+	photoCurrentPrefix     = "photo-backups/current/"
+	photoDeletedPrefix     = "photo-backups/deleted/"
 
 	// Exported for the console's backup list, which counts both trees, and
 	// for internal/restore, which copies photos back out of them.
@@ -58,6 +69,31 @@ const (
 )
 
 var photoDeletedPattern = regexp.MustCompile(`^photo-backups/deleted/(\d{4}-\d{2}-\d{2})/`)
+
+// PhotoSourcePrefixes are the trees the photo backup covers. Order
+// matters to nobody but the tests' expectations of List.
+var PhotoSourcePrefixes = []string{photoSourcePrefix, babyAvatarSourcePrefix}
+
+// PhotoBackupRest maps a source key to the path its copy takes under the
+// backup trees, or false for a key under neither source tree.
+func PhotoBackupRest(key string) (string, bool) {
+	if rest, ok := strings.CutPrefix(key, photoSourcePrefix); ok {
+		return rest, true
+	}
+	if strings.HasPrefix(key, babyAvatarSourcePrefix) {
+		return key, true
+	}
+	return "", false
+}
+
+// PhotoSourceKey is PhotoBackupRest's inverse: the source key a copy's
+// path stands for.
+func PhotoSourceKey(rest string) string {
+	if strings.HasPrefix(rest, babyAvatarSourcePrefix) {
+		return rest
+	}
+	return photoSourcePrefix + rest
+}
 
 // PhotoBackupResult counts what one run of RunPhotoBackup did.
 type PhotoBackupResult struct {
@@ -82,20 +118,28 @@ func RunPhotoBackup(ctx context.Context, d Deps, now time.Time) (PhotoBackupResu
 	if err != nil {
 		return res, fmt.Errorf("jobs: list photo rows: %w", err)
 	}
-	live := make(map[string]bool, len(rowKeys))
-	for _, k := range rowKeys {
-		if rest, ok := strings.CutPrefix(k, photoSourcePrefix); ok {
+	avatarKeys, err := d.Q.ListBabyAvatarKeys(ctx)
+	if err != nil {
+		return res, fmt.Errorf("jobs: list baby photo rows: %w", err)
+	}
+	live := make(map[string]bool, len(rowKeys)+len(avatarKeys))
+	for _, k := range append(rowKeys, avatarKeys...) {
+		if rest, ok := PhotoBackupRest(k); ok {
 			live[rest] = true
 		}
 	}
 
-	source, err := d.Storage.List(ctx, photoSourcePrefix)
-	if err != nil {
-		return res, fmt.Errorf("jobs: list photos: %w", err)
-	}
-	stored := make(map[string]time.Time, len(source))
-	for _, o := range source {
-		stored[strings.TrimPrefix(o.Key, photoSourcePrefix)] = o.UploadedAt
+	stored := make(map[string]time.Time)
+	for _, prefix := range PhotoSourcePrefixes {
+		source, err := d.Storage.List(ctx, prefix)
+		if err != nil {
+			return res, fmt.Errorf("jobs: list %s: %w", prefix, err)
+		}
+		for _, o := range source {
+			if rest, ok := PhotoBackupRest(o.Key); ok {
+				stored[rest] = o.UploadedAt
+			}
+		}
 	}
 
 	current, err := d.Storage.List(ctx, photoCurrentPrefix)
@@ -115,7 +159,7 @@ func RunPhotoBackup(ctx context.Context, d Deps, now time.Time) (PhotoBackupResu
 		if _, ok := stored[key]; !ok || copied[key] {
 			continue
 		}
-		if err := copyObject(ctx, d, photoSourcePrefix+key, photoCurrentPrefix+key); err != nil {
+		if err := copyObject(ctx, d, PhotoSourceKey(key), photoCurrentPrefix+key); err != nil {
 			return res, err
 		}
 		res.Copied++
@@ -130,12 +174,12 @@ func RunPhotoBackup(ctx context.Context, d Deps, now time.Time) (PhotoBackupResu
 			continue
 		}
 		if !copied[key] {
-			if err := copyObject(ctx, d, photoSourcePrefix+key, photoDeletedPrefix+day+"/"+key); err != nil {
+			if err := copyObject(ctx, d, PhotoSourceKey(key), photoDeletedPrefix+day+"/"+key); err != nil {
 				return res, err
 			}
 			res.Moved++
 		}
-		if err := d.Storage.Delete(ctx, photoSourcePrefix+key); err != nil {
+		if err := d.Storage.Delete(ctx, PhotoSourceKey(key)); err != nil {
 			return res, fmt.Errorf("jobs: erase orphaned photo %s: %w", key, err)
 		}
 		res.Orphaned++

@@ -869,6 +869,10 @@ var vaccineDocumentsPattern = regexp.MustCompile(`^/api/vaccines/[^/]+/documents
 // JSON route mounted there from request validation.
 var avatarPattern = regexp.MustCompile(`^/api/users/[^/]+/avatar$`)
 
+// babyAvatarPattern is avatarPattern for a baby's photo
+// (internal/api/baby_avatar.go): the same three hand-routed methods.
+var babyAvatarPattern = regexp.MustCompile(`^/api/babies/[^/]+/avatar$`)
+
 // skipSpecValidation reports whether r's path is one of the routes that
 // never go through kin-openapi request validation: the auth handler (Limen
 // owns its own request shapes), raw file streaming, the CSV export stream,
@@ -892,6 +896,8 @@ func skipSpecValidation(r *http.Request) bool {
 	case r.URL.Path == "/api/me/avatar":
 		return true
 	case avatarPattern.MatchString(r.URL.Path):
+		return true
+	case babyAvatarPattern.MatchString(r.URL.Path):
 		return true
 	default:
 		return false
@@ -1029,6 +1035,10 @@ func NewHandler(d Deps) http.Handler {
 	// for the same reason as the files routes, but session tier (a profile
 	// is global) and never an API key.
 	d.mountAvatarRoutes(mux, sessionChain(d), avatarReadChain(d))
+	// A baby's photo (internal/api/baby_avatar.go): the same three methods
+	// behind the family fence, the read open to the family's kiosk too.
+	babyWrite, babyRead := babyAvatarChains(d)
+	d.mountBabyAvatarRoutes(mux, babyWrite, babyRead)
 
 	// CSV export (internal/api/export.go's package doc comment): same
 	// reasoning as the files routes above — a text/csv streamed body has

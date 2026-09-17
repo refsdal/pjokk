@@ -216,6 +216,11 @@ func (d Deps) DeleteAdminFamily(ctx context.Context, req gen.DeleteAdminFamilyRe
 	if err != nil {
 		return nil, err
 	}
+	avatarKeys, err := qtx.BabyAvatarKeysForFamily(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+	photoKeys = append(photoKeys, avatarKeys...)
 	// Zero rows means the family disappeared between the lookup above and
 	// this DELETE (a concurrent delete). Answered as the same 404 the
 	// lookup would have given rather than a 200 for a delete that deleted

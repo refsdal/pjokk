@@ -53,6 +53,7 @@ type Baby struct {
 	BirthDate pgtype.Timestamptz
 	Sex       *string
 	CreatedAt pgtype.Timestamptz
+	AvatarKey *string
 }
 
 type BabyAbout struct {

@@ -107,6 +107,32 @@ func (q *Queries) LatchStaleCalendarReminders(ctx context.Context, arg LatchStal
 	return result.RowsAffected(), nil
 }
 
+const listBabyAvatarKeys = `-- name: ListBabyAvatarKeys :many
+SELECT "avatar_key"::text FROM "baby" WHERE "avatar_key" IS NOT NULL
+`
+
+// ListMilestonePhotoKeys for the babies' photos: the second "live" set the
+// photo backup keeps copies of, across every family for the same reason.
+func (q *Queries) ListBabyAvatarKeys(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listBabyAvatarKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var avatar_key string
+		if err := rows.Scan(&avatar_key); err != nil {
+			return nil, err
+		}
+		items = append(items, avatar_key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDueCalendarReminders = `-- name: ListDueCalendarReminders :many
 SELECT "id", "family_id", "title", "start_time", "all_day",
        "remind_minutes_before", "reminded_at", "recurrence", "recurrence_until"

@@ -112,7 +112,7 @@ func Whole(ctx context.Context, d Deps, snap *Snapshot) (*Report, error) {
 		return nil, err
 	}
 
-	rep.PhotosRestored, rep.PhotosMissing, err = restorePhotos(ctx, d.Storage, photoKeys(snap.Tables["milestone_photo"]))
+	rep.PhotosRestored, rep.PhotosMissing, err = restorePhotos(ctx, d.Storage, snapshotPhotoKeys(snap.Tables))
 	if err != nil {
 		return rep, err
 	}

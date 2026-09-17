@@ -2441,6 +2441,8 @@ type AuditPage struct {
 
 // Baby defines model for Baby.
 type Baby struct {
+	// AvatarUrl "/api/babies/{id}/avatar?v=<key>" when the baby has a photo, null otherwise (the client shows the initial). The photo routes are hand-mounted outside this document, like a person's (internal/api/baby_avatar.go): `PUT /api/babies/{id}/avatar` (multipart field `file`, JPEG or PNG, at most 512 KB and 1024 px; re-encoded server-side, EXIF stripped) and `DELETE /api/babies/{id}/avatar` both answer with the Baby and are open to any family member, never an API key or a kiosk device; `GET /api/babies/{id}/avatar` streams the JPEG to a member or to the family's own kiosk device, 404 for anyone else.
+	AvatarUrl *string   `json:"avatarUrl"`
 	BirthDate time.Time `json:"birthDate"`
 	Id        string    `json:"id"`
 	Name      string    `json:"name"`

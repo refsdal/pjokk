@@ -93,3 +93,27 @@ FROM "organization_members" om
 WHERE om."user_id" = $1
 ORDER BY om."created_at" DESC, om."organization_id" DESC
 LIMIT 1;
+
+-- name: SetBabyAvatar :one
+-- NULL clears the photo. The caller deletes the previous object
+-- (internal/api/baby_avatar.go). RETURNING * so the route answers with the
+-- Baby as it now is.
+UPDATE "baby"
+SET "avatar_key" = $3
+WHERE "family_id" = $1 AND "id" = $2
+RETURNING *;
+
+-- name: GetBabyAvatarKey :one
+-- The streaming read's lookup: no row for another family's baby, and none
+-- for a baby without a photo, so the route answers 404 either way and
+-- never confirms that a baby id exists.
+SELECT "avatar_key"
+FROM "baby"
+WHERE "family_id" = $1 AND "id" = $2 AND "avatar_key" IS NOT NULL;
+
+-- name: BabyAvatarKeysForFamily :many
+-- Read BEFORE DeleteOrganization (admin.sql): the babies cascade away with
+-- the family, the objects behind their photos do not (issue #95).
+SELECT "avatar_key"::text
+FROM "baby"
+WHERE "family_id" = $1 AND "avatar_key" IS NOT NULL;

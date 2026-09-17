@@ -283,3 +283,29 @@ func TestDeletedFamiliesListsOnlyTheGoneOnes(t *testing.T) {
 		t.Errorf("deleted families = %+v, want Hansen alone with one member and one baby", gone)
 	}
 }
+
+// A baby's photo (baby.avatar_key) comes back with the family, from the
+// photo backup's trees like a milestone photo.
+func TestFamilyRestoreBringsBackABabyPhoto(t *testing.T) {
+	a := testrig.App(t)
+	ctx := context.Background()
+	hansen, baby, _ := seedFamily(t, a, "Hansen", "parent@example.com")
+	key := "baby-avatars/" + hansen + "/face.jpg"
+	if _, err := a.Deps.Pool.Exec(ctx, `UPDATE "baby" SET "avatar_key" = $1 WHERE "id" = $2`, key, baby); err != nil {
+		t.Fatalf("set avatar_key: %v", err)
+	}
+
+	snap := backupThenDelete(t, a, hansen)
+	putObject(t, a, "photo-backups/current/"+key, "face")
+
+	rep, err := restore.Family(ctx, restoreDeps(a), snap, hansen, nil)
+	if err != nil {
+		t.Fatalf("Family: %v", err)
+	}
+	if body, _ := object(a, key); body != "face" || rep.PhotosRestored != 1 {
+		t.Errorf("photo = %q (restored %d), want it back from the current tree", body, rep.PhotosRestored)
+	}
+	if got := scalar[string](t, a, `SELECT "avatar_key" FROM "baby" WHERE "id" = $1`, baby); got != key {
+		t.Errorf("avatar_key after restore = %q, want %q", got, key)
+	}
+}

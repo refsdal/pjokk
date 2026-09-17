@@ -222,3 +222,56 @@ func TestRunPhotoBackupSparesAPhotoMidUpload(t *testing.T) {
 		t.Errorf("deleted copy = %q (%v), want the orphan's bytes under the night's date", got, ok)
 	}
 }
+
+// A baby's photo (baby.avatar_key, internal/api/baby_avatar.go) is the
+// second thing under the photo backup: its own source prefix, the same
+// copy / move / prune life. Its copies keep the FULL key under the backup
+// trees, where a milestone photo's copy keeps the bare key — the older
+// tree came first and its copies stay where they are.
+func TestRunPhotoBackupCoversBabyPhotos(t *testing.T) {
+	p := newPhotoRig(t)
+	ctx := context.Background()
+	var babyID string
+	if err := p.a.Deps.Pool.QueryRow(ctx, `SELECT "id" FROM "baby" WHERE "family_id" = $1`, p.familyID).Scan(&babyID); err != nil {
+		t.Fatal(err)
+	}
+	key := "baby-avatars/" + p.familyID + "/face.jpg"
+	if err := p.mem.Put(ctx, key, bytes.NewReader([]byte("face")), 4, "image/jpeg"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.a.Deps.Pool.Exec(ctx, `UPDATE "baby" SET "avatar_key" = $1 WHERE "id" = $2`, key, babyID); err != nil {
+		t.Fatalf("set avatar_key: %v", err)
+	}
+
+	night1 := time.Now().UTC().Add(2 * time.Hour)
+	if got := p.run(night1); got != (jobs.PhotoBackupResult{Copied: 1}) {
+		t.Fatalf("night 1 = %+v, want 1 copied", got)
+	}
+	if got, ok := p.mem.Read("photo-backups/current/" + key); !ok || string(got) != "face" {
+		t.Errorf("current copy = %q (%v), want the face under its full key", got, ok)
+	}
+
+	// The photo is replaced: a new object, the row re-pointed, the old
+	// object left behind (storeAvatar deletes it best-effort). The old one
+	// is an orphan the job erases; the new one gets its copy.
+	next := "baby-avatars/" + p.familyID + "/face2.jpg"
+	if err := p.mem.Put(ctx, next, bytes.NewReader([]byte("face2")), 5, "image/jpeg"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.a.Deps.Pool.Exec(ctx, `UPDATE "baby" SET "avatar_key" = $1 WHERE "id" = $2`, next, babyID); err != nil {
+		t.Fatalf("set avatar_key: %v", err)
+	}
+	night2 := night1.Add(24 * time.Hour)
+	if got := p.run(night2); got != (jobs.PhotoBackupResult{Copied: 1, Moved: 1, Orphaned: 1}) {
+		t.Fatalf("night 2 = %+v, want 1 copied, 1 moved, 1 orphan erased", got)
+	}
+	if p.has(key) {
+		t.Errorf("the replaced photo's object is still stored")
+	}
+	if !p.has("photo-backups/deleted/" + night2.Format("2006-01-02") + "/" + key) {
+		t.Errorf("the replaced photo's copy did not move to the dated tree")
+	}
+	if !p.has("photo-backups/current/" + next) {
+		t.Errorf("the new photo has no current copy")
+	}
+}
