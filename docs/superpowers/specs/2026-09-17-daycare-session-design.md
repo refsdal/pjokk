@@ -103,10 +103,12 @@ has been answered.
 
 - **Starting.** A **Barnehage** tile in the More list (after the play
   kinds, before Vaccines), opening `DaycareSheet`: time chips for the
-  drop-off, the caretaker chips, a note, and the play sheet's two buttons:
-  **Drop off** starts the running session, **Log finished day** saves one
-  with an end time and a pick-up person. Two taps from More for the happy
-  path. The same component edits.
+  drop-off, the caretaker chips, a note, and **Drop off**, which starts
+  the running session. Two taps from More for the happy path. **Log a
+  finished day** unfolds the pick-up time and a second chip row for who
+  picked up, and the button becomes Save; folded by default, unlike the
+  play sheet, because the drop-off is done at the gate with a child on one
+  arm. The same component edits.
 - **While it runs.** A banner on Home, "At barnehage · 5 h 20 min since
   08:10", with a **Pick up** button: one tap, now, the caller. Tapping
   the body opens the edit sheet, for a drop-off logged late. The banner is
@@ -117,9 +119,10 @@ has been answered.
   since then". The relative time stays: it is still true.
 - **No app badge.** The badge says "something is running that you will
   want to stop". A weekday-long dot says nothing.
-- **Timeline.** A span row with a duration, like sleep: "Barnehage
-  08:10–15:40 · 7 h 30 min", "by Kari", and "picked up by Anders" in the
-  detail when recorded; an "active" badge while running. Tap opens the
+- **Timeline.** A span row with a duration, like sleep: "Barnehage ·
+  08:10–15:40 · 7:30 · picked up by Anders", the pick-up person last
+  (where a narrow row truncates first) and only when recorded, then "by
+  Kari"; an "active" badge while running. Tap opens the
   edit sheet, where the pick-up person is a second chip row.
 - **Offline.** Mutation defaults with an optimistic summary patch for
   drop-off, as play: a drop-off with no signal at the gate must not fail.

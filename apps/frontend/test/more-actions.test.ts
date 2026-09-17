@@ -9,11 +9,12 @@ describe("moreActions", () => {
   const actions = moreActions({
     onPick: (kind) => calls.push(`pick:${kind}`),
     onPickPlay: (type) => calls.push(`play:${type}`),
+    onPickDaycare: () => calls.push("daycare"),
     onPickHelp: () => calls.push("help"),
     onVaccines: () => calls.push("vaccines"),
   });
 
-  it("lists the six kinds, the three play types, vaccines and help, in that order", () => {
+  it("lists the six kinds, the three play types, daycare, vaccines and help, in that order", () => {
     expect(actions.map((a) => a.key)).toEqual([
       "medicine",
       "bath",
@@ -24,6 +25,7 @@ describe("moreActions", () => {
       "play:tummy",
       "play:walk",
       "play:play",
+      "daycare",
       "vaccines",
       "help",
     ]);
@@ -42,6 +44,7 @@ describe("moreActions", () => {
       "play:tummy",
       "play:walk",
       "play:play",
+      "daycare",
       "vaccines",
       "help",
     ]);

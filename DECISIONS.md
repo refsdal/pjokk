@@ -2777,3 +2777,50 @@ to drift from the spec without anything noticing. This closes it.
   of them lands on a row both name — the FK violation surfaced in the
   suite, not in production.
 
+
+## 2026-09-17 — at barnehage: a session from drop-off to pick-up
+
+First of the barnehage series (issues #105–#113), from an investigation
+into what a family needs once the child starts barnehage around twelve
+months. Built autonomously at the owner's request; these are the calls
+made on his behalf. Spec:
+`docs/superpowers/specs/2026-09-17-daycare-session-design.md`.
+
+- **State, not a screen: `daycare_log` is a `sleep_log` clone**, as
+  `play_log` is — `end_time IS NULL` means she is there now, one running
+  session per baby by partial unique index, `activeDaycare` on
+  `/api/summary`. Independent of sleep and play: a child can be asleep at
+  barnehage, and a handover nap logged afterwards (#106) must not collide
+  with the day itself.
+- **Code says `daycare`, the UI says the family's word** ("Barnehage" /
+  "Daycare"). One English identifier through schema, API and SPA.
+- **Two people on one row.** `caretaker_id` dropped off (the who-did-it
+  rule, unchanged); `pickup_caretaker_id` picked up, defaulting to whoever
+  taps Pick up. NULL on a finished row means "not recorded", never the
+  drop-off person. Reopening a day clears it.
+- **Since-last feed and diaper reminders hold while she is there, and the
+  pick-up answers them**: the gap runs from the later of the last log and
+  the last pick-up. Without the second half, 15:30 would be greeted with
+  "no feed for 8 h" about a child who ate lunch there. A family-wide
+  reminder holds while ANY baby is there. Left alone on purpose: pump
+  (about the parent), medicine (a missed dose is worth knowing wherever
+  she is), fixed-time and custom reminders (the parent chose the clock),
+  calendar reminders. A snooze that comes due while she is there is
+  dropped, not held.
+- **The calmest banner.** A plain hairline card, no accent ring, no
+  breathing: it is on screen eight hours a day and nothing about it is
+  urgent. For the same reason it does **not** set the app badge, which
+  means "something is running that you will want to stop".
+- **The cards stay honest rather than go quiet.** A Last feed / Last
+  diaper card whose entry predates the drop-off gains the line "At daycare
+  since then"; the relative time stays, because it is still true.
+- **The finished-day fields are folded in the create sheet**, unlike the
+  play sheet's side-by-side layout: the drop-off is done at the gate with
+  a child on one arm, and is a time, a face and one button.
+- **No tilvenning field.** "Time without a parent" was floated in the
+  issue; the row's own span is the record of a tilvenning day and the note
+  holds the rest. A stepper that matters for two weeks would sit on the
+  sheet for four years.
+- **Not for kiosks** (`deviceOperations` unchanged: a nursery tablet at
+  home has no part in a drop-off), **not on night Home** (three actions,
+  by rule), and not in the PDF report, the importers or Stats (#111).

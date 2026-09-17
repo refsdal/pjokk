@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { registerFeedTimerMutationDefaults } from "./feed-timer";
 import { registerLogMutationDefaults } from "./logs";
 import { registerOtherMutationDefaults } from "./other";
+import { registerDaycareMutationDefaults } from "./daycare";
 import { registerPlayMutationDefaults } from "./play";
 
 // One import site for the data layer; modules are split by domain.
@@ -18,6 +19,7 @@ export * from "./logs";
 export * from "./medicines";
 export * from "./other";
 export * from "./photos";
+export * from "./daycare";
 export * from "./play";
 export * from "./profile";
 export * from "./reminders";
@@ -29,4 +31,5 @@ export function registerMutationDefaults(qc: QueryClient) {
   registerFeedTimerMutationDefaults(qc);
   registerOtherMutationDefaults(qc);
   registerPlayMutationDefaults(qc);
+  registerDaycareMutationDefaults(qc);
 }

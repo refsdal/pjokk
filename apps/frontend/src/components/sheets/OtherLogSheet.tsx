@@ -54,6 +54,7 @@ import { minutesFromSeconds, totalSeconds } from "@/lib/feed-timer-ui";
 import { measurementScale, useUnits } from "@/lib/units";
 import { t } from "@/lib/i18n";
 import { nextDoseFrom } from "@/lib/medicine-ui";
+import { daycareMeta } from "@/lib/daycare-ui";
 import { playKindMeta, playTypeOrder } from "@/lib/play-ui";
 import { formatClock } from "@/lib/time";
 import { toast } from "@/lib/toast";
@@ -86,14 +87,15 @@ export type MoreAction = {
 export type MoreHandlers = {
   onPick: (kind: OtherKind) => void;
   onPickPlay: (type: PlayType) => void;
+  onPickDaycare: () => void;
   onPickHelp: () => void;
   onVaccines: () => void;
 };
 
 // The "More" actions, in display order: the six generic kinds, the three
 // play kinds (timed sessions with their own endpoints, so they sit beside
-// the generic kinds rather than inside otherKindMeta), the vaccines
-// screen, and asking another caretaker for help. ONE list, rendered by the
+// the generic kinds rather than inside otherKindMeta), barnehage, the
+// vaccines screen, and asking another caretaker for help. ONE list, rendered by the
 // phone's More sheet below and by Home's unfolded tiles at md and up
 // (components/HomeActions.tsx) — test/more-actions.test.ts pins the order.
 export function moreActions(h: MoreHandlers): MoreAction[] {
@@ -108,6 +110,13 @@ export function moreActions(h: MoreHandlers): MoreAction[] {
       ...playKindMeta[type],
       pick: () => h.onPickPlay(type),
     })),
+    // A day at barnehage (issue #105): a session with its own endpoints,
+    // like play, and one tile rather than a kind per type.
+    {
+      key: "daycare",
+      ...daycareMeta,
+      pick: h.onPickDaycare,
+    },
     // Vaccines open a screen, not a sheet — the programme schedule needs
     // more room than a tray.
     {
@@ -134,12 +143,14 @@ export function MoreSheet({
   onOpenChange,
   onPick,
   onPickPlay,
+  onPickDaycare,
   onPickHelp,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPick: (kind: OtherKind) => void;
   onPickPlay: (type: PlayType) => void;
+  onPickDaycare: () => void;
   onPickHelp: () => void;
 }) {
   const navigate = useNavigate();
@@ -147,6 +158,7 @@ export function MoreSheet({
   const tiles = moreActions({
     onPick,
     onPickPlay,
+    onPickDaycare,
     onPickHelp,
     onVaccines: () => {
       onOpenChange(false);

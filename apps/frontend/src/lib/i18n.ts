@@ -217,6 +217,22 @@ const nb: Record<string, string> = {
   "Could not stop: ": "Kunne ikke stoppe: ",
   activity: "aktivitet",
 
+  // A day at barnehage (issue #105). "Daycare" itself is translated with
+  // the contact types below.
+  "At daycare": "I barnehagen",
+  "Pick up": "Hent",
+  "Drop off": "Lever",
+  "Dropped off": "Levert",
+  "Picked up": "Hentet",
+  "Dropped off by": "Levert av",
+  "Picked up by": "Hentet av",
+  "picked up by": "hentet av",
+  "Edit daycare day": "Rediger barnehagedag",
+  "Log a finished day": "Logg en ferdig dag",
+  "Still there — finish the day with Pick up on Home.":
+    "Fortsatt der — avslutt dagen med Hent på Hjem.",
+  "At daycare since then": "I barnehagen siden da",
+
   // Vaccines
   Vaccines: "Vaksiner",
   Vaccine: "Vaksine",

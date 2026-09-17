@@ -5,14 +5,16 @@ import {
   type Icon as TablerIcon,
 } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
-import type { FeedTimer, PlayLog, SleepLog } from "@pjokk/shared";
+import type { DaycareLog, FeedTimer, PlayLog, SleepLog } from "@pjokk/shared";
 import { Button } from "@/components/ui/button";
 import {
   isOptimisticTimer,
+  usePickUp,
   useStopFeedTimer,
   useStopPlay,
   useWakeSleep,
 } from "@/lib/data";
+import { daycareMeta } from "@/lib/daycare-ui";
 import { clock, totalSeconds } from "@/lib/feed-timer-ui";
 import { t } from "@/lib/i18n";
 import { playKindMeta } from "@/lib/play-ui";
@@ -64,7 +66,9 @@ function SessionBanner({
   // activity to come back to); sleep breathes in its own tint — the same
   // radiating ring as the help card, but slower and fainter, since it can
   // be on screen for hours (styles.css animate-sleep-breathe).
-  emphasis?: "ring" | "breathe";
+  // A day at barnehage gets neither: it is on screen eight hours a day and
+  // nothing about it is urgent, so it is a plain hairline card ("calm").
+  emphasis?: "ring" | "breathe" | "calm";
   // A timer that pauses (nursing) counts banked seconds, not wall time —
   // the default counter is now minus startTime.
   elapsedMs?: (now: number) => number;
@@ -83,7 +87,9 @@ function SessionBanner({
           tint,
         )}
       >
-        <Icon className="h-5 w-5 animate-pulse-soft" />
+        <Icon
+          className={cn("h-5 w-5", emphasis !== "calm" && "animate-pulse-soft")}
+        />
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-xs font-semibold tracking-wide text-muted uppercase">
@@ -102,9 +108,9 @@ function SessionBanner({
     <div
       className={cn(
         "flex items-center gap-3 rounded-xl2 border bg-surface p-4",
-        emphasis === "ring"
-          ? "border-accent ring-1 ring-accent/40"
-          : "border-sleep animate-sleep-breathe",
+        emphasis === "ring" && "border-accent ring-1 ring-accent/40",
+        emphasis === "breathe" && "border-sleep animate-sleep-breathe",
+        emphasis === "calm" && "border-line",
       )}
     >
       {onOpen ? (
@@ -236,6 +242,34 @@ export function ActivePlayBanner({ session }: { session: PlayLog }) {
       onAction={() => stopPlay.mutate({ id: session.id })}
       disabled={stopPlay.isPending || session.id === "optimistic"}
       emphasis="ring"
+    />
+  );
+}
+
+// At barnehage (issue #105). Pick up is one tap — now, by whoever taps —
+// and the body opens the edit sheet, for a drop-off logged late. The
+// calmest banner of the four: see `emphasis`.
+export function ActiveDaycareBanner({
+  session,
+  onEdit,
+}: {
+  session: DaycareLog;
+  onEdit?: (session: DaycareLog) => void;
+}) {
+  const pickUp = usePickUp();
+  const optimistic = session.id === "optimistic";
+  return (
+    <SessionBanner
+      icon={daycareMeta.icon}
+      tint={daycareMeta.tint}
+      label={t("At daycare")}
+      startTime={new Date(session.startTime)}
+      action={t("Pick up")}
+      onAction={() => pickUp.mutate({ id: session.id })}
+      onOpen={onEdit && !optimistic ? () => onEdit(session) : undefined}
+      openLabel={t("Edit daycare day")}
+      disabled={pickUp.isPending || optimistic}
+      emphasis="calm"
     />
   );
 }

@@ -40,9 +40,16 @@ export type CaretakerChoice = ReturnType<typeof useCaretakerChoice>;
 export function CaretakerChips({
   choice,
   edit = null,
+  label = "Who",
+  testId = "caretaker-chips",
 }: {
-  choice: CaretakerChoice;
+  // Only `value` and `choose` are read here, so a sheet with a second
+  // person on it (the barnehage pick-up) can hand in a choice of its own.
+  choice: Pick<CaretakerChoice, "value" | "choose">;
   edit?: { loggedById: string; loggedByName: string } | null;
+  // The row's heading, an i18n key. "Who" everywhere but that second row.
+  label?: string;
+  testId?: string;
 }) {
   const me = useMe();
   const members = useMembers();
@@ -52,12 +59,12 @@ export function CaretakerChips({
   return (
     <div className="space-y-2">
       <p className="text-xs font-semibold tracking-wide text-muted uppercase">
-        {t("Who")}
+        {t(label)}
       </p>
       <fieldset
-        aria-label={t("Who")}
+        aria-label={t(label)}
         className="flex gap-2 overflow-x-auto"
-        data-testid="caretaker-chips"
+        data-testid={testId}
       >
         {faces.map((m) => {
           const on = m.userId === choice.value;

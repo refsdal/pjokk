@@ -744,6 +744,76 @@ export interface paths {
         patch: operations["updatePlay"];
         trace?: never;
     };
+    "/api/daycare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Days at barnehage in the caller's active family, newest first (by startTime). */
+        get: operations["listDaycares"];
+        put?: never;
+        /** Drop off (issue #105). Omit endTime to start a running session — "she is there now"; a baby can only have one at a time, enforced by a partial unique index (see internal/api/daycare.go) as well as the pre-check this endpoint does. With an endTime it logs a finished day after the fact. */
+        post: operations["createDaycare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/daycare/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The running daycare session for a baby, or null. */
+        get: operations["getActiveDaycare"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/daycare/{id}/pickup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pick up: end the running session. endTime defaults to now and the pick-up person to the caller. A replay answers 404 rather than moving the end a first call already set. */
+        post: operations["pickupDaycare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/daycare/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a daycare log. */
+        delete: operations["deleteDaycare"];
+        options?: never;
+        head?: never;
+        /** Partial update. `endTime` sent as `null` CLEARS it, reopening the session — subject to the same one-running-session-per-baby constraint as create, so this can also 409. `pickupCaretakerId` and `notes` may be sent as `null` to clear them; `caretakerId` and `startTime` are settable or omitted. */
+        patch: operations["updateDaycare"];
+        trace?: never;
+    };
     "/api/vaccines/dismissals": {
         parameters: {
             query?: never;
@@ -894,7 +964,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The merged feed of everything, newest first. Sleep and play entries sort by their startTime (active sessions have endTime null); every other kind sorts by time. filter=other selects the eight non-core kinds (medicine, bath, note, milestone, measurement, pump, play, vaccine) together; omitting filter returns all eleven. */
+        /** The merged feed of everything, newest first. Sleep, play and daycare entries sort by their startTime (active sessions have endTime null); every other kind sorts by time. filter=other selects the nine non-core kinds (medicine, bath, note, milestone, measurement, pump, play, daycare, vaccine) together; omitting filter returns all twelve. */
         get: operations["listTimeline"];
         put?: never;
         post?: never;
@@ -1587,7 +1657,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Delete an account safely. Every non-cascading reference to the user (log attribution on all eleven log kinds, vaccine documents and dismissals, invites, API keys, calendar events and audit rows) is reassigned to the tombstone "Deleted user" in ONE transaction, calendar assignments are dropped, the user's API keys are revoked, and only then is the account removed (sessions, memberships and push subscriptions cascade). POST rather than DELETE, matching the TypeScript predecessor's route. Audited as `user.delete`. System admin only. */
+        /** Delete an account safely. Every non-cascading reference to the user (log attribution on all twelve log kinds, vaccine documents and dismissals, invites, API keys, calendar events and audit rows) is reassigned to the tombstone "Deleted user" in ONE transaction, calendar assignments are dropped, the user's API keys are revoked, and only then is the account removed (sessions, memberships and push subscriptions cascade). POST rather than DELETE, matching the TypeScript predecessor's route. Audited as `user.delete`. System admin only. */
         post: operations["deleteAdminUser"];
         delete?: never;
         options?: never;
@@ -2239,6 +2309,65 @@ export interface components {
             /** Format: date-time */
             endTime?: string;
         };
+        /** @description One day at barnehage, from drop-off to pick-up (issue #105) — the session shape of SleepLog and PlayLog: startTime + nullable endTime, null meaning "she is there now". Two people belong to it: `caretakerId` dropped off, `pickupCaretakerId` picked up. */
+        DaycareLog: {
+            id: string;
+            babyId: string;
+            /** @description Who dropped off. */
+            caretakerId: string;
+            caretakerName: string;
+            /** @description Who saved the row; set by the server, never by a client. */
+            loggedById: string;
+            loggedByName: string;
+            /** @description Who picked up. Null while the session runs, and on a finished day whose pick-up person was not recorded. */
+            pickupCaretakerId: string | null;
+            pickupCaretakerName: string | null;
+            notes: string | null;
+            /**
+             * Format: date-time
+             * @description The drop-off.
+             */
+            startTime: string;
+            /**
+             * Format: date-time
+             * @description The pick-up; null while she is there.
+             */
+            endTime: string | null;
+        };
+        CreateDaycare: {
+            /** @description Who dropped off (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller. */
+            caretakerId?: string;
+            /** @description Who picked up, for a finished day logged after the fact: a member of the caller's family, 403 NOT_MEMBER otherwise. Ignored without an endTime — a running session has no pick-up yet. */
+            pickupCaretakerId?: string;
+            babyId: string;
+            /** Format: date-time */
+            startTime: string;
+            /**
+             * Format: date-time
+             * @description Omit to start a running session.
+             */
+            endTime?: string | null;
+            notes?: string;
+        };
+        /** @description Every field is optional; an empty object is a no-op. `endTime`, `pickupCaretakerId` and `notes` may also be sent as `null` to CLEAR that column — clearing `endTime` reopens the session (and clears the pick-up person with it) and can 409 if another session for the same baby is already running (see internal/api/daycare.go). */
+        UpdateDaycare: {
+            /** @description Who dropped off: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave it unchanged. */
+            caretakerId?: string;
+            /** @description Who picked up: a member of the caller's family (403 NOT_MEMBER otherwise), or null for "not recorded". */
+            pickupCaretakerId?: string | null;
+            /** Format: date-time */
+            startTime?: string;
+            /** Format: date-time */
+            endTime?: string | null;
+            notes?: string | null;
+        };
+        /** @description Defaults endTime to now on the server, and the pick-up person to the caller, when omitted. */
+        PickupDaycare: {
+            /** Format: date-time */
+            endTime?: string;
+            /** @description Who picked up: a member of the caller's family (403 NOT_MEMBER otherwise). Defaults to the caller. */
+            caretakerId?: string;
+        };
         /** @description One file attached to a vaccine log. Fetch through `/api/files/{id}` — the object store is never public. */
         VaccineDocument: {
             id: string;
@@ -2297,10 +2426,10 @@ export interface components {
             scheduleSlot?: string | null;
             notes?: string | null;
         };
-        /** @description One row in the merged timeline. `kind`, `id`, `babyId`, `caretakerId`, `caretakerName` and `notes` are present on every entry regardless of kind; everything else is kind-specific and only present for the kinds that have it (e.g. `startTime`/`endTime` on sleep and play, `time` on the other nine, `documents` only on vaccine) — see internal/api/timeline.go's per-kind entry builders, ported field-for-field from apps/api/src/routes/timeline.ts's merge. Modeled as an open object (kind + a handful of always-present fields typed, everything else additionalProperties) rather than a oneOf discriminated union: oapi-codegen has no clean Go representation for eleven structurally different variants sharing one JSON shape. */
+        /** @description One row in the merged timeline. `kind`, `id`, `babyId`, `caretakerId`, `caretakerName` and `notes` are present on every entry regardless of kind; everything else is kind-specific and only present for the kinds that have it (e.g. `startTime`/`endTime` on sleep, play and daycare, `time` on the other nine, `documents` only on vaccine) — see internal/api/timeline.go's per-kind entry builders, ported field-for-field from apps/api/src/routes/timeline.ts's merge. Modeled as an open object (kind + a handful of always-present fields typed, everything else additionalProperties) rather than a oneOf discriminated union: oapi-codegen has no clean Go representation for twelve structurally different variants sharing one JSON shape. */
         TimelineEntry: {
             /** @enum {string} */
-            kind: "feed" | "diaper" | "sleep" | "medicine" | "bath" | "note" | "milestone" | "measurement" | "pump" | "play" | "vaccine";
+            kind: "feed" | "diaper" | "sleep" | "medicine" | "bath" | "note" | "milestone" | "measurement" | "pump" | "play" | "daycare" | "vaccine";
             id: string;
             babyId: string;
             caretakerId: string;
@@ -2441,6 +2570,8 @@ export interface components {
              */
             lastNightLongestMin: number | null;
             activePlay: components["schemas"]["PlayLog"] | null;
+            /** @description The running barnehage session, or null (issue #105): she is there now. State, like activeSleep — Home's banner and the hold on since-last reminders both read it. */
+            activeDaycare: components["schemas"]["DaycareLog"] | null;
             /** @description The running nursing timer, or null (issue */
             activeFeed: components["schemas"]["FeedTimer"] | null;
             /** @description The running pump timer, or null. */
@@ -5853,6 +5984,236 @@ export interface operations {
                 };
             };
             /** @description No play log with this id in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Clearing endTime would reopen a session while another is already running for this baby. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listDaycares: {
+        parameters: {
+            query?: {
+                /** @description Restrict the result to one baby in the caller's family. */
+                babyId?: components["parameters"]["babyIdQuery"];
+                /** @description Maximum number of rows to return. */
+                limit?: components["parameters"]["limitQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daycare logs, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DaycareLog"][];
+                };
+            };
+        };
+    };
+    createDaycare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDaycare"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DaycareLog"];
+                };
+            };
+            /** @description `caretakerId` or `pickupCaretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unknown baby. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Baby is already at daycare (ALREADY_ACTIVE). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getActiveDaycare: {
+        parameters: {
+            query?: {
+                /** @description Restrict the result to one baby in the caller's family. */
+                babyId?: components["parameters"]["babyIdQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The running daycare session, or null. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DaycareLog"] | null;
+                };
+            };
+        };
+    };
+    pickupDaycare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PickupDaycare"];
+            };
+        };
+        responses: {
+            /** @description Picked up. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DaycareLog"];
+                };
+            };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such running session. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteDaycare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description No daycare log with this id in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateDaycare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDaycare"];
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DaycareLog"];
+                };
+            };
+            /** @description `caretakerId` or `pickupCaretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No daycare log with this id in the caller's family. */
             404: {
                 headers: {
                     [name: string]: unknown;
