@@ -27,6 +27,7 @@ import { HelpCard } from "@/components/HelpCard";
 import { InstallBanner } from "@/components/InstallBanner";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { HomeActions } from "@/components/HomeActions";
+import { NothingTrackedCard } from "@/components/NothingTrackedCard";
 import { HomeRecent } from "@/components/HomeRecent";
 import { StatusCard } from "@/components/StatusCard";
 import {
@@ -58,6 +59,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   prefetchOtherLists,
   useFeeds,
+  useMe,
   useResumeSleep,
   useSummary,
   useWakeSleep,
@@ -76,6 +78,7 @@ import {
 import { useResumableSleep } from "@/lib/sleep-resume";
 import { napsLine, sleepNoun } from "@/lib/sleep-ui";
 import { useSelectedBaby } from "@/lib/selected-baby";
+import { logParamFeature, useTracking } from "@/lib/tracking";
 import { formatDuration, formatElapsed } from "@/lib/time";
 import { useAppearance } from "@/lib/appearance";
 import { useHotkeys } from "@/lib/hotkeys";
@@ -159,6 +162,13 @@ const TREND_LABEL: Record<TemperatureTrend, string> = {
 export function HomeScreen() {
   const units = useUnits();
   const { babies, baby } = useSelectedBaby();
+  // What the family tracks for her (spec
+  // 2026-09-17-per-baby-tracking-design.md): every button, card and
+  // banner below follows its switch.
+  const track = useTracking(baby);
+  const me = useMe();
+  const isAdmin =
+    me.data?.memberRole === "admin" || me.data?.memberRole === "owner";
   const summary = useSummary(baby?.id);
   const feeds = useFeeds(baby?.id);
   // Measurements are rare — a handful per baby over months — so the existing
@@ -195,29 +205,32 @@ export function HomeScreen() {
   const queryClient = useQueryClient();
   // The unfolded tiles at md and up (components/HomeActions.tsx) — the
   // same list the More sheet renders on the phone, with the same handlers.
-  const actions = moreActions({
-    onPick: (kind) => {
-      setOtherKind(kind);
-      setPumpStop(false);
-      setMeasurementType("weight");
-      setSheet("other");
+  const actions = moreActions(
+    {
+      onPick: (kind) => {
+        setOtherKind(kind);
+        setPumpStop(false);
+        setMeasurementType("weight");
+        setSheet("other");
+      },
+      onPickPlay: (type) => {
+        setPlayType(type);
+        setSheet("play");
+      },
+      onPickDaycare: () => {
+        setEditDaycare(null);
+        setSheet("daycare");
+      },
+      onPickIllness: () => {
+        // One open episode per baby: the tile opens the one she has.
+        setEditIllness(summary.data?.activeIllness ?? null);
+        setSheet("illness");
+      },
+      onPickHelp: () => setSheet("help"),
+      onVaccines: () => void navigate({ to: "/vaccines" }),
     },
-    onPickPlay: (type) => {
-      setPlayType(type);
-      setSheet("play");
-    },
-    onPickDaycare: () => {
-      setEditDaycare(null);
-      setSheet("daycare");
-    },
-    onPickIllness: () => {
-      // One open episode per baby: the tile opens the one she has.
-      setEditIllness(summary.data?.activeIllness ?? null);
-      setSheet("illness");
-    },
-    onPickHelp: () => setSheet("help"),
-    onVaccines: () => void navigate({ to: "/vaccines" }),
-  });
+    track.has,
+  );
   // F / D / S with no sheet open (spec §6). S wakes a running session, as
   // the banner's button does, because the Sleep button is disabled then.
   const wakeSleep = useWakeSleep();
@@ -227,12 +240,16 @@ export function HomeScreen() {
   const resumable = useResumableSleep(summary.data);
   useHotkeys(
     {
-      f: () => setSheet("feed"),
-      d: () => setSheet("diaper"),
-      s: () =>
-        activeSleepId
-          ? wakeSleep.mutate({ id: activeSleepId })
-          : setSheet("sleep"),
+      ...(track.has("feeds") ? { f: () => setSheet("feed") } : {}),
+      ...(track.has("diapers") ? { d: () => setSheet("diaper") } : {}),
+      ...(track.has("sleep")
+        ? {
+            s: () =>
+              activeSleepId
+                ? wakeSleep.mutate({ id: activeSleepId })
+                : setSheet("sleep"),
+          }
+        : {}),
     },
     sheet === null && !!baby,
   );
@@ -242,16 +259,21 @@ export function HomeScreen() {
   const { log } = useSearch({ strict: false }) as { log?: string };
   useEffect(() => {
     if (!log || !baby) return;
-    if (log === "feed" || log === "diaper" || log === "sleep") {
-      setSheet(log);
-    } else if (isOtherKind(log)) {
-      setOtherKind(log);
-      setPumpStop(false);
-      setMeasurementType("weight");
-      setSheet("other");
+    // A shortcut for a kind she does not track (the manifest's are static)
+    // is simply dropped.
+    const feature = logParamFeature(log);
+    if (feature && track.has(feature)) {
+      if (log === "feed" || log === "diaper" || log === "sleep") {
+        setSheet(log);
+      } else if (isOtherKind(log)) {
+        setOtherKind(log);
+        setPumpStop(false);
+        setMeasurementType("weight");
+        setSheet("other");
+      }
     }
     void navigate({ to: "/home", search: {}, replace: true });
-  }, [log, baby, navigate]);
+  }, [log, baby, navigate, track]);
 
   if (babies.isError) {
     return (
@@ -336,6 +358,12 @@ export function HomeScreen() {
     return (
       <NightHome
         babyId={baby.id}
+        show={{
+          feeds: track.has("feeds"),
+          diapers: track.has("diapers"),
+          sleep: track.has("sleep"),
+        }}
+        babyName={baby.name}
         sheet={sheet}
         setSheet={setSheet}
         activeSleepId={active?.id ?? null}
@@ -362,8 +390,8 @@ export function HomeScreen() {
               the first thing to see, but it must not displace whose home this
               is. */}
           {openHelp && <HelpCard request={openHelp} />}
-          <ClosedDayLine />
-          {active && (
+          {track.has("daycare") && <ClosedDayLine />}
+          {track.has("sleep") && active && (
             <ActiveSleepBanner
               session={active}
               onEdit={(session) => {
@@ -372,7 +400,7 @@ export function HomeScreen() {
               }}
             />
           )}
-          {activeDaycare && (
+          {track.has("daycare") && activeDaycare && (
             <ActiveDaycareBanner
               session={activeDaycare}
               today={summary.data?.daycare}
@@ -383,7 +411,7 @@ export function HomeScreen() {
             />
           )}
           {/* Where the barnehage banner was, once she has been picked up. */}
-          {handoverDue && !activeDaycare && (
+          {track.has("daycare") && handoverDue && !activeDaycare && (
             <HandoverCard
               key={handoverDue.id}
               day={handoverDue}
@@ -393,7 +421,7 @@ export function HomeScreen() {
               }}
             />
           )}
-          {activeIllness && (
+          {track.has("illness") && activeIllness && (
             <IllnessCard
               illness={activeIllness}
               readings={measurementRows}
@@ -403,14 +431,16 @@ export function HomeScreen() {
               }}
             />
           )}
-          {activePlay && <ActivePlayBanner session={activePlay} />}
-          {activeFeed && (
+          {track.has("play") && activePlay && (
+            <ActivePlayBanner session={activePlay} />
+          )}
+          {track.has("feeds") && activeFeed && (
             <ActiveFeedBanner
               timer={activeFeed}
               onOpen={() => setSheet("feed")}
             />
           )}
-          {activePump && (
+          {track.has("pump") && activePump && (
             <ActivePumpBanner
               timer={activePump}
               onStop={() => {
@@ -420,55 +450,62 @@ export function HomeScreen() {
               }}
             />
           )}
+          {/* Nothing tracked: a brand-new baby whose carousel was left, or
+              everything switched off. The door, not an empty grid. */}
+          {!track.any && <NothingTrackedCard baby={baby} isAdmin={isAdmin} />}
           {/* Status before action: last feed / last diaper at a glance */}
           <div className="grid grid-cols-1 gap-3">
-            <StatusCard
-              icon={IconBabyBottle}
-              label={t("Last feed")}
-              time={s?.lastFeed ? new Date(s.lastFeed.time) : null}
-              detail={s?.lastFeed ? feedDetail(s.lastFeed, units) : undefined}
-              sub={
-                s
-                  ? `${s.today.feeds} ${t("feeds")} · ${formatVolume(s.today.intakeMl, units)}${
-                      s.today.solidsG > 0 ? ` · ${s.today.solidsG} g` : ""
-                    } ${t("today")}`
-                  : undefined
-              }
-              note={
-                predatesDropOff(s?.lastFeed?.time, activeDaycare)
-                  ? t("At daycare since then")
-                  : undefined
-              }
-              tintClass="text-feed"
-              onClick={() => setSheet("feed")}
-            />
-            <StatusCard
-              icon={IconDiaper}
-              label={t("Last diaper")}
-              time={s?.lastDiaper ? new Date(s.lastDiaper.time) : null}
-              detail={s?.lastDiaper ? t(s.lastDiaper.type) : undefined}
-              sub={
-                s
-                  ? `${s.today.wet} ${t("wet")} · ${s.today.dirty} ${t("dirty")} · ${s.today.both} ${t("both")}${s.today.dry > 0 ? ` · ${s.today.dry} ${t("dry")}` : ""}`
-                  : undefined
-              }
-              note={
-                predatesDropOff(s?.lastDiaper?.time, activeDaycare)
-                  ? t("At daycare since then")
-                  : s?.lastDiaper?.daycareId
-                    ? // A handover diaper is a count spread over the day
-                      // (issue #106): its time is an estimate, so say so.
-                      t("From the daycare handover, time estimated")
+            {track.has("feeds") && (
+              <StatusCard
+                icon={IconBabyBottle}
+                label={t("Last feed")}
+                time={s?.lastFeed ? new Date(s.lastFeed.time) : null}
+                detail={s?.lastFeed ? feedDetail(s.lastFeed, units) : undefined}
+                sub={
+                  s
+                    ? `${s.today.feeds} ${t("feeds")} · ${formatVolume(s.today.intakeMl, units)}${
+                        s.today.solidsG > 0 ? ` · ${s.today.solidsG} g` : ""
+                      } ${t("today")}`
                     : undefined
-              }
-              tintClass="text-diaper"
-              onClick={() => setSheet("diaper")}
-            />
+                }
+                note={
+                  predatesDropOff(s?.lastFeed?.time, activeDaycare)
+                    ? t("At daycare since then")
+                    : undefined
+                }
+                tintClass="text-feed"
+                onClick={() => setSheet("feed")}
+              />
+            )}
+            {track.has("diapers") && (
+              <StatusCard
+                icon={IconDiaper}
+                label={t("Last diaper")}
+                time={s?.lastDiaper ? new Date(s.lastDiaper.time) : null}
+                detail={s?.lastDiaper ? t(s.lastDiaper.type) : undefined}
+                sub={
+                  s
+                    ? `${s.today.wet} ${t("wet")} · ${s.today.dirty} ${t("dirty")} · ${s.today.both} ${t("both")}${s.today.dry > 0 ? ` · ${s.today.dry} ${t("dry")}` : ""}`
+                    : undefined
+                }
+                note={
+                  predatesDropOff(s?.lastDiaper?.time, activeDaycare)
+                    ? t("At daycare since then")
+                    : s?.lastDiaper?.daycareId
+                      ? // A handover diaper is a count spread over the day
+                        // (issue #106): its time is an estimate, so say so.
+                        t("From the daycare handover, time estimated")
+                      : undefined
+                }
+                tintClass="text-diaper"
+                onClick={() => setSheet("diaper")}
+              />
+            )}
             {/* The wake window, not "last sleep N ago": the same instant read
                 as a duration, because how long she has been up is what decides
                 whether the next nap is due. The last sleep's length rides
                 along as the detail. */}
-            {!active && s?.lastSleep?.endTime && (
+            {track.has("sleep") && !active && s?.lastSleep?.endTime && (
               <StatusCard
                 icon={IconMoon}
                 label={t("Awake")}
@@ -505,7 +542,8 @@ export function HomeScreen() {
             {/* Only while it is still a live question — see
                 showsTemperatureCard. A fever takes the danger tint so it reads
                 at a glance, which is the whole reason the card exists. */}
-            {s?.lastTemperature &&
+            {track.has("measurements") &&
+              s?.lastTemperature &&
               showsTemperatureCard(new Date(s.lastTemperature.time)) && (
                 <StatusCard
                   icon={IconTemperature}
@@ -543,17 +581,24 @@ export function HomeScreen() {
           pb-tabbar clears the bottom bar on the phone and is 1.5rem from md
           (styles.css). */}
       <div className="pt-4 pb-tabbar md:sticky md:top-0 md:pt-6">
-        <HomeActions
-          active={!!active}
-          onFeed={() => setSheet("feed")}
-          onDiaper={() => setSheet("diaper")}
-          onSleep={() => setSheet("sleep")}
-          onMore={() => {
-            prefetchOtherLists(queryClient, baby.id);
-            setSheet("more");
-          }}
-          actions={actions}
-        />
+        {track.any && (
+          <HomeActions
+            active={!!active}
+            show={{
+              feeds: track.has("feeds"),
+              diapers: track.has("diapers"),
+              sleep: track.has("sleep"),
+            }}
+            onFeed={() => setSheet("feed")}
+            onDiaper={() => setSheet("diaper")}
+            onSleep={() => setSheet("sleep")}
+            onMore={() => {
+              prefetchOtherLists(queryClient, baby.id);
+              setSheet("more");
+            }}
+            actions={actions}
+          />
+        )}
       </div>
 
       <FeedSheet
@@ -602,6 +647,7 @@ export function HomeScreen() {
           setSheet("illness");
         }}
         onPickHelp={() => setSheet("help")}
+        has={track.has}
       />
       <OtherLogSheet
         open={sheet === "other"}
@@ -650,6 +696,8 @@ export function HomeScreen() {
 // nothing bright (CLAUDE.md §6).
 function NightHome({
   babyId,
+  show,
+  babyName,
   sheet,
   setSheet,
   activeSleepId,
@@ -660,6 +708,8 @@ function NightHome({
   openHelp,
 }: {
   babyId: string;
+  show: Record<"feeds" | "diapers" | "sleep", boolean>;
+  babyName: string;
   sheet: OpenSheet;
   setSheet: (s: OpenSheet) => void;
   activeSleepId: string | null;
@@ -704,9 +754,14 @@ function NightHome({
       <div className="space-y-3 pb-4">
         <IconBabyCarriage className="mx-auto h-6 w-6 text-muted" />
         {openHelp && <HelpCard request={openHelp} />}
+        {!show.sleep && !show.feeds && !show.diapers && (
+          <p className="text-center text-sm text-muted">
+            {t("Nothing is tracked for")} {babyName} {t("yet")}
+          </p>
+        )}
         {/* Just after a wake the Sleep row splits in two rather than adding
             a fourth action: still three rows (CLAUDE.md §6). */}
-        {activeSleepId ? (
+        {!show.sleep ? null : activeSleepId ? (
           nightAction(t("Wake"), IconMoon, () =>
             wakeSleep.mutate({ id: activeSleepId }),
           )
@@ -723,8 +778,10 @@ function NightHome({
         ) : (
           nightAction(t("Sleep"), IconMoon, () => setSheet("sleep"))
         )}
-        {nightAction(t("Feed"), IconBabyBottle, () => setSheet("feed"))}
-        {nightAction(t("Diaper"), IconDiaper, () => setSheet("diaper"))}
+        {show.feeds &&
+          nightAction(t("Feed"), IconBabyBottle, () => setSheet("feed"))}
+        {show.diapers &&
+          nightAction(t("Diaper"), IconDiaper, () => setSheet("diaper"))}
       </div>
 
       <FeedSheet
