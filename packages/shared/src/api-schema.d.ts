@@ -3226,7 +3226,9 @@ export interface components {
             description: string | null;
             location: string | null;
             /** @enum {string} */
-            category: "doctor" | "vaccination" | "babysitting" | "family" | "other";
+            category: "doctor" | "vaccination" | "babysitting" | "family" | "daycare" | "other";
+            /** @description The barnehage is closed that day (issue #110): a planning day, the summer weeks. Only meaningful for `category: daycare` — the server stores false on any other category. Home surfaces a closed day the evening before and on the day. */
+            closed: boolean;
             /**
              * Format: date-time
              * @description This occurrence's start. A series is returned once per occurrence in the window, all sharing the id (issue #52).
@@ -3272,7 +3274,9 @@ export interface components {
              * @default other
              * @enum {string}
              */
-            category: "doctor" | "vaccination" | "babysitting" | "family" | "other";
+            category: "doctor" | "vaccination" | "babysitting" | "family" | "daycare" | "other";
+            /** @description The barnehage is closed that day (issue #110): a planning day, the summer weeks. Only meaningful for `category: daycare` — the server stores false on any other category. Home surfaces a closed day the evening before and on the day. */
+            closed?: boolean;
             /** Format: date-time */
             startTime: string;
             /**
@@ -3305,7 +3309,9 @@ export interface components {
             description?: string | null;
             location?: string | null;
             /** @enum {string} */
-            category?: "doctor" | "vaccination" | "babysitting" | "family" | "other";
+            category?: "doctor" | "vaccination" | "babysitting" | "family" | "daycare" | "other";
+            /** @description The barnehage is closed that day (issue #110): a planning day, the summer weeks. Only meaningful for `category: daycare` — the server stores false on any other category. Home surfaces a closed day the evening before and on the day. */
+            closed?: boolean;
             /** Format: date-time */
             startTime?: string;
             allDay?: boolean;

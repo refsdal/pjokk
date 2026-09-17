@@ -398,6 +398,14 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   it into a standalone event carrying the change; "All events" edits the
   series, and a real change to its start or rule clears its skips (spec
   `docs/superpowers/specs/2026-09-11-calendar-occurrence-exceptions-design.md`).
+- **Barnehage on the calendar (#110):** a `daycare` category (planning
+  days, parent meetings, photo day) and `calendar_event.closed`, a flag
+  that means something only there — `closedFor` in
+  `internal/api/calendar.go` stores it false on any other category and
+  clears it when an event leaves the category. A closed day on the local
+  today or tomorrow shows on Home as one quiet line
+  (`components/ClosedDayLine.tsx` over `closedNotices`), read from the
+  ordinary calendar list; the ICS feed already carried `CATEGORIES`.
 - **Profile (`/profile`):** the person, not the family — full name,
   nickname (shown instead of the name everywhere, via the users
   `display_name` generated column), phone (private), photo, display

@@ -2979,3 +2979,27 @@ Sixth of the barnehage series (#109). Spec:
   issue imagined an "emergency contact" flag; there is none, and adding one
   to save a parent a switch was not worth a migration. Members' own phone
   numbers stay private to their profiles.
+
+## 2026-09-17 — barnehage on the calendar, and closed days on Home
+
+Seventh of the barnehage series (#110). No spec file: the issue is the
+design, and this is what was decided while building it.
+
+- **A category and one flag.** `daycare` joins the calendar categories, and
+  `closed` marks the days the barnehage is shut. Closed is the one fact
+  about such an event that changes a family's morning, so it is the one
+  that reaches Home: "Daycare is closed tomorrow · Planning day", the
+  evening before and on the day.
+- **The flag belongs to the category.** `closedFor` stores it false on any
+  other category whatever a client sends, and an event moved out of the
+  category loses it, rather than leave a flag nothing shows.
+- **Home reads the ordinary calendar list** for the two local days. No new
+  field on `/api/summary`: the summary is per baby and a closed day is the
+  family's, and "today" and "tomorrow" are the device's local days, which
+  the server does not know.
+- **No pick-up rota preset.** The issue floated "Pick-up, weekdays 15:30";
+  the recurrence rules are daily / weekly / biweekly / monthly / yearly and
+  have no "weekdays". A weekly event per weekday with an assignee already
+  works; a weekdays rule is its own piece of work in `internal/recur`.
+- **The push reminder is unchanged.** It already carries the event's
+  title, which for a closed day is the message.
