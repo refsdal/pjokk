@@ -7372,6 +7372,7 @@ components:
         - description
         - location
         - category
+        - closed
         - startTime
         - allDay
         - durationMin
@@ -7396,7 +7397,14 @@ components:
           nullable: true
         category:
           type: string
-          enum: [doctor, vaccination, babysitting, family, other]
+          enum: [doctor, vaccination, babysitting, family, daycare, other]
+        closed:
+          type: boolean
+          description: >-
+            The barnehage is closed that day (issue #110): a planning day,
+            the summer weeks. Only meaningful for `category: daycare` — the
+            server stores false on any other category. Home surfaces a
+            closed day the evening before and on the day.
         startTime:
           type: string
           format: date-time
@@ -7469,8 +7477,15 @@ components:
           maxLength: 200
         category:
           type: string
-          enum: [doctor, vaccination, babysitting, family, other]
+          enum: [doctor, vaccination, babysitting, family, daycare, other]
           default: other
+        closed:
+          type: boolean
+          description: >-
+            The barnehage is closed that day (issue #110): a planning day,
+            the summer weeks. Only meaningful for `category: daycare` — the
+            server stores false on any other category. Home surfaces a
+            closed day the evening before and on the day.
         startTime:
           type: string
           format: date-time
@@ -7532,7 +7547,14 @@ components:
           nullable: true
         category:
           type: string
-          enum: [doctor, vaccination, babysitting, family, other]
+          enum: [doctor, vaccination, babysitting, family, daycare, other]
+        closed:
+          type: boolean
+          description: >-
+            The barnehage is closed that day (issue #110): a planning day,
+            the summer weeks. Only meaningful for `category: daycare` — the
+            server stores false on any other category. Home surfaces a
+            closed day the evening before and on the day.
         startTime:
           type: string
           format: date-time

@@ -97,6 +97,7 @@ type CalendarEvent struct {
 	CreatedAt           pgtype.Timestamptz
 	Recurrence          string
 	RecurrenceUntil     pgtype.Timestamptz
+	Closed              bool
 }
 
 type CalendarEventBaby struct {
