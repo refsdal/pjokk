@@ -57,6 +57,20 @@ func RunReminders(ctx context.Context, d Deps, now time.Time) (int, error) {
 			continue
 		}
 
+		// A kind the baby does not track is held, not latched (spec
+		// 2026-09-17-per-baby-tracking-design.md): the switch is a
+		// preference about the app, and the reminder fires again the tick
+		// after it comes back. A custom reminder has no kind to be off.
+		if f := featureForKind(r.Kind); f != "" {
+			tracked, err := d.Q.BabyTracks(ctx, dbgen.BabyTracksParams{FamilyID: r.FamilyID, BabyID: r.BabyID, Feature: f})
+			if err != nil {
+				return sent, fmt.Errorf("jobs: tracked kind for reminder %s: %w", r.ID, err)
+			}
+			if !tracked {
+				continue
+			}
+		}
+
 		var fire bool
 		var gap time.Duration
 		switch r.Mode {
@@ -167,6 +181,22 @@ func (d Deps) lastLogTime(ctx context.Context, r dbgen.Reminder) (pgtype.Timesta
 		return d.Q.LastMedicineTime(ctx, dbgen.LastMedicineTimeParams{FamilyID: r.FamilyID, BabyID: r.BabyID, Name: r.Label})
 	}
 	return pgtype.Timestamptz{}, nil
+}
+
+// featureForKind maps a reminder kind onto the per-baby switch that hides
+// it (lib/tracking.ts reminderKindFeature is the SPA's copy of this map).
+func featureForKind(kind string) string {
+	switch kind {
+	case "feed":
+		return "feeds"
+	case "diaper":
+		return "diapers"
+	case "pump":
+		return "pump"
+	case "medicine":
+		return "medicine"
+	}
+	return ""
 }
 
 // holdsAtDaycare names the since_last kinds barnehage holds (issue #105):
