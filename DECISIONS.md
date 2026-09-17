@@ -3169,3 +3169,47 @@ asked for and its PR did not build.
   first read "Ill 3 of 7 days", which in the app's typeface looks like the
   Roman numeral III; it is now an "Ill days" label over "3 of 7 days · 1
   episode", the shape the other Stats cards have.
+
+## 2026-09-17 — the barnehage as a place, a pick-up plan, a closing alert
+
+Designed with the owner in conversation (spec
+`docs/superpowers/specs/2026-09-17-daycare-place-and-pickup-plan-design.md`);
+his answers are marked.
+
+- **A weekly grid, not calendar events** (owner: "it will mostly follow a
+  fixed pattern"). `daycare_pickup_plan` is Monday to Friday per baby, an
+  expected time and a person. The calendar's "Pick-up, weekdays" preset
+  stays what it was, an event; nothing marks an event as a pick-up, and a
+  rota that differs by weekday would have needed several weekly series.
+- **The exception is one row and one tap** (owner: nice, rarely relevant).
+  `daycare_pickup_override` is a baby and a date; any member sets it from
+  the day sheet's "Collecting today" chips, and tapping the grid's own
+  person clears it.
+- **The push goes to the planned person only** (owner), else the parents.
+  No second, escalating push. A named person who is no longer an unbanned
+  member reads as nobody, checked in the job even though removing a member
+  clears them from the grid.
+- **The expected time fires nothing** (owner). A plan, not a deadline: the
+  only push is the closing one, and it has no Snooze because closing time
+  does not move.
+- **Not a Contact.** Hours, a zone and a per-baby link are not address-book
+  fields, and nothing reads contacts. An existing daycare contact is left
+  alone.
+- **The place carries a zone; the server resolves no "today" for display.**
+  The summary hands the grid and the exceptions to the client, which has a
+  calendar, so Home works from the offline cache. Only the closing alert
+  resolves a day, in the place's zone, with the closing instant built by
+  `time.Date` there so a clock-change day still closes at 16:30 on the wall.
+- **One opening and closing time for every weekday, one place per baby,
+  parents write and everyone reads.** Mine, stated to the owner and not
+  objected to. The enrolment's primary key is the baby, so moving her is an
+  upsert.
+- **A PUT for the place, not a PATCH.** The settings page holds every
+  field; the tri-state PATCH machinery would have bought nothing.
+- **The banner's turn to "Closes 16:30 · in 25 min" follows the push's
+  lead**, or half an hour when the family switched the push off. The
+  device compares the wall-clock minute with its own clock, as it does the
+  usual-nap minute.
+- **Not built:** a weekend plan, per-weekday opening hours, an import from
+  Contacts, kiosk access (`deviceOperations` is unchanged), a heads-up
+  before the expected time.
