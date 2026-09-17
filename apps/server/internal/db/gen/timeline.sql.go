@@ -85,6 +85,88 @@ func (q *Queries) ListBathsPage(ctx context.Context, arg ListBathsPageParams) ([
 	return items, nil
 }
 
+const listDaycaresPage = `-- name: ListDaycaresPage :many
+SELECT
+    d."id", d."baby_id", d."caretaker_id", d."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    d."pickup_caretaker_id", pu."display_name" AS pickup_caretaker_name,
+    d."start_time", d."end_time", d."notes"
+FROM "daycare_log" d
+JOIN "users" u ON u."id" = d."caretaker_id"
+JOIN "users" lu ON lu."id" = d."logged_by_id"
+LEFT JOIN "users" pu ON pu."id" = d."pickup_caretaker_id"
+WHERE d."family_id" = $1
+  AND d."baby_id" = $2
+  AND (
+    $3::timestamptz IS NULL
+    OR (d."start_time", d."id") < ($3::timestamptz, $4::text)
+  )
+  AND ($5::text IS NULL OR d."notes" ILIKE $5::text)
+ORDER BY d."start_time" DESC, d."id" DESC
+LIMIT $6
+`
+
+type ListDaycaresPageParams struct {
+	FamilyID   string
+	BabyID     string
+	CursorTime pgtype.Timestamptz
+	CursorID   *string
+	Q          *string
+	Lim        int32
+}
+
+type ListDaycaresPageRow struct {
+	ID                  string
+	BabyID              string
+	CaretakerID         string
+	LoggedByID          string
+	CaretakerName       string
+	LoggedByName        string
+	PickupCaretakerID   *string
+	PickupCaretakerName *string
+	StartTime           pgtype.Timestamptz
+	EndTime             pgtype.Timestamptz
+	Notes               *string
+}
+
+func (q *Queries) ListDaycaresPage(ctx context.Context, arg ListDaycaresPageParams) ([]ListDaycaresPageRow, error) {
+	rows, err := q.db.Query(ctx, listDaycaresPage,
+		arg.FamilyID,
+		arg.BabyID,
+		arg.CursorTime,
+		arg.CursorID,
+		arg.Q,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDaycaresPageRow
+	for rows.Next() {
+		var i ListDaycaresPageRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.BabyID,
+			&i.CaretakerID,
+			&i.LoggedByID,
+			&i.CaretakerName,
+			&i.LoggedByName,
+			&i.PickupCaretakerID,
+			&i.PickupCaretakerName,
+			&i.StartTime,
+			&i.EndTime,
+			&i.Notes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDiapersPage = `-- name: ListDiapersPage :many
 SELECT
     d."id", d."baby_id", d."caretaker_id", d."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
@@ -215,7 +297,7 @@ type ListFeedsPageRow struct {
 }
 
 // Merged-timeline pagination (timeline.ts). One "Page"
-// query per source, all eleven shaped identically: family+baby scoped
+// query per source, all twelve shaped identically: family+baby scoped
 // (baby_id is REQUIRED here, unlike ListFeeds/ListDiapers/… — the
 // /api/timeline route always has a babyId), an optional keyset cursor via
 // ROW COMPARISON "(t, id) < (cursor_t, cursor_id)" — never two separate
@@ -238,8 +320,8 @@ type ListFeedsPageRow struct {
 // term (backslash is ILIKE's default escape) and wraps it in %…% before
 // it gets here; NULL means "no search".
 //
-// Sleep and play sort by start_time (see sleep.sql's ActiveSleep /
-// play.sql's ActivePlay for why — both are session tables where the natural
+// Sleep, play and daycare sort by start_time (see sleep.sql's ActiveSleep /
+// play.sql's ActivePlay for why — all are session tables where the natural
 // timeline position is when the session STARTED, not the row's other
 // timestamp); every other source sorts by time.
 func (q *Queries) ListFeedsPage(ctx context.Context, arg ListFeedsPageParams) ([]ListFeedsPageRow, error) {

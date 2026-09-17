@@ -1301,6 +1301,7 @@ func (e StopFeedTimerSide) Valid() bool {
 // Defines values for TimelineEntryKind.
 const (
 	TimelineEntryKindBath        TimelineEntryKind = "bath"
+	TimelineEntryKindDaycare     TimelineEntryKind = "daycare"
 	TimelineEntryKindDiaper      TimelineEntryKind = "diaper"
 	TimelineEntryKindFeed        TimelineEntryKind = "feed"
 	TimelineEntryKindMeasurement TimelineEntryKind = "measurement"
@@ -1317,6 +1318,8 @@ const (
 func (e TimelineEntryKind) Valid() bool {
 	switch e {
 	case TimelineEntryKindBath:
+		return true
+	case TimelineEntryKindDaycare:
 		return true
 	case TimelineEntryKindDiaper:
 		return true
@@ -2373,6 +2376,22 @@ type CreateContact struct {
 // CreateContactIcon defines model for CreateContact.Icon.
 type CreateContactIcon string
 
+// CreateDaycare defines model for CreateDaycare.
+type CreateDaycare struct {
+	BabyId string `json:"babyId"`
+
+	// CaretakerId Who dropped off (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller.
+	CaretakerId *string `json:"caretakerId,omitempty"`
+
+	// EndTime Omit to start a running session.
+	EndTime *time.Time `json:"endTime,omitempty"`
+	Notes   *string    `json:"notes,omitempty"`
+
+	// PickupCaretakerId Who picked up, for a finished day logged after the fact: a member of the caller's family, 403 NOT_MEMBER otherwise. Ignored without an endTime — a running session has no pick-up yet.
+	PickupCaretakerId *string   `json:"pickupCaretakerId,omitempty"`
+	StartTime         time.Time `json:"startTime"`
+}
+
 // CreateDevice defines model for CreateDevice.
 type CreateDevice struct {
 	Name string `json:"name"`
@@ -2604,6 +2623,31 @@ type CreateVaccine struct {
 type CreateVaccineDismissal struct {
 	BabyId  string `json:"babyId"`
 	SlotKey string `json:"slotKey"`
+}
+
+// DaycareLog One day at barnehage, from drop-off to pick-up (issue #105) — the session shape of SleepLog and PlayLog: startTime + nullable endTime, null meaning "she is there now". Two people belong to it: `caretakerId` dropped off, `pickupCaretakerId` picked up.
+type DaycareLog struct {
+	BabyId string `json:"babyId"`
+
+	// CaretakerId Who dropped off.
+	CaretakerId   string `json:"caretakerId"`
+	CaretakerName string `json:"caretakerName"`
+
+	// EndTime The pick-up; null while she is there.
+	EndTime *time.Time `json:"endTime"`
+	Id      string     `json:"id"`
+
+	// LoggedById Who saved the row; set by the server, never by a client.
+	LoggedById   string  `json:"loggedById"`
+	LoggedByName string  `json:"loggedByName"`
+	Notes        *string `json:"notes"`
+
+	// PickupCaretakerId Who picked up. Null while the session runs, and on a finished day whose pick-up person was not recorded.
+	PickupCaretakerId   *string `json:"pickupCaretakerId"`
+	PickupCaretakerName *string `json:"pickupCaretakerName"`
+
+	// StartTime The drop-off.
+	StartTime time.Time `json:"startTime"`
 }
 
 // DeletedFamily A family in a snapshot that does not exist now.
@@ -3061,6 +3105,13 @@ type Ok struct {
 // OkOk defines model for Ok.Ok.
 type OkOk bool
 
+// PickupDaycare Defaults endTime to now on the server, and the pick-up person to the caller, when omitted.
+type PickupDaycare struct {
+	// CaretakerId Who picked up: a member of the caller's family (403 NOT_MEMBER otherwise). Defaults to the caller.
+	CaretakerId *string    `json:"caretakerId,omitempty"`
+	EndTime     *time.Time `json:"endTime,omitempty"`
+}
+
 // PlayLog Timed activities (tummy time, walks, free play) — same session shape as SleepLog: startTime + nullable endTime, null meaning "still running". Free (no plan gate).
 type PlayLog struct {
 	BabyId        string `json:"babyId"`
@@ -3332,6 +3383,9 @@ type Subscribe struct {
 
 // Summary defines model for Summary.
 type Summary struct {
+	// ActiveDaycare The running barnehage session, or null (issue #105): she is there now. State, like activeSleep — Home's banner and the hold on since-last reminders both read it.
+	ActiveDaycare *DaycareLog `json:"activeDaycare"`
+
 	// ActiveFeed The running nursing timer, or null (issue
 	ActiveFeed *FeedTimer `json:"activeFeed"`
 	ActivePlay *PlayLog   `json:"activePlay"`
@@ -3383,7 +3437,7 @@ type Timeline struct {
 	NextCursor *string `json:"nextCursor"`
 }
 
-// TimelineEntry One row in the merged timeline. `kind`, `id`, `babyId`, `caretakerId`, `caretakerName` and `notes` are present on every entry regardless of kind; everything else is kind-specific and only present for the kinds that have it (e.g. `startTime`/`endTime` on sleep and play, `time` on the other nine, `documents` only on vaccine) — see internal/api/timeline.go's per-kind entry builders, ported field-for-field from apps/api/src/routes/timeline.ts's merge. Modeled as an open object (kind + a handful of always-present fields typed, everything else additionalProperties) rather than a oneOf discriminated union: oapi-codegen has no clean Go representation for eleven structurally different variants sharing one JSON shape.
+// TimelineEntry One row in the merged timeline. `kind`, `id`, `babyId`, `caretakerId`, `caretakerName` and `notes` are present on every entry regardless of kind; everything else is kind-specific and only present for the kinds that have it (e.g. `startTime`/`endTime` on sleep, play and daycare, `time` on the other nine, `documents` only on vaccine) — see internal/api/timeline.go's per-kind entry builders, ported field-for-field from apps/api/src/routes/timeline.ts's merge. Modeled as an open object (kind + a handful of always-present fields typed, everything else additionalProperties) rather than a oneOf discriminated union: oapi-codegen has no clean Go representation for twelve structurally different variants sharing one JSON shape.
 type TimelineEntry struct {
 	BabyId        string            `json:"babyId"`
 	CaretakerId   string            `json:"caretakerId"`
@@ -3470,6 +3524,18 @@ type UpdateContact struct {
 
 // UpdateContactIcon defines model for UpdateContact.Icon.
 type UpdateContactIcon string
+
+// UpdateDaycare Every field is optional; an empty object is a no-op. `endTime`, `pickupCaretakerId` and `notes` may also be sent as `null` to CLEAR that column — clearing `endTime` reopens the session (and clears the pick-up person with it) and can 409 if another session for the same baby is already running (see internal/api/daycare.go).
+type UpdateDaycare struct {
+	// CaretakerId Who dropped off: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave it unchanged.
+	CaretakerId *string    `json:"caretakerId,omitempty"`
+	EndTime     *time.Time `json:"endTime,omitempty"`
+	Notes       *string    `json:"notes,omitempty"`
+
+	// PickupCaretakerId Who picked up: a member of the caller's family (403 NOT_MEMBER otherwise), or null for "not recorded".
+	PickupCaretakerId *string    `json:"pickupCaretakerId,omitempty"`
+	StartTime         *time.Time `json:"startTime,omitempty"`
+}
 
 // UpdateDiaper Every field is optional; an empty object is a no-op. `color`, `consistency` and `notes` may also be sent as `null` to CLEAR them; `time`/`type` are not nullable — only settable or omitted (see internal/api/feeds.go for the presence-detection pattern this endpoint shares with UpdateFeed).
 type UpdateDiaper struct {
@@ -3784,6 +3850,21 @@ type UpdateCalendarEventParams struct {
 	Occurrence *time.Time `form:"occurrence,omitempty" json:"occurrence,omitempty"`
 }
 
+// ListDaycaresParams defines parameters for ListDaycares.
+type ListDaycaresParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+
+	// Limit Maximum number of rows to return.
+	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// GetActiveDaycareParams defines parameters for GetActiveDaycare.
+type GetActiveDaycareParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+}
+
 // ListDiapersParams defines parameters for ListDiapers.
 type ListDiapersParams struct {
 	// BabyId Restrict the result to one baby in the caller's family.
@@ -4003,6 +4084,15 @@ type CreateContactJSONRequestBody = CreateContact
 
 // UpdateContactJSONRequestBody defines body for UpdateContact for application/json ContentType.
 type UpdateContactJSONRequestBody = UpdateContact
+
+// CreateDaycareJSONRequestBody defines body for CreateDaycare for application/json ContentType.
+type CreateDaycareJSONRequestBody = CreateDaycare
+
+// UpdateDaycareJSONRequestBody defines body for UpdateDaycare for application/json ContentType.
+type UpdateDaycareJSONRequestBody = UpdateDaycare
+
+// PickupDaycareJSONRequestBody defines body for PickupDaycare for application/json ContentType.
+type PickupDaycareJSONRequestBody = PickupDaycare
 
 // EnrolDeviceJSONRequestBody defines body for EnrolDevice for application/json ContentType.
 type EnrolDeviceJSONRequestBody = EnrolDevice

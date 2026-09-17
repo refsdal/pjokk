@@ -96,6 +96,18 @@ func (d Deps) snoozedPayload(ctx context.Context, s dbgen.PushSnooze, now time.T
 		if err != nil {
 			return push.PushPayload{}, snoozeDrop, err
 		}
+		if r.Mode == "since_last" {
+			// Barnehage (issue #105): a snooze that comes due while she is
+			// there is dropped, not held — by pick-up it is answered, and
+			// the pick-up folded into the anchor says the same afterwards.
+			var atDaycare bool
+			if last, atDaycare, err = d.sinceLastAnchor(ctx, r); err != nil {
+				return push.PushPayload{}, snoozeDrop, err
+			}
+			if atDaycare {
+				return push.PushPayload{}, snoozeDrop, nil
+			}
+		}
 		if answered(r, last, s.SentAt.Time, now) {
 			return push.PushPayload{}, snoozeDrop, nil
 		}

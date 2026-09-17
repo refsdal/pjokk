@@ -282,6 +282,16 @@ var operationAuthTiers = map[string]authTier{
 	"UpdatePlay":    tierFamily,
 	"DeletePlay":    tierFamily,
 
+	// Days at barnehage (issue #105): play's lifecycle one table over. Not
+	// in deviceOperations — a nursery tablet at home has no part in a
+	// drop-off.
+	"ListDaycares":     tierFamily,
+	"CreateDaycare":    tierFamily,
+	"GetActiveDaycare": tierFamily,
+	"PickupDaycare":    tierFamily,
+	"UpdateDaycare":    tierFamily,
+	"DeleteDaycare":    tierFamily,
+
 	"GetSummary": tierFamily,
 
 	// The six Phase 3 activity types (other-logs.ts's makeLogRoutes

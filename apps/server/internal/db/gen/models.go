@@ -119,6 +119,19 @@ type ContactBaby struct {
 	BabyID    string
 }
 
+type DaycareLog struct {
+	ID                string
+	FamilyID          string
+	BabyID            string
+	CaretakerID       string
+	LoggedByID        string
+	PickupCaretakerID *string
+	StartTime         pgtype.Timestamptz
+	EndTime           pgtype.Timestamptz
+	Notes             *string
+	CreatedAt         pgtype.Timestamptz
+}
+
 type Device struct {
 	ID             string
 	FamilyID       string
