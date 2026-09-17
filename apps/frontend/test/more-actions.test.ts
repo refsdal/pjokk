@@ -10,11 +10,12 @@ describe("moreActions", () => {
     onPick: (kind) => calls.push(`pick:${kind}`),
     onPickPlay: (type) => calls.push(`play:${type}`),
     onPickDaycare: () => calls.push("daycare"),
+    onPickIllness: () => calls.push("illness"),
     onPickHelp: () => calls.push("help"),
     onVaccines: () => calls.push("vaccines"),
   });
 
-  it("lists the six kinds, the three play types, daycare, vaccines and help, in that order", () => {
+  it("lists the six kinds, the three play types, daycare, illness, vaccines and help, in that order", () => {
     expect(actions.map((a) => a.key)).toEqual([
       "medicine",
       "bath",
@@ -26,6 +27,7 @@ describe("moreActions", () => {
       "play:walk",
       "play:play",
       "daycare",
+      "illness",
       "vaccines",
       "help",
     ]);
@@ -45,6 +47,7 @@ describe("moreActions", () => {
       "play:walk",
       "play:play",
       "daycare",
+      "illness",
       "vaccines",
       "help",
     ]);

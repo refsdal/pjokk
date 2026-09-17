@@ -52,6 +52,8 @@ export type CreateContact = Schemas["CreateContact"];
 export type UpdateContact = Schemas["UpdateContact"];
 export type PlayLog = Schemas["PlayLog"];
 export type DaycareLog = Schemas["DaycareLog"];
+export type IllnessLog = Schemas["IllnessLog"];
+export type IllnessSymptom = Schemas["IllnessSymptom"];
 export type Handover = Schemas["Handover"];
 export type HandoverMeal = Schemas["HandoverMeal"];
 export type DaycareMood = NonNullable<DaycareLog["mood"]>;
@@ -61,7 +63,7 @@ export type VaccineDocument = Schemas["VaccineDocument"];
 export type VaccineDismissal = Schemas["VaccineDismissal"];
 
 // The timeline's rows. The spec models TimelineEntry as an open object —
-// oapi-codegen has no clean Go shape for twelve structurally different
+// oapi-codegen has no clean Go shape for thirteen structurally different
 // variants (see the schema's description) — but every row IS one of the log
 // schemas plus its kind, so the SPA gets the discriminated union back, built
 // from those schemas rather than written out by hand.
@@ -78,6 +80,7 @@ export type TimelineEntry =
   | Entry<"pump", PumpLog>
   | Entry<"play", PlayLog>
   | Entry<"daycare", DaycareLog>
+  | Entry<"illness", IllnessLog>
   | Entry<"vaccine", VaccineLog>;
 export type Timeline = Omit<Schemas["Timeline"], "entries"> & {
   entries: TimelineEntry[];
@@ -113,6 +116,18 @@ export const measurementTypes = everyOf<MeasurementType>()([
   "temperature",
 ]);
 
+export const illnessSymptoms = everyOf<IllnessSymptom>()([
+  "fever",
+  "vomiting",
+  "diarrhoea",
+  "cough",
+  "cold",
+  "rash",
+  "eye",
+  "ear",
+  "other",
+]);
+
 export const contactIcons = everyOf<ContactIcon>()([
   "user",
   "doctor",
@@ -140,5 +155,6 @@ export const timelineKinds = everyOf<Schemas["TimelineEntry"]["kind"]>()([
   "pump",
   "play",
   "daycare",
+  "illness",
   "vaccine",
 ]) satisfies readonly TimelineEntry["kind"][];

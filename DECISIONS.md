@@ -2890,3 +2890,36 @@ Third of the barnehage series (#106). Spec:
   morning's drop-off, yesterday's handover is nobody's question.
 - **Mood is three words** (good / okay / hard), set only through the
   handover. No free text: the day's note already exists.
+
+## 2026-09-17 — illness episodes
+
+Fourth of the barnehage series (#107). Spec:
+`docs/superpowers/specs/2026-09-17-illness-and-care-days-design.md`.
+
+- **A clock against the family's rule, never a verdict.** The medicine
+  interval's stance (#49). The card says when the last symptom was and
+  when the family's chosen number of hours will have passed since; it never
+  says a child "may return", and a unit test refuses the words. FHI's
+  guidance (48 h after vomiting or diarrhoea, otherwise general condition)
+  is quoted and linked in the sheet as reference.
+- **`clear_hours` lives on the episode, not in a family setting.** A
+  barnehage's rule differs by illness, the sheet's suggestion follows the
+  symptom chips until the family touches it, and a per-episode number needs
+  no settings table.
+- **The server holds no medical constant.** It stores `last_symptom_at` and
+  `clear_hours` and compares neither. The clock is the SPA's, and so is the
+  rule that a fever reading logged after "symptom-free" moves the clock
+  forward — computed at read time from the temperatures Home already
+  loads, so the one fever threshold in the codebase stays where it is and
+  the measurement route gains no hook.
+- **State, like a day at barnehage**: one open episode per baby by partial
+  unique index, `activeIllness` on the summary, a calm hairline card
+  (coral, where temperatures live; not the danger token — it sits on Home
+  for days). The More tile opens the episode she already has rather than
+  offer a second.
+- **One fact per line on the card.** The first cut put "symptom-free
+  since … · 48 h on …" on one truncating line, and the screenshot showed
+  the moment the hours are reached — the one thing a parent opens the app
+  to read — cut off. Two lines, neither truncated.
+- **Timeline rows count days, not a clock span**: an illness runs over
+  several.

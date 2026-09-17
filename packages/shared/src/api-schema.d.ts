@@ -832,6 +832,76 @@ export interface paths {
         patch: operations["updateDaycare"];
         trace?: never;
     };
+    "/api/illness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Illness episodes in the caller's active family, newest first (by startTime). */
+        get: operations["listIllnesses"];
+        put?: never;
+        /** Start an illness episode (issue #107), or with an endTime log one that is over. A baby can only have one open episode at a time — a partial unique index, as for sleep and daycare. */
+        post: operations["createIllness"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/illness/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The open illness episode for a baby, or null. */
+        get: operations["getActiveIllness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/illness/{id}/recover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recovered: close the open episode. endTime defaults to now. A replay answers 404 rather than moving the end. */
+        post: operations["recoverIllness"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/illness/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete an illness episode. */
+        delete: operations["deleteIllness"];
+        options?: never;
+        head?: never;
+        /** Partial update. `endTime` sent as `null` reopens the episode (409 if another is open). `lastSymptomAt` as `null` means "still has symptoms"; `clearHours` and `notes` as `null` clear them. */
+        patch: operations["updateIllness"];
+        trace?: never;
+    };
     "/api/vaccines/dismissals": {
         parameters: {
             query?: never;
@@ -982,7 +1052,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The merged feed of everything, newest first. Sleep, play and daycare entries sort by their startTime (active sessions have endTime null); every other kind sorts by time. filter=other selects the nine non-core kinds (medicine, bath, note, milestone, measurement, pump, play, daycare, vaccine) together; omitting filter returns all twelve. */
+        /** The merged feed of everything, newest first. Sleep, play, daycare and illness entries sort by their startTime (active sessions have endTime null); every other kind sorts by time. filter=other selects the ten non-core kinds (medicine, bath, note, milestone, measurement, pump, play, daycare, illness, vaccine) together; omitting filter returns all thirteen. */
         get: operations["listTimeline"];
         put?: never;
         post?: never;
@@ -1675,7 +1745,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Delete an account safely. Every non-cascading reference to the user (log attribution on all twelve log kinds, vaccine documents and dismissals, invites, API keys, calendar events and audit rows) is reassigned to the tombstone "Deleted user" in ONE transaction, calendar assignments are dropped, the user's API keys are revoked, and only then is the account removed (sessions, memberships and push subscriptions cascade). POST rather than DELETE, matching the TypeScript predecessor's route. Audited as `user.delete`. System admin only. */
+        /** Delete an account safely. Every non-cascading reference to the user (log attribution on all thirteen log kinds, vaccine documents and dismissals, invites, API keys, calendar events and audit rows) is reassigned to the tombstone "Deleted user" in ONE transaction, calendar assignments are dropped, the user's API keys are revoked, and only then is the account removed (sessions, memberships and push subscriptions cascade). POST rather than DELETE, matching the TypeScript predecessor's route. Audited as `user.delete`. System admin only. */
         post: operations["deleteAdminUser"];
         delete?: never;
         options?: never;
@@ -2430,6 +2500,69 @@ export interface components {
             /** @enum {string|null} */
             mood: "good" | "ok" | "hard" | null;
         };
+        /** @enum {string} */
+        IllnessSymptom: "fever" | "vomiting" | "diarrhoea" | "cough" | "cold" | "rash" | "eye" | "ear" | "other";
+        /** @description One illness episode (issue #107): what ties Monday's fever to Tuesday's vomiting, and what a "symptom-free since" clock counts from. State like a sleep session: endTime null means still ill. The app ships no medical judgement — `clearHours` is the family's own number for this episode and `lastSymptomAt` what they told us; the server compares neither to anything. */
+        IllnessLog: {
+            id: string;
+            babyId: string;
+            caretakerId: string;
+            caretakerName: string;
+            /** @description Who saved the row; set by the server, never by a client. */
+            loggedById: string;
+            loggedByName: string;
+            /** Format: date-time */
+            startTime: string;
+            /**
+             * Format: date-time
+             * @description null while she is still ill.
+             */
+            endTime: string | null;
+            symptoms: components["schemas"]["IllnessSymptom"][];
+            /**
+             * Format: date-time
+             * @description When the last symptom was; null = still having symptoms. The SPA moves it forward, at read time, past any fever reading logged after it.
+             */
+            lastSymptomAt: string | null;
+            /** @description How many symptom-free hours this family wants before barnehage, for THIS episode. null = no clock. */
+            clearHours: number | null;
+            notes: string | null;
+        };
+        CreateIllness: {
+            /** @description Who noted it (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller. */
+            caretakerId?: string;
+            babyId: string;
+            /** Format: date-time */
+            startTime: string;
+            /**
+             * Format: date-time
+             * @description Omit to open an episode.
+             */
+            endTime?: string | null;
+            symptoms?: components["schemas"]["IllnessSymptom"][];
+            /** Format: date-time */
+            lastSymptomAt?: string | null;
+            clearHours?: number | null;
+            notes?: string;
+        };
+        /** @description Every field is optional; an empty object is a no-op. `endTime`, `lastSymptomAt`, `clearHours` and `notes` may be sent as `null` to CLEAR that column. */
+        UpdateIllness: {
+            caretakerId?: string;
+            /** Format: date-time */
+            startTime?: string;
+            /** Format: date-time */
+            endTime?: string | null;
+            symptoms?: components["schemas"]["IllnessSymptom"][];
+            /** Format: date-time */
+            lastSymptomAt?: string | null;
+            clearHours?: number | null;
+            notes?: string | null;
+        };
+        /** @description Defaults endTime to now on the server when omitted. */
+        RecoverIllness: {
+            /** Format: date-time */
+            endTime?: string;
+        };
         /** @description One file attached to a vaccine log. Fetch through `/api/files/{id}` — the object store is never public. */
         VaccineDocument: {
             id: string;
@@ -2488,10 +2621,10 @@ export interface components {
             scheduleSlot?: string | null;
             notes?: string | null;
         };
-        /** @description One row in the merged timeline. `kind`, `id`, `babyId`, `caretakerId`, `caretakerName` and `notes` are present on every entry regardless of kind; everything else is kind-specific and only present for the kinds that have it (e.g. `startTime`/`endTime` on sleep, play and daycare, `time` on the other nine, `documents` only on vaccine) — see internal/api/timeline.go's per-kind entry builders, ported field-for-field from apps/api/src/routes/timeline.ts's merge. Modeled as an open object (kind + a handful of always-present fields typed, everything else additionalProperties) rather than a oneOf discriminated union: oapi-codegen has no clean Go representation for twelve structurally different variants sharing one JSON shape. */
+        /** @description One row in the merged timeline. `kind`, `id`, `babyId`, `caretakerId`, `caretakerName` and `notes` are present on every entry regardless of kind; everything else is kind-specific and only present for the kinds that have it (e.g. `startTime`/`endTime` on sleep, play and daycare, `time` on the other nine, `documents` only on vaccine) — see internal/api/timeline.go's per-kind entry builders, ported field-for-field from apps/api/src/routes/timeline.ts's merge. Modeled as an open object (kind + a handful of always-present fields typed, everything else additionalProperties) rather than a oneOf discriminated union: oapi-codegen has no clean Go representation for thirteen structurally different variants sharing one JSON shape. */
         TimelineEntry: {
             /** @enum {string} */
-            kind: "feed" | "diaper" | "sleep" | "medicine" | "bath" | "note" | "milestone" | "measurement" | "pump" | "play" | "daycare" | "vaccine";
+            kind: "feed" | "diaper" | "sleep" | "medicine" | "bath" | "note" | "milestone" | "measurement" | "pump" | "play" | "daycare" | "illness" | "vaccine";
             id: string;
             babyId: string;
             caretakerId: string;
@@ -2636,6 +2769,8 @@ export interface components {
             activeDaycare: components["schemas"]["DaycareLog"] | null;
             /** @description The newest day at barnehage that ended within the last 12 hours and has no handover yet (no linked rows, no mood), or null. Backs Home's "How was the day?" card (issue #106). */
             handoverDue: components["schemas"]["DaycareLog"] | null;
+            /** @description The open illness episode, or null (issue */
+            activeIllness: components["schemas"]["IllnessLog"] | null;
             /** @description The running nursing timer, or null (issue */
             activeFeed: components["schemas"]["FeedTimer"] | null;
             /** @description The running pump timer, or null. */
@@ -6268,7 +6403,7 @@ export interface operations {
                     "application/json": components["schemas"]["Handover"];
                 };
             };
-            /** @description A nap that ends before it starts (BAD_NAP). */
+            /** @description A nap that ends before it starts (BAD_NAP), or a nap or meal outside the hours she was there (OUTSIDE_DAY): between the drop-off, widened to its minute, and the pick-up — or now, for a day still running. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -6364,6 +6499,227 @@ export interface operations {
                 };
             };
             /** @description Clearing endTime would reopen a session while another is already running for this baby. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listIllnesses: {
+        parameters: {
+            query?: {
+                /** @description Restrict the result to one baby in the caller's family. */
+                babyId?: components["parameters"]["babyIdQuery"];
+                /** @description Maximum number of rows to return. */
+                limit?: components["parameters"]["limitQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Illness episodes, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IllnessLog"][];
+                };
+            };
+        };
+    };
+    createIllness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateIllness"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IllnessLog"];
+                };
+            };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unknown baby. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Baby already has an open episode (ALREADY_ACTIVE). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getActiveIllness: {
+        parameters: {
+            query?: {
+                /** @description Restrict the result to one baby in the caller's family. */
+                babyId?: components["parameters"]["babyIdQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The open episode, or null. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IllnessLog"] | null;
+                };
+            };
+        };
+    };
+    recoverIllness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RecoverIllness"];
+            };
+        };
+        responses: {
+            /** @description Closed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IllnessLog"];
+                };
+            };
+            /** @description No such open episode. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteIllness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description No illness episode with this id in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateIllness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateIllness"];
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IllnessLog"];
+                };
+            };
+            /** @description `caretakerId` names someone who is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No illness episode with this id in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Clearing endTime would reopen an episode while another is already open for this baby. */
             409: {
                 headers: {
                     [name: string]: unknown;

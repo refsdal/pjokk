@@ -8,6 +8,7 @@ import {
 import { useEffect, useState } from "react";
 import type {
   DaycareLog,
+  IllnessLog,
   HelpRequest,
   MeasurementType,
   PlayType,
@@ -48,8 +49,10 @@ import {
   OtherLogSheet,
 } from "@/components/sheets/OtherLogSheet";
 import { HandoverCard } from "@/components/HandoverCard";
+import { IllnessCard } from "@/components/IllnessCard";
 import { DaycareSheet } from "@/components/sheets/DaycareSheet";
 import { HandoverSheet } from "@/components/sheets/HandoverSheet";
+import { IllnessSheet } from "@/components/sheets/IllnessSheet";
 import { PlaySheet } from "@/components/sheets/PlaySheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
 import { useQueryClient } from "@tanstack/react-query";
@@ -101,6 +104,7 @@ type OpenSheet =
   | "play"
   | "daycare"
   | "handover"
+  | "illness"
   | "help"
   | "account"
   | null;
@@ -181,6 +185,8 @@ export function HomeScreen() {
   // The day the handover sheet is for: a snapshot, because saving it makes
   // the summary stop offering that day while the sheet is still closing.
   const [handoverDay, setHandoverDay] = useState<DaycareLog | null>(null);
+  // null is "a new illness"; the open episode is "edit it".
+  const [editIllness, setEditIllness] = useState<IllnessLog | null>(null);
   const { night } = useAppearance();
   const napGuide = useNapGuide();
   const navigate = useNavigate();
@@ -201,6 +207,11 @@ export function HomeScreen() {
     onPickDaycare: () => {
       setEditDaycare(null);
       setSheet("daycare");
+    },
+    onPickIllness: () => {
+      // One open episode per baby: the tile opens the one she has.
+      setEditIllness(summary.data?.activeIllness ?? null);
+      setSheet("illness");
     },
     onPickHelp: () => setSheet("help"),
     onVaccines: () => void navigate({ to: "/vaccines" }),
@@ -277,6 +288,7 @@ export function HomeScreen() {
   // existed, and null when she is simply at home.
   const activeDaycare = s?.activeDaycare ?? null;
   const handoverDue = s?.handoverDue ?? null;
+  const activeIllness = s?.activeIllness ?? null;
   const activeFeed = s?.activeFeed ?? null;
   const activePump = s?.activePump ?? null;
   // The nap-window guide (issue #46): a conclusion under the awake card,
@@ -373,6 +385,16 @@ export function HomeScreen() {
               onAdd={(day) => {
                 setHandoverDay(day);
                 setSheet("handover");
+              }}
+            />
+          )}
+          {activeIllness && (
+            <IllnessCard
+              illness={activeIllness}
+              readings={measurementRows}
+              onEdit={(illness) => {
+                setEditIllness(illness);
+                setSheet("illness");
               }}
             />
           )}
@@ -570,6 +592,10 @@ export function HomeScreen() {
           setEditDaycare(null);
           setSheet("daycare");
         }}
+        onPickIllness={() => {
+          setEditIllness(summary.data?.activeIllness ?? null);
+          setSheet("illness");
+        }}
         onPickHelp={() => setSheet("help")}
       />
       <OtherLogSheet
@@ -597,6 +623,12 @@ export function HomeScreen() {
         open={sheet === "handover"}
         onOpenChange={(o) => setSheet(o ? "handover" : null)}
         day={handoverDay}
+      />
+      <IllnessSheet
+        open={sheet === "illness"}
+        onOpenChange={(o) => setSheet(o ? "illness" : null)}
+        babyId={baby.id}
+        edit={editIllness}
       />
       <HelpSheet
         open={sheet === "help"}

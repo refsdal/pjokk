@@ -57,7 +57,7 @@ test("the More actions unfold on Home from 768 px and stay a sheet on the phone"
   } else {
     await expect(more).toBeHidden();
     await expect(unfolded).toBeVisible();
-    await expect(unfolded.getByRole("button")).toHaveCount(12);
+    await expect(unfolded.getByRole("button")).toHaveCount(13);
     await unfolded.getByRole("button", { name: "Medicine" }).click();
     await expect(page.getByRole("dialog", { name: "Medicine" })).toBeVisible();
   }
