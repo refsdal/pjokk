@@ -48,6 +48,12 @@ test("a second baby joins the row and one tap switches", async ({ page, request 
   await page.getByPlaceholder("Baby's name").fill("Oskar");
   await page.getByLabel("Birth date").fill("2024-01-10");
   await page.getByRole("button", { name: "Save" }).click();
+  // A new baby chooses what to track first (e2e/tracking.spec.ts).
+  await expect(page).toHaveURL(/\/settings\/baby\/[^/]+\/tracking/);
+  await page.getByTestId("use-recommended").click();
+  await page.getByTestId("tracking-done").click();
+  await expect(page).toHaveURL(/\/home/);
+  await page.goto("/settings");
   await expect(page.getByRole("link", { name: /Oskar/ })).toBeVisible();
 
   await page.goto("/home");

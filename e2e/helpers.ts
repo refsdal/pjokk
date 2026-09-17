@@ -87,6 +87,24 @@ export async function uiSignIn(page: Page, email: string): Promise<void> {
   await expect(page).not.toHaveURL(/\/login/, { timeout: 10_000 });
 }
 
+/** Every per-baby tracking switch (openapi/pjokk.yaml `Feature`), the
+ *  state the 00033 backfill leaves a deployment's babies in. */
+export const ALL_FEATURES = [
+  "feeds",
+  "pump",
+  "sleep",
+  "diapers",
+  "medicine",
+  "measurements",
+  "milestones",
+  "bath",
+  "notes",
+  "play",
+  "daycare",
+  "illness",
+  "vaccines",
+];
+
 /** Welcome flow: create the family, then the first baby, then land on Home. */
 export async function uiCreateFamily(
   page: Page,
@@ -105,6 +123,22 @@ export async function uiCreateFamily(
   await page.getByLabel("Birth date").fill("2026-06-15");
   await page.getByRole("button", { name: "Add baby" }).click();
 
+  // The app now goes to the what-to-track carousel (or, for an enrolled
+  // kiosk, straight to /kiosk). Every spec wants the "existing baby" state
+  // — everything tracked, as the 00033 backfill leaves a deployment's
+  // babies — so set it through the API and move on. The carousel itself is
+  // e2e/tracking.spec.ts's business.
+  await expect(page).not.toHaveURL(/\/welcome/, { timeout: 10_000 });
+  const babies = (await (await page.request.get("/api/babies")).json()) as {
+    id: string;
+  }[];
+  for (const b of babies) {
+    const res = await page.request.put(`/api/babies/${b.id}/features`, {
+      data: { features: ALL_FEATURES },
+    });
+    expect(res.ok(), `features: ${res.status()} ${await res.text()}`).toBeTruthy();
+  }
+  await page.goto(landing.source.includes("kiosk") ? "/kiosk" : "/home");
   await expect(page).toHaveURL(landing, { timeout: 10_000 });
 }
 
