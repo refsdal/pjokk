@@ -56,6 +56,7 @@ func serBaby(b dbgen.Baby) gen.Baby {
 		Name:      b.Name,
 		BirthDate: b.BirthDate.Time,
 		Sex:       babySexPtr(b.Sex),
+		AvatarUrl: babyAvatarURL(b.ID, b.AvatarKey),
 	}
 }
 
@@ -199,9 +200,10 @@ func (d Deps) UpdateBaby(ctx context.Context, req gen.UpdateBabyRequestObject) (
 // middleware.RequireAdmin (tierAdmin), not this method; the cascade is the
 // baby table's own FKs (ON DELETE CASCADE on every log table), not
 // application code. The cascade takes the baby's milestone photo and
-// vaccine document rows but not the stored objects behind them, so their
-// keys are read first and the objects deleted once the rows are gone
-// (issue #95), the same order the per-item routes use.
+// vaccine document rows but not the stored objects behind them — nor the
+// baby's own photo (baby_avatar.go) — so their keys are read first and the
+// objects deleted once the rows are gone (issue #95), the same order the
+// per-item routes use.
 func (d Deps) DeleteBaby(ctx context.Context, req gen.DeleteBabyRequestObject) (gen.DeleteBabyResponseObject, error) {
 	fam := middleware.FamilyFromContext(ctx)
 	photoKeys, err := d.Q.MilestonePhotoKeysForBaby(ctx, dbgen.MilestonePhotoKeysForBabyParams{FamilyID: fam.FamilyID, BabyID: req.Id})
@@ -211,6 +213,13 @@ func (d Deps) DeleteBaby(ctx context.Context, req gen.DeleteBabyRequestObject) (
 	docKeys, err := d.Q.VaccineObjectKeysForBaby(ctx, dbgen.VaccineObjectKeysForBabyParams{FamilyID: fam.FamilyID, BabyID: req.Id})
 	if err != nil {
 		return nil, err
+	}
+	avatarKey, err := d.Q.GetBabyAvatarKey(ctx, dbgen.GetBabyAvatarKeyParams{FamilyID: fam.FamilyID, ID: req.Id})
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+	if avatarKey != nil {
+		photoKeys = append(photoKeys, *avatarKey)
 	}
 	n, err := d.Q.DeleteBaby(ctx, dbgen.DeleteBabyParams{FamilyID: fam.FamilyID, ID: req.Id})
 	if err != nil {

@@ -227,7 +227,7 @@ func Family(ctx context.Context, d Deps, snap *Snapshot, familyID string, inTx f
 		}
 	}
 
-	rep.PhotosRestored, rep.PhotosMissing, err = restorePhotos(ctx, d.Storage, photoKeys(selected["milestone_photo"]))
+	rep.PhotosRestored, rep.PhotosMissing, err = restorePhotos(ctx, d.Storage, snapshotPhotoKeys(selected))
 	if err != nil {
 		return rep, err
 	}

@@ -9,15 +9,23 @@ import (
 	"github.com/refsdal/pjokk/server/internal/storage"
 )
 
-// photoKeys are the object keys a snapshot's milestone_photo rows name.
-func photoKeys(rows []map[string]any) []string {
+// photoKeys are the object keys a snapshot's rows name in column: a
+// milestone_photo's object_key, a baby's avatar_key.
+func photoKeys(rows []map[string]any, column string) []string {
 	var keys []string
 	for _, r := range rows {
-		if k, ok := r["object_key"].(string); ok && k != "" {
+		if k, ok := r[column].(string); ok && k != "" {
 			keys = append(keys, k)
 		}
 	}
 	return keys
+}
+
+// snapshotPhotoKeys are every photo object a snapshot's tables name: the
+// milestone photos and the babies' photos, the two trees the photo backup
+// covers (jobs.PhotoSourcePrefixes).
+func snapshotPhotoKeys(tables map[string][]map[string]any) []string {
+	return append(photoKeys(tables["milestone_photo"], "object_key"), photoKeys(tables["baby"], "avatar_key")...)
 }
 
 // restorePhotos puts each photo object back from the photo backup
@@ -31,13 +39,15 @@ func restorePhotos(ctx context.Context, st storage.Storage, keys []string) (rest
 	if len(keys) == 0 {
 		return 0, nil, nil
 	}
-	live, err := st.List(ctx, jobs.PhotoSourcePrefix)
-	if err != nil {
-		return 0, nil, fmt.Errorf("restore: list photos: %w", err)
-	}
 	present := map[string]bool{}
-	for _, o := range live {
-		present[o.Key] = true
+	for _, prefix := range jobs.PhotoSourcePrefixes {
+		live, err := st.List(ctx, prefix)
+		if err != nil {
+			return 0, nil, fmt.Errorf("restore: list %s: %w", prefix, err)
+		}
+		for _, o := range live {
+			present[o.Key] = true
+		}
 	}
 
 	current, err := st.List(ctx, jobs.PhotoBackupCurrentPrefix)
@@ -72,7 +82,7 @@ func restorePhotos(ctx context.Context, st storage.Storage, keys []string) (rest
 		if present[key] {
 			continue
 		}
-		rest, ok := strings.CutPrefix(key, jobs.PhotoSourcePrefix)
+		rest, ok := jobs.PhotoBackupRest(key)
 		src, found := copies[rest]
 		if !found {
 			src, found = older[rest]

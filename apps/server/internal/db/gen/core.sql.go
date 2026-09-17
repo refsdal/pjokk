@@ -11,11 +11,39 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const babyAvatarKeysForFamily = `-- name: BabyAvatarKeysForFamily :many
+SELECT "avatar_key"::text
+FROM "baby"
+WHERE "family_id" = $1 AND "avatar_key" IS NOT NULL
+`
+
+// Read BEFORE DeleteOrganization (admin.sql): the babies cascade away with
+// the family, the objects behind their photos do not (issue #95).
+func (q *Queries) BabyAvatarKeysForFamily(ctx context.Context, familyID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, babyAvatarKeysForFamily, familyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var avatar_key string
+		if err := rows.Scan(&avatar_key); err != nil {
+			return nil, err
+		}
+		items = append(items, avatar_key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createBaby = `-- name: CreateBaby :one
 
 INSERT INTO "baby" ("family_id", "name", "birth_date", "sex")
 VALUES ($1, $2, $3, $4)
-RETURNING id, family_id, name, birth_date, sex, created_at
+RETURNING id, family_id, name, birth_date, sex, created_at, avatar_key
 `
 
 type CreateBabyParams struct {
@@ -44,6 +72,7 @@ func (q *Queries) CreateBaby(ctx context.Context, arg CreateBabyParams) (Baby, e
 		&i.BirthDate,
 		&i.Sex,
 		&i.CreatedAt,
+		&i.AvatarKey,
 	)
 	return i, err
 }
@@ -70,7 +99,7 @@ func (q *Queries) DeleteBaby(ctx context.Context, arg DeleteBabyParams) (int64, 
 }
 
 const getBaby = `-- name: GetBaby :one
-SELECT id, family_id, name, birth_date, sex, created_at FROM "baby"
+SELECT id, family_id, name, birth_date, sex, created_at, avatar_key FROM "baby"
 WHERE "family_id" = $1 AND "id" = $2
 `
 
@@ -89,8 +118,30 @@ func (q *Queries) GetBaby(ctx context.Context, arg GetBabyParams) (Baby, error) 
 		&i.BirthDate,
 		&i.Sex,
 		&i.CreatedAt,
+		&i.AvatarKey,
 	)
 	return i, err
+}
+
+const getBabyAvatarKey = `-- name: GetBabyAvatarKey :one
+SELECT "avatar_key"
+FROM "baby"
+WHERE "family_id" = $1 AND "id" = $2 AND "avatar_key" IS NOT NULL
+`
+
+type GetBabyAvatarKeyParams struct {
+	FamilyID string
+	ID       string
+}
+
+// The streaming read's lookup: no row for another family's baby, and none
+// for a baby without a photo, so the route answers 404 either way and
+// never confirms that a baby id exists.
+func (q *Queries) GetBabyAvatarKey(ctx context.Context, arg GetBabyAvatarKeyParams) (*string, error) {
+	row := q.db.QueryRow(ctx, getBabyAvatarKey, arg.FamilyID, arg.ID)
+	var avatar_key *string
+	err := row.Scan(&avatar_key)
+	return avatar_key, err
 }
 
 const getFamilyBySlugless = `-- name: GetFamilyBySlugless :one
@@ -170,7 +221,7 @@ func (q *Queries) GetMembership(ctx context.Context, arg GetMembershipParams) (G
 }
 
 const listBabies = `-- name: ListBabies :many
-SELECT id, family_id, name, birth_date, sex, created_at FROM "baby"
+SELECT id, family_id, name, birth_date, sex, created_at, avatar_key FROM "baby"
 WHERE "family_id" = $1
 ORDER BY "created_at"
 `
@@ -191,6 +242,7 @@ func (q *Queries) ListBabies(ctx context.Context, familyID string) ([]Baby, erro
 			&i.BirthDate,
 			&i.Sex,
 			&i.CreatedAt,
+			&i.AvatarKey,
 		); err != nil {
 			return nil, err
 		}
@@ -222,11 +274,42 @@ func (q *Queries) MostRecentMembership(ctx context.Context, userID string) (stri
 	return organization_id, err
 }
 
+const setBabyAvatar = `-- name: SetBabyAvatar :one
+UPDATE "baby"
+SET "avatar_key" = $3
+WHERE "family_id" = $1 AND "id" = $2
+RETURNING id, family_id, name, birth_date, sex, created_at, avatar_key
+`
+
+type SetBabyAvatarParams struct {
+	FamilyID  string
+	ID        string
+	AvatarKey *string
+}
+
+// NULL clears the photo. The caller deletes the previous object
+// (internal/api/baby_avatar.go). RETURNING * so the route answers with the
+// Baby as it now is.
+func (q *Queries) SetBabyAvatar(ctx context.Context, arg SetBabyAvatarParams) (Baby, error) {
+	row := q.db.QueryRow(ctx, setBabyAvatar, arg.FamilyID, arg.ID, arg.AvatarKey)
+	var i Baby
+	err := row.Scan(
+		&i.ID,
+		&i.FamilyID,
+		&i.Name,
+		&i.BirthDate,
+		&i.Sex,
+		&i.CreatedAt,
+		&i.AvatarKey,
+	)
+	return i, err
+}
+
 const updateBaby = `-- name: UpdateBaby :one
 UPDATE "baby"
 SET "name" = $3, "birth_date" = $4, "sex" = $5
 WHERE "family_id" = $1 AND "id" = $2
-RETURNING id, family_id, name, birth_date, sex, created_at
+RETURNING id, family_id, name, birth_date, sex, created_at, avatar_key
 `
 
 type UpdateBabyParams struct {
@@ -253,6 +336,7 @@ func (q *Queries) UpdateBaby(ctx context.Context, arg UpdateBabyParams) (Baby, e
 		&i.BirthDate,
 		&i.Sex,
 		&i.CreatedAt,
+		&i.AvatarKey,
 	)
 	return i, err
 }

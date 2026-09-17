@@ -104,50 +104,64 @@ func (d Deps) storeAvatar(ctx context.Context, userID string, jpg []byte) (strin
 	return key, nil
 }
 
-func (d Deps) putAvatar(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	session := middleware.SessionFromContext(ctx)
-
+// readAvatarUpload reads the multipart "file" part of r, bounded, and
+// returns it normalised to JPEG; on any failure it has already written the
+// error response and returns ok=false. Shared with the baby photo upload
+// (baby_avatar.go), which has the same bytes to accept and refuse.
+func readAvatarUpload(w http.ResponseWriter, r *http.Request) (jpg []byte, ok bool) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxAvatarBytes+maxMultipartOverhead)
 	if err := r.ParseMultipartForm(maxAvatarBytes); err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
 			respond.Error(w, http.StatusRequestEntityTooLarge, "File too large", "TOO_LARGE")
-			return
+			return nil, false
 		}
 		respond.Error(w, http.StatusBadRequest, "No file", "NO_FILE")
-		return
+		return nil, false
 	}
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		respond.Error(w, http.StatusBadRequest, "No file", "NO_FILE")
-		return
+		return nil, false
 	}
 	defer func() { _ = file.Close() }()
 	if header.Size <= 0 || header.Size > maxAvatarBytes {
 		respond.Error(w, http.StatusRequestEntityTooLarge, "File too large", "TOO_LARGE")
-		return
+		return nil, false
 	}
 	src, err := io.ReadAll(io.LimitReader(file, maxAvatarBytes+1))
 	if err != nil {
 		internalError(w, r, err)
-		return
+		return nil, false
 	}
 	if len(src) > maxAvatarBytes {
 		respond.Error(w, http.StatusRequestEntityTooLarge, "File too large", "TOO_LARGE")
-		return
+		return nil, false
 	}
 
-	jpg, err := normalizeAvatar(src)
+	jpg, err = normalizeAvatar(src)
 	switch {
 	case errors.Is(err, errTooLarge):
 		respond.Error(w, http.StatusRequestEntityTooLarge, "Image too large — at most 1024 px on either side", "TOO_LARGE")
-		return
+		return nil, false
 	case err != nil:
 		respond.Error(w, http.StatusUnsupportedMediaType, "JPEG or PNG only", "BAD_TYPE")
+		return nil, false
+	}
+	return jpg, true
+}
+
+// bytesReader is bytes.NewReader under a name that reads at the call site.
+func bytesReader(b []byte) io.Reader { return bytes.NewReader(b) }
+
+func (d Deps) putAvatar(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	session := middleware.SessionFromContext(ctx)
+
+	jpg, ok := readAvatarUpload(w, r)
+	if !ok {
 		return
 	}
-
 	if _, err := d.storeAvatar(ctx, session.UserID, jpg); err != nil {
 		internalError(w, r, err)
 		return
@@ -214,13 +228,25 @@ func (d Deps) getUserAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	etag := `"` + path.Base(*key) + `"`
+	d.streamAvatar(w, r, *key)
+}
+
+// avatarVersion is the cache-busting ?v= a face URL carries: the object's
+// file name, unique per upload.
+func avatarVersion(key string) string { return path.Base(key) }
+
+// streamAvatar answers with the JPEG stored under key, with the caching
+// headers a face gets: an ETag from the key (so a re-upload is a new URL
+// AND a new tag) and a long private max-age. Shared by the user and the
+// baby routes.
+func (d Deps) streamAvatar(w http.ResponseWriter, r *http.Request, key string) {
+	etag := `"` + avatarVersion(key) + `"`
 	if r.Header.Get("If-None-Match") == etag {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
 
-	body, found, err := d.Storage.GetStream(ctx, *key)
+	body, found, err := d.Storage.GetStream(r.Context(), key)
 	if err != nil {
 		internalError(w, r, err)
 		return

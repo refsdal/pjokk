@@ -102,3 +102,8 @@ DELETE FROM "users" WHERE "id" = $1;
 -- handler calls this. A stored photo object whose key is not here is an
 -- orphan the job erases (issue #95). Keys only: nothing else is needed.
 SELECT "object_key" FROM "milestone_photo";
+
+-- name: ListBabyAvatarKeys :many
+-- ListMilestonePhotoKeys for the babies' photos: the second "live" set the
+-- photo backup keeps copies of, across every family for the same reason.
+SELECT "avatar_key"::text FROM "baby" WHERE "avatar_key" IS NOT NULL;

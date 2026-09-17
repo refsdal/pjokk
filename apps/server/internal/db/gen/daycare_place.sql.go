@@ -556,9 +556,9 @@ type PlannedPickupUserParams struct {
 }
 
 // Who collects this baby on this local day: the one-day exception, else
-// the grid's person for the weekday — and only while they are an unbanned
-// member of the family (issue #92's rule for calendar assignees). No row
-// means nobody is named, and the parents hear instead.
+// the grid's person for the weekday. No row means nobody is named. The job
+// then checks the person is still an unbanned member (IsUnbannedFamilyMember,
+// issue #92's rule for calendar assignees); otherwise the parents hear.
 func (q *Queries) PlannedPickupUser(ctx context.Context, arg PlannedPickupUserParams) (string, error) {
 	row := q.db.QueryRow(ctx, plannedPickupUser,
 		arg.FamilyID,

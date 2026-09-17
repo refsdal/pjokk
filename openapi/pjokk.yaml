@@ -4947,7 +4947,7 @@ components:
           enum: [true]
     Baby:
       type: object
-      required: [id, name, birthDate, sex]
+      required: [id, name, birthDate, sex, avatarUrl]
       properties:
         id:
           type: string
@@ -4960,6 +4960,20 @@ components:
           type: string
           enum: [girl, boy]
           nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+          description: >-
+            "/api/babies/{id}/avatar?v=<key>" when the baby has a photo,
+            null otherwise (the client shows the initial). The photo routes
+            are hand-mounted outside this document, like a person's
+            (internal/api/baby_avatar.go): `PUT /api/babies/{id}/avatar`
+            (multipart field `file`, JPEG or PNG, at most 512 KB and 1024
+            px; re-encoded server-side, EXIF stripped) and `DELETE
+            /api/babies/{id}/avatar` both answer with the Baby and are open
+            to any family member, never an API key or a kiosk device; `GET
+            /api/babies/{id}/avatar` streams the JPEG to a member or to the
+            family's own kiosk device, 404 for anyone else.
       x-go-name: Baby
     CreateBaby:
       type: object
