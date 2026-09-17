@@ -195,3 +195,60 @@ func TestRunRemindersPerBabyAndPerMedicine(t *testing.T) {
 		t.Fatalf("sent 2 h after a fresh dose = %d, want 0", sent)
 	}
 }
+
+// A reminder for a kind the baby does not track is held, like quiet hours
+// (spec 2026-09-17-per-baby-tracking-design.md): switching Feeds off must
+// not mean a 3 a.m. nudge about a bottle nobody logs any more, and
+// switching it back on must not need a new reminder.
+func TestRunRemindersHoldForAnUntrackedKind(t *testing.T) {
+	a := testrig.App(t)
+	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
+	babyID := a.NewBaby(familyID, "Nora")
+	subscribe(t, a, cookie, "features")
+	addReminder(t, a, cookie, map[string]any{"kind": "feed", "mode": "since_last", "intervalMin": 180, "tz": "UTC", "babyId": babyID})
+
+	now := time.Date(2026, 3, 16, 12, 0, 0, 0, time.UTC)
+	logAt(t, a, cookie, "/api/feeds", map[string]any{"babyId": babyID, "time": now.Add(-6 * time.Hour).Format(time.RFC3339), "type": "bottle", "amountMl": 100})
+
+	setFeatures := func(features ...string) {
+		res := a.Do(http.MethodPut, "/api/babies/"+babyID+"/features", cookie, map[string]any{"features": features})
+		if res.Status != http.StatusOK {
+			t.Fatalf("set features: %d %s", res.Status, res.Raw)
+		}
+	}
+	setFeatures("sleep", "diapers")
+	if sent := run(t, a, now); sent != 0 {
+		t.Fatalf("sent = %d, want 0 (feeds are not tracked)", sent)
+	}
+	setFeatures("sleep", "diapers", "feeds")
+	if sent := run(t, a, now.Add(15*time.Minute)); sent != 1 {
+		t.Fatalf("sent = %d, want 1 (held, not latched)", sent)
+	}
+}
+
+// A family-wide reminder (no baby) is held only when NO baby tracks the kind.
+func TestRunRemindersFamilyWideHoldsOnlyWhenNoBabyTracks(t *testing.T) {
+	a := testrig.App(t)
+	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
+	nora := a.NewBaby(familyID, "Nora")
+	emil := a.NewBaby(familyID, "Emil")
+	subscribe(t, a, cookie, "family-wide")
+	addReminder(t, a, cookie, map[string]any{"kind": "diaper", "mode": "since_last", "intervalMin": 120, "tz": "UTC"})
+	now := time.Date(2026, 3, 16, 12, 0, 0, 0, time.UTC)
+	logAt(t, a, cookie, "/api/diapers", map[string]any{"babyId": nora, "time": now.Add(-5 * time.Hour).Format(time.RFC3339), "type": "wet"})
+
+	for _, id := range []string{nora, emil} {
+		if res := a.Do(http.MethodPut, "/api/babies/"+id+"/features", cookie, map[string]any{"features": []string{"sleep"}}); res.Status != http.StatusOK {
+			t.Fatalf("set features: %d %s", res.Status, res.Raw)
+		}
+	}
+	if sent := run(t, a, now); sent != 0 {
+		t.Fatalf("sent = %d, want 0 (no baby tracks diapers)", sent)
+	}
+	if res := a.Do(http.MethodPut, "/api/babies/"+emil+"/features", cookie, map[string]any{"features": []string{"sleep", "diapers"}}); res.Status != http.StatusOK {
+		t.Fatalf("set features: %d %s", res.Status, res.Raw)
+	}
+	if sent := run(t, a, now.Add(15*time.Minute)); sent != 1 {
+		t.Fatalf("sent = %d, want 1 (Emil tracks diapers)", sent)
+	}
+}

@@ -220,3 +220,16 @@ func TestClosingAlertIsInThePersonsLanguage(t *testing.T) {
 		t.Errorf("got %+v", got)
 	}
 }
+
+// Barnehage switched off for the baby (spec
+// 2026-09-17-per-baby-tracking-design.md): enrolled or not, no alert.
+func TestClosingAlertSkipsABabyNotTrackingDaycare(t *testing.T) {
+	w := newClosingWorld(t)
+	if res := w.a.Do(http.MethodPut, "/api/babies/"+w.babyID+"/features", w.cookie, map[string]any{"features": []string{"sleep"}}); res.Status != http.StatusOK {
+		t.Fatalf("set features: %d %s", res.Status, res.Raw)
+	}
+	dropOff(t, w.a, w.cookie, w.babyID, osloMarch16(8, 0))
+	if sent := runClosing(t, w.a, osloMarch16(16, 15)); sent != 0 {
+		t.Errorf("sent = %d, want 0 (daycare is not tracked for her)", sent)
+	}
+}

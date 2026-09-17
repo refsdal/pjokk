@@ -49,6 +49,16 @@ func RunDaycareClosingAlerts(ctx context.Context, d Deps, now time.Time) (int, e
 
 	sent := 0
 	for _, r := range rows {
+		// Barnehage switched off for her (spec
+		// 2026-09-17-per-baby-tracking-design.md): no alert and no latch,
+		// so switching it on later the same day still gets one.
+		tracked, err := d.Q.BabyTracks(ctx, dbgen.BabyTracksParams{FamilyID: r.FamilyID, BabyID: &r.BabyID, Feature: "daycare"})
+		if err != nil {
+			return sent, fmt.Errorf("jobs: tracked daycare for %s: %w", r.ID, err)
+		}
+		if !tracked {
+			continue
+		}
 		loc, err := time.LoadLocation(r.Tz)
 		if err != nil {
 			continue // validated at creation; a corrupt row must not stall the sweep
