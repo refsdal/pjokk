@@ -48,6 +48,7 @@ import {
   moreActions,
   OtherLogSheet,
 } from "@/components/sheets/OtherLogSheet";
+import { ClosedDayLine } from "@/components/ClosedDayLine";
 import { HandoverCard } from "@/components/HandoverCard";
 import { IllnessCard } from "@/components/IllnessCard";
 import { DaycareSheet } from "@/components/sheets/DaycareSheet";
@@ -359,6 +360,7 @@ export function HomeScreen() {
               the first thing to see, but it must not displace whose home this
               is. */}
           {openHelp && <HelpCard request={openHelp} />}
+          <ClosedDayLine />
           {active && (
             <ActiveSleepBanner
               session={active}

@@ -309,6 +309,11 @@ const nb: Record<string, string> = {
   "Symptoms again": "Symptomer igjen",
   Recovered: "Frisk",
 
+  // Barnehage on the calendar (issue #110).
+  "Closed that day": "Stengt den dagen",
+  "Daycare is closed today": "Barnehagen er stengt i dag",
+  "Daycare is closed tomorrow": "Barnehagen er stengt i morgen",
+
   // The pick-up handover (issue #106).
   Handover: "Overlevering",
   "How was the day at daycare?": "Hvordan var dagen i barnehagen?",

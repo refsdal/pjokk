@@ -60,6 +60,9 @@ export function EventSheet({
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<CalendarCategory>("other");
+  // A barnehage event may be a day it is closed (issue #110): Home says so
+  // the evening before. Meaningless on any other category, and sent false.
+  const [closed, setClosed] = useState(false);
   const [allDay, setAllDay] = useState(false);
   const [date, setDate] = useState(() => toDateInput(nextHour()));
   const [time, setTime] = useState(() => toTimeInput(nextHour()));
@@ -90,6 +93,7 @@ export function EventSheet({
       );
       setTitle(edit.title);
       setCategory(edit.category);
+      setClosed(edit.closed);
       setAllDay(edit.allDay);
       setDate(toDateInput(start));
       setTime(toTimeInput(edit.allDay ? nextHour() : start));
@@ -110,6 +114,7 @@ export function EventSheet({
       const start = nextHour();
       setTitle("");
       setCategory("other");
+      setClosed(false);
       setAllDay(false);
       setDate(toDateInput(start));
       setTime(toTimeInput(start));
@@ -167,6 +172,7 @@ export function EventSheet({
       description: description.trim() || undefined,
       location: location.trim() || undefined,
       category,
+      closed: category === "daycare" && closed,
       startTime: start.toISOString(),
       allDay,
       durationMin,
@@ -245,6 +251,18 @@ export function EventSheet({
           value={category}
           onChange={setCategory}
         />
+        {category === "daycare" && (
+          <ChipGroup
+            options={[{ value: "closed", label: t("Closed that day") }]}
+            value={closed ? "closed" : null}
+            onChange={() => {
+              // A closed day is a whole day; turning it on picks that for
+              // a new event, and can be changed back.
+              if (!closed && !edit) setAllDay(true);
+              setClosed((c) => !c);
+            }}
+          />
+        )}
         <ChipGroup
           options={[
             { value: "timed", label: t("Pick time") },
