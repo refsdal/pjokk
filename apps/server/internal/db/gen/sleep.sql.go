@@ -13,7 +13,7 @@ import (
 
 const activeSleep = `-- name: ActiveSleep :one
 SELECT
-    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", s."daycare_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
@@ -35,6 +35,7 @@ type ActiveSleepRow struct {
 	BabyID        string
 	CaretakerID   string
 	LoggedByID    string
+	DaycareID     *string
 	CaretakerName string
 	LoggedByName  string
 	StartTime     pgtype.Timestamptz
@@ -57,6 +58,7 @@ func (q *Queries) ActiveSleep(ctx context.Context, arg ActiveSleepParams) (Activ
 		&i.BabyID,
 		&i.CaretakerID,
 		&i.LoggedByID,
+		&i.DaycareID,
 		&i.CaretakerName,
 		&i.LoggedByName,
 		&i.StartTime,
@@ -123,7 +125,7 @@ func (q *Queries) DeleteSleep(ctx context.Context, arg DeleteSleepParams) (int64
 
 const getSleep = `-- name: GetSleep :one
 SELECT
-    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", s."daycare_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
@@ -141,6 +143,7 @@ type GetSleepRow struct {
 	BabyID        string
 	CaretakerID   string
 	LoggedByID    string
+	DaycareID     *string
 	CaretakerName string
 	LoggedByName  string
 	StartTime     pgtype.Timestamptz
@@ -158,6 +161,7 @@ func (q *Queries) GetSleep(ctx context.Context, arg GetSleepParams) (GetSleepRow
 		&i.BabyID,
 		&i.CaretakerID,
 		&i.LoggedByID,
+		&i.DaycareID,
 		&i.CaretakerName,
 		&i.LoggedByName,
 		&i.StartTime,
@@ -172,7 +176,7 @@ func (q *Queries) GetSleep(ctx context.Context, arg GetSleepParams) (GetSleepRow
 const listSleeps = `-- name: ListSleeps :many
 
 SELECT
-    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", s."daycare_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
@@ -194,6 +198,7 @@ type ListSleepsRow struct {
 	BabyID        string
 	CaretakerID   string
 	LoggedByID    string
+	DaycareID     *string
 	CaretakerName string
 	LoggedByName  string
 	StartTime     pgtype.Timestamptz
@@ -228,6 +233,7 @@ func (q *Queries) ListSleeps(ctx context.Context, arg ListSleepsParams) ([]ListS
 			&i.BabyID,
 			&i.CaretakerID,
 			&i.LoggedByID,
+			&i.DaycareID,
 			&i.CaretakerName,
 			&i.LoggedByName,
 			&i.StartTime,

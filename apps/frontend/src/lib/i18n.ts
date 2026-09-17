@@ -226,6 +226,32 @@ const nb: Record<string, string> = {
   "ate some": "spiste litt",
   "ate little": "spiste lite",
 
+  // The pick-up handover (issue #106).
+  Handover: "Overlevering",
+  "How was the day at daycare?": "Hvordan var dagen i barnehagen?",
+  "Nap, meals and diapers, as the staff told it":
+    "Lur, måltider og bleier, slik de ansatte fortalte",
+  Add: "Legg til",
+  "No nap today.": "Ingen lur i dag.",
+  "Nap started": "Luren startet",
+  "Nap ended": "Luren sluttet",
+  "Remove nap": "Fjern lur",
+  "Add a nap": "Legg til lur",
+  Meals: "Måltider",
+  Breakfast: "Frokost",
+  Lunch: "Lunsj",
+  Snack: "Mellommåltid",
+  "The day": "Dagen",
+  "Good day": "God dag",
+  Okay: "Helt grei",
+  "Hard day": "Tung dag",
+  "at daycare": "i barnehagen",
+  now: "nå",
+  "A nap there must be between drop-off and pick-up":
+    "En lur der må være mellom levering og henting",
+  "From the daycare handover, time estimated":
+    "Fra overleveringen, omtrentlig tid",
+
   // A day at barnehage (issue #105). "Daycare" itself is translated with
   // the contact types below.
   "At daycare": "I barnehagen",

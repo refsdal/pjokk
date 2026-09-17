@@ -15,7 +15,7 @@
 -- alias would come back as a *string; the family.sql ListFamilyMembers query
 -- uses the same trick for the same reason.
 SELECT
-    f."id", f."baby_id", f."caretaker_id", f."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    f."id", f."baby_id", f."caretaker_id", f."logged_by_id", f."daycare_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
     f."left_min", f."right_min", f."contents", f."food", f."reaction", f."appetite", f."notes"
 FROM "feed_log" f
@@ -28,7 +28,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetFeed :one
 SELECT
-    f."id", f."baby_id", f."caretaker_id", f."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    f."id", f."baby_id", f."caretaker_id", f."logged_by_id", f."daycare_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
     f."left_min", f."right_min", f."contents", f."food", f."reaction", f."appetite", f."notes"
 FROM "feed_log" f

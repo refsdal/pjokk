@@ -1,5 +1,5 @@
 import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
-import type { DaycareLog, Summary } from "@pjokk/shared";
+import type { DaycareLog, Handover, Summary } from "@pjokk/shared";
 import { client, unwrap } from "../api";
 import { t } from "../i18n";
 import { toast } from "../toast";
@@ -54,7 +54,40 @@ export function useDaycares(babyId: string | undefined, limit = 1, on = true) {
   });
 }
 
+// The pick-up handover (issue #106): one document over the day's ordinary
+// rows. A day without one answers the empty document.
+export function useHandover(dayId: string | undefined, on = true) {
+  return useQuery({
+    queryKey: ["handover", dayId],
+    enabled: !!dayId && on,
+    queryFn: async () =>
+      unwrap<Handover>(
+        client.GET("/api/daycare/{id}/handover", {
+          params: { path: { id: dayId! } },
+        }),
+      ),
+  });
+}
+
+export type SaveHandoverVars = { id: string; handover: Handover };
+
 export function registerDaycareMutationDefaults(qc: QueryClient) {
+  // PUT replaces, so a save paused offline and replayed after a reload
+  // writes once however often it is sent.
+  qc.setMutationDefaults(["saveHandover"], {
+    mutationFn: async ({ id, handover }: SaveHandoverVars) =>
+      unwrap<Handover>(
+        client.PUT("/api/daycare/{id}/handover", {
+          params: { path: { id } },
+          body: handover,
+        }),
+      ),
+    onError: saveError,
+    onSettled: () => {
+      invalidateLogs(qc);
+      void qc.invalidateQueries({ queryKey: ["handover"] });
+    },
+  });
   qc.setMutationDefaults(["dropOff"], {
     mutationFn: async (vars: DropOffVars) =>
       unwrap<DaycareLog>(client.POST("/api/daycare", { body: vars })),
@@ -73,6 +106,7 @@ export function registerDaycareMutationDefaults(qc: QueryClient) {
                 loggedByName: "",
                 pickupCaretakerId: null,
                 pickupCaretakerName: null,
+                mood: null,
                 startTime: vars.startTime,
                 endTime: null,
                 notes: vars.notes ?? null,
@@ -154,5 +188,11 @@ export function useUpdateDaycare() {
 export function useDeleteDaycare() {
   return useMutation<unknown, Error, DeleteDaycareVars>({
     mutationKey: ["deleteDaycare"],
+  });
+}
+
+export function useSaveHandover() {
+  return useMutation<Handover, Error, SaveHandoverVars>({
+    mutationKey: ["saveHandover"],
   });
 }

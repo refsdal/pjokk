@@ -179,6 +179,12 @@ type ServerInterface interface {
 	// UpdateDaycare Partial update. `endTime` sent as `null` CLEARS it, reopening the session — subject to the same one-running-session-per-baby constraint as create, so this can also 409. `pickupCaretakerId` and `notes` may be sent as `null` to clear them; `caretakerId` and `startTime` are settable or omitted.
 	// (PATCH /api/daycare/{id})
 	UpdateDaycare(w http.ResponseWriter, r *http.Request, id IdPath)
+	// GetDaycareHandover The day's handover, rebuilt from the rows that carry its id. A day without one answers the empty document, not a 404.
+	// (GET /api/daycare/{id}/handover)
+	GetDaycareHandover(w http.ResponseWriter, r *http.Request, id IdPath)
+	// PutDaycareHandover Replace the day's handover in one transaction: the rows written by a previous PUT are deleted, the new ones inserted, the mood set. Idempotent, so a replayed offline save is harmless. The rows are credited to the caller (both people columns must be a member, and the staff are not users); `daycareId` is what says who really did it.
+	// (PUT /api/daycare/{id}/handover)
+	PutDaycareHandover(w http.ResponseWriter, r *http.Request, id IdPath)
 	// PickupDaycare Pick up: end the running session. endTime defaults to now and the pick-up person to the caller. A replay answers 404 rather than moving the end a first call already set.
 	// (POST /api/daycare/{id}/pickup)
 	PickupDaycare(w http.ResponseWriter, r *http.Request, id IdPath)
@@ -1937,6 +1943,58 @@ func (siw *ServerInterfaceWrapper) UpdateDaycare(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateDaycare(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDaycareHandover operation middleware
+func (siw *ServerInterfaceWrapper) GetDaycareHandover(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDaycareHandover(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutDaycareHandover operation middleware
+func (siw *ServerInterfaceWrapper) PutDaycareHandover(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutDaycareHandover(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4572,6 +4630,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/daycare", wrapper.CreateDaycare)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/daycare/active", wrapper.GetActiveDaycare)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/daycare/{id}/pickup", wrapper.PickupDaycare)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/daycare/{id}/handover", wrapper.GetDaycareHandover)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/daycare/{id}/handover", wrapper.PutDaycareHandover)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/daycare/{id}", wrapper.DeleteDaycare)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/daycare/{id}", wrapper.UpdateDaycare)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/vaccines/dismissals", wrapper.ListVaccineDismissals)
@@ -6731,6 +6791,93 @@ func (response UpdateDaycare409JSONResponse) VisitUpdateDaycareResponse(w http.R
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDaycareHandoverRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type GetDaycareHandoverResponseObject interface {
+	VisitGetDaycareHandoverResponse(w http.ResponseWriter) error
+}
+
+type GetDaycareHandover200JSONResponse Handover
+
+func (response GetDaycareHandover200JSONResponse) VisitGetDaycareHandoverResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDaycareHandover404JSONResponse Error
+
+func (response GetDaycareHandover404JSONResponse) VisitGetDaycareHandoverResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutDaycareHandoverRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *PutDaycareHandoverJSONRequestBody
+}
+
+type PutDaycareHandoverResponseObject interface {
+	VisitPutDaycareHandoverResponse(w http.ResponseWriter) error
+}
+
+type PutDaycareHandover200JSONResponse Handover
+
+func (response PutDaycareHandover200JSONResponse) VisitPutDaycareHandoverResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutDaycareHandover400JSONResponse Error
+
+func (response PutDaycareHandover400JSONResponse) VisitPutDaycareHandoverResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutDaycareHandover404JSONResponse Error
+
+func (response PutDaycareHandover404JSONResponse) VisitPutDaycareHandoverResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -10675,6 +10822,12 @@ type StrictServerInterface interface {
 	// UpdateDaycare Partial update. `endTime` sent as `null` CLEARS it, reopening the session — subject to the same one-running-session-per-baby constraint as create, so this can also 409. `pickupCaretakerId` and `notes` may be sent as `null` to clear them; `caretakerId` and `startTime` are settable or omitted.
 	// (PATCH /api/daycare/{id})
 	UpdateDaycare(ctx context.Context, request UpdateDaycareRequestObject) (UpdateDaycareResponseObject, error)
+	// GetDaycareHandover The day's handover, rebuilt from the rows that carry its id. A day without one answers the empty document, not a 404.
+	// (GET /api/daycare/{id}/handover)
+	GetDaycareHandover(ctx context.Context, request GetDaycareHandoverRequestObject) (GetDaycareHandoverResponseObject, error)
+	// PutDaycareHandover Replace the day's handover in one transaction: the rows written by a previous PUT are deleted, the new ones inserted, the mood set. Idempotent, so a replayed offline save is harmless. The rows are credited to the caller (both people columns must be a member, and the staff are not users); `daycareId` is what says who really did it.
+	// (PUT /api/daycare/{id}/handover)
+	PutDaycareHandover(ctx context.Context, request PutDaycareHandoverRequestObject) (PutDaycareHandoverResponseObject, error)
 	// PickupDaycare Pick up: end the running session. endTime defaults to now and the pick-up person to the caller. A replay answers 404 rather than moving the end a first call already set.
 	// (POST /api/daycare/{id}/pickup)
 	PickupDaycare(ctx context.Context, request PickupDaycareRequestObject) (PickupDaycareResponseObject, error)
@@ -12500,6 +12653,65 @@ func (sh *strictHandler) UpdateDaycare(w http.ResponseWriter, r *http.Request, i
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateDaycareResponseObject); ok {
 		if err := validResponse.VisitUpdateDaycareResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDaycareHandover operation middleware
+func (sh *strictHandler) GetDaycareHandover(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request GetDaycareHandoverRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDaycareHandover(ctx, request.(GetDaycareHandoverRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDaycareHandover")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDaycareHandoverResponseObject); ok {
+		if err := validResponse.VisitGetDaycareHandoverResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutDaycareHandover operation middleware
+func (sh *strictHandler) PutDaycareHandover(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request PutDaycareHandoverRequestObject
+
+	request.Id = id
+
+	var body PutDaycareHandoverJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutDaycareHandover(ctx, request.(PutDaycareHandoverRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutDaycareHandover")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutDaycareHandoverResponseObject); ok {
+		if err := validResponse.VisitPutDaycareHandoverResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -89,7 +89,7 @@ const listDaycaresPage = `-- name: ListDaycaresPage :many
 SELECT
     d."id", d."baby_id", d."caretaker_id", d."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     d."pickup_caretaker_id", pu."display_name" AS pickup_caretaker_name,
-    d."start_time", d."end_time", d."notes"
+    d."start_time", d."end_time", d."notes", d."mood"
 FROM "daycare_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
 JOIN "users" lu ON lu."id" = d."logged_by_id"
@@ -126,6 +126,7 @@ type ListDaycaresPageRow struct {
 	StartTime           pgtype.Timestamptz
 	EndTime             pgtype.Timestamptz
 	Notes               *string
+	Mood                *string
 }
 
 func (q *Queries) ListDaycaresPage(ctx context.Context, arg ListDaycaresPageParams) ([]ListDaycaresPageRow, error) {
@@ -156,6 +157,7 @@ func (q *Queries) ListDaycaresPage(ctx context.Context, arg ListDaycaresPagePara
 			&i.StartTime,
 			&i.EndTime,
 			&i.Notes,
+			&i.Mood,
 		); err != nil {
 			return nil, err
 		}
@@ -169,7 +171,7 @@ func (q *Queries) ListDaycaresPage(ctx context.Context, arg ListDaycaresPagePara
 
 const listDiapersPage = `-- name: ListDiapersPage :many
 SELECT
-    d."id", d."baby_id", d."caretaker_id", d."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    d."id", d."baby_id", d."caretaker_id", d."logged_by_id", d."daycare_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     d."time", d."type", d."color", d."consistency", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
@@ -199,6 +201,7 @@ type ListDiapersPageRow struct {
 	BabyID        string
 	CaretakerID   string
 	LoggedByID    string
+	DaycareID     *string
 	CaretakerName string
 	LoggedByName  string
 	Time          pgtype.Timestamptz
@@ -229,6 +232,7 @@ func (q *Queries) ListDiapersPage(ctx context.Context, arg ListDiapersPageParams
 			&i.BabyID,
 			&i.CaretakerID,
 			&i.LoggedByID,
+			&i.DaycareID,
 			&i.CaretakerName,
 			&i.LoggedByName,
 			&i.Time,
@@ -250,7 +254,7 @@ func (q *Queries) ListDiapersPage(ctx context.Context, arg ListDiapersPageParams
 const listFeedsPage = `-- name: ListFeedsPage :many
 
 SELECT
-    f."id", f."baby_id", f."caretaker_id", f."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    f."id", f."baby_id", f."caretaker_id", f."logged_by_id", f."daycare_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
     f."left_min", f."right_min", f."contents", f."food", f."reaction", f."appetite", f."notes"
 FROM "feed_log" f
@@ -281,6 +285,7 @@ type ListFeedsPageRow struct {
 	BabyID        string
 	CaretakerID   string
 	LoggedByID    string
+	DaycareID     *string
 	CaretakerName string
 	LoggedByName  string
 	Time          pgtype.Timestamptz
@@ -346,6 +351,7 @@ func (q *Queries) ListFeedsPage(ctx context.Context, arg ListFeedsPageParams) ([
 			&i.BabyID,
 			&i.CaretakerID,
 			&i.LoggedByID,
+			&i.DaycareID,
 			&i.CaretakerName,
 			&i.LoggedByName,
 			&i.Time,
@@ -843,7 +849,7 @@ func (q *Queries) ListPumpsPage(ctx context.Context, arg ListPumpsPageParams) ([
 
 const listSleepsPage = `-- name: ListSleepsPage :many
 SELECT
-    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", s."daycare_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
@@ -873,6 +879,7 @@ type ListSleepsPageRow struct {
 	BabyID        string
 	CaretakerID   string
 	LoggedByID    string
+	DaycareID     *string
 	CaretakerName string
 	LoggedByName  string
 	StartTime     pgtype.Timestamptz
@@ -903,6 +910,7 @@ func (q *Queries) ListSleepsPage(ctx context.Context, arg ListSleepsPageParams) 
 			&i.BabyID,
 			&i.CaretakerID,
 			&i.LoggedByID,
+			&i.DaycareID,
 			&i.CaretakerName,
 			&i.LoggedByName,
 			&i.StartTime,
