@@ -303,6 +303,18 @@ var operationAuthTiers = map[string]authTier{
 	"UpdateIllness":    tierFamily,
 	"DeleteIllness":    tierFamily,
 
+	// The barnehage as a place and the pick-up plan (daycare_place.go).
+	// Parents write the place and the grid; everyone reads them, and any
+	// member may say who collects on one day, as any member may log the
+	// pick-up itself. None of it is in deviceOperations.
+	"ListDaycarePlaces":  tierFamily,
+	"CreateDaycarePlace": tierAdmin,
+	"UpdateDaycarePlace": tierAdmin,
+	"DeleteDaycarePlace": tierAdmin,
+	"GetPickupPlan":      tierFamily,
+	"SetPickupPlan":      tierAdmin,
+	"SetPickupOverride":  tierFamily,
+
 	// Days at home with an ill child (issue #108, care_days.go). The quota
 	// is tierFamily too: "one's own, or anyone's as admin" is a rule about
 	// the body, so the handler checks it.

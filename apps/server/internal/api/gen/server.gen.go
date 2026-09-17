@@ -131,6 +131,15 @@ type ServerInterface interface {
 	// PutBabyAbout Replace the four lines. Blank or null clears one. Any member may.
 	// (PUT /api/babies/{id}/about)
 	PutBabyAbout(w http.ResponseWriter, r *http.Request, id IdPath)
+	// SetPickupOverride Who collects on ONE day instead of the grid's person; a null userId clears the day. Any member may. `date` is the caller's own local day: the server derives none.
+	// (PUT /api/babies/{id}/pickup-override)
+	SetPickupOverride(w http.ResponseWriter, r *http.Request, id IdPath)
+	// GetPickupPlan Who collects this baby from barnehage and when, Monday to Friday, plus the one-day exceptions from yesterday on. Days nobody has planned are simply absent.
+	// (GET /api/babies/{id}/pickup-plan)
+	GetPickupPlan(w http.ResponseWriter, r *http.Request, id IdPath)
+	// SetPickupPlan Replace the weekly grid in one transaction (family admins). A day with neither a time nor a person is dropped. Every person must be a member of the family.
+	// (PUT /api/babies/{id}/pickup-plan)
+	SetPickupPlan(w http.ResponseWriter, r *http.Request, id IdPath)
 	// SetUsualNap The family's own nap anchor (issue #112): minutes after LOCAL midnight, or null for none. When set, Home's Awake card says "Usual nap 11:30" instead of computing a wake window. Any member may.
 	// (PUT /api/babies/{id}/usual-nap)
 	SetUsualNap(w http.ResponseWriter, r *http.Request, id IdPath)
@@ -194,6 +203,18 @@ type ServerInterface interface {
 	// CreateDaycare Drop off (issue #105). Omit endTime to start a running session — "she is there now"; a baby can only have one at a time, enforced by a partial unique index (see internal/api/daycare.go) as well as the pre-check this endpoint does. With an endTime it logs a finished day after the fact.
 	// (POST /api/daycare)
 	CreateDaycare(w http.ResponseWriter, r *http.Request)
+	// ListDaycarePlaces The family's barnehager as places: how to reach each, when it opens and closes, and which babies attend. Any member may read; usually one row.
+	// (GET /api/daycare-places)
+	ListDaycarePlaces(w http.ResponseWriter, r *http.Request)
+	// CreateDaycarePlace Add a place (family admins). `babyIds` enrols those babies here, and moves any of them from another place: a baby attends one at a time.
+	// (POST /api/daycare-places)
+	CreateDaycarePlace(w http.ResponseWriter, r *http.Request)
+	// DeleteDaycarePlace Delete a place (family admins); its enrolments cascade, pick-up plans stay.
+	// (DELETE /api/daycare-places/{id})
+	DeleteDaycarePlace(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdateDaycarePlace Replace a place, enrolments included (family admins). A PUT, not a PATCH: the settings page holds every field, and a replayed offline save is harmless.
+	// (PUT /api/daycare-places/{id})
+	UpdateDaycarePlace(w http.ResponseWriter, r *http.Request, id IdPath)
 	// GetActiveDaycare The running daycare session for a baby, or null.
 	// (GET /api/daycare/active)
 	GetActiveDaycare(w http.ResponseWriter, r *http.Request, params GetActiveDaycareParams)
@@ -1551,6 +1572,84 @@ func (siw *ServerInterfaceWrapper) PutBabyAbout(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// SetPickupOverride operation middleware
+func (siw *ServerInterfaceWrapper) SetPickupOverride(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetPickupOverride(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPickupPlan operation middleware
+func (siw *ServerInterfaceWrapper) GetPickupPlan(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPickupPlan(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetPickupPlan operation middleware
+func (siw *ServerInterfaceWrapper) SetPickupPlan(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetPickupPlan(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SetUsualNap operation middleware
 func (siw *ServerInterfaceWrapper) SetUsualNap(w http.ResponseWriter, r *http.Request) {
 
@@ -2091,6 +2190,86 @@ func (siw *ServerInterfaceWrapper) CreateDaycare(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateDaycare(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDaycarePlaces operation middleware
+func (siw *ServerInterfaceWrapper) ListDaycarePlaces(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDaycarePlaces(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateDaycarePlace operation middleware
+func (siw *ServerInterfaceWrapper) CreateDaycarePlace(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateDaycarePlace(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteDaycarePlace operation middleware
+func (siw *ServerInterfaceWrapper) DeleteDaycarePlace(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteDaycarePlace(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateDaycarePlace operation middleware
+func (siw *ServerInterfaceWrapper) UpdateDaycarePlace(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateDaycarePlace(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5041,6 +5220,13 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/daycare/{id}/handover", wrapper.PutDaycareHandover)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/daycare/{id}", wrapper.DeleteDaycare)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/daycare/{id}", wrapper.UpdateDaycare)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/daycare-places", wrapper.ListDaycarePlaces)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/daycare-places", wrapper.CreateDaycarePlace)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/daycare-places/{id}", wrapper.DeleteDaycarePlace)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/daycare-places/{id}", wrapper.UpdateDaycarePlace)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/babies/{id}/pickup-plan", wrapper.GetPickupPlan)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/babies/{id}/pickup-plan", wrapper.SetPickupPlan)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/babies/{id}/pickup-override", wrapper.SetPickupOverride)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/illness", wrapper.ListIllnesses)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/illness", wrapper.CreateIllness)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/illness/active", wrapper.GetActiveIllness)
@@ -6575,6 +6761,144 @@ func (response PutBabyAbout404JSONResponse) VisitPutBabyAboutResponse(w http.Res
 	return err
 }
 
+type SetPickupOverrideRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *SetPickupOverrideJSONRequestBody
+}
+
+type SetPickupOverrideResponseObject interface {
+	VisitSetPickupOverrideResponse(w http.ResponseWriter) error
+}
+
+type SetPickupOverride200JSONResponse PickupPlan
+
+func (response SetPickupOverride200JSONResponse) VisitSetPickupOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetPickupOverride400JSONResponse Error
+
+func (response SetPickupOverride400JSONResponse) VisitSetPickupOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetPickupOverride404JSONResponse Error
+
+func (response SetPickupOverride404JSONResponse) VisitSetPickupOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPickupPlanRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type GetPickupPlanResponseObject interface {
+	VisitGetPickupPlanResponse(w http.ResponseWriter) error
+}
+
+type GetPickupPlan200JSONResponse PickupPlan
+
+func (response GetPickupPlan200JSONResponse) VisitGetPickupPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPickupPlan404JSONResponse Error
+
+func (response GetPickupPlan404JSONResponse) VisitGetPickupPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetPickupPlanRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *SetPickupPlanJSONRequestBody
+}
+
+type SetPickupPlanResponseObject interface {
+	VisitSetPickupPlanResponse(w http.ResponseWriter) error
+}
+
+type SetPickupPlan200JSONResponse PickupPlan
+
+func (response SetPickupPlan200JSONResponse) VisitSetPickupPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetPickupPlan400JSONResponse Error
+
+func (response SetPickupPlan400JSONResponse) VisitSetPickupPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetPickupPlan404JSONResponse Error
+
+func (response SetPickupPlan404JSONResponse) VisitSetPickupPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type SetUsualNapRequestObject struct {
 	Id   IdPath `json:"id"`
 	Body *SetUsualNapJSONRequestBody
@@ -7433,6 +7757,150 @@ func (response CreateDaycare409JSONResponse) VisitCreateDaycareResponse(w http.R
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDaycarePlacesRequestObject struct {
+}
+
+type ListDaycarePlacesResponseObject interface {
+	VisitListDaycarePlacesResponse(w http.ResponseWriter) error
+}
+
+type ListDaycarePlaces200JSONResponse []DaycarePlace
+
+func (response ListDaycarePlaces200JSONResponse) VisitListDaycarePlacesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDaycarePlaceRequestObject struct {
+	Body *CreateDaycarePlaceJSONRequestBody
+}
+
+type CreateDaycarePlaceResponseObject interface {
+	VisitCreateDaycarePlaceResponse(w http.ResponseWriter) error
+}
+
+type CreateDaycarePlace201JSONResponse DaycarePlace
+
+func (response CreateDaycarePlace201JSONResponse) VisitCreateDaycarePlaceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDaycarePlace400JSONResponse Error
+
+func (response CreateDaycarePlace400JSONResponse) VisitCreateDaycarePlaceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteDaycarePlaceRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteDaycarePlaceResponseObject interface {
+	VisitDeleteDaycarePlaceResponse(w http.ResponseWriter) error
+}
+
+type DeleteDaycarePlace200JSONResponse Ok
+
+func (response DeleteDaycarePlace200JSONResponse) VisitDeleteDaycarePlaceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteDaycarePlace404JSONResponse Error
+
+func (response DeleteDaycarePlace404JSONResponse) VisitDeleteDaycarePlaceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDaycarePlaceRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdateDaycarePlaceJSONRequestBody
+}
+
+type UpdateDaycarePlaceResponseObject interface {
+	VisitUpdateDaycarePlaceResponse(w http.ResponseWriter) error
+}
+
+type UpdateDaycarePlace200JSONResponse DaycarePlace
+
+func (response UpdateDaycarePlace200JSONResponse) VisitUpdateDaycarePlaceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDaycarePlace400JSONResponse Error
+
+func (response UpdateDaycarePlace400JSONResponse) VisitUpdateDaycarePlaceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDaycarePlace404JSONResponse Error
+
+func (response UpdateDaycarePlace404JSONResponse) VisitUpdateDaycarePlaceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11785,6 +12253,15 @@ type StrictServerInterface interface {
 	// PutBabyAbout Replace the four lines. Blank or null clears one. Any member may.
 	// (PUT /api/babies/{id}/about)
 	PutBabyAbout(ctx context.Context, request PutBabyAboutRequestObject) (PutBabyAboutResponseObject, error)
+	// SetPickupOverride Who collects on ONE day instead of the grid's person; a null userId clears the day. Any member may. `date` is the caller's own local day: the server derives none.
+	// (PUT /api/babies/{id}/pickup-override)
+	SetPickupOverride(ctx context.Context, request SetPickupOverrideRequestObject) (SetPickupOverrideResponseObject, error)
+	// GetPickupPlan Who collects this baby from barnehage and when, Monday to Friday, plus the one-day exceptions from yesterday on. Days nobody has planned are simply absent.
+	// (GET /api/babies/{id}/pickup-plan)
+	GetPickupPlan(ctx context.Context, request GetPickupPlanRequestObject) (GetPickupPlanResponseObject, error)
+	// SetPickupPlan Replace the weekly grid in one transaction (family admins). A day with neither a time nor a person is dropped. Every person must be a member of the family.
+	// (PUT /api/babies/{id}/pickup-plan)
+	SetPickupPlan(ctx context.Context, request SetPickupPlanRequestObject) (SetPickupPlanResponseObject, error)
 	// SetUsualNap The family's own nap anchor (issue #112): minutes after LOCAL midnight, or null for none. When set, Home's Awake card says "Usual nap 11:30" instead of computing a wake window. Any member may.
 	// (PUT /api/babies/{id}/usual-nap)
 	SetUsualNap(ctx context.Context, request SetUsualNapRequestObject) (SetUsualNapResponseObject, error)
@@ -11848,6 +12325,18 @@ type StrictServerInterface interface {
 	// CreateDaycare Drop off (issue #105). Omit endTime to start a running session — "she is there now"; a baby can only have one at a time, enforced by a partial unique index (see internal/api/daycare.go) as well as the pre-check this endpoint does. With an endTime it logs a finished day after the fact.
 	// (POST /api/daycare)
 	CreateDaycare(ctx context.Context, request CreateDaycareRequestObject) (CreateDaycareResponseObject, error)
+	// ListDaycarePlaces The family's barnehager as places: how to reach each, when it opens and closes, and which babies attend. Any member may read; usually one row.
+	// (GET /api/daycare-places)
+	ListDaycarePlaces(ctx context.Context, request ListDaycarePlacesRequestObject) (ListDaycarePlacesResponseObject, error)
+	// CreateDaycarePlace Add a place (family admins). `babyIds` enrols those babies here, and moves any of them from another place: a baby attends one at a time.
+	// (POST /api/daycare-places)
+	CreateDaycarePlace(ctx context.Context, request CreateDaycarePlaceRequestObject) (CreateDaycarePlaceResponseObject, error)
+	// DeleteDaycarePlace Delete a place (family admins); its enrolments cascade, pick-up plans stay.
+	// (DELETE /api/daycare-places/{id})
+	DeleteDaycarePlace(ctx context.Context, request DeleteDaycarePlaceRequestObject) (DeleteDaycarePlaceResponseObject, error)
+	// UpdateDaycarePlace Replace a place, enrolments included (family admins). A PUT, not a PATCH: the settings page holds every field, and a replayed offline save is harmless.
+	// (PUT /api/daycare-places/{id})
+	UpdateDaycarePlace(ctx context.Context, request UpdateDaycarePlaceRequestObject) (UpdateDaycarePlaceResponseObject, error)
 	// GetActiveDaycare The running daycare session for a baby, or null.
 	// (GET /api/daycare/active)
 	GetActiveDaycare(ctx context.Context, request GetActiveDaycareRequestObject) (GetActiveDaycareResponseObject, error)
@@ -13258,6 +13747,98 @@ func (sh *strictHandler) PutBabyAbout(w http.ResponseWriter, r *http.Request, id
 	}
 }
 
+// SetPickupOverride operation middleware
+func (sh *strictHandler) SetPickupOverride(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request SetPickupOverrideRequestObject
+
+	request.Id = id
+
+	var body SetPickupOverrideJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetPickupOverride(ctx, request.(SetPickupOverrideRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetPickupOverride")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetPickupOverrideResponseObject); ok {
+		if err := validResponse.VisitSetPickupOverrideResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPickupPlan operation middleware
+func (sh *strictHandler) GetPickupPlan(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request GetPickupPlanRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPickupPlan(ctx, request.(GetPickupPlanRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPickupPlan")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPickupPlanResponseObject); ok {
+		if err := validResponse.VisitGetPickupPlanResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetPickupPlan operation middleware
+func (sh *strictHandler) SetPickupPlan(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request SetPickupPlanRequestObject
+
+	request.Id = id
+
+	var body SetPickupPlanJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetPickupPlan(ctx, request.(SetPickupPlanRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetPickupPlan")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetPickupPlanResponseObject); ok {
+		if err := validResponse.VisitSetPickupPlanResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // SetUsualNap operation middleware
 func (sh *strictHandler) SetUsualNap(w http.ResponseWriter, r *http.Request, id IdPath) {
 	var request SetUsualNapRequestObject
@@ -13860,6 +14441,120 @@ func (sh *strictHandler) CreateDaycare(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateDaycareResponseObject); ok {
 		if err := validResponse.VisitCreateDaycareResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDaycarePlaces operation middleware
+func (sh *strictHandler) ListDaycarePlaces(w http.ResponseWriter, r *http.Request) {
+	var request ListDaycarePlacesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDaycarePlaces(ctx, request.(ListDaycarePlacesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDaycarePlaces")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDaycarePlacesResponseObject); ok {
+		if err := validResponse.VisitListDaycarePlacesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateDaycarePlace operation middleware
+func (sh *strictHandler) CreateDaycarePlace(w http.ResponseWriter, r *http.Request) {
+	var request CreateDaycarePlaceRequestObject
+
+	var body CreateDaycarePlaceJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateDaycarePlace(ctx, request.(CreateDaycarePlaceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateDaycarePlace")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateDaycarePlaceResponseObject); ok {
+		if err := validResponse.VisitCreateDaycarePlaceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteDaycarePlace operation middleware
+func (sh *strictHandler) DeleteDaycarePlace(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteDaycarePlaceRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteDaycarePlace(ctx, request.(DeleteDaycarePlaceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteDaycarePlace")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteDaycarePlaceResponseObject); ok {
+		if err := validResponse.VisitDeleteDaycarePlaceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateDaycarePlace operation middleware
+func (sh *strictHandler) UpdateDaycarePlace(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdateDaycarePlaceRequestObject
+
+	request.Id = id
+
+	var body UpdateDaycarePlaceJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateDaycarePlace(ctx, request.(UpdateDaycarePlaceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateDaycarePlace")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateDaycarePlaceResponseObject); ok {
+		if err := validResponse.VisitUpdateDaycarePlaceResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

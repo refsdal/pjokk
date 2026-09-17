@@ -50,6 +50,23 @@ func (q *Queries) ClearActiveFamilyForUser(ctx context.Context, arg ClearActiveF
 	return err
 }
 
+const clearMemberPickupPlan = `-- name: ClearMemberPickupPlan :exec
+UPDATE "daycare_pickup_plan" SET "user_id" = NULL
+WHERE "family_id" = $1 AND "user_id" = $2
+`
+
+type ClearMemberPickupPlanParams struct {
+	FamilyID string
+	UserID   *string
+}
+
+// A removed member stops being the planned pick-up in that family; the
+// day keeps its time. And their one-day exceptions go (daycare place spec).
+func (q *Queries) ClearMemberPickupPlan(ctx context.Context, arg ClearMemberPickupPlanParams) error {
+	_, err := q.db.Exec(ctx, clearMemberPickupPlan, arg.FamilyID, arg.UserID)
+	return err
+}
+
 const countFamilyAdmins = `-- name: CountFamilyAdmins :one
 SELECT COUNT(*)::int
 FROM "organization_members" om
@@ -221,6 +238,21 @@ type DeleteMemberCareDaysParams struct {
 // (issue #108): their own leave record, which leaves with them.
 func (q *Queries) DeleteMemberCareDays(ctx context.Context, arg DeleteMemberCareDaysParams) error {
 	_, err := q.db.Exec(ctx, deleteMemberCareDays, arg.FamilyID, arg.UserID)
+	return err
+}
+
+const deleteMemberPickupOverrides = `-- name: DeleteMemberPickupOverrides :exec
+DELETE FROM "daycare_pickup_override"
+WHERE "family_id" = $1 AND "user_id" = $2
+`
+
+type DeleteMemberPickupOverridesParams struct {
+	FamilyID string
+	UserID   string
+}
+
+func (q *Queries) DeleteMemberPickupOverrides(ctx context.Context, arg DeleteMemberPickupOverridesParams) error {
+	_, err := q.db.Exec(ctx, deleteMemberPickupOverrides, arg.FamilyID, arg.UserID)
 	return err
 }
 

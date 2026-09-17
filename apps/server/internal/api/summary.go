@@ -152,6 +152,13 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		return nil, err
 	}
 
+	// Her barnehage as a place and the pick-up plan (daycare_place.go). The
+	// client resolves "today"; the server has no local day to offer.
+	daycareInfo, err := d.daycareToday(ctx, fam.FamilyID, babyID)
+	if err != nil {
+		return nil, err
+	}
+
 	// Picked up within the last 12 hours and nobody has said how the day
 	// went (handover.go, issue #106): Home offers the handover sheet.
 	var handoverDue *gen.DaycareLog
@@ -340,6 +347,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		ActivePlay:          activePlay,
 		ActiveDaycare:       activeDaycare,
 		HandoverDue:         handoverDue,
+		Daycare:             daycareInfo,
 		ActiveIllness:       activeIllness,
 		UsualNapMinute:      usualNap,
 		ActiveFeed:          activeFeed,

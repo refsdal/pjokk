@@ -2987,6 +2987,53 @@ type DaycareLog struct {
 // DaycareLogMood How the day went, as the staff put it at pick-up. Set only through the handover (PUT /api/daycare/{id}/handover).
 type DaycareLogMood string
 
+// DaycarePlace defines model for DaycarePlace.
+type DaycarePlace struct {
+	Address *string `json:"address"`
+
+	// AlertLeadMin The family's own number: how long before closing the planned person is told she is still there. Null means no alert.
+	AlertLeadMin *int     `json:"alertLeadMin"`
+	BabyIds      []string `json:"babyIds"`
+
+	// CloseMinute Closes, minutes after local midnight in `tz`.
+	CloseMinute *int    `json:"closeMinute"`
+	Email       *string `json:"email"`
+	Id          string  `json:"id"`
+	Name        string  `json:"name"`
+	Notes       *string `json:"notes"`
+
+	// OpenMinute Opens, minutes after local midnight in `tz`; one time for every weekday.
+	OpenMinute *int    `json:"openMinute"`
+	Phone      *string `json:"phone"`
+
+	// Tz IANA zone the hours are wall-clock times in.
+	Tz      string  `json:"tz"`
+	Website *string `json:"website"`
+}
+
+// DaycarePlaceInput defines model for DaycarePlaceInput.
+type DaycarePlaceInput struct {
+	Address      *string   `json:"address,omitempty"`
+	AlertLeadMin *int      `json:"alertLeadMin,omitempty"`
+	BabyIds      *[]string `json:"babyIds,omitempty"`
+	CloseMinute  *int      `json:"closeMinute,omitempty"`
+
+	// Email Free text, like a contact's website; saving matters more than shape.
+	Email      *string `json:"email,omitempty"`
+	Name       string  `json:"name"`
+	Notes      *string `json:"notes,omitempty"`
+	OpenMinute *int    `json:"openMinute,omitempty"`
+	Phone      *string `json:"phone,omitempty"`
+	Tz         string  `json:"tz"`
+	Website    *string `json:"website,omitempty"`
+}
+
+// DaycareToday defines model for DaycareToday.
+type DaycareToday struct {
+	Place *DaycarePlace `json:"place"`
+	Plan  PickupPlan    `json:"plan"`
+}
+
 // DeletedFamily A family in a snapshot that does not exist now.
 type DeletedFamily struct {
 	Babies    int        `json:"babies"`
@@ -3518,6 +3565,32 @@ type PickupDaycare struct {
 	EndTime     *time.Time `json:"endTime,omitempty"`
 }
 
+// PickupOverride defines model for PickupOverride.
+type PickupOverride struct {
+	Date   string `json:"date"`
+	UserId string `json:"userId"`
+}
+
+// PickupPlan defines model for PickupPlan.
+type PickupPlan struct {
+	Days []PickupPlanDay `json:"days"`
+
+	// Overrides One-day exceptions from yesterday (UTC) on, oldest first.
+	Overrides []PickupOverride `json:"overrides"`
+}
+
+// PickupPlanDay defines model for PickupPlanDay.
+type PickupPlanDay struct {
+	// Minute Expected pick-up, minutes after local midnight. A plan, not a deadline; nothing fires on it.
+	Minute *int `json:"minute"`
+
+	// UserId Who collects; a member of the family, or nobody named.
+	UserId *string `json:"userId"`
+
+	// Weekday ISO weekday, 1 = Monday. Barnehage is Monday to Friday.
+	Weekday int `json:"weekday"`
+}
+
 // PlayLog Timed activities (tummy time, walks, free play) — same session shape as SleepLog: startTime + nullable endTime, null meaning "still running". Free (no plan gate).
 type PlayLog struct {
 	BabyId        string `json:"babyId"`
@@ -3649,6 +3722,19 @@ type SetMemberRole struct {
 
 // SetMemberRoleRole defines model for SetMemberRole.Role.
 type SetMemberRoleRole string
+
+// SetPickupOverride defines model for SetPickupOverride.
+type SetPickupOverride struct {
+	Date string `json:"date"`
+
+	// UserId Null clears the day back to the grid.
+	UserId *string `json:"userId"`
+}
+
+// SetPickupPlan defines model for SetPickupPlan.
+type SetPickupPlan struct {
+	Days []PickupPlanDay `json:"days"`
+}
 
 // SetUserPassword defines model for SetUserPassword.
 type SetUserPassword struct {
@@ -3856,6 +3942,9 @@ type Summary struct {
 	// ActivePump The running pump timer, or null.
 	ActivePump  *FeedTimer `json:"activePump"`
 	ActiveSleep *SleepLog  `json:"activeSleep"`
+
+	// Daycare This baby's barnehage as a place and her pick-up plan, or null when she has neither. The CLIENT resolves "today" against its own date, so Home needs no second request and the server guesses no local day for display.
+	Daycare *DaycareToday `json:"daycare"`
 
 	// HandoverDue The newest day at barnehage that ended within the last 12 hours and has no handover yet (no linked rows, no mood), or null. Backs Home's "How was the day?" card (issue #106).
 	HandoverDue *DaycareLog `json:"handoverDue"`
@@ -4587,6 +4676,12 @@ type UpdateBabyJSONRequestBody = UpdateBaby
 // PutBabyAboutJSONRequestBody defines body for PutBabyAbout for application/json ContentType.
 type PutBabyAboutJSONRequestBody = BabyAbout
 
+// SetPickupOverrideJSONRequestBody defines body for SetPickupOverride for application/json ContentType.
+type SetPickupOverrideJSONRequestBody = SetPickupOverride
+
+// SetPickupPlanJSONRequestBody defines body for SetPickupPlan for application/json ContentType.
+type SetPickupPlanJSONRequestBody = SetPickupPlan
+
 // SetUsualNapJSONRequestBody defines body for SetUsualNap for application/json ContentType.
 type SetUsualNapJSONRequestBody = SetUsualNap
 
@@ -4619,6 +4714,12 @@ type UpdateContactJSONRequestBody = UpdateContact
 
 // CreateDaycareJSONRequestBody defines body for CreateDaycare for application/json ContentType.
 type CreateDaycareJSONRequestBody = CreateDaycare
+
+// CreateDaycarePlaceJSONRequestBody defines body for CreateDaycarePlace for application/json ContentType.
+type CreateDaycarePlaceJSONRequestBody = DaycarePlaceInput
+
+// UpdateDaycarePlaceJSONRequestBody defines body for UpdateDaycarePlace for application/json ContentType.
+type UpdateDaycarePlaceJSONRequestBody = DaycarePlaceInput
 
 // UpdateDaycareJSONRequestBody defines body for UpdateDaycare for application/json ContentType.
 type UpdateDaycareJSONRequestBody = UpdateDaycare
