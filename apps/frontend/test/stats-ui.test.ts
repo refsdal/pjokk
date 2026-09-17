@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { formatMinutes, lastNight, napLine } from "../src/lib/stats-ui";
+import {
+  clockOfMinutes,
+  dayGroupLine,
+  formatMinutes,
+  lastNight,
+  napLine,
+} from "../src/lib/stats-ui";
 
 const n = (date: string, longest: number | null, wakings: number | null) => ({
   date,
@@ -55,5 +61,38 @@ describe("napLine", () => {
     expect(napLine(45, 2, fmt, { nap: "Lur", naps: "lurer" })).toBe(
       "Lur 45 min · 2 lurer",
     );
+  });
+});
+
+// Barnehage days against home days (issue #111).
+describe("dayGroupLine", () => {
+  const labels = { nap: "nap", bed: "bed", night: "night" };
+  const fmt = (min: number) =>
+    `${Math.floor(min / 60)}:${String(min % 60).padStart(2, "0")}`;
+
+  test("words a group: daytime sleep, bedtime, the night after", () => {
+    expect(
+      dayGroupLine(
+        {
+          days: 4,
+          avgNapMin: 60,
+          avgBedtimeMin: 18 * 60 + 50,
+          avgNightSleepMin: 690,
+        },
+        fmt,
+        labels,
+      ),
+    ).toBe("nap 1:00 · bed 18:50 · night 11:30");
+  });
+
+  test("leaves out what the group has no data for, and pads a bedtime past midnight", () => {
+    expect(
+      dayGroupLine(
+        { days: 2, avgNapMin: 0, avgBedtimeMin: null, avgNightSleepMin: null },
+        fmt,
+        labels,
+      ),
+    ).toBe("nap 0:00");
+    expect(clockOfMinutes(5)).toBe("00:05");
   });
 });

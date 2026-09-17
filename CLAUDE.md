@@ -375,7 +375,11 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   the window's earlier nights; a night runs local noon to noon and belongs
   to the day it began on), one bar chart (sleep per day stacked night /
   day, week/month toggle), weight row w/ percentile
-  teaser, and one growth chart with Weight / Length / Head chips against the
+  teaser, a **Daycare days and home days** card (#111: daytime sleep,
+  bedtime and the night after, averaged over completed days of each kind
+  by `internal/api/stats_daycare.go`, shown only once the window holds two
+  of each, with the barnehage days dotted under the chart's bars), and one
+  growth chart with Weight / Length / Head chips against the
   WHO P3/P50/P97 curves. WHO growth reference data ships as bundled static
   JSON (`data/who-*-for-age-lms.json`, weight, length and head, 0–60 months,
   each cited in the file; no API).

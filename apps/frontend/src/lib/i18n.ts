@@ -309,6 +309,13 @@ const nb: Record<string, string> = {
   "Symptoms again": "Symptomer igjen",
   Recovered: "Frisk",
 
+  // Barnehage days against home days in Stats (issue #111).
+  "at daycare that day": "i barnehagen den dagen",
+  "Daycare days and home days": "Barnehagedager og hjemmedager",
+  "Daycare days": "Barnehagedager",
+  "Home days": "Hjemmedager",
+  bed: "legging",
+
   // Barnehage on the calendar (issue #110).
   "Closed that day": "Stengt den dagen",
   "Daycare is closed today": "Barnehagen er stengt i dag",
