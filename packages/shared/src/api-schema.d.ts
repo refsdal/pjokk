@@ -2769,6 +2769,8 @@ export interface components {
         StatsDay: {
             /** @description YYYY-MM-DD in the requester's local time. */
             date: string;
+            /** @description A barnehage session STARTED on this local day (issue #111). The Stats chart marks these days; `daycareSplit` averages them against the rest. */
+            daycare: boolean;
             /** Format: int32 */
             sleepMin: number;
             /**
@@ -2783,6 +2785,24 @@ export interface components {
             feeds: number;
             /** Format: int32 */
             diapers: number;
+        };
+        /** @description Sleep averaged over one kind of day (issue #111). `avgNapMin` is the mean daytime sleep per day, a nap counted whole against the day it started, no-nap days included. The two night figures belong to the night that FOLLOWED the day, and are null when no such night was logged in the group. */
+        StatsDayGroup: {
+            /** Format: int32 */
+            days: number;
+            /** Format: int32 */
+            avgNapMin: number;
+            /** Format: int32 */
+            avgNightSleepMin: number | null;
+            /**
+             * Format: int32
+             * @description Minutes after local midnight (0–1439) of the night's first session, averaged on the evening's own line so 23:50 and 00:10 meet at midnight, not noon.
+             */
+            avgBedtimeMin: number | null;
+        };
+        StatsDaycareSplit: {
+            daycare: components["schemas"]["StatsDayGroup"];
+            home: components["schemas"]["StatsDayGroup"];
         };
         StatsWeight: {
             /** Format: double */
@@ -2818,6 +2838,8 @@ export interface components {
             solids: number;
         };
         Stats: {
+            /** @description Barnehage days against home days (issue #111): is the single midday nap pushing bedtime, are nights worse after barnehage? Completed days only — today is left out of both groups — and null unless the window holds at least two days of each kind: one day is an anecdote. */
+            daycareSplit: components["schemas"]["StatsDaycareSplit"] | null;
             days: components["schemas"]["StatsDay"][];
             /** @description One entry per local day of the window plus the day before it (oldest first): the night that began on each. The extra night is what lets a one-day window still answer "last night". */
             nights: components["schemas"]["StatsNight"][];

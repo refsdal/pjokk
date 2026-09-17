@@ -3003,3 +3003,32 @@ design, and this is what was decided while building it.
   works; a weekdays rule is its own piece of work in `internal/recur`.
 - **The push reminder is unchanged.** It already carries the event's
   title, which for a closed day is the message.
+
+## 2026-09-17 — barnehage days against home days in Stats
+
+Eighth of the barnehage series (#111). No spec file: the issue is the
+design.
+
+- **One card, two lines, and only when it can say something.** Stats stays
+  deliberately minimal. `daycareSplit` is null unless the window holds at
+  least TWO completed days of each kind: a row that says "home days:
+  bedtime 21:40" from a single Saturday would be read as a pattern.
+- **Completed days only.** Today is left out of both groups; its nap and
+  its night are not over.
+- **A barnehage day is a local day a session STARTED on.** The night
+  figures belong to the night that FOLLOWED the day, which is the question
+  being asked ("are nights worse after barnehage?").
+- **The no-nap day counts towards the nap mean; a day with no night logged
+  does not drag the night figures down.** A day without a nap is a fact
+  about sleep; a night nobody logged is a fact about logging.
+- **Bedtime is averaged on the evening's own line** — measured from the
+  midnight that began the day, so 23:50 and 00:10 meet at midnight rather
+  than noon — the rule the About-me page uses too.
+- **Naps are counted whole against the day they started**, as `avgNapMin`
+  already does, not from the midnight-clipped day buckets.
+- **The day markers are an HTML row under the chart**, not a chart series:
+  the chart has no margins and no Y axis, so n equal cells sit exactly
+  under n bands, in both the week and the month view, with none of
+  Recharts' second-axis behaviour to depend on.
+- **The arithmetic is a pure function** (`stats_daycare.go`) with its own
+  internal test, beside an API test with a fixed clock.
