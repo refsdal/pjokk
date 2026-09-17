@@ -78,3 +78,27 @@ func (d Deps) PutBabyAbout(ctx context.Context, req gen.PutBabyAboutRequestObjec
 	}
 	return gen.PutBabyAbout200JSONResponse(out), nil
 }
+
+// SetUsualNap implements PUT /api/babies/{id}/usual-nap (issue #112): the
+// family's own nap anchor, minutes after local midnight, or null. It is a
+// wall-clock time — "she naps at half past eleven" — so the server stores
+// the number and compares it with nothing; the device has the clock.
+func (d Deps) SetUsualNap(ctx context.Context, req gen.SetUsualNapRequestObject) (gen.SetUsualNapResponseObject, error) {
+	fam := middleware.FamilyFromContext(ctx)
+	if req.Body == nil {
+		return nil, errNoRequestBody("SetUsualNap")
+	}
+	known, err := babyExists(ctx, d, fam.FamilyID, req.Id)
+	if err != nil {
+		return nil, err
+	}
+	if !known {
+		return gen.SetUsualNap404JSONResponse(notFound()), nil
+	}
+	if err := d.Q.SetUsualNapMinute(ctx, dbgen.SetUsualNapMinuteParams{
+		BabyID: req.Id, FamilyID: fam.FamilyID, Minute: int32Ptr(req.Body.Minute),
+	}); err != nil {
+		return nil, err
+	}
+	return gen.SetUsualNap200JSONResponse{Ok: gen.OkOkTrue}, nil
+}

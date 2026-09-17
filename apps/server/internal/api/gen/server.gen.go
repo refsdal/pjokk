@@ -131,6 +131,9 @@ type ServerInterface interface {
 	// PutBabyAbout Replace the four lines. Blank or null clears one. Any member may.
 	// (PUT /api/babies/{id}/about)
 	PutBabyAbout(w http.ResponseWriter, r *http.Request, id IdPath)
+	// SetUsualNap The family's own nap anchor (issue #112): minutes after LOCAL midnight, or null for none. When set, Home's Awake card says "Usual nap 11:30" instead of computing a wake window. Any member may.
+	// (PUT /api/babies/{id}/usual-nap)
+	SetUsualNap(w http.ResponseWriter, r *http.Request, id IdPath)
 	// ListBaths Bath logs in the caller's active family, newest first.
 	// (GET /api/baths)
 	ListBaths(w http.ResponseWriter, r *http.Request, params ListBathsParams)
@@ -1539,6 +1542,32 @@ func (siw *ServerInterfaceWrapper) PutBabyAbout(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PutBabyAbout(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetUsualNap operation middleware
+func (siw *ServerInterfaceWrapper) SetUsualNap(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetUsualNap(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4942,6 +4971,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/babies/{id}", wrapper.UpdateBaby)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/babies/{id}/about", wrapper.GetBabyAbout)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/babies/{id}/about", wrapper.PutBabyAbout)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/babies/{id}/usual-nap", wrapper.SetUsualNap)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/family", wrapper.GetFamily)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/family/members", wrapper.ListFamilyMembers)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/family/members/{memberId}", wrapper.DeleteFamilyMember)
@@ -6534,6 +6564,43 @@ func (response PutBabyAbout200JSONResponse) VisitPutBabyAboutResponse(w http.Res
 type PutBabyAbout404JSONResponse Error
 
 func (response PutBabyAbout404JSONResponse) VisitPutBabyAboutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetUsualNapRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *SetUsualNapJSONRequestBody
+}
+
+type SetUsualNapResponseObject interface {
+	VisitSetUsualNapResponse(w http.ResponseWriter) error
+}
+
+type SetUsualNap200JSONResponse Ok
+
+func (response SetUsualNap200JSONResponse) VisitSetUsualNapResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetUsualNap404JSONResponse Error
+
+func (response SetUsualNap404JSONResponse) VisitSetUsualNapResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -11718,6 +11785,9 @@ type StrictServerInterface interface {
 	// PutBabyAbout Replace the four lines. Blank or null clears one. Any member may.
 	// (PUT /api/babies/{id}/about)
 	PutBabyAbout(ctx context.Context, request PutBabyAboutRequestObject) (PutBabyAboutResponseObject, error)
+	// SetUsualNap The family's own nap anchor (issue #112): minutes after LOCAL midnight, or null for none. When set, Home's Awake card says "Usual nap 11:30" instead of computing a wake window. Any member may.
+	// (PUT /api/babies/{id}/usual-nap)
+	SetUsualNap(ctx context.Context, request SetUsualNapRequestObject) (SetUsualNapResponseObject, error)
 	// ListBaths Bath logs in the caller's active family, newest first.
 	// (GET /api/baths)
 	ListBaths(ctx context.Context, request ListBathsRequestObject) (ListBathsResponseObject, error)
@@ -13181,6 +13251,39 @@ func (sh *strictHandler) PutBabyAbout(w http.ResponseWriter, r *http.Request, id
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PutBabyAboutResponseObject); ok {
 		if err := validResponse.VisitPutBabyAboutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetUsualNap operation middleware
+func (sh *strictHandler) SetUsualNap(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request SetUsualNapRequestObject
+
+	request.Id = id
+
+	var body SetUsualNapJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetUsualNap(ctx, request.(SetUsualNapRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetUsualNap")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetUsualNapResponseObject); ok {
+		if err := validResponse.VisitSetUsualNapResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

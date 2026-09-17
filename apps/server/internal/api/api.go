@@ -315,6 +315,7 @@ var operationAuthTiers = map[string]authTier{
 	// The "About <name>" sheet's free-text lines (issue #109).
 	"GetBabyAbout": tierFamily,
 	"PutBabyAbout": tierFamily,
+	"SetUsualNap":  tierFamily,
 
 	"GetSummary": tierFamily,
 

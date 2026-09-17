@@ -41,6 +41,24 @@ func (q *Queries) GetBabyAbout(ctx context.Context, arg GetBabyAboutParams) (Get
 	return i, err
 }
 
+const getUsualNapMinute = `-- name: GetUsualNapMinute :one
+SELECT "usual_nap_minute" FROM "baby_about"
+WHERE "family_id" = $1 AND "baby_id" = $2
+`
+
+type GetUsualNapMinuteParams struct {
+	FamilyID string
+	BabyID   string
+}
+
+// For GET /api/summary. No row and a NULL column are the same answer.
+func (q *Queries) GetUsualNapMinute(ctx context.Context, arg GetUsualNapMinuteParams) (*int32, error) {
+	row := q.db.QueryRow(ctx, getUsualNapMinute, arg.FamilyID, arg.BabyID)
+	var usual_nap_minute *int32
+	err := row.Scan(&usual_nap_minute)
+	return usual_nap_minute, err
+}
+
 const putBabyAbout = `-- name: PutBabyAbout :exec
 INSERT INTO "baby_about" ("baby_id", "family_id", "comfort", "falls_asleep", "diet", "other")
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -70,5 +88,26 @@ func (q *Queries) PutBabyAbout(ctx context.Context, arg PutBabyAboutParams) erro
 		arg.Diet,
 		arg.Other,
 	)
+	return err
+}
+
+const setUsualNapMinute = `-- name: SetUsualNapMinute :exec
+INSERT INTO "baby_about" ("baby_id", "family_id", "usual_nap_minute")
+VALUES ($1, $2, $3)
+ON CONFLICT ("baby_id") DO UPDATE
+SET "usual_nap_minute" = EXCLUDED."usual_nap_minute", "updated_at" = now()
+WHERE "baby_about"."family_id" = EXCLUDED."family_id"
+`
+
+type SetUsualNapMinuteParams struct {
+	BabyID   string
+	FamilyID string
+	Minute   *int32
+}
+
+// Touches this one column: PutBabyAbout replaces the four text lines and
+// must not be the only way to set a time, nor clear it as a side effect.
+func (q *Queries) SetUsualNapMinute(ctx context.Context, arg SetUsualNapMinuteParams) error {
+	_, err := q.db.Exec(ctx, setUsualNapMinute, arg.BabyID, arg.FamilyID, arg.Minute)
 	return err
 }
