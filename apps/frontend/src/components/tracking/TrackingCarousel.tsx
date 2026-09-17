@@ -141,7 +141,8 @@ export function TrackingCarousel({
           </p>
         </section>
       </div>
-      <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-4 pb-safe">
+      {/* pb-tabbar clears the bottom bar on the phone (styles.css). */}
+      <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-tabbar">
         <Button
           variant="outline"
           onClick={() => goTo(index - 1)}
