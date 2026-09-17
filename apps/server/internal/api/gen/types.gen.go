@@ -3646,6 +3646,11 @@ type SetUserPassword struct {
 	Password string `json:"password"`
 }
 
+// SetUsualNap defines model for SetUsualNap.
+type SetUsualNap struct {
+	Minute *int `json:"minute"`
+}
+
 // SleepLocation defines model for SleepLocation.
 type SleepLocation struct {
 	Id   string `json:"id"`
@@ -3870,6 +3875,9 @@ type Summary struct {
 		SolidsG int32 `json:"solidsG"`
 		Wet     int32 `json:"wet"`
 	} `json:"today"`
+
+	// UsualNapMinute The family's own nap anchor for this baby, minutes after local midnight, or null (issue #112). A wall-clock time with no timezone: the device compares it with its own clock.
+	UsualNapMinute *int `json:"usualNapMinute"`
 }
 
 // Timeline defines model for Timeline.
@@ -4560,6 +4568,9 @@ type UpdateBabyJSONRequestBody = UpdateBaby
 
 // PutBabyAboutJSONRequestBody defines body for PutBabyAbout for application/json ContentType.
 type PutBabyAboutJSONRequestBody = BabyAbout
+
+// SetUsualNapJSONRequestBody defines body for SetUsualNap for application/json ContentType.
+type SetUsualNapJSONRequestBody = SetUsualNap
 
 // CreateBathJSONRequestBody defines body for CreateBath for application/json ContentType.
 type CreateBathJSONRequestBody = CreateBath

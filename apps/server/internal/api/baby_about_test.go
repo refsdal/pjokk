@@ -55,3 +55,53 @@ func TestBabyAboutRoundTripClearAndTenancy(t *testing.T) {
 		t.Errorf("501 characters = %d, want 400", res.Status)
 	}
 }
+
+// The family's own nap anchor (issue #112): set, read on the summary,
+// cleared, and untouched by the text lines' PUT (and the reverse).
+func TestUsualNapAnchor(t *testing.T) {
+	a := testrig.App(t)
+	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
+	babyID := a.NewBaby(familyID, "Nora")
+	summary := func() any {
+		t.Helper()
+		s := a.Do(http.MethodGet, "/api/summary?babyId="+babyID, cookie, nil)
+		v, present := s.JSON["usualNapMinute"]
+		if !present {
+			t.Fatalf("summary has no usualNapMinute key: %s", s.Raw)
+		}
+		return v
+	}
+	if summary() != nil {
+		t.Errorf("usualNapMinute before anything = %v, want null", summary())
+	}
+	if res := a.Do(http.MethodPut, "/api/babies/"+babyID+"/usual-nap", cookie, map[string]any{"minute": 11*60 + 30}); res.Status != http.StatusOK {
+		t.Fatalf("PUT = %d %s", res.Status, res.Raw)
+	}
+	if summary() != float64(690) {
+		t.Errorf("usualNapMinute = %v, want 690", summary())
+	}
+
+	// The text lines' PUT replaces four lines and must leave the time alone…
+	a.Do(http.MethodPut, "/api/babies/"+babyID+"/about", cookie, map[string]any{"comfort": "Kosekanin", "fallsAsleep": nil, "diet": nil, "other": nil})
+	if summary() != float64(690) {
+		t.Errorf("usualNapMinute after the about PUT = %v, want 690 still", summary())
+	}
+	// …and clearing the time leaves the lines.
+	a.Do(http.MethodPut, "/api/babies/"+babyID+"/usual-nap", cookie, map[string]any{"minute": nil})
+	if summary() != nil {
+		t.Errorf("usualNapMinute after clearing = %v, want null", summary())
+	}
+	if about := a.Do(http.MethodGet, "/api/babies/"+babyID+"/about", cookie, nil); about.JSON["comfort"] != "Kosekanin" {
+		t.Errorf("comfort after clearing the time = %v", about.JSON["comfort"])
+	}
+
+	for name, body := range map[string]map[string]any{"24:00": {"minute": 1440}, "a negative time": {"minute": -1}, "no minute key": {}} {
+		if res := a.Do(http.MethodPut, "/api/babies/"+babyID+"/usual-nap", cookie, body); res.Status != http.StatusBadRequest {
+			t.Errorf("%s = %d, want 400", name, res.Status)
+		}
+	}
+	_, other := a.NewFamily("Olsen", "other@example.com")
+	if res := a.Do(http.MethodPut, "/api/babies/"+babyID+"/usual-nap", other, map[string]any{"minute": 600}); res.Status != http.StatusNotFound {
+		t.Errorf("across families = %d, want 404", res.Status)
+	}
+}
