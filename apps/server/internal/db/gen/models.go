@@ -223,6 +223,21 @@ type HelpRequest struct {
 	AcknowledgedBy *string
 }
 
+type Illness struct {
+	ID            string
+	FamilyID      string
+	BabyID        string
+	CaretakerID   string
+	LoggedByID    string
+	StartTime     pgtype.Timestamptz
+	EndTime       pgtype.Timestamptz
+	Symptoms      []string
+	LastSymptomAt pgtype.Timestamptz
+	ClearHours    *int32
+	Notes         *string
+	CreatedAt     pgtype.Timestamptz
+}
+
 type Impersonation struct {
 	ImpersonatedToken string
 	AdminToken        string

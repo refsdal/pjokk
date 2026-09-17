@@ -271,6 +271,64 @@ func (q *Queries) ExportFeeds(ctx context.Context, arg ExportFeedsParams) ([]Exp
 	return items, nil
 }
 
+const exportIllnesses = `-- name: ExportIllnesses :many
+SELECT
+    i."baby_id", bb."name" AS baby_name, i."start_time", i."end_time", i."symptoms",
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, i."notes"
+FROM "illness" i
+JOIN "baby" bb ON bb."id" = i."baby_id"
+JOIN "users" u ON u."id" = i."caretaker_id"
+JOIN "users" lu ON lu."id" = i."logged_by_id"
+WHERE i."family_id" = $1
+ORDER BY i."start_time" ASC, i."id" ASC
+LIMIT $2
+`
+
+type ExportIllnessesParams struct {
+	FamilyID string
+	Lim      int32
+}
+
+type ExportIllnessesRow struct {
+	BabyID        string
+	BabyName      string
+	StartTime     pgtype.Timestamptz
+	EndTime       pgtype.Timestamptz
+	Symptoms      []string
+	CaretakerName string
+	LoggedByName  string
+	Notes         *string
+}
+
+func (q *Queries) ExportIllnesses(ctx context.Context, arg ExportIllnessesParams) ([]ExportIllnessesRow, error) {
+	rows, err := q.db.Query(ctx, exportIllnesses, arg.FamilyID, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ExportIllnessesRow
+	for rows.Next() {
+		var i ExportIllnessesRow
+		if err := rows.Scan(
+			&i.BabyID,
+			&i.BabyName,
+			&i.StartTime,
+			&i.EndTime,
+			&i.Symptoms,
+			&i.CaretakerName,
+			&i.LoggedByName,
+			&i.Notes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const exportMeasurements = `-- name: ExportMeasurements :many
 SELECT
     m."baby_id", bb."name" AS baby_name, m."time", m."type", m."value",

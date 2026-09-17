@@ -833,6 +833,12 @@ WITH
             "pickup_caretaker_id" = CASE WHEN "daycare_log"."pickup_caretaker_id" = $1 THEN $2 ELSE "daycare_log"."pickup_caretaker_id" END
         WHERE "daycare_log"."caretaker_id" = $1 OR "daycare_log"."logged_by_id" = $1 OR "daycare_log"."pickup_caretaker_id" = $1
     ),
+    illness AS (
+        UPDATE "illness"
+        SET "caretaker_id" = CASE WHEN "illness"."caretaker_id" = $1 THEN $2 ELSE "illness"."caretaker_id" END,
+            "logged_by_id" = CASE WHEN "illness"."logged_by_id" = $1 THEN $2 ELSE "illness"."logged_by_id" END
+        WHERE "illness"."caretaker_id" = $1 OR "illness"."logged_by_id" = $1
+    ),
     -- A running nursing/pump timer is an attribution ("started by"), not an
     -- assignment: the clock belongs to the family and a co-parent may still
     -- be feeding, so it survives the deletion and lands on the tombstone

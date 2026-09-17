@@ -35,7 +35,7 @@ import (
 // are therefore allowed, matching /api/files.
 
 // exportMaxRows is apps/api/src/routes/export.ts's `MAX = 100_000`, applied
-// per kind (twelve queries below, LIMIT sqlc.arg(lim) each).
+// per kind (thirteen queries below, LIMIT sqlc.arg(lim) each).
 const exportMaxRows = 100_000
 
 // formulaGuard/needsQuoting/esc port export.ts's esc() byte for byte,
@@ -334,6 +334,28 @@ func rowDaycare(r dbgen.ExportDaycaresRow) exportRow {
 	}
 }
 
+// rowIllness is an illness episode (issue #107): a span like sleep, with
+// its symptoms in "detail".
+func rowIllness(r dbgen.ExportIllnessesRow) exportRow {
+	var detail *string
+	if len(r.Symptoms) > 0 {
+		detail = str(strings.Join(r.Symptoms, " · "))
+	}
+	return exportRow{
+		sortTime: r.StartTime.Time,
+		cells: map[string]*string{
+			"kind":      str("illness"),
+			"baby":      str(r.BabyName),
+			"time":      fmtTS(r.StartTime),
+			"end_time":  fmtTS(r.EndTime),
+			"detail":    detail,
+			"caretaker": str(r.CaretakerName),
+			"logged_by": str(r.LoggedByName),
+			"notes":     r.Notes,
+		},
+	}
+}
+
 func rowPlay(r dbgen.ExportPlaysRow) exportRow {
 	var durationMin *string
 	if r.EndTime.Valid {
@@ -482,6 +504,15 @@ func (d Deps) exportCSV(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, rowDaycare(v))
 	}
 
+	illnesses, err := d.Q.ExportIllnesses(ctx, dbgen.ExportIllnessesParams{FamilyID: fam.FamilyID, Lim: lim})
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+	for _, v := range illnesses {
+		rows = append(rows, rowIllness(v))
+	}
+
 	vaccines, err := d.Q.ExportVaccines(ctx, dbgen.ExportVaccinesParams{FamilyID: fam.FamilyID, Lim: lim})
 	if err != nil {
 		internalError(w, r, err)
@@ -495,8 +526,8 @@ func (d Deps) exportCSV(w http.ResponseWriter, r *http.Request) {
 	// queries/export.sql's ORDER BY on each — and appended here in the
 	// SAME kind order export.ts's `rows` array literal uses (feed, diaper,
 	// sleep, medicine, bath, note, milestone, measurement, pump, play,
-	// vaccine), with daycare — which has no TypeScript ancestor — before
-	// vaccine. A stable sort by sortTime then reproduces a single
+	// vaccine), with daycare and illness — which have no TypeScript
+	// ancestor — before vaccine. A stable sort by sortTime then reproduces a single
 	// ascending-by-time file: ties (rows from different kinds sharing an
 	// exact timestamp) keep that kind order, which is a deterministic
 	// choice this port makes rather than one export.ts's own JS-stable-sort
