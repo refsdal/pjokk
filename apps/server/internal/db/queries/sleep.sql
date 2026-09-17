@@ -12,7 +12,7 @@
 -- COALESCE(u.name, '') — see feeds.sql's ListFeeds for why (sqlc can't prove
 -- an inner-joined column NOT NULL from a bare alias).
 SELECT
-    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", s."daycare_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
@@ -24,7 +24,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: GetSleep :one
 SELECT
-    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", s."daycare_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
@@ -38,7 +38,7 @@ WHERE s."family_id" = $1 AND s."id" = $2;
 -- recently, mirroring the TS behaviour exactly rather than restricting to
 -- one baby.
 SELECT
-    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", s."daycare_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"

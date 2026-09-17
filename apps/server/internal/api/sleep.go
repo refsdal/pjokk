@@ -73,6 +73,7 @@ func serSleep(row dbgen.GetSleepRow) gen.SleepLog {
 		CaretakerName: row.CaretakerName,
 		LoggedById:    row.LoggedByID,
 		LoggedByName:  row.LoggedByName,
+		DaycareId:     row.DaycareID,
 		Notes:         row.Notes,
 		StartTime:     row.StartTime.Time,
 		EndTime:       tsPtr(row.EndTime),

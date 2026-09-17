@@ -47,7 +47,9 @@ import {
   moreActions,
   OtherLogSheet,
 } from "@/components/sheets/OtherLogSheet";
+import { HandoverCard } from "@/components/HandoverCard";
 import { DaycareSheet } from "@/components/sheets/DaycareSheet";
+import { HandoverSheet } from "@/components/sheets/HandoverSheet";
 import { PlaySheet } from "@/components/sheets/PlaySheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
 import { useQueryClient } from "@tanstack/react-query";
@@ -98,6 +100,7 @@ type OpenSheet =
   | "other"
   | "play"
   | "daycare"
+  | "handover"
   | "help"
   | "account"
   | null;
@@ -175,6 +178,9 @@ export function HomeScreen() {
   // The same, for the barnehage banner: null is "drop off", a session is
   // "edit the running day".
   const [editDaycare, setEditDaycare] = useState<DaycareLog | null>(null);
+  // The day the handover sheet is for: a snapshot, because saving it makes
+  // the summary stop offering that day while the sheet is still closing.
+  const [handoverDay, setHandoverDay] = useState<DaycareLog | null>(null);
   const { night } = useAppearance();
   const napGuide = useNapGuide();
   const navigate = useNavigate();
@@ -270,6 +276,7 @@ export function HomeScreen() {
   // `?? null` twice over: absent from a snapshot cached before the field
   // existed, and null when she is simply at home.
   const activeDaycare = s?.activeDaycare ?? null;
+  const handoverDue = s?.handoverDue ?? null;
   const activeFeed = s?.activeFeed ?? null;
   const activePump = s?.activePump ?? null;
   // The nap-window guide (issue #46): a conclusion under the awake card,
@@ -358,6 +365,17 @@ export function HomeScreen() {
               }}
             />
           )}
+          {/* Where the barnehage banner was, once she has been picked up. */}
+          {handoverDue && !activeDaycare && (
+            <HandoverCard
+              key={handoverDue.id}
+              day={handoverDue}
+              onAdd={(day) => {
+                setHandoverDay(day);
+                setSheet("handover");
+              }}
+            />
+          )}
           {activePlay && <ActivePlayBanner session={activePlay} />}
           {activeFeed && (
             <ActiveFeedBanner
@@ -410,7 +428,11 @@ export function HomeScreen() {
               note={
                 predatesDropOff(s?.lastDiaper?.time, activeDaycare)
                   ? t("At daycare since then")
-                  : undefined
+                  : s?.lastDiaper?.daycareId
+                    ? // A handover diaper is a count spread over the day
+                      // (issue #106): its time is an estimate, so say so.
+                      t("From the daycare handover, time estimated")
+                    : undefined
               }
               tintClass="text-diaper"
               onClick={() => setSheet("diaper")}
@@ -570,6 +592,11 @@ export function HomeScreen() {
         onOpenChange={(o) => setSheet(o ? "daycare" : null)}
         babyId={baby.id}
         edit={editDaycare}
+      />
+      <HandoverSheet
+        open={sheet === "handover"}
+        onOpenChange={(o) => setSheet(o ? "handover" : null)}
+        day={handoverDay}
       />
       <HelpSheet
         open={sheet === "help"}

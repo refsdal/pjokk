@@ -796,6 +796,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/daycare/{id}/handover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The day's handover, rebuilt from the rows that carry its id. A day without one answers the empty document, not a 404. */
+        get: operations["getDaycareHandover"];
+        /** Replace the day's handover in one transaction: the rows written by a previous PUT are deleted, the new ones inserted, the mood set. Idempotent, so a replayed offline save is harmless. The rows are credited to the caller (both people columns must be a member, and the staff are not users); `daycareId` is what says who really did it. */
+        put: operations["putDaycareHandover"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/daycare/{id}": {
         parameters: {
             query?: never;
@@ -1980,6 +1998,8 @@ export interface components {
             /** @description Who saved the row; set by the server, never by a client. */
             loggedById: string;
             loggedByName: string;
+            /** @description Set when the row came from a barnehage handover (issue #106): reported by the staff for that day, not done by a member. The SPA shows "at barnehage" in place of "by <name>". Never client-settable; null on every ordinary row. */
+            daycareId: string | null;
             notes: string | null;
             /** Format: date-time */
             time: string;
@@ -2155,6 +2175,8 @@ export interface components {
             /** @description Who saved the row; set by the server, never by a client. */
             loggedById: string;
             loggedByName: string;
+            /** @description Set when the row came from a barnehage handover (issue #106): reported by the staff for that day, not done by a member. The SPA shows "at barnehage" in place of "by <name>". Never client-settable; null on every ordinary row. */
+            daycareId: string | null;
             notes: string | null;
             /** Format: date-time */
             time: string;
@@ -2210,6 +2232,8 @@ export interface components {
             /** @description Who saved the row; set by the server, never by a client. */
             loggedById: string;
             loggedByName: string;
+            /** @description Set when the row came from a barnehage handover (issue #106): reported by the staff for that day, not done by a member. The SPA shows "at barnehage" in place of "by <name>". Never client-settable; null on every ordinary row. */
+            daycareId: string | null;
             notes: string | null;
             /** Format: date-time */
             startTime: string;
@@ -2331,6 +2355,11 @@ export interface components {
             /** @description Who picked up. Null while the session runs, and on a finished day whose pick-up person was not recorded. */
             pickupCaretakerId: string | null;
             pickupCaretakerName: string | null;
+            /**
+             * @description How the day went, as the staff put it at pick-up. Set only through the handover (PUT /api/daycare/{id}/handover).
+             * @enum {string|null}
+             */
+            mood: "good" | "ok" | "hard" | null;
             notes: string | null;
             /**
              * Format: date-time
@@ -2376,6 +2405,30 @@ export interface components {
             endTime?: string;
             /** @description Who picked up: a member of the caller's family (403 NOT_MEMBER otherwise). Defaults to the caller. */
             caretakerId?: string;
+        };
+        HandoverNap: {
+            /** Format: date-time */
+            startTime: string;
+            /** Format: date-time */
+            endTime: string;
+        };
+        HandoverMeal: {
+            /** Format: date-time */
+            time: string;
+            /** @enum {string|null} */
+            appetite?: "well" | "some" | "little" | null;
+            food?: string | null;
+        };
+        /** @description What the staff said at pick-up (issue #106), as one document over ORDINARY rows: each nap is a sleep_log row, each meal a solids feed_log row, each diaper a diaper_log row, all carrying the day's id as `daycareId`. GET rebuilds it from those rows; PUT replaces them, so saving twice writes once and the edit path is the create path. Diapers are a count, not times: the server spreads them evenly across the day, wet first. */
+        Handover: {
+            naps: components["schemas"]["HandoverNap"][];
+            meals: components["schemas"]["HandoverMeal"][];
+            diapers: {
+                wet: number;
+                dirty: number;
+            };
+            /** @enum {string|null} */
+            mood: "good" | "ok" | "hard" | null;
         };
         /** @description One file attached to a vaccine log. Fetch through `/api/files/{id}` — the object store is never public. */
         VaccineDocument: {
@@ -2581,6 +2634,8 @@ export interface components {
             activePlay: components["schemas"]["PlayLog"] | null;
             /** @description The running barnehage session, or null (issue #105): she is there now. State, like activeSleep — Home's banner and the hold on since-last reminders both read it. */
             activeDaycare: components["schemas"]["DaycareLog"] | null;
+            /** @description The newest day at barnehage that ended within the last 12 hours and has no handover yet (no linked rows, no mood), or null. Backs Home's "How was the day?" card (issue #106). */
+            handoverDue: components["schemas"]["DaycareLog"] | null;
             /** @description The running nursing timer, or null (issue */
             activeFeed: components["schemas"]["FeedTimer"] | null;
             /** @description The running pump timer, or null. */
@@ -6146,6 +6201,83 @@ export interface operations {
                 };
             };
             /** @description No such running session. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getDaycareHandover: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The handover. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Handover"];
+                };
+            };
+            /** @description No daycare log with this id in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    putDaycareHandover: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Handover"];
+            };
+        };
+        responses: {
+            /** @description Saved; the handover as it now reads. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Handover"];
+                };
+            };
+            /** @description A nap that ends before it starts (BAD_NAP). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No daycare log with this id in the caller's family. */
             404: {
                 headers: {
                     [name: string]: unknown;

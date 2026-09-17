@@ -662,6 +662,27 @@ func (e CreateSleepType) Valid() bool {
 	}
 }
 
+// Defines values for DaycareLogMood.
+const (
+	DaycareLogMoodGood DaycareLogMood = "good"
+	DaycareLogMoodHard DaycareLogMood = "hard"
+	DaycareLogMoodOk   DaycareLogMood = "ok"
+)
+
+// Valid indicates whether the value is a known member of the DaycareLogMood enum.
+func (e DaycareLogMood) Valid() bool {
+	switch e {
+	case DaycareLogMoodGood:
+		return true
+	case DaycareLogMoodHard:
+		return true
+	case DaycareLogMoodOk:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeviceStatus.
 const (
 	Active  DeviceStatus = "active"
@@ -908,6 +929,48 @@ func (e FeedTimerStoppedKind) Valid() bool {
 	case FeedTimerStoppedKindBreast:
 		return true
 	case FeedTimerStoppedKindPump:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HandoverMood.
+const (
+	HandoverMoodGood HandoverMood = "good"
+	HandoverMoodHard HandoverMood = "hard"
+	HandoverMoodOk   HandoverMood = "ok"
+)
+
+// Valid indicates whether the value is a known member of the HandoverMood enum.
+func (e HandoverMood) Valid() bool {
+	switch e {
+	case HandoverMoodGood:
+		return true
+	case HandoverMoodHard:
+		return true
+	case HandoverMoodOk:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HandoverMealAppetite.
+const (
+	HandoverMealAppetiteLittle HandoverMealAppetite = "little"
+	HandoverMealAppetiteSome   HandoverMealAppetite = "some"
+	HandoverMealAppetiteWell   HandoverMealAppetite = "well"
+)
+
+// Valid indicates whether the value is a known member of the HandoverMealAppetite enum.
+func (e HandoverMealAppetite) Valid() bool {
+	switch e {
+	case HandoverMealAppetiteLittle:
+		return true
+	case HandoverMealAppetiteSome:
+		return true
+	case HandoverMealAppetiteWell:
 		return true
 	default:
 		return false
@@ -2705,9 +2768,12 @@ type DaycareLog struct {
 	Id      string     `json:"id"`
 
 	// LoggedById Who saved the row; set by the server, never by a client.
-	LoggedById   string  `json:"loggedById"`
-	LoggedByName string  `json:"loggedByName"`
-	Notes        *string `json:"notes"`
+	LoggedById   string `json:"loggedById"`
+	LoggedByName string `json:"loggedByName"`
+
+	// Mood How the day went, as the staff put it at pick-up. Set only through the handover (PUT /api/daycare/{id}/handover).
+	Mood  *DaycareLogMood `json:"mood"`
+	Notes *string         `json:"notes"`
 
 	// PickupCaretakerId Who picked up. Null while the session runs, and on a finished day whose pick-up person was not recorded.
 	PickupCaretakerId   *string `json:"pickupCaretakerId"`
@@ -2716,6 +2782,9 @@ type DaycareLog struct {
 	// StartTime The drop-off.
 	StartTime time.Time `json:"startTime"`
 }
+
+// DaycareLogMood How the day went, as the staff put it at pick-up. Set only through the handover (PUT /api/daycare/{id}/handover).
+type DaycareLogMood string
 
 // DeletedFamily A family in a snapshot that does not exist now.
 type DeletedFamily struct {
@@ -2794,7 +2863,10 @@ type DiaperLog struct {
 
 	// Consistency Stool consistency. Only meaningful for dirty/both.
 	Consistency *DiaperLogConsistency `json:"consistency"`
-	Id          string                `json:"id"`
+
+	// DaycareId Set when the row came from a barnehage handover (issue #106): reported by the staff for that day, not done by a member. The SPA shows "at barnehage" in place of "by <name>". Never client-settable; null on every ordinary row.
+	DaycareId *string `json:"daycareId"`
+	Id        string  `json:"id"`
 
 	// LoggedById Who saved the row; set by the server, never by a client.
 	LoggedById   string    `json:"loggedById"`
@@ -2878,8 +2950,11 @@ type FeedLog struct {
 	CaretakerName string           `json:"caretakerName"`
 
 	// Contents What a bottle held. Only meaningful for `type: bottle`; null = not recorded.
-	Contents    *FeedLogContents `json:"contents"`
-	DurationMin *int32           `json:"durationMin"`
+	Contents *FeedLogContents `json:"contents"`
+
+	// DaycareId Set when the row came from a barnehage handover (issue #106): reported by the staff for that day, not done by a member. The SPA shows "at barnehage" in place of "by <name>". Never client-settable; null on every ordinary row.
+	DaycareId   *string `json:"daycareId"`
+	DurationMin *int32  `json:"durationMin"`
 
 	// Food What a solids feed was, free text ("Banana"). Only meaningful for `type: solids`; null = not recorded.
 	Food    *string `json:"food"`
@@ -2953,6 +3028,36 @@ type FeedTimerStoppedKind string
 type FeedTimers struct {
 	Breast *FeedTimer `json:"breast"`
 	Pump   *FeedTimer `json:"pump"`
+}
+
+// Handover What the staff said at pick-up (issue #106), as one document over ORDINARY rows: each nap is a sleep_log row, each meal a solids feed_log row, each diaper a diaper_log row, all carrying the day's id as `daycareId`. GET rebuilds it from those rows; PUT replaces them, so saving twice writes once and the edit path is the create path. Diapers are a count, not times: the server spreads them evenly across the day, wet first.
+type Handover struct {
+	Diapers struct {
+		Dirty int `json:"dirty"`
+		Wet   int `json:"wet"`
+	} `json:"diapers"`
+	Meals []HandoverMeal `json:"meals"`
+	Mood  *HandoverMood  `json:"mood"`
+	Naps  []HandoverNap  `json:"naps"`
+}
+
+// HandoverMood defines model for Handover.Mood.
+type HandoverMood string
+
+// HandoverMeal defines model for HandoverMeal.
+type HandoverMeal struct {
+	Appetite *HandoverMealAppetite `json:"appetite,omitempty"`
+	Food     *string               `json:"food,omitempty"`
+	Time     time.Time             `json:"time"`
+}
+
+// HandoverMealAppetite defines model for HandoverMeal.Appetite.
+type HandoverMealAppetite string
+
+// HandoverNap defines model for HandoverNap.
+type HandoverNap struct {
+	EndTime   time.Time `json:"endTime"`
+	StartTime time.Time `json:"startTime"`
 }
 
 // HelpRequest One caretaker asking a specific other member of the family for a hand. Family state, not a log: it is not on the timeline and has no baby. Open until someone acknowledges it; shown on Home (see Summary.openHelp) for two hours after creation whatever its state, then simply no longer returned. Names are denormalised so the card never needs a second lookup and still reads correctly after a member leaves.
@@ -3321,6 +3426,9 @@ type SleepLog struct {
 	CaretakerId   string `json:"caretakerId"`
 	CaretakerName string `json:"caretakerName"`
 
+	// DaycareId Set when the row came from a barnehage handover (issue #106): reported by the staff for that day, not done by a member. The SPA shows "at barnehage" in place of "by <name>". Never client-settable; null on every ordinary row.
+	DaycareId *string `json:"daycareId"`
+
 	// EndTime null while the session is active.
 	EndTime  *time.Time `json:"endTime"`
 	Id       string     `json:"id"`
@@ -3466,8 +3574,11 @@ type Summary struct {
 	// ActivePump The running pump timer, or null.
 	ActivePump  *FeedTimer `json:"activePump"`
 	ActiveSleep *SleepLog  `json:"activeSleep"`
-	LastDiaper  *DiaperLog `json:"lastDiaper"`
-	LastFeed    *FeedLog   `json:"lastFeed"`
+
+	// HandoverDue The newest day at barnehage that ended within the last 12 hours and has no handover yet (no linked rows, no mood), or null. Backs Home's "How was the day?" card (issue #106).
+	HandoverDue *DaycareLog `json:"handoverDue"`
+	LastDiaper  *DiaperLog  `json:"lastDiaper"`
+	LastFeed    *FeedLog    `json:"lastFeed"`
 
 	// LastNightLongestMin The longest single session of that same night — the number Stats calls the longest stretch. Null exactly when lastNightMin is.
 	LastNightLongestMin *int32 `json:"lastNightLongestMin"`
@@ -4167,6 +4278,9 @@ type CreateDaycareJSONRequestBody = CreateDaycare
 
 // UpdateDaycareJSONRequestBody defines body for UpdateDaycare for application/json ContentType.
 type UpdateDaycareJSONRequestBody = UpdateDaycare
+
+// PutDaycareHandoverJSONRequestBody defines body for PutDaycareHandover for application/json ContentType.
+type PutDaycareHandoverJSONRequestBody = Handover
 
 // PickupDaycareJSONRequestBody defines body for PickupDaycare for application/json ContentType.
 type PickupDaycareJSONRequestBody = PickupDaycare

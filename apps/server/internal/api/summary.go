@@ -152,6 +152,18 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		return nil, err
 	}
 
+	// Picked up within the last 12 hours and nobody has said how the day
+	// went (handover.go, issue #106): Home offers the handover sheet.
+	var handoverDue *gen.DaycareLog
+	if day, err := d.Q.HandoverDue(ctx, dbgen.HandoverDueParams{
+		FamilyID: fam.FamilyID, BabyID: babyID, Since: ts(d.Now().Add(-handoverDueWindow)),
+	}); err == nil {
+		v := serDaycare(dbgen.GetDaycareRow(day))
+		handoverDue = &v
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+
 	// The shared nursing / pump timers (feed_timer.go), read the same way
 	// activeSleep / activePlay are: state, not screens.
 	activeFeed, err := d.activeFeedTimer(ctx, fam.FamilyID, babyID, "breast")
@@ -307,6 +319,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		LastNightLongestMin: lastNightLongestMin,
 		ActivePlay:          activePlay,
 		ActiveDaycare:       activeDaycare,
+		HandoverDue:         handoverDue,
 		ActiveFeed:          activeFeed,
 		ActivePump:          activePump,
 		LastTemperature:     lastTemperature,

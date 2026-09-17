@@ -15,7 +15,7 @@ const activeDaycare = `-- name: ActiveDaycare :one
 SELECT
     d."id", d."baby_id", d."caretaker_id", d."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     d."pickup_caretaker_id", pu."display_name" AS pickup_caretaker_name,
-    d."start_time", d."end_time", d."notes"
+    d."start_time", d."end_time", d."notes", d."mood"
 FROM "daycare_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
 JOIN "users" lu ON lu."id" = d."logged_by_id"
@@ -44,6 +44,7 @@ type ActiveDaycareRow struct {
 	StartTime           pgtype.Timestamptz
 	EndTime             pgtype.Timestamptz
 	Notes               *string
+	Mood                *string
 }
 
 // The running session for a baby, if any; without a baby, the family's most
@@ -63,7 +64,35 @@ func (q *Queries) ActiveDaycare(ctx context.Context, arg ActiveDaycareParams) (A
 		&i.StartTime,
 		&i.EndTime,
 		&i.Notes,
+		&i.Mood,
 	)
+	return i, err
+}
+
+const countHandoverDiapers = `-- name: CountHandoverDiapers :one
+SELECT
+    COUNT(*) FILTER (WHERE "type" = 'wet')::int AS wet,
+    COUNT(*) FILTER (WHERE "type" IN ('dirty', 'both'))::int AS dirty
+FROM "diaper_log"
+WHERE "family_id" = $1 AND "daycare_id" = $2
+`
+
+type CountHandoverDiapersParams struct {
+	FamilyID  string
+	DaycareID *string
+}
+
+type CountHandoverDiapersRow struct {
+	Wet   int32
+	Dirty int32
+}
+
+// 'both' counts as dirty: the sheet has two steppers, and a row a parent
+// later edited to "both" is still one nappy that was not merely wet.
+func (q *Queries) CountHandoverDiapers(ctx context.Context, arg CountHandoverDiapersParams) (CountHandoverDiapersRow, error) {
+	row := q.db.QueryRow(ctx, countHandoverDiapers, arg.FamilyID, arg.DaycareID)
+	var i CountHandoverDiapersRow
+	err := row.Scan(&i.Wet, &i.Dirty)
 	return i, err
 }
 
@@ -98,6 +127,88 @@ func (q *Queries) CreateDaycare(ctx context.Context, arg CreateDaycareParams) (s
 	var id string
 	err := row.Scan(&id)
 	return id, err
+}
+
+const createHandoverDiaper = `-- name: CreateHandoverDiaper :exec
+INSERT INTO "diaper_log" ("family_id", "baby_id", "caretaker_id", "logged_by_id", "daycare_id", "time", "type")
+VALUES ($1, $2, $3, $3, $4, $5, $6)
+`
+
+type CreateHandoverDiaperParams struct {
+	FamilyID  string
+	BabyID    string
+	UserID    string
+	DaycareID *string
+	Time      pgtype.Timestamptz
+	Type      string
+}
+
+func (q *Queries) CreateHandoverDiaper(ctx context.Context, arg CreateHandoverDiaperParams) error {
+	_, err := q.db.Exec(ctx, createHandoverDiaper,
+		arg.FamilyID,
+		arg.BabyID,
+		arg.UserID,
+		arg.DaycareID,
+		arg.Time,
+		arg.Type,
+	)
+	return err
+}
+
+const createHandoverMeal = `-- name: CreateHandoverMeal :exec
+INSERT INTO "feed_log" ("family_id", "baby_id", "caretaker_id", "logged_by_id", "daycare_id", "time", "type", "appetite", "food")
+VALUES ($1, $2, $3, $3, $4, $5, 'solids', $6, $7)
+`
+
+type CreateHandoverMealParams struct {
+	FamilyID  string
+	BabyID    string
+	UserID    string
+	DaycareID *string
+	Time      pgtype.Timestamptz
+	Appetite  *string
+	Food      *string
+}
+
+func (q *Queries) CreateHandoverMeal(ctx context.Context, arg CreateHandoverMealParams) error {
+	_, err := q.db.Exec(ctx, createHandoverMeal,
+		arg.FamilyID,
+		arg.BabyID,
+		arg.UserID,
+		arg.DaycareID,
+		arg.Time,
+		arg.Appetite,
+		arg.Food,
+	)
+	return err
+}
+
+const createHandoverNap = `-- name: CreateHandoverNap :exec
+INSERT INTO "sleep_log" ("family_id", "baby_id", "caretaker_id", "logged_by_id", "daycare_id", "start_time", "end_time", "location", "type")
+VALUES ($1, $2, $3, $3, $4, $5, $6, $7, 'nap')
+`
+
+type CreateHandoverNapParams struct {
+	FamilyID  string
+	BabyID    string
+	UserID    string
+	DaycareID *string
+	StartTime pgtype.Timestamptz
+	EndTime   pgtype.Timestamptz
+	Location  *string
+}
+
+func (q *Queries) CreateHandoverNap(ctx context.Context, arg CreateHandoverNapParams) error {
+	_, err := q.db.Exec(ctx, createHandoverNap,
+		arg.FamilyID,
+		arg.BabyID,
+		arg.UserID,
+		arg.DaycareID,
+		arg.StartTime,
+		arg.EndTime,
+		arg.Location,
+	)
+	return err
 }
 
 const daycareHold = `-- name: DaycareHold :one
@@ -148,11 +259,53 @@ func (q *Queries) DeleteDaycare(ctx context.Context, arg DeleteDaycareParams) (i
 	return result.RowsAffected(), nil
 }
 
+const deleteHandoverDiapers = `-- name: DeleteHandoverDiapers :exec
+DELETE FROM "diaper_log" WHERE "family_id" = $1 AND "daycare_id" = $2
+`
+
+type DeleteHandoverDiapersParams struct {
+	FamilyID  string
+	DaycareID *string
+}
+
+func (q *Queries) DeleteHandoverDiapers(ctx context.Context, arg DeleteHandoverDiapersParams) error {
+	_, err := q.db.Exec(ctx, deleteHandoverDiapers, arg.FamilyID, arg.DaycareID)
+	return err
+}
+
+const deleteHandoverFeeds = `-- name: DeleteHandoverFeeds :exec
+DELETE FROM "feed_log" WHERE "family_id" = $1 AND "daycare_id" = $2
+`
+
+type DeleteHandoverFeedsParams struct {
+	FamilyID  string
+	DaycareID *string
+}
+
+func (q *Queries) DeleteHandoverFeeds(ctx context.Context, arg DeleteHandoverFeedsParams) error {
+	_, err := q.db.Exec(ctx, deleteHandoverFeeds, arg.FamilyID, arg.DaycareID)
+	return err
+}
+
+const deleteHandoverSleeps = `-- name: DeleteHandoverSleeps :exec
+DELETE FROM "sleep_log" WHERE "family_id" = $1 AND "daycare_id" = $2
+`
+
+type DeleteHandoverSleepsParams struct {
+	FamilyID  string
+	DaycareID *string
+}
+
+func (q *Queries) DeleteHandoverSleeps(ctx context.Context, arg DeleteHandoverSleepsParams) error {
+	_, err := q.db.Exec(ctx, deleteHandoverSleeps, arg.FamilyID, arg.DaycareID)
+	return err
+}
+
 const getDaycare = `-- name: GetDaycare :one
 SELECT
     d."id", d."baby_id", d."caretaker_id", d."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     d."pickup_caretaker_id", pu."display_name" AS pickup_caretaker_name,
-    d."start_time", d."end_time", d."notes"
+    d."start_time", d."end_time", d."notes", d."mood"
 FROM "daycare_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
 JOIN "users" lu ON lu."id" = d."logged_by_id"
@@ -177,6 +330,7 @@ type GetDaycareRow struct {
 	StartTime           pgtype.Timestamptz
 	EndTime             pgtype.Timestamptz
 	Notes               *string
+	Mood                *string
 }
 
 func (q *Queries) GetDaycare(ctx context.Context, arg GetDaycareParams) (GetDaycareRow, error) {
@@ -194,6 +348,72 @@ func (q *Queries) GetDaycare(ctx context.Context, arg GetDaycareParams) (GetDayc
 		&i.StartTime,
 		&i.EndTime,
 		&i.Notes,
+		&i.Mood,
+	)
+	return i, err
+}
+
+const handoverDue = `-- name: HandoverDue :one
+SELECT
+    d."id", d."baby_id", d."caretaker_id", d."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    d."pickup_caretaker_id", pu."display_name" AS pickup_caretaker_name,
+    d."start_time", d."end_time", d."notes", d."mood"
+FROM "daycare_log" d
+JOIN "users" u ON u."id" = d."caretaker_id"
+JOIN "users" lu ON lu."id" = d."logged_by_id"
+LEFT JOIN "users" pu ON pu."id" = d."pickup_caretaker_id"
+WHERE d."family_id" = $1
+  AND d."baby_id" = $2
+  AND d."end_time" IS NOT NULL
+  AND d."end_time" > $3::timestamptz
+  AND d."mood" IS NULL
+  AND NOT EXISTS (SELECT 1 FROM "sleep_log" x WHERE x."daycare_id" = d."id")
+  AND NOT EXISTS (SELECT 1 FROM "feed_log" x WHERE x."daycare_id" = d."id")
+  AND NOT EXISTS (SELECT 1 FROM "diaper_log" x WHERE x."daycare_id" = d."id")
+ORDER BY d."end_time" DESC
+LIMIT 1
+`
+
+type HandoverDueParams struct {
+	FamilyID string
+	BabyID   string
+	Since    pgtype.Timestamptz
+}
+
+type HandoverDueRow struct {
+	ID                  string
+	BabyID              string
+	CaretakerID         string
+	LoggedByID          string
+	CaretakerName       string
+	LoggedByName        string
+	PickupCaretakerID   *string
+	PickupCaretakerName *string
+	StartTime           pgtype.Timestamptz
+	EndTime             pgtype.Timestamptz
+	Notes               *string
+	Mood                *string
+}
+
+// The newest day that ended within the window and has no handover yet: no
+// mood and no linked row (issue #106). Backs Summary.handoverDue, Home's
+// "How was the day?" card.
+func (q *Queries) HandoverDue(ctx context.Context, arg HandoverDueParams) (HandoverDueRow, error) {
+	row := q.db.QueryRow(ctx, handoverDue, arg.FamilyID, arg.BabyID, arg.Since)
+	var i HandoverDueRow
+	err := row.Scan(
+		&i.ID,
+		&i.BabyID,
+		&i.CaretakerID,
+		&i.LoggedByID,
+		&i.CaretakerName,
+		&i.LoggedByName,
+		&i.PickupCaretakerID,
+		&i.PickupCaretakerName,
+		&i.StartTime,
+		&i.EndTime,
+		&i.Notes,
+		&i.Mood,
 	)
 	return i, err
 }
@@ -203,7 +423,7 @@ const listDaycares = `-- name: ListDaycares :many
 SELECT
     d."id", d."baby_id", d."caretaker_id", d."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     d."pickup_caretaker_id", pu."display_name" AS pickup_caretaker_name,
-    d."start_time", d."end_time", d."notes"
+    d."start_time", d."end_time", d."notes", d."mood"
 FROM "daycare_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
 JOIN "users" lu ON lu."id" = d."logged_by_id"
@@ -232,6 +452,7 @@ type ListDaycaresRow struct {
 	StartTime           pgtype.Timestamptz
 	EndTime             pgtype.Timestamptz
 	Notes               *string
+	Mood                *string
 }
 
 // Days at barnehage (issue #105). Structurally play.sql, which is
@@ -263,7 +484,81 @@ func (q *Queries) ListDaycares(ctx context.Context, arg ListDaycaresParams) ([]L
 			&i.StartTime,
 			&i.EndTime,
 			&i.Notes,
+			&i.Mood,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listHandoverMeals = `-- name: ListHandoverMeals :many
+SELECT "time", "appetite", "food" FROM "feed_log"
+WHERE "family_id" = $1 AND "daycare_id" = $2
+ORDER BY "time", "id"
+`
+
+type ListHandoverMealsParams struct {
+	FamilyID  string
+	DaycareID *string
+}
+
+type ListHandoverMealsRow struct {
+	Time     pgtype.Timestamptz
+	Appetite *string
+	Food     *string
+}
+
+func (q *Queries) ListHandoverMeals(ctx context.Context, arg ListHandoverMealsParams) ([]ListHandoverMealsRow, error) {
+	rows, err := q.db.Query(ctx, listHandoverMeals, arg.FamilyID, arg.DaycareID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListHandoverMealsRow
+	for rows.Next() {
+		var i ListHandoverMealsRow
+		if err := rows.Scan(&i.Time, &i.Appetite, &i.Food); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listHandoverNaps = `-- name: ListHandoverNaps :many
+SELECT "start_time", "end_time" FROM "sleep_log"
+WHERE "family_id" = $1 AND "daycare_id" = $2 AND "end_time" IS NOT NULL
+ORDER BY "start_time", "id"
+`
+
+type ListHandoverNapsParams struct {
+	FamilyID  string
+	DaycareID *string
+}
+
+type ListHandoverNapsRow struct {
+	StartTime pgtype.Timestamptz
+	EndTime   pgtype.Timestamptz
+}
+
+func (q *Queries) ListHandoverNaps(ctx context.Context, arg ListHandoverNapsParams) ([]ListHandoverNapsRow, error) {
+	rows, err := q.db.Query(ctx, listHandoverNaps, arg.FamilyID, arg.DaycareID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListHandoverNapsRow
+	for rows.Next() {
+		var i ListHandoverNapsRow
+		if err := rows.Scan(&i.StartTime, &i.EndTime); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -301,6 +596,25 @@ func (q *Queries) PickupDaycare(ctx context.Context, arg PickupDaycareParams) (i
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const setDaycareMood = `-- name: SetDaycareMood :exec
+
+UPDATE "daycare_log" SET "mood" = $1
+WHERE "family_id" = $2 AND "id" = $3
+`
+
+type SetDaycareMoodParams struct {
+	Mood     *string
+	FamilyID string
+	ID       string
+}
+
+// The handover's rows. Every statement is family-scoped as well as
+// day-scoped: the day's id alone is never the whole key.
+func (q *Queries) SetDaycareMood(ctx context.Context, arg SetDaycareMoodParams) error {
+	_, err := q.db.Exec(ctx, setDaycareMood, arg.Mood, arg.FamilyID, arg.ID)
+	return err
 }
 
 const updateDaycare = `-- name: UpdateDaycare :execrows

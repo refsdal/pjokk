@@ -23,6 +23,7 @@ func serDiaper(row dbgen.GetDiaperRow) gen.DiaperLog {
 		CaretakerName: row.CaretakerName,
 		LoggedById:    row.LoggedByID,
 		LoggedByName:  row.LoggedByName,
+		DaycareId:     row.DaycareID,
 		Notes:         row.Notes,
 		Time:          row.Time.Time,
 		Type:          gen.DiaperLogType(row.Type),

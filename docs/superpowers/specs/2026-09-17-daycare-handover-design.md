@@ -62,7 +62,13 @@ Handover {
 - Naps become `sleep_log` rows, `type = nap`, `location = 'Barnehage'`
   (the word is the family's data, written by the server in one language on
   purpose: it is a place name, and the sleep-location chips are free text
-  already). A nap must end after it starts (400).
+  already). A nap must end after it starts (400 `BAD_NAP`).
+- **A handover is about the hours she was there.** A nap or a meal outside
+  the day — before the drop-off (widened to its minute, because the sheet
+  speaks in whole minutes) or after the pick-up, or after now for a day
+  still running — is refused (400 `OUTSIDE_DAY`). Not pedantry: a usual
+  11:30 nap saved for a child fetched at 09:30 with a fever is a sleep in
+  the future, and Home's Awake card counts from its end.
 - Meals become `feed_log` rows, `type = solids`, no amount.
 - Diapers have a count, not times. They are spread evenly across the
   session (the n-th of N at `start + n·span/(N+1)`), wet first. The link
@@ -87,7 +93,11 @@ Handover {
   optional; saving nothing is allowed and only dismisses the card.
 - **Last-value prefill.** Nap clock times and meal clock times come from
   the previous day's handover; without one: nap 11:30–13:00, meals 08:30 /
-  11:00 / 14:00, clamped into the session. Appetite, diaper counts and
+  11:00 / 14:00. Only what fits the hours she was there is offered: a
+  usual nap that does not fit is left out, a meal slot outside the day is
+  not shown, "Add a nap" after an early pick-up adds the last hour and a
+  half, and a nap typed outside the day blocks Save with a line saying
+  when she was there. Appetite, diaper counts and
   mood never prefill: they are observations of this day.
 - Meal times are not editable in the sheet (v1). The rows are ordinary
   feeds and open in the feed sheet from the timeline.

@@ -1953,6 +1953,69 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/daycare/{id}/handover:
+    get:
+      operationId: getDaycareHandover
+      summary: >-
+        The day's handover, rebuilt from the rows that carry its id. A day
+        without one answers the empty document, not a 404.
+      tags: [daycare]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: The handover.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Handover"
+        "404":
+          description: No daycare log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      operationId: putDaycareHandover
+      summary: >-
+        Replace the day's handover in one transaction: the rows written by
+        a previous PUT are deleted, the new ones inserted, the mood set.
+        Idempotent, so a replayed offline save is harmless. The rows are
+        credited to the caller (both people columns must be a member, and
+        the staff are not users); `daycareId` is what says who really did
+        it.
+      tags: [daycare]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Handover"
+      responses:
+        "200":
+          description: Saved; the handover as it now reads.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Handover"
+        "400":
+          description: >-
+            A nap that ends before it starts (BAD_NAP), or a nap or meal
+            outside the hours she was there (OUTSIDE_DAY): between the
+            drop-off, widened to its minute, and the pick-up — or now, for
+            a day still running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No daycare log with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/daycare/{id}:
     patch:
       operationId: updateDaycare
@@ -4521,6 +4584,7 @@ components:
         - caretakerName
         - loggedById
         - loggedByName
+        - daycareId
         - notes
         - time
         - type
@@ -4547,6 +4611,14 @@ components:
           description: Who saved the row; set by the server, never by a client.
         loggedByName:
           type: string
+        daycareId:
+          type: string
+          nullable: true
+          description: >-
+            Set when the row came from a barnehage handover (issue #106):
+            reported by the staff for that day, not done by a member. The
+            SPA shows "at barnehage" in place of "by <name>". Never
+            client-settable; null on every ordinary row.
         notes:
           type: string
           nullable: true
@@ -4896,6 +4968,7 @@ components:
         - caretakerName
         - loggedById
         - loggedByName
+        - daycareId
         - notes
         - time
         - type
@@ -4915,6 +4988,14 @@ components:
           description: Who saved the row; set by the server, never by a client.
         loggedByName:
           type: string
+        daycareId:
+          type: string
+          nullable: true
+          description: >-
+            Set when the row came from a barnehage handover (issue #106):
+            reported by the staff for that day, not done by a member. The
+            SPA shows "at barnehage" in place of "by <name>". Never
+            client-settable; null on every ordinary row.
         notes:
           type: string
           nullable: true
@@ -5002,6 +5083,7 @@ components:
         - caretakerName
         - loggedById
         - loggedByName
+        - daycareId
         - notes
         - startTime
         - endTime
@@ -5021,6 +5103,14 @@ components:
           description: Who saved the row; set by the server, never by a client.
         loggedByName:
           type: string
+        daycareId:
+          type: string
+          nullable: true
+          description: >-
+            Set when the row came from a barnehage handover (issue #106):
+            reported by the staff for that day, not done by a member. The
+            SPA shows "at barnehage" in place of "by <name>". Never
+            client-settable; null on every ordinary row.
         notes:
           type: string
           nullable: true
@@ -5246,6 +5336,7 @@ components:
         - loggedByName
         - pickupCaretakerId
         - pickupCaretakerName
+        - mood
         - notes
         - startTime
         - endTime
@@ -5273,6 +5364,13 @@ components:
         pickupCaretakerName:
           type: string
           nullable: true
+        mood:
+          type: string
+          enum: [good, ok, hard]
+          nullable: true
+          description: >-
+            How the day went, as the staff put it at pick-up. Set only
+            through the handover (PUT /api/daycare/{id}/handover).
         notes:
           type: string
           nullable: true
@@ -5355,6 +5453,69 @@ components:
           type: string
           description: >-
             Who picked up: a member of the caller's family (403 NOT_MEMBER otherwise). Defaults to the caller.
+    HandoverNap:
+      type: object
+      required: [startTime, endTime]
+      properties:
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+    HandoverMeal:
+      type: object
+      required: [time]
+      properties:
+        time:
+          type: string
+          format: date-time
+        appetite:
+          type: string
+          enum: [well, some, little]
+          nullable: true
+        food:
+          type: string
+          maxLength: 100
+          nullable: true
+    Handover:
+      type: object
+      description: >-
+        What the staff said at pick-up (issue #106), as one document over
+        ORDINARY rows: each nap is a sleep_log row, each meal a solids
+        feed_log row, each diaper a diaper_log row, all carrying the day's
+        id as `daycareId`. GET rebuilds it from those rows; PUT replaces
+        them, so saving twice writes once and the edit path is the create
+        path. Diapers are a count, not times: the server spreads them
+        evenly across the day, wet first.
+      required: [naps, meals, diapers, mood]
+      properties:
+        naps:
+          type: array
+          maxItems: 4
+          items:
+            $ref: "#/components/schemas/HandoverNap"
+        meals:
+          type: array
+          maxItems: 6
+          items:
+            $ref: "#/components/schemas/HandoverMeal"
+        diapers:
+          type: object
+          required: [wet, dirty]
+          properties:
+            wet:
+              type: integer
+              minimum: 0
+              maximum: 10
+            dirty:
+              type: integer
+              minimum: 0
+              maximum: 10
+        mood:
+          type: string
+          enum: [good, ok, hard]
+          nullable: true
     VaccineDocument:
       type: object
       description: >-
@@ -5795,6 +5956,7 @@ components:
         - lastNightLongestMin
         - activePlay
         - activeDaycare
+        - handoverDue
         - activeFeed
         - activePump
         - lastTemperature
@@ -5846,6 +6008,14 @@ components:
             The running barnehage session, or null (issue #105): she is
             there now. State, like activeSleep — Home's banner and the hold
             on since-last reminders both read it.
+          allOf:
+            - $ref: "#/components/schemas/DaycareLog"
+          nullable: true
+        handoverDue:
+          description: >-
+            The newest day at barnehage that ended within the last 12 hours
+            and has no handover yet (no linked rows, no mood), or null.
+            Backs Home's "How was the day?" card (issue #106).
           allOf:
             - $ref: "#/components/schemas/DaycareLog"
           nullable: true
