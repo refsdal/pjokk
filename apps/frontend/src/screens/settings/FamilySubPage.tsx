@@ -10,6 +10,7 @@ import { ApiKeysSection } from "./ApiKeysSection";
 import { CalendarFeedCard } from "./CalendarFeedCard";
 import { CareDaysSection } from "./CareDaysSection";
 import { ContactsSection } from "./ContactsSection";
+import { DaycarePlaceSection } from "./DaycarePlaceSection";
 import { SettingsPage } from "./lib";
 import { MedicinesSection } from "./MedicinesSection";
 import { PhotoUsageLine } from "./PhotoUsageLine";
@@ -65,6 +66,7 @@ export function FamilySubPage({ section }: { section: string }) {
 
   const body: Record<FamilySectionKey, ReactNode> = {
     contacts: <ContactsSection />,
+    daycare: <DaycarePlaceSection isAdmin={isAdmin} />,
     medicines: <MedicinesSection />,
     "sleep-locations": <SleepLocationsSection />,
     "care-days": <CareDaysSection isAdmin={isAdmin} />,

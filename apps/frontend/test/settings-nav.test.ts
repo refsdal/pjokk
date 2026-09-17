@@ -9,6 +9,7 @@ describe("familySections", () => {
     const keys = familySections(false).map((s) => s.key);
     expect(keys).toEqual([
       "contacts",
+      "daycare",
       "medicines",
       "care-days",
       "calendar-feed",
@@ -20,6 +21,7 @@ describe("familySections", () => {
     const keys = familySections(true).map((s) => s.key);
     expect(keys).toEqual([
       "contacts",
+      "daycare",
       "medicines",
       "sleep-locations",
       "care-days",

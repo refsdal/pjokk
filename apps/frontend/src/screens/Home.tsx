@@ -395,6 +395,7 @@ export function HomeScreen() {
           {activeDaycare && (
             <ActiveDaycareBanner
               session={activeDaycare}
+              today={summary.data?.daycare}
               onEdit={(session) => {
                 setEditDaycare(session);
                 setSheet("daycare");

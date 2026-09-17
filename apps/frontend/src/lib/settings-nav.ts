@@ -6,6 +6,7 @@
 // landing on a page of errors.
 export type FamilySectionKey =
   | "contacts"
+  | "daycare"
   | "medicines"
   | "sleep-locations"
   | "care-days"
@@ -25,6 +26,9 @@ export type FamilySectionMeta = {
 
 const sections: FamilySectionMeta[] = [
   { key: "contacts", label: "Contacts", group: "lists" },
+  // Not admin-only: a grandparent needs the phone number. The page itself
+  // is read-only for a member.
+  { key: "daycare", label: "Daycare", group: "lists" },
   { key: "medicines", label: "Medicines", group: "lists" },
   {
     key: "sleep-locations",

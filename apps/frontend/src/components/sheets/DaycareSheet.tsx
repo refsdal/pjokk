@@ -4,6 +4,7 @@ import {
   CaretakerChips,
   useCaretakerChoice,
 } from "@/components/CaretakerChips";
+import { DaycarePlaceBlock } from "@/components/DaycarePlaceBlock";
 import { DeleteButton } from "@/components/DeleteButton";
 import { Sheet, useSheetReset } from "@/components/Sheet";
 import { TimeField } from "@/components/TimeField";
@@ -165,6 +166,12 @@ export function DaycareSheet({
         />
 
         <CaretakerChips choice={who} edit={edit} label="Dropped off by" />
+
+        {/* The place and who collects today: at the gate in the morning,
+            and on the running day. A finished day has no "today". */}
+        {(isRunningEdit || (!edit && !finished)) && (
+          <DaycarePlaceBlock babyId={babyId} />
+        )}
 
         {isRunningEdit && (
           <p className="text-sm text-muted">
