@@ -78,7 +78,7 @@ export function HandoverSheet({
     q.isError || q.fetchStatus === "paused" || (!q.isPending && !q.isFetching);
   const ready =
     settled(saved) && settled(recent) && (!previousId || settled(previous));
-  if (open && ready && draft === null) {
+  if (open && day && ready && draft === null) {
     setDraft(draftFor(saved.data ?? null, previous.data ?? null, day));
   }
 
