@@ -1,8 +1,10 @@
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Baby, Family, Invite, Member } from "@pjokk/shared";
+import type { QueryClient } from "@tanstack/react-query";
+import type { Baby, Family, Feature, Invite, Member } from "@pjokk/shared";
 import type { components } from "@pjokk/shared";
 import { API_BASE, client, unwrap } from "../api";
+import { toast } from "../toast";
 
 // Who the caller is, according to the server. This replaces every read the
 // screens used to take off the better-auth session object — the system-admin
@@ -52,6 +54,48 @@ export function useBabies() {
   return useQuery({
     queryKey: ["babies"],
     queryFn: async () => unwrap<Baby[]>(client.GET("/api/babies")),
+  });
+}
+
+export type SetBabyFeaturesVars = { babyId: string; features: Feature[] };
+
+// The per-baby tracking switches (lib/tracking.ts). Optimistic on the
+// babies list, which is what every screen reads, so a card lights up at
+// once; a flip made offline queues like a log and replays whole (the
+// route replaces the set, so a replay is harmless).
+export function registerFamilyMutationDefaults(qc: QueryClient) {
+  qc.setMutationDefaults(["setBabyFeatures"], {
+    mutationFn: async (vars: SetBabyFeaturesVars) =>
+      unwrap<Baby>(
+        client.PUT("/api/babies/{id}/features", {
+          params: { path: { id: vars.babyId } },
+          body: { features: vars.features },
+        }),
+      ),
+    onMutate: async (vars: SetBabyFeaturesVars) => {
+      await qc.cancelQueries({ queryKey: ["babies"] });
+      const previous = qc.getQueryData<Baby[]>(["babies"]);
+      qc.setQueryData<Baby[]>(["babies"], (old) =>
+        old?.map((b) =>
+          b.id === vars.babyId ? { ...b, features: vars.features } : b,
+        ),
+      );
+      return { previous };
+    },
+    onError: (err: Error, _vars: SetBabyFeaturesVars, ctx: unknown) => {
+      const snap = ctx as { previous?: Baby[] } | undefined;
+      if (snap?.previous) qc.setQueryData(["babies"], snap.previous);
+      toast(err.message, "error");
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["babies"] });
+    },
+  });
+}
+
+export function useSetBabyFeatures() {
+  return useMutation<Baby, Error, SetBabyFeaturesVars>({
+    mutationKey: ["setBabyFeatures"],
   });
 }
 

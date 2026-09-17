@@ -13,6 +13,7 @@ const babies = [
     birthDate: "2026-06-15T00:00:00.000Z",
     sex: "girl" as const,
     avatarUrl: "/api/babies/b1/avatar?v=k.jpg",
+    features: [],
   },
   {
     id: "b2",
@@ -20,6 +21,7 @@ const babies = [
     birthDate: "2024-01-10T00:00:00.000Z",
     sex: "boy" as const,
     avatarUrl: null,
+    features: [],
   },
 ];
 
