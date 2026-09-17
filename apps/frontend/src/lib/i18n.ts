@@ -399,6 +399,37 @@ const nb: Record<string, string> = {
     "Fortsatt der — avslutt dagen med Hent på Hjem.",
   "At daycare since then": "I barnehagen siden da",
 
+  // The barnehage as a place, and the pick-up plan (spec 2026-09-17-
+  // daycare-place-and-pickup-plan-design.md).
+  Closes: "Stenger",
+  "Closed at": "Stengte kl.",
+  in: "om",
+  Opens: "Åpner",
+  Directions: "Veibeskrivelse",
+  "Collecting today": "Henter i dag",
+  "Add the barnehage to keep its number and address at hand, and to hear when she is still there near closing time.":
+    "Legg til barnehagen for å ha nummeret og adressen for hånden, og for å få beskjed når hun fortsatt er der nær stengetid.",
+  "A parent can add the barnehage here.":
+    "En forelder kan legge til barnehagen her.",
+  "Add barnehage": "Legg til barnehage",
+  "Add another barnehage": "Legg til en barnehage til",
+  Saved: "Lagret",
+  "Name of the barnehage": "Barnehagens navn",
+  Address: "Adresse",
+  "Still there near closing": "Fortsatt der nær stengetid",
+  "One notification this long before closing if she has not been picked up, to whoever the plan says collects her that day, or to the parents when it names nobody.":
+    "Ett varsel så lenge før stengetid hvis hun ikke er hentet, til den planen sier henter den dagen, eller til foreldrene når den ikke nevner noen.",
+  "Who goes here": "Hvem går her",
+  "Pick-up plan": "Henteplan",
+  "Save plan": "Lagre plan",
+  "The time is when you expect to collect her. It shows on Home while she is there; nothing reminds you of it. Someone else on one day? Set it on the day itself, from Home.":
+    "Tiden er når dere regner med å hente henne. Den vises på Hjem mens hun er der; ingenting minner dere på den. Noen andre én dag? Sett det på selve dagen, fra Hjem.",
+  Monday: "Mandag",
+  Tuesday: "Tirsdag",
+  Wednesday: "Onsdag",
+  Thursday: "Torsdag",
+  Friday: "Fredag",
+
   // Vaccines
   Vaccines: "Vaksiner",
   Vaccine: "Vaksine",

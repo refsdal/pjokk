@@ -867,6 +867,77 @@ export interface paths {
         patch: operations["updateDaycare"];
         trace?: never;
     };
+    "/api/daycare-places": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The family's barnehager as places: how to reach each, when it opens and closes, and which babies attend. Any member may read; usually one row. */
+        get: operations["listDaycarePlaces"];
+        put?: never;
+        /** Add a place (family admins). `babyIds` enrols those babies here, and moves any of them from another place: a baby attends one at a time. */
+        post: operations["createDaycarePlace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/daycare-places/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Replace a place, enrolments included (family admins). A PUT, not a PATCH: the settings page holds every field, and a replayed offline save is harmless. */
+        put: operations["updateDaycarePlace"];
+        post?: never;
+        /** Delete a place (family admins); its enrolments cascade, pick-up plans stay. */
+        delete: operations["deleteDaycarePlace"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/babies/{id}/pickup-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Who collects this baby from barnehage and when, Monday to Friday, plus the one-day exceptions from yesterday on. Days nobody has planned are simply absent. */
+        get: operations["getPickupPlan"];
+        /** Replace the weekly grid in one transaction (family admins). A day with neither a time nor a person is dropped. Every person must be a member of the family. */
+        put: operations["setPickupPlan"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/babies/{id}/pickup-override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Who collects on ONE day instead of the grid's person; a null userId clears the day. Any member may. `date` is the caller's own local day: the server derives none. */
+        put: operations["setPickupOverride"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/illness": {
         parameters: {
             query?: never;
@@ -2677,6 +2748,68 @@ export interface components {
             /** @description One per CURRENT member, those with nothing used included. */
             totals: components["schemas"]["CareDayTotal"][];
         };
+        DaycarePlace: {
+            id: string;
+            name: string;
+            address: string | null;
+            phone: string | null;
+            email: string | null;
+            website: string | null;
+            notes: string | null;
+            /** @description Opens, minutes after local midnight in `tz`; one time for every weekday. */
+            openMinute: number | null;
+            /** @description Closes, minutes after local midnight in `tz`. */
+            closeMinute: number | null;
+            /** @description The family's own number: how long before closing the planned person is told she is still there. Null means no alert. */
+            alertLeadMin: number | null;
+            /** @description IANA zone the hours are wall-clock times in. */
+            tz: string;
+            babyIds: string[];
+        };
+        DaycarePlaceInput: {
+            name: string;
+            address?: string | null;
+            phone?: string | null;
+            /** @description Free text, like a contact's website; saving matters more than shape. */
+            email?: string | null;
+            website?: string | null;
+            notes?: string | null;
+            openMinute?: number | null;
+            closeMinute?: number | null;
+            alertLeadMin?: number | null;
+            tz: string;
+            /** @default [] */
+            babyIds: string[];
+        };
+        PickupPlanDay: {
+            /** @description ISO weekday, 1 = Monday. Barnehage is Monday to Friday. */
+            weekday: number;
+            /** @description Expected pick-up, minutes after local midnight. A plan, not a deadline; nothing fires on it. */
+            minute: number | null;
+            /** @description Who collects; a member of the family, or nobody named. */
+            userId: string | null;
+        };
+        PickupOverride: {
+            date: string;
+            userId: string;
+        };
+        PickupPlan: {
+            days: components["schemas"]["PickupPlanDay"][];
+            /** @description One-day exceptions from yesterday (UTC) on, oldest first. */
+            overrides: components["schemas"]["PickupOverride"][];
+        };
+        SetPickupPlan: {
+            days: components["schemas"]["PickupPlanDay"][];
+        };
+        SetPickupOverride: {
+            date: string;
+            /** @description Null clears the day back to the grid. */
+            userId: string | null;
+        };
+        DaycareToday: {
+            place: components["schemas"]["DaycarePlace"] | null;
+            plan: components["schemas"]["PickupPlan"];
+        };
         CreateCareDay: {
             /** @description Who stayed home; a member of the caller's family. Defaults to the caller. */
             userId?: string;
@@ -2953,6 +3086,8 @@ export interface components {
             activeDaycare: components["schemas"]["DaycareLog"] | null;
             /** @description The newest day at barnehage that ended within the last 12 hours and has no handover yet (no linked rows, no mood), or null. Backs Home's "How was the day?" card (issue #106). */
             handoverDue: components["schemas"]["DaycareLog"] | null;
+            /** @description This baby's barnehage as a place and her pick-up plan, or null when she has neither. The CLIENT resolves "today" against its own date, so Home needs no second request and the server guesses no local day for display. */
+            daycare: components["schemas"]["DaycareToday"] | null;
             /** @description The family's own nap anchor for this baby, minutes after local midnight, or null (issue #112). A wall-clock time with no timezone: the device compares it with its own clock. */
             usualNapMinute: number | null;
             /** @description The open illness episode, or null (issue */
@@ -6796,6 +6931,258 @@ export interface operations {
             };
             /** @description Clearing endTime would reopen a session while another is already running for this baby. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listDaycarePlaces: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Places, by name. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DaycarePlace"][];
+                };
+            };
+        };
+    };
+    createDaycarePlace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DaycarePlaceInput"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DaycarePlace"];
+                };
+            };
+            /** @description Unknown baby (INVALID_REFERENCE) or a zone that does not load (BAD_TZ). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateDaycarePlace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DaycarePlaceInput"];
+            };
+        };
+        responses: {
+            /** @description Saved, as it now reads. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DaycarePlace"];
+                };
+            };
+            /** @description Unknown baby (INVALID_REFERENCE) or a zone that does not load (BAD_TZ). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No place with this id in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteDaycarePlace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description No place with this id in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getPickupPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plan. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickupPlan"];
+                };
+            };
+            /** @description No baby with this id in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setPickupPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPickupPlan"];
+            };
+        };
+        responses: {
+            /** @description Saved, as it now reads. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickupPlan"];
+                };
+            };
+            /** @description A weekday twice (DUPLICATE_DAY) or a person who is not a member (INVALID_REFERENCE). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No baby with this id in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setPickupOverride: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPickupOverride"];
+            };
+        };
+        responses: {
+            /** @description Saved; the plan as it now reads. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickupPlan"];
+                };
+            };
+            /** @description Not a calendar date (BAD_DATE) or a person who is not a member (INVALID_REFERENCE). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No baby with this id in the caller's family. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

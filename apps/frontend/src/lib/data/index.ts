@@ -24,6 +24,7 @@ export * from "./medicines";
 export * from "./other";
 export * from "./photos";
 export * from "./daycare";
+export * from "./daycare-place";
 export * from "./play";
 export * from "./profile";
 export * from "./reminders";

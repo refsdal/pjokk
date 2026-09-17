@@ -5,7 +5,13 @@ import {
   type Icon as TablerIcon,
 } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
-import type { DaycareLog, FeedTimer, PlayLog, SleepLog } from "@pjokk/shared";
+import type {
+  DaycareLog,
+  DaycareToday,
+  FeedTimer,
+  PlayLog,
+  SleepLog,
+} from "@pjokk/shared";
 import { Button } from "@/components/ui/button";
 import {
   isOptimisticTimer,
@@ -14,7 +20,9 @@ import {
   useStopPlay,
   useWakeSleep,
 } from "@/lib/data";
-import { daycareMeta } from "@/lib/daycare-ui";
+import { firstName } from "@/lib/caretaker-ui";
+import { useMembers } from "@/lib/data/family";
+import { daycareBannerLine, daycareMeta } from "@/lib/daycare-ui";
 import { clock, totalSeconds } from "@/lib/feed-timer-ui";
 import { t } from "@/lib/i18n";
 import { playKindMeta } from "@/lib/play-ui";
@@ -49,6 +57,7 @@ function SessionBanner({
   detail,
   tickMs = 30_000,
   format = formatDuration,
+  note,
 }: {
   icon: TablerIcon;
   tint: string;
@@ -77,8 +86,12 @@ function SessionBanner({
   tickMs?: number;
   // A nursing clock reads mm:ss; a nap reads "1:10".
   format?: (ms: number) => string;
+  // A quiet third line, recomputed on the banner's own tick: the barnehage
+  // banner's pick-up plan, and its closing time once that is near.
+  note?: (now: number) => string | null;
 }) {
   const now = useNow(tickMs);
+  const noteLine = note?.(now) ?? null;
   const body = (
     <>
       <span
@@ -101,6 +114,14 @@ function SessionBanner({
             {detail ?? `${t("since")} ${formatClock(startTime)}`}
           </span>
         </p>
+        {noteLine && (
+          <p
+            className="truncate text-sm text-ink-soft tabular-nums"
+            data-testid="banner-note"
+          >
+            {noteLine}
+          </p>
+        )}
       </div>
     </>
   );
@@ -249,14 +270,25 @@ export function ActivePlayBanner({ session }: { session: PlayLog }) {
 // At barnehage (issue #105). Pick up is one tap — now, by whoever taps —
 // and the body opens the edit sheet, for a drop-off logged late. The
 // calmest banner of the four: see `emphasis`.
+//
+// `today` is the summary's place and pick-up plan: the banner's quiet third
+// line says "Pick-up 15:30 · Anne" and, inside the family's lead, "Closes
+// 16:30 · in 25 min" instead. Still no ring and no badge.
 export function ActiveDaycareBanner({
   session,
+  today = null,
   onEdit,
 }: {
   session: DaycareLog;
+  today?: DaycareToday | null;
   onEdit?: (session: DaycareLog) => void;
 }) {
   const pickUp = usePickUp();
+  const members = useMembers();
+  const nameOf = (userId: string) => {
+    const m = members.data?.find((x) => x.userId === userId);
+    return m ? firstName(m) : null;
+  };
   const optimistic = session.id === "optimistic";
   return (
     <SessionBanner
@@ -270,6 +302,7 @@ export function ActiveDaycareBanner({
       openLabel={t("Edit daycare day")}
       disabled={pickUp.isPending || optimistic}
       emphasis="calm"
+      note={(now) => daycareBannerLine(today, nameOf, new Date(now))}
     />
   );
 }
