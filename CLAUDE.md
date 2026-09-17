@@ -397,7 +397,9 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
 - **Settings:** a hub, not a list — three scopes, three places. **Family**
   (`/settings/family`): caretakers + invite link w/ QR and devices inline,
   then one row per shared section, each its own page at
-  `/settings/family/$section` (contacts, medicines, sleep locations,
+  `/settings/family/$section` (contacts, the barnehage — the place and
+  each enrolled baby's pick-up plan, read-only for a member — medicines,
+  sleep locations,
   sick-child days, API keys, the **Calendar subscription** link — #52,
   which mints a read-only `pjk_` key into `/api/calendar.ics?key=…`; the
   route lifts the query key into the Authorization header and then runs
@@ -484,7 +486,10 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   screen eight hours a day — and while it runs the since-last feed and
   diaper reminders HOLD; the pick-up then answers them (the gap runs from
   the later of the last log and the last pick-up,
-  `internal/jobs/reminders.go` `sinceLastAnchor`).
+  `internal/jobs/reminders.go` `sinceLastAnchor`). The banner's quiet third
+  line is the family's plan, "Pick-up 15:30 · Anne", and inside the place's
+  alert lead it turns to "Closes 16:30 · in 25 min"
+  (`daycareBannerLine`); still no ring and no badge.
 
 ## Data model (Phase 1 core)
 
@@ -543,6 +548,29 @@ Bun-era schema used. Domain tables kept their singular names:
   over the day. Rows must fall inside the day (400 `OUTSIDE_DAY`).
   `Summary.handoverDue` backs Home's "How was the day?" card for 12 h
   after a pick-up.
+- **The barnehage as a place, and the pick-up plan** (spec
+  `docs/superpowers/specs/2026-09-17-daycare-place-and-pickup-plan-design.md`):
+  `daycare_place(id, familyId, name, address?, phone?, email?, website?,
+  notes?, openMinute?, closeMinute?, alertLeadMin?, tz)` — one opening and
+  closing time for every weekday, wall-clock minutes in the row's own IANA
+  zone (a reminder's reason: the server has none) — with
+  `daycare_enrolment(babyId PK, placeId)`, one place per baby;
+  `daycare_pickup_plan(babyId, weekday 1..5, pickupMinute?, userId?)`, the
+  Monday-to-Friday grid; and `daycare_pickup_override(babyId, date,
+  userId)`, the one-day exception any member may set (`date` is the
+  client's local day, the `care_day` rule). Parents write the place and the
+  grid (`tierAdmin`), everyone reads. `Summary.daycare` hands the place, the
+  grid and the exceptions to the client, which resolves "today"
+  (`lib/daycare-ui.ts`); the server resolves a day only in
+  `jobs.RunDaycareClosingAlerts`, the third step of the */15 sweep: one
+  push per day there, latched on `daycare_log.closing_alerted_at`, to the
+  exception's person, else the grid's, else the family's admins — a named
+  person who is not an unbanned member reads as nobody. **The expected
+  pick-up time fires nothing** (a plan, not a deadline) and the push has no
+  Snooze (closing time does not move). A removed member is cleared from the
+  grid and their exceptions deleted (`auth.sql`); the override table is
+  `userOwned` in `internal/restore`. Not a `contact` row, and not in
+  `deviceOperations`.
 - `illness(id, familyId, babyId, caretakerId, loggedById, startTime,
   endTime NULL while ill, symptoms text[], lastSymptomAt?, clearHours?,
   notes?)` — an illness episode (#107, spec

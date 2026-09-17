@@ -56,8 +56,7 @@ daycare_pickup_plan(
   weekday int check 1..5,                -- ISO: 1 = Monday
   pickup_minute int null check 0..1439,
   user_id text null -> users SET NULL,
-  PRIMARY KEY (baby_id, weekday),
-  check (pickup_minute is not null or user_id is not null)
+  PRIMARY KEY (baby_id, weekday)         -- a day with neither is no row
 )
 daycare_pickup_override(
   family_id, baby_id -> baby CASCADE,
@@ -89,21 +88,24 @@ daycare_log.closing_alerted_at timestamptz null   -- the latch
 |---|---|---|
 | `ListDaycarePlaces` | `GET /api/daycare-places` | family |
 | `CreateDaycarePlace` | `POST /api/daycare-places` | admin |
-| `UpdateDaycarePlace` | `PATCH /api/daycare-places/{id}` | admin |
+| `UpdateDaycarePlace` | `PUT /api/daycare-places/{id}` | admin |
 | `DeleteDaycarePlace` | `DELETE /api/daycare-places/{id}` | admin |
 | `GetPickupPlan` | `GET /api/babies/{babyId}/pickup-plan` | family |
 | `SetPickupPlan` | `PUT /api/babies/{babyId}/pickup-plan` | admin |
 | `SetPickupOverride` | `PUT /api/babies/{babyId}/pickup-override` | family |
 
-- A place's body carries `babyIds`; create and update REPLACE its
-  enrolments in the same transaction, and enrolling a baby moves her from
-  any other place (the primary key is the baby). Every baby must be the
-  family's (404). `tz` must load (400 `BAD_TZ`).
+- A place is written whole (a PUT, not a PATCH: the settings page holds
+  every field, so there is no omitted-versus-null to tell apart). Its body
+  carries `babyIds`; create and update REPLACE its enrolments in the same
+  transaction, and enrolling a baby moves her from any other place (the
+  primary key is the baby). Every baby must be the family's (400
+  `INVALID_REFERENCE`, the contacts rule). `tz` must load (400 `BAD_TZ`).
 - `PUT pickup-plan` replaces the five rows in one transaction, the
-  handover's idempotent shape, so a replayed offline save is harmless.
-  Every named person must be a member (403 `NOT_MEMBER`).
+  handover's idempotent shape, so a replayed save is harmless. Every named
+  person must be a member (400 `INVALID_REFERENCE`); a weekday twice is
+  400 `DUPLICATE_DAY`; a day with neither a time nor a person is dropped.
 - `PUT pickup-override` takes `{date, userId}`; a null `userId` clears
-  the day.
+  the day. On the sheet, tapping the grid's own person IS the clear.
 - `Summary` gains `daycare`: `{ place, plan, overrides }` for the summary's
   baby, null when she has neither a place nor a plan. `overrides` holds
   yesterday onward. The CLIENT resolves "today" with its own date, so Home
