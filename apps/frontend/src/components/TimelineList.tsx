@@ -16,6 +16,7 @@ import {
   otherKindMeta,
   type OtherEntry,
 } from "@/components/sheets/OtherLogSheet";
+import { DaycareSheet } from "@/components/sheets/DaycareSheet";
 import { PlaySheet } from "@/components/sheets/PlaySheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
 import { VaccineSheet } from "@/components/sheets/VaccineSheet";
@@ -30,6 +31,7 @@ import {
   type Units,
   useUnits,
 } from "@/lib/units";
+import { daycareMeta } from "@/lib/daycare-ui";
 import { playKindMeta } from "@/lib/play-ui";
 import { nextDoseFrom } from "@/lib/medicine-ui";
 import { formatClock, formatDay, formatDuration } from "@/lib/time";
@@ -40,9 +42,14 @@ import { cn } from "@/lib/utils";
 // from screens/Timeline.tsx, which keeps the header, search, filter chips
 // and paging; this owns the rows and the edit-sheet state.
 
-// Sessions (sleep, play) sort and display by their start time.
+// Sessions (sleep, play, a day at barnehage) sort and display by their
+// start time.
+const isSession = (
+  e: TimelineEntry,
+): e is Extract<TimelineEntry, { kind: "sleep" | "play" | "daycare" }> =>
+  e.kind === "sleep" || e.kind === "play" || e.kind === "daycare";
 const entryTime = (e: TimelineEntry): Date =>
-  new Date(e.kind === "sleep" || e.kind === "play" ? e.startTime : e.time);
+  new Date(isSession(e) ? e.startTime : e.time);
 
 function dayLabel(d: Date, now = new Date()): string {
   if (d.toDateString() === now.toDateString()) return t("Today");
@@ -81,7 +88,7 @@ const diaperLabel: Record<string, string> = {
   dry: "Dry diaper",
 };
 
-function entryMain(
+export function entryMain(
   e: TimelineEntry,
   units: Units,
 ): { title: string; detail: string | null } {
@@ -161,6 +168,28 @@ function entryMain(
       detail: `${formatClock(start)}–${formatClock(end)} · ${formatDuration(end.getTime() - start.getTime())}`,
     };
   }
+  if (e.kind === "daycare") {
+    const start = new Date(e.startTime);
+    const title = t(daycareMeta.label);
+    if (!e.endTime) {
+      return { title, detail: `${t("since")} ${formatClock(start)}` };
+    }
+    const end = new Date(e.endTime);
+    return {
+      title,
+      // The avatar says who dropped off; the pick-up person, when someone
+      // recorded one, rides at the end where a narrow row truncates first.
+      detail: [
+        `${formatClock(start)}–${formatClock(end)}`,
+        formatDuration(end.getTime() - start.getTime()),
+        e.pickupCaretakerName
+          ? `${t("picked up by")} ${e.pickupCaretakerName}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    };
+  }
   if (e.kind === "vaccine") {
     return {
       title: e.name,
@@ -193,6 +222,7 @@ const kindStyle: Record<
   pump: otherKindMeta.pump,
   // Every play type shares the row icon; the title carries which one.
   play: { icon: playKindMeta.tummy.icon, tint: playKindMeta.tummy.tint },
+  daycare: { icon: daycareMeta.icon, tint: daycareMeta.tint },
   vaccine: { icon: IconVaccine, tint: "text-growth" },
 };
 
@@ -218,8 +248,7 @@ function Row({
   const fever =
     entry.kind === "measurement" && isFever(entry.type, entry.value);
   const tint = fever ? "text-danger" : baseTint;
-  const active =
-    (entry.kind === "sleep" || entry.kind === "play") && !entry.endTime;
+  const active = isSession(entry) && !entry.endTime;
   return (
     <button
       type="button"
@@ -322,6 +351,7 @@ export function TimelineList({
     editEntry.kind !== "diaper" &&
     editEntry.kind !== "sleep" &&
     editEntry.kind !== "play" &&
+    editEntry.kind !== "daycare" &&
     editEntry.kind !== "vaccine"
       ? (editEntry as OtherEntry)
       : null;
@@ -376,6 +406,12 @@ export function TimelineList({
         onOpenChange={(o) => !o && setEditEntry(null)}
         babyId={babyId ?? ""}
         edit={editEntry?.kind === "play" ? editEntry : null}
+      />
+      <DaycareSheet
+        open={editEntry?.kind === "daycare"}
+        onOpenChange={(o) => !o && setEditEntry(null)}
+        babyId={babyId ?? ""}
+        edit={editEntry?.kind === "daycare" ? editEntry : null}
       />
       <VaccineSheet
         open={editEntry?.kind === "vaccine"}

@@ -51,13 +51,14 @@ export type Contact = Schemas["Contact"];
 export type CreateContact = Schemas["CreateContact"];
 export type UpdateContact = Schemas["UpdateContact"];
 export type PlayLog = Schemas["PlayLog"];
+export type DaycareLog = Schemas["DaycareLog"];
 export type FeedTimer = Schemas["FeedTimer"];
 export type VaccineLog = Schemas["VaccineLog"];
 export type VaccineDocument = Schemas["VaccineDocument"];
 export type VaccineDismissal = Schemas["VaccineDismissal"];
 
 // The timeline's rows. The spec models TimelineEntry as an open object —
-// oapi-codegen has no clean Go shape for eleven structurally different
+// oapi-codegen has no clean Go shape for twelve structurally different
 // variants (see the schema's description) — but every row IS one of the log
 // schemas plus its kind, so the SPA gets the discriminated union back, built
 // from those schemas rather than written out by hand.
@@ -73,6 +74,7 @@ export type TimelineEntry =
   | Entry<"measurement", MeasurementLog>
   | Entry<"pump", PumpLog>
   | Entry<"play", PlayLog>
+  | Entry<"daycare", DaycareLog>
   | Entry<"vaccine", VaccineLog>;
 export type Timeline = Omit<Schemas["Timeline"], "entries"> & {
   entries: TimelineEntry[];
@@ -134,5 +136,6 @@ export const timelineKinds = everyOf<Schemas["TimelineEntry"]["kind"]>()([
   "measurement",
   "pump",
   "play",
+  "daycare",
   "vaccine",
 ]) satisfies readonly TimelineEntry["kind"][];

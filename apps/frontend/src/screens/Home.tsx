@@ -7,6 +7,7 @@ import {
 } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import type {
+  DaycareLog,
   HelpRequest,
   MeasurementType,
   PlayType,
@@ -14,6 +15,7 @@ import type {
 } from "@pjokk/shared";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
+  ActiveDaycareBanner,
   ActiveFeedBanner,
   ActivePlayBanner,
   ActivePumpBanner,
@@ -45,6 +47,7 @@ import {
   moreActions,
   OtherLogSheet,
 } from "@/components/sheets/OtherLogSheet";
+import { DaycareSheet } from "@/components/sheets/DaycareSheet";
 import { PlaySheet } from "@/components/sheets/PlaySheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
 import { useQueryClient } from "@tanstack/react-query";
@@ -57,6 +60,7 @@ import {
   useWakeSleep,
   type OtherKind,
 } from "@/lib/data";
+import { predatesDropOff } from "@/lib/daycare-ui";
 import { t } from "@/lib/i18n";
 import { describeNapWindow, napWindow, useNapGuide } from "@/lib/nap-window";
 import { useResumableSleep } from "@/lib/sleep-resume";
@@ -92,6 +96,7 @@ type OpenSheet =
   | "more"
   | "other"
   | "play"
+  | "daycare"
   | "help"
   | "account"
   | null;
@@ -163,6 +168,9 @@ export function HomeScreen() {
   // live summary value so a Wake from another device mid-edit cannot turn
   // the open edit sheet into a "start sleep" sheet under the user's thumb.
   const [editSleep, setEditSleep] = useState<SleepLog | null>(null);
+  // The same, for the barnehage banner: null is "drop off", a session is
+  // "edit the running day".
+  const [editDaycare, setEditDaycare] = useState<DaycareLog | null>(null);
   const { night } = useAppearance();
   const napGuide = useNapGuide();
   const navigate = useNavigate();
@@ -179,6 +187,10 @@ export function HomeScreen() {
     onPickPlay: (type) => {
       setPlayType(type);
       setSheet("play");
+    },
+    onPickDaycare: () => {
+      setEditDaycare(null);
+      setSheet("daycare");
     },
     onPickHelp: () => setSheet("help"),
     onVaccines: () => void navigate({ to: "/vaccines" }),
@@ -251,6 +263,9 @@ export function HomeScreen() {
   const s = summary.data;
   const active = s?.activeSleep ?? null;
   const activePlay = s?.activePlay ?? null;
+  // `?? null` twice over: absent from a snapshot cached before the field
+  // existed, and null when she is simply at home.
+  const activeDaycare = s?.activeDaycare ?? null;
   const activeFeed = s?.activeFeed ?? null;
   const activePump = s?.activePump ?? null;
   // The nap-window guide (issue #46): a conclusion under the awake card,
@@ -330,6 +345,15 @@ export function HomeScreen() {
               }}
             />
           )}
+          {activeDaycare && (
+            <ActiveDaycareBanner
+              session={activeDaycare}
+              onEdit={(session) => {
+                setEditDaycare(session);
+                setSheet("daycare");
+              }}
+            />
+          )}
           {activePlay && <ActivePlayBanner session={activePlay} />}
           {activeFeed && (
             <ActiveFeedBanner
@@ -361,6 +385,11 @@ export function HomeScreen() {
                     } ${t("today")}`
                   : undefined
               }
+              note={
+                predatesDropOff(s?.lastFeed?.time, activeDaycare)
+                  ? t("At daycare since then")
+                  : undefined
+              }
               tintClass="text-feed"
               onClick={() => setSheet("feed")}
             />
@@ -372,6 +401,11 @@ export function HomeScreen() {
               sub={
                 s
                   ? `${s.today.wet} ${t("wet")} · ${s.today.dirty} ${t("dirty")} · ${s.today.both} ${t("both")}${s.today.dry > 0 ? ` · ${s.today.dry} ${t("dry")}` : ""}`
+                  : undefined
+              }
+              note={
+                predatesDropOff(s?.lastDiaper?.time, activeDaycare)
+                  ? t("At daycare since then")
                   : undefined
               }
               tintClass="text-diaper"
@@ -506,6 +540,10 @@ export function HomeScreen() {
           setPlayType(type);
           setSheet("play");
         }}
+        onPickDaycare={() => {
+          setEditDaycare(null);
+          setSheet("daycare");
+        }}
         onPickHelp={() => setSheet("help")}
       />
       <OtherLogSheet
@@ -522,6 +560,12 @@ export function HomeScreen() {
         onOpenChange={(o) => setSheet(o ? "play" : null)}
         babyId={baby.id}
         type={playType}
+      />
+      <DaycareSheet
+        open={sheet === "daycare"}
+        onOpenChange={(o) => setSheet(o ? "daycare" : null)}
+        babyId={baby.id}
+        edit={editDaycare}
       />
       <HelpSheet
         open={sheet === "help"}

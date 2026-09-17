@@ -429,7 +429,13 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   baby and kind, on `/api/summary` as `activeFeed` / `activePump`): every
   caretaker sees the running clock, and the server banks the seconds — the
   client only ever says start / switch / pause / stop. There is no
-  device-local timer any more.
+  device-local timer any more. A day at barnehage is the same kind of
+  state again (`activeDaycare`, #105): a banner from drop-off to pick-up —
+  the calmest of the four, no ring and no app badge, because it is on
+  screen eight hours a day — and while it runs the since-last feed and
+  diaper reminders HOLD; the pick-up then answers them (the gap runs from
+  the later of the last log and the last pick-up,
+  `internal/jobs/reminders.go` `sinceLastAnchor`).
 
 ## Data model (Phase 1 core)
 
@@ -466,6 +472,13 @@ Bun-era schema used. Domain tables kept their singular names:
   pump clock, UNIQUE (babyId, kind). Its own table, not a `feed_log` row
   with a NULL end, because a logged feed has one `time`; stopping turns it
   into a `feed_log` / `pump_log` row and deletes it in one transaction.
+- `daycare_log(id, familyId, babyId, caretakerId, loggedById,
+  pickupCaretakerId?, startTime, endTime NULL while she is there, notes?)`
+  — a day at barnehage (#105, spec
+  `docs/superpowers/specs/2026-09-17-daycare-session-design.md`), a
+  `sleep_log` clone as `play_log` is, with a second person: `caretakerId`
+  dropped off, `pickupCaretakerId` picked up. Code says `daycare`; the UI
+  says "Barnehage" / "Daycare". Not in `deviceOperations`.
 - `milestone_photo(id, familyId, milestoneLogId, objectKey, width, height,
   size)` — up to three photos per milestone, server re-encoded to JPEG
   (EXIF gone) under a server-generated key, served only through
