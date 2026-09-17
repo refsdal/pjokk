@@ -1006,6 +1006,68 @@ const nb: Record<string, string> = {
   "Profile saved": "Profil lagret",
   "Name cannot be blank": "Navn kan ikke være tomt",
   "Could not read that image": "Kunne ikke lese bildet",
+
+  // What to track (per-baby switches, spec
+  // docs/superpowers/specs/2026-09-17-per-baby-tracking-design.md)
+  months: "måneder",
+  "Growth and temperature": "Vekst og temperatur",
+  Milestones: "Milepæler",
+  Baths: "Bad",
+  Barnehage: "Barnehage",
+  Everyday: "Hverdag",
+  Health: "Helse",
+  Extras: "Ekstra",
+  "Bottles, nursing with a timer, and solids. The last feed at a glance, intake per day, and a nudge when it has been a while.":
+    "Flaske, amming med tidtaker og fast føde. Siste måltid med ett blikk, inntak per dag, og et lite dytt når det er lenge siden.",
+  "A pump timer every caretaker can see, and the amounts over the day.":
+    "En pumpetidtaker alle kan se, og mengdene gjennom dagen.",
+  "One tap when she falls asleep, one when she wakes. How long she has been up, naps today, and last night's longest stretch.":
+    "Ett trykk når hun sovner, ett når hun våkner. Hvor lenge hun har vært våken, dagens lurer og nattens lengste strekk.",
+  "Wet, dirty or both in two taps, and the count for today.":
+    "Våt, bæsj eller begge med to trykk, og antallet i dag.",
+  "Doses from the family's own list, and when the next one is OK from.":
+    "Doser fra familiens egen liste, og når neste er OK fra.",
+  "Weight, length and head against the WHO curves, and a temperature with a fever flag.":
+    "Vekt, lengde og hodeomkrets mot WHO-kurvene, og temperatur med feberflagg.",
+  "First smile, first steps — with up to three photos each.":
+    "Første smil, første skritt – med inntil tre bilder hver.",
+  "When she last had one.": "Når hun sist badet.",
+  "A line about anything, on the timeline where it happened.":
+    "En linje om hva som helst, på tidslinjen der det skjedde.",
+  "Tummy time, walks and play, timed from Home.":
+    "Magetid, turer og lek, med tidtaking fra Hjem.",
+  "Drop-off to pick-up, what the staff said, the pick-up plan and a heads-up before closing time.":
+    "Fra levering til henting, hva personalet sa, henteplanen og et varsel før stengetid.",
+  "An episode from first symptom to recovered, and the days at home with a sick child.":
+    "En episode fra første symptom til frisk, og dagene hjemme med sykt barn.",
+  "The Norwegian programme as a checklist, with a place for the documents.":
+    "Det norske programmet som sjekkliste, med plass til dokumentene.",
+  "Tap Wake when she is up": "Trykk Våknet når hun er oppe",
+  "with a photo": "med bilde",
+  "Slept in the pram": "Sov i vogna",
+  "still going": "pågår",
+  "Ill since Monday": "Syk siden mandag",
+  "symptom-free by": "symptomfri innen",
+  "due this week": "denne uka",
+  "First smile": "Første smil",
+  "Swipe through what Pjokk can track, or take the set we suggest for a baby of":
+    "Bla gjennom det Pjokk kan følge, eller ta settet vi foreslår for en baby på",
+  "Use the recommended set": "Bruk det anbefalte settet",
+  "Recommended if": "Anbefalt hvis",
+  "goes to barnehage": "går i barnehage",
+  "Recommended at": "Anbefalt for",
+  "'s age": "s alder",
+  Summary: "Oppsummering",
+  "Tracking for": "Dette følges for",
+  "Nothing tracked yet": "Ingenting følges ennå",
+  "Change this any time under Settings.":
+    "Dette kan endres når som helst under Innstillinger.",
+  "Choose what to track for": "Velg hva som skal følges for",
+  "Nothing is tracked for": "Ingenting følges for",
+  yet: "ennå",
+  "What to track": "Hva som følges",
+  "Turn on Sleep or Feeds to see stats":
+    "Slå på Søvn eller Måltider for å se statistikk",
 };
 
 function readMode(): LanguageMode {

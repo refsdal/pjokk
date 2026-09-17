@@ -59,7 +59,7 @@ export const featureCatalogue: FeatureMeta[] = [
   },
   {
     key: "pump",
-    label: "Pumping",
+    label: "Pump",
     description:
       "A pump timer every caretaker can see, and the amounts over the day.",
     group: "everyday",
