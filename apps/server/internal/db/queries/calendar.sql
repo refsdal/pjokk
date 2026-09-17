@@ -18,7 +18,7 @@
 -- occurrences themselves are expanded in Go (internal/recur), so a series
 -- row comes back once and internal/api/calendar.go fans it out.
 SELECT
-    e."id", e."title", e."description", e."location", e."category",
+    e."id", e."title", e."description", e."location", e."category", e."closed",
     e."start_time", e."all_day", e."duration_min", e."remind_minutes_before",
     e."recurrence", e."recurrence_until",
     e."created_by", COALESCE(u."display_name", '') AS created_by_name
@@ -36,7 +36,7 @@ ORDER BY e."start_time" ASC, e."id" ASC;
 -- Every event of the family, for the ICS feed (internal/api/ics.go), which
 -- hands series to the calendar client as RRULEs rather than expanding.
 SELECT
-    e."id", e."title", e."description", e."location", e."category",
+    e."id", e."title", e."description", e."location", e."category", e."closed",
     e."start_time", e."all_day", e."duration_min", e."remind_minutes_before",
     e."recurrence", e."recurrence_until", e."created_at",
     e."created_by", COALESCE(u."display_name", '') AS created_by_name
@@ -47,7 +47,7 @@ ORDER BY e."start_time" ASC, e."id" ASC;
 
 -- name: GetCalendarEvent :one
 SELECT
-    e."id", e."title", e."description", e."location", e."category",
+    e."id", e."title", e."description", e."location", e."category", e."closed",
     e."start_time", e."all_day", e."duration_min", e."remind_minutes_before",
     e."recurrence", e."recurrence_until",
     e."created_by", COALESCE(u."display_name", '') AS created_by_name
@@ -59,8 +59,8 @@ WHERE e."family_id" = $1 AND e."id" = $2;
 INSERT INTO "calendar_event"
     ("family_id", "created_by", "title", "description", "location",
      "category", "start_time", "all_day", "duration_min", "remind_minutes_before",
-     "recurrence", "recurrence_until")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+     "recurrence", "recurrence_until", "closed")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 RETURNING "id";
 
 -- name: UpdateCalendarEvent :execrows
@@ -70,6 +70,7 @@ SET
     "description" = CASE WHEN sqlc.arg(description_set)::bool THEN sqlc.narg(description_val)::text ELSE "description" END,
     "location" = CASE WHEN sqlc.arg(location_set)::bool THEN sqlc.narg(location_val)::text ELSE "location" END,
     "category" = CASE WHEN sqlc.arg(category_set)::bool THEN sqlc.narg(category_val)::text ELSE "category" END,
+    "closed" = CASE WHEN sqlc.arg(closed_set)::bool THEN sqlc.arg(closed_val)::bool ELSE "closed" END,
     "start_time" = CASE WHEN sqlc.arg(start_time_set)::bool THEN sqlc.narg(start_time_val)::timestamptz ELSE "start_time" END,
     "all_day" = CASE WHEN sqlc.arg(all_day_set)::bool THEN sqlc.narg(all_day_val)::bool ELSE "all_day" END,
     "duration_min" = CASE WHEN sqlc.arg(duration_min_set)::bool THEN sqlc.narg(duration_min_val)::integer ELSE "duration_min" END,
