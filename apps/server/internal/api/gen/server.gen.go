@@ -131,6 +131,9 @@ type ServerInterface interface {
 	// PutBabyAbout Replace the four lines. Blank or null clears one. Any member may.
 	// (PUT /api/babies/{id}/about)
 	PutBabyAbout(w http.ResponseWriter, r *http.Request, id IdPath)
+	// SetBabyFeatures Replace what the family tracks for this baby (spec 2026-09-17-per-baby-tracking-design.md). Family-admin only; never a kiosk device. Whole-set replacement so a replayed offline save is harmless. Duplicates are dropped; order is the enum's. The server gates nothing on the set: a write for an off kind is still accepted.
+	// (PUT /api/babies/{id}/features)
+	SetBabyFeatures(w http.ResponseWriter, r *http.Request, id IdPath)
 	// SetPickupOverride Who collects on ONE day instead of the grid's person; a null userId clears the day. Any member may. `date` is the caller's own local day: the server derives none.
 	// (PUT /api/babies/{id}/pickup-override)
 	SetPickupOverride(w http.ResponseWriter, r *http.Request, id IdPath)
@@ -1563,6 +1566,32 @@ func (siw *ServerInterfaceWrapper) PutBabyAbout(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PutBabyAbout(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetBabyFeatures operation middleware
+func (siw *ServerInterfaceWrapper) SetBabyFeatures(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetBabyFeatures(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5151,6 +5180,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/babies/{id}/about", wrapper.GetBabyAbout)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/babies/{id}/about", wrapper.PutBabyAbout)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/babies/{id}/usual-nap", wrapper.SetUsualNap)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/babies/{id}/features", wrapper.SetBabyFeatures)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/family", wrapper.GetFamily)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/family/members", wrapper.ListFamilyMembers)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/family/members/{memberId}", wrapper.DeleteFamilyMember)
@@ -6750,6 +6780,57 @@ func (response PutBabyAbout200JSONResponse) VisitPutBabyAboutResponse(w http.Res
 type PutBabyAbout404JSONResponse Error
 
 func (response PutBabyAbout404JSONResponse) VisitPutBabyAboutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetBabyFeaturesRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *SetBabyFeaturesJSONRequestBody
+}
+
+type SetBabyFeaturesResponseObject interface {
+	VisitSetBabyFeaturesResponse(w http.ResponseWriter) error
+}
+
+type SetBabyFeatures200JSONResponse Baby
+
+func (response SetBabyFeatures200JSONResponse) VisitSetBabyFeaturesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetBabyFeatures403JSONResponse Error
+
+func (response SetBabyFeatures403JSONResponse) VisitSetBabyFeaturesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetBabyFeatures404JSONResponse Error
+
+func (response SetBabyFeatures404JSONResponse) VisitSetBabyFeaturesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -12253,6 +12334,9 @@ type StrictServerInterface interface {
 	// PutBabyAbout Replace the four lines. Blank or null clears one. Any member may.
 	// (PUT /api/babies/{id}/about)
 	PutBabyAbout(ctx context.Context, request PutBabyAboutRequestObject) (PutBabyAboutResponseObject, error)
+	// SetBabyFeatures Replace what the family tracks for this baby (spec 2026-09-17-per-baby-tracking-design.md). Family-admin only; never a kiosk device. Whole-set replacement so a replayed offline save is harmless. Duplicates are dropped; order is the enum's. The server gates nothing on the set: a write for an off kind is still accepted.
+	// (PUT /api/babies/{id}/features)
+	SetBabyFeatures(ctx context.Context, request SetBabyFeaturesRequestObject) (SetBabyFeaturesResponseObject, error)
 	// SetPickupOverride Who collects on ONE day instead of the grid's person; a null userId clears the day. Any member may. `date` is the caller's own local day: the server derives none.
 	// (PUT /api/babies/{id}/pickup-override)
 	SetPickupOverride(ctx context.Context, request SetPickupOverrideRequestObject) (SetPickupOverrideResponseObject, error)
@@ -13740,6 +13824,39 @@ func (sh *strictHandler) PutBabyAbout(w http.ResponseWriter, r *http.Request, id
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PutBabyAboutResponseObject); ok {
 		if err := validResponse.VisitPutBabyAboutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetBabyFeatures operation middleware
+func (sh *strictHandler) SetBabyFeatures(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request SetBabyFeaturesRequestObject
+
+	request.Id = id
+
+	var body SetBabyFeaturesJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetBabyFeatures(ctx, request.(SetBabyFeaturesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetBabyFeatures")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetBabyFeaturesResponseObject); ok {
+		if err := validResponse.VisitSetBabyFeaturesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -376,6 +376,13 @@ func (a *AppRig) NewBaby(familyID, name string) string {
 	if err != nil {
 		a.t.Fatalf("testrig: NewBaby(%q, %q): %v", familyID, name, err)
 	}
+	// A seeded baby is an "existing" baby: everything tracked, as the
+	// 00033 backfill leaves the babies a deployment already has.
+	if _, err := a.Deps.Q.SetBabyFeatures(context.Background(), gen.SetBabyFeaturesParams{
+		FamilyID: familyID, ID: baby.ID, Features: api.AllFeatures,
+	}); err != nil {
+		a.t.Fatalf("testrig: NewBaby(%q, %q) features: %v", familyID, name, err)
+	}
 	return baby.ID
 }
 

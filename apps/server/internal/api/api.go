@@ -439,6 +439,8 @@ var operationAuthTiers = map[string]authTier{
 	"DeleteHelpRequest":      tierFamilyNoAPIKey,
 
 	"DeleteBaby":          tierAdmin,
+	// What the family tracks for a baby (features.go): the parents' call.
+	"SetBabyFeatures":     tierAdmin,
 	"DeleteFamilyMember":  tierAdmin,
 	"SetFamilyMemberRole": tierAdmin,
 

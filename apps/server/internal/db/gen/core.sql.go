@@ -39,11 +39,37 @@ func (q *Queries) BabyAvatarKeysForFamily(ctx context.Context, familyID string) 
 	return items, nil
 }
 
+const babyTracks = `-- name: BabyTracks :one
+SELECT EXISTS (
+    SELECT 1 FROM "baby"
+    WHERE "family_id" = $1
+      AND ($2::text IS NULL OR "id" = $2)
+      AND $3::text = ANY("features")
+)::bool AS tracked
+`
+
+type BabyTracksParams struct {
+	FamilyID string
+	BabyID   *string
+	Feature  string
+}
+
+// Does this baby — or, with no baby, ANY baby of the family — track this
+// feature? What the reminder and closing-alert jobs ask before firing
+// (internal/jobs): a reminder with no baby applies to each baby that has
+// the kind on, so it is held only when none does.
+func (q *Queries) BabyTracks(ctx context.Context, arg BabyTracksParams) (bool, error) {
+	row := q.db.QueryRow(ctx, babyTracks, arg.FamilyID, arg.BabyID, arg.Feature)
+	var tracked bool
+	err := row.Scan(&tracked)
+	return tracked, err
+}
+
 const createBaby = `-- name: CreateBaby :one
 
 INSERT INTO "baby" ("family_id", "name", "birth_date", "sex")
 VALUES ($1, $2, $3, $4)
-RETURNING id, family_id, name, birth_date, sex, created_at, avatar_key
+RETURNING id, family_id, name, birth_date, sex, created_at, avatar_key, features
 `
 
 type CreateBabyParams struct {
@@ -73,6 +99,7 @@ func (q *Queries) CreateBaby(ctx context.Context, arg CreateBabyParams) (Baby, e
 		&i.Sex,
 		&i.CreatedAt,
 		&i.AvatarKey,
+		&i.Features,
 	)
 	return i, err
 }
@@ -99,7 +126,7 @@ func (q *Queries) DeleteBaby(ctx context.Context, arg DeleteBabyParams) (int64, 
 }
 
 const getBaby = `-- name: GetBaby :one
-SELECT id, family_id, name, birth_date, sex, created_at, avatar_key FROM "baby"
+SELECT id, family_id, name, birth_date, sex, created_at, avatar_key, features FROM "baby"
 WHERE "family_id" = $1 AND "id" = $2
 `
 
@@ -119,6 +146,7 @@ func (q *Queries) GetBaby(ctx context.Context, arg GetBabyParams) (Baby, error) 
 		&i.Sex,
 		&i.CreatedAt,
 		&i.AvatarKey,
+		&i.Features,
 	)
 	return i, err
 }
@@ -221,7 +249,7 @@ func (q *Queries) GetMembership(ctx context.Context, arg GetMembershipParams) (G
 }
 
 const listBabies = `-- name: ListBabies :many
-SELECT id, family_id, name, birth_date, sex, created_at, avatar_key FROM "baby"
+SELECT id, family_id, name, birth_date, sex, created_at, avatar_key, features FROM "baby"
 WHERE "family_id" = $1
 ORDER BY "created_at"
 `
@@ -243,6 +271,7 @@ func (q *Queries) ListBabies(ctx context.Context, familyID string) ([]Baby, erro
 			&i.Sex,
 			&i.CreatedAt,
 			&i.AvatarKey,
+			&i.Features,
 		); err != nil {
 			return nil, err
 		}
@@ -278,7 +307,7 @@ const setBabyAvatar = `-- name: SetBabyAvatar :one
 UPDATE "baby"
 SET "avatar_key" = $3
 WHERE "family_id" = $1 AND "id" = $2
-RETURNING id, family_id, name, birth_date, sex, created_at, avatar_key
+RETURNING id, family_id, name, birth_date, sex, created_at, avatar_key, features
 `
 
 type SetBabyAvatarParams struct {
@@ -301,6 +330,38 @@ func (q *Queries) SetBabyAvatar(ctx context.Context, arg SetBabyAvatarParams) (B
 		&i.Sex,
 		&i.CreatedAt,
 		&i.AvatarKey,
+		&i.Features,
+	)
+	return i, err
+}
+
+const setBabyFeatures = `-- name: SetBabyFeatures :one
+UPDATE "baby"
+SET "features" = $3
+WHERE "family_id" = $1 AND "id" = $2
+RETURNING id, family_id, name, birth_date, sex, created_at, avatar_key, features
+`
+
+type SetBabyFeaturesParams struct {
+	FamilyID string
+	ID       string
+	Features []string
+}
+
+// The per-baby tracking switches (00033), replaced whole. RETURNING * so
+// the route answers with the Baby, as UpdateBaby does.
+func (q *Queries) SetBabyFeatures(ctx context.Context, arg SetBabyFeaturesParams) (Baby, error) {
+	row := q.db.QueryRow(ctx, setBabyFeatures, arg.FamilyID, arg.ID, arg.Features)
+	var i Baby
+	err := row.Scan(
+		&i.ID,
+		&i.FamilyID,
+		&i.Name,
+		&i.BirthDate,
+		&i.Sex,
+		&i.CreatedAt,
+		&i.AvatarKey,
+		&i.Features,
 	)
 	return i, err
 }
@@ -309,7 +370,7 @@ const updateBaby = `-- name: UpdateBaby :one
 UPDATE "baby"
 SET "name" = $3, "birth_date" = $4, "sex" = $5
 WHERE "family_id" = $1 AND "id" = $2
-RETURNING id, family_id, name, birth_date, sex, created_at, avatar_key
+RETURNING id, family_id, name, birth_date, sex, created_at, avatar_key, features
 `
 
 type UpdateBabyParams struct {
@@ -337,6 +398,7 @@ func (q *Queries) UpdateBaby(ctx context.Context, arg UpdateBabyParams) (Baby, e
 		&i.Sex,
 		&i.CreatedAt,
 		&i.AvatarKey,
+		&i.Features,
 	)
 	return i, err
 }
