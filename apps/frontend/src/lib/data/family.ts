@@ -1,8 +1,8 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Baby, Family, Invite, Member } from "@pjokk/shared";
 import type { components } from "@pjokk/shared";
-import { client, unwrap } from "../api";
+import { API_BASE, client, unwrap } from "../api";
 
 // Who the caller is, according to the server. This replaces every read the
 // screens used to take off the better-auth session object — the system-admin
@@ -53,6 +53,57 @@ export function useBabies() {
     queryKey: ["babies"],
     queryFn: async () => unwrap<Baby[]>(client.GET("/api/babies")),
   });
+}
+
+// A baby's photo (internal/api/baby_avatar.go): multipart in and a Baby
+// out, outside the spec like a person's, so raw fetch. The fresh list is
+// what every face reads from, so the write just refreshes it.
+function useBabyAvatarMutation<V>(fn: (vars: V) => Promise<Baby>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["babies"] });
+    },
+  });
+}
+
+export function useUploadBabyAvatar(babyId: string) {
+  return useBabyAvatarMutation(async (file: Blob) => {
+    const form = new FormData();
+    form.append("file", file, "baby.jpg");
+    return unwrap<Baby>(
+      await fetch(`${API_BASE}/api/babies/${babyId}/avatar`, {
+        method: "PUT",
+        body: form,
+        credentials: "include",
+      }),
+    );
+  });
+}
+
+export function useDeleteBabyAvatar(babyId: string) {
+  return useBabyAvatarMutation(async () =>
+    unwrap<Baby>(
+      await fetch(`${API_BASE}/api/babies/${babyId}/avatar`, {
+        method: "DELETE",
+        credentials: "include",
+      }),
+    ),
+  );
+}
+
+// babyId → avatarUrl, useMemberAvatars' twin: a calendar event names its
+// babies by id and name only.
+export function useBabyAvatars(): Record<string, string | null> {
+  const babies = useBabies();
+  return useMemo(
+    () =>
+      Object.fromEntries(
+        (babies.data ?? []).map((b) => [b.id, b.avatarUrl] as const),
+      ),
+    [babies.data],
+  );
 }
 
 export function useMembers(enabled = true) {

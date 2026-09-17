@@ -1,11 +1,19 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { BabySheet } from "@/components/sheets/BabySheet";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useBabies, useMe } from "@/lib/data";
+import { prepareAvatar } from "@/lib/avatar-image";
+import {
+  useBabies,
+  useDeleteBabyAvatar,
+  useMe,
+  useUploadBabyAvatar,
+} from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { formatAge } from "@/lib/time";
+import { toast } from "@/lib/toast";
 import { AboutMeCard } from "./AboutMeCard";
 import { SectionTitle, SettingsPage } from "./lib";
 import { MedicineSheetCard } from "./MedicineSheetCard";
@@ -20,6 +28,9 @@ export function BabyPage({ babyId }: { babyId: string }) {
   const me = useMe();
   const babies = useBabies();
   const [editing, setEditing] = useState(false);
+  const upload = useUploadBabyAvatar(babyId);
+  const removePhoto = useDeleteBabyAvatar(babyId);
+  const fileInput = useRef<HTMLInputElement>(null);
   const role = me.data?.memberRole;
   const isAdmin = role === "admin" || role === "owner";
   const baby = babies.data?.find((b) => b.id === babyId);
@@ -41,6 +52,27 @@ export function BabyPage({ babyId }: { babyId: string }) {
     );
   }
 
+  // The same square crop and resize a person's photo gets (lib/avatar-image):
+  // the server never sees the original.
+  const pickPhoto = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const blob = await prepareAvatar(file);
+      upload.mutate(blob, {
+        onSuccess: () => toast(t("Photo updated")),
+        onError: (err) => toast(err.message, "error"),
+      });
+    } catch (err) {
+      toast(
+        err instanceof Error ? err.message : t("Could not read that image"),
+        "error",
+      );
+    } finally {
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  };
+  const busy = upload.isPending || removePhoto.isPending;
+
   return (
     <SettingsPage title={baby.name} back={{ to: "/settings" }}>
       <Card className="p-0">
@@ -49,7 +81,7 @@ export function BabyPage({ babyId }: { babyId: string }) {
           onClick={() => setEditing(true)}
           className="flex min-h-14 w-full items-center gap-3 px-4 py-2 text-left active:bg-surface-2"
         >
-          <Avatar src={null} name={baby.name} size={11} />
+          <Avatar src={baby.avatarUrl} name={baby.name} size={11} />
           <span className="min-w-0 flex-1">
             <span className="block truncate font-semibold text-ink">
               {baby.name}
@@ -61,6 +93,39 @@ export function BabyPage({ babyId }: { babyId: string }) {
           </span>
           <span className="text-sm font-semibold text-accent">{t("Edit")}</span>
         </button>
+        <div className="flex gap-2 border-t border-line px-4 py-3">
+          <input
+            ref={fileInput}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            aria-label={t("Change photo")}
+            onChange={(e) => void pickPhoto(e.target.files?.[0])}
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => fileInput.current?.click()}
+          >
+            {t("Change photo")}
+          </Button>
+          {baby.avatarUrl && (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={busy}
+              onClick={() =>
+                removePhoto.mutate(undefined, {
+                  onSuccess: () => toast(t("Photo removed")),
+                  onError: (err) => toast(err.message, "error"),
+                })
+              }
+            >
+              {t("Remove photo")}
+            </Button>
+          )}
+        </div>
       </Card>
       <BabySheet
         open={editing}

@@ -1,5 +1,6 @@
 import type { Baby } from "@pjokk/shared";
 import { useEffect, useRef, useState } from "react";
+import { Avatar } from "@/components/Avatar";
 import { t } from "@/lib/i18n";
 import { formatAge, formatClock, formatDay } from "@/lib/time";
 import { cn, focusRing } from "@/lib/utils";
@@ -45,26 +46,29 @@ export function KioskBand({
   );
   return (
     <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 pt-5">
-      <div className="min-w-0">
-        <button
-          type="button"
-          aria-label={t("Hold to leave kiosk mode")}
-          onPointerDown={start}
-          onPointerUp={stop}
-          onPointerLeave={stop}
-          onPointerCancel={stop}
-          onContextMenu={(e) => e.preventDefault()}
-          className={cn(
-            "block max-w-full truncate rounded-xl text-left text-[26px] leading-8 font-extrabold text-ink select-none",
-            holding && "opacity-60",
-            focusRing,
-          )}
-        >
-          {baby.name}
-        </button>
-        <p className="truncate text-sm font-semibold tracking-[.12em] text-muted uppercase">
-          {formatDay(now)} · {formatAge(new Date(baby.birthDate))}
-        </p>
+      <div className="flex min-w-0 items-center gap-3">
+        <Avatar src={baby.avatarUrl} name={baby.name} size={11} />
+        <div className="min-w-0">
+          <button
+            type="button"
+            aria-label={t("Hold to leave kiosk mode")}
+            onPointerDown={start}
+            onPointerUp={stop}
+            onPointerLeave={stop}
+            onPointerCancel={stop}
+            onContextMenu={(e) => e.preventDefault()}
+            className={cn(
+              "block max-w-full truncate rounded-xl text-left text-[26px] leading-8 font-extrabold text-ink select-none",
+              holding && "opacity-60",
+              focusRing,
+            )}
+          >
+            {baby.name}
+          </button>
+          <p className="truncate text-sm font-semibold tracking-[.12em] text-muted uppercase">
+            {formatDay(now)} · {formatAge(new Date(baby.birthDate))}
+          </p>
+        </div>
       </div>
       <time
         className="text-7xl leading-none font-light tracking-tight tabular-nums text-ink"

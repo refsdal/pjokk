@@ -120,3 +120,30 @@ export const PICKUP_PRESET = {
   time: "15:30",
   duration: "30",
 } as const;
+
+// The faces at the right edge of an upcoming-events row: the babies the
+// event is about, then the people responsible — the way a timeline row
+// carries the caretaker's face on its right. Both come from the screen's
+// avatar maps (useBabyAvatars, useMemberAvatars); a name missing from its
+// map is an initial. The text names stay on the row: a stack of initials
+// alone cannot tell Anne from Anders.
+export type EventFace = { key: string; name: string; src: string | null };
+
+export function eventFaces(
+  event: Pick<CalendarEvent, "babies" | "assignees">,
+  babyAvatars: Record<string, string | null>,
+  memberAvatars: Record<string, string | null>,
+): EventFace[] {
+  return [
+    ...event.babies.map((b) => ({
+      key: `baby:${b.id}`,
+      name: b.name,
+      src: babyAvatars[b.id] ?? null,
+    })),
+    ...event.assignees.map((a) => ({
+      key: `user:${a.userId}`,
+      name: a.name,
+      src: memberAvatars[a.userId] ?? null,
+    })),
+  ];
+}

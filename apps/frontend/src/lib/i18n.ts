@@ -726,7 +726,6 @@ const nb: Record<string, string> = {
   Grandparent: "Besteforelder",
   Daycare: "Barnehage",
   Friend: "Venn",
-  "Switch baby": "Bytt baby",
   "Make admin": "Gjør til admin",
   "Make member": "Gjør til medlem",
   "Role updated": "Rolle oppdatert",

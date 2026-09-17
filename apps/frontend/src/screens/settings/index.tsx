@@ -52,7 +52,7 @@ export function SettingsScreen() {
               params={{ babyId: b.id }}
               label={b.name}
               sub={`${formatAge(new Date(b.birthDate))}${b.sex ? "" : ` · ${t("sex not set")}`}`}
-              leading={<Avatar src={null} name={b.name} size={9} />}
+              leading={<Avatar src={b.avatarUrl} name={b.name} size={9} />}
             />
           ))}
           <button

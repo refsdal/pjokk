@@ -6,14 +6,20 @@ import {
   IconRepeat,
 } from "@tabler/icons-react";
 import type { CalendarEvent } from "@pjokk/shared";
+import { Avatar } from "@/components/Avatar";
 import { ChipGroup } from "@/components/Chips";
 import { ErrorState } from "@/components/QueryStates";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EventSheet } from "@/components/sheets/EventSheet";
-import { useCalendarEvents } from "@/lib/data";
+import {
+  useBabyAvatars,
+  useCalendarEvents,
+  useMemberAvatars,
+} from "@/lib/data";
 import {
   calendarCategoryMeta,
+  eventFaces,
   dayKey,
   monthGridDays,
   weekStart,
@@ -55,6 +61,7 @@ function EventRow({
   const meta = calendarCategoryMeta[event.category];
   const Icon = meta.icon;
   const people = event.assignees.map((a) => a.name).join(", ");
+  const faces = eventFaces(event, useBabyAvatars(), useMemberAvatars());
   return (
     <button
       type="button"
@@ -89,6 +96,19 @@ function EventRow({
           {` · ${t("by")} ${event.createdByName}`}
         </span>
       </span>
+      {faces.length > 0 && (
+        <span className="flex shrink-0 -space-x-2">
+          {faces.map((f) => (
+            <Avatar
+              key={f.key}
+              src={f.src}
+              name={f.name}
+              size={8}
+              className="ring-2 ring-surface"
+            />
+          ))}
+        </span>
+      )}
     </button>
   );
 }
