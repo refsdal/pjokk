@@ -56,13 +56,14 @@ type Baby struct {
 }
 
 type BabyAbout struct {
-	BabyID      string
-	FamilyID    string
-	Comfort     *string
-	FallsAsleep *string
-	Diet        *string
-	Other       *string
-	UpdatedAt   pgtype.Timestamptz
+	BabyID         string
+	FamilyID       string
+	Comfort        *string
+	FallsAsleep    *string
+	Diet           *string
+	Other          *string
+	UpdatedAt      pgtype.Timestamptz
+	UsualNapMinute *int32
 }
 
 type BathLog struct {

@@ -221,6 +221,35 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/babies/{id}/usual-nap:
+    put:
+      operationId: setUsualNap
+      summary: >-
+        The family's own nap anchor (issue #112): minutes after LOCAL
+        midnight, or null for none. When set, Home's Awake card says "Usual
+        nap 11:30" instead of computing a wake window. Any member may.
+      tags: [babies]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetUsualNap"
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No baby with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/family:
     get:
       operationId: getFamily
@@ -6159,6 +6188,15 @@ components:
           type: string
           maxLength: 500
           nullable: true
+    SetUsualNap:
+      type: object
+      required: [minute]
+      properties:
+        minute:
+          type: integer
+          minimum: 0
+          maximum: 1439
+          nullable: true
     VaccineDocument:
       type: object
       description: >-
@@ -6655,6 +6693,7 @@ components:
         - activeDaycare
         - handoverDue
         - activeIllness
+        - usualNapMinute
         - activeFeed
         - activePump
         - lastTemperature
@@ -6717,6 +6756,13 @@ components:
           allOf:
             - $ref: "#/components/schemas/DaycareLog"
           nullable: true
+        usualNapMinute:
+          type: integer
+          nullable: true
+          description: >-
+            The family's own nap anchor for this baby, minutes after local
+            midnight, or null (issue #112). A wall-clock time with no
+            timezone: the device compares it with its own clock.
         activeIllness:
           description: The open illness episode, or null (issue #107).
           allOf:

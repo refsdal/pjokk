@@ -164,6 +164,17 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		return nil, err
 	}
 
+	// The family's own nap anchor (issue #112). No row is no anchor.
+	var usualNap *int
+	if minute, err := d.Q.GetUsualNapMinute(ctx, dbgen.GetUsualNapMinuteParams{FamilyID: fam.FamilyID, BabyID: babyID}); err == nil {
+		if minute != nil {
+			v := int(*minute)
+			usualNap = &v
+		}
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+
 	// Ill right now, or not (illness.go, issue #107).
 	var activeIllness *gen.IllnessLog
 	if ill, err := d.Q.ActiveIllness(ctx, dbgen.ActiveIllnessParams{FamilyID: fam.FamilyID, BabyID: &babyID}); err == nil {
@@ -330,6 +341,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		ActiveDaycare:       activeDaycare,
 		HandoverDue:         handoverDue,
 		ActiveIllness:       activeIllness,
+		UsualNapMinute:      usualNap,
 		ActiveFeed:          activeFeed,
 		ActivePump:          activePump,
 		LastTemperature:     lastTemperature,
