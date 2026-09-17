@@ -419,6 +419,25 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   <name>", the medicine sheet, the PDF report — these take the baby from the URL and
   never from Home's selection. **You** is `/profile` (below); the hub only
   points at it. iOS-style grouped rows throughout.
+- **What to track (per baby, spec
+  `docs/superpowers/specs/2026-09-17-per-baby-tracking-design.md`):**
+  `baby.features` is the ENABLED keys of thirteen switches (`feeds, pump,
+  sleep, diapers, medicine, measurements, milestones, bath, notes, play,
+  daycare, illness, vaccines`), all on for a baby that predates the
+  column (00033's backfill), none for a new one until the carousel
+  (`/settings/baby/$babyId/tracking`, `components/tracking/`) runs right
+  after creation with a set recommended from the birth date
+  (`lib/tracking.ts` `recommended`: bands at 4 and 12 months; barnehage
+  is never age-recommended, its card carries its own tag). Off HIDES
+  entry points — the Home button and card, the More tile, the timeline
+  chip, the Stats card, the Settings row, the reminder kind, the kiosk
+  card — and never history, never a write: `PUT /api/babies/{id}/features`
+  is admin-only and not a device operation, the server gates nothing on
+  it, and the only server readers are the reminder job (holds) and the
+  closing alert (skips). Every screen asks `useTracking(baby).has(key)`;
+  nothing reads the array. Family-wide things (Calendar, Contacts, help,
+  keys) have no switch; the Family page's shared-list rows follow the
+  union of the babies' switches (`familySections`' second argument).
 - **Calendar recurrence (#52):** `calendar_event.recurrence`
   (none|daily|weekly|biweekly|weekdays|monthly|yearly) + `recurrence_until`
   (`weekdays` is Monday to Friday, #125: the pick-up rota, offered as a
