@@ -348,8 +348,17 @@ entry, More).
 No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
 (the invite flow IS onboarding).
 
-- **Home:** baby header w/ age + caretaker chip (the user's avatar → account
-  sheet: profile, family switcher, sign out), active-session banner (live
+- **Home:** the baby header (`components/BabyHeader.tsx`, the SAME on
+  Home, Timeline, Stats and Vaccines — Calendar and Settings are
+  family-wide and carry none): the babies in a fixed row on the left, in
+  list order, the selected one a pill with photo (or initial), name and
+  age, the others bare faces — one tap switches, the ring says which is
+  current and the positions never move; the caretaker's own face on the
+  right opens the account sheet (profile, family switcher, sign out). A
+  baby's photo is `baby.avatar_key`, set on the baby's settings page,
+  served through `/api/babies/{id}/avatar` (a family's, so the kiosk's
+  care station shows it too), and — unlike a person's — copied by the
+  nightly photo backup. Then the active-session banner (live
   counter + Wake button when sleeping), last-feed / last-diaper status cards,
   2×2 grid of big log buttons (Feed, Diaper, Sleep, More), tab bar. The
   Awake card carries the nap-window guide: a typical wake window for the
@@ -406,8 +415,8 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   the ordinary key middleware, so the URL is a credential like any key —
   and Export CSV). `lib/settings-nav.ts` is the ONE list behind both the
   rows and the route, admin-only flag included. **One page per baby**
-  (`/settings/baby/$babyId`): details, usual nap, "About <name>", the
-  medicine sheet, the PDF report — these take the baby from the URL and
+  (`/settings/baby/$babyId`): details and photo, usual nap, "About
+  <name>", the medicine sheet, the PDF report — these take the baby from the URL and
   never from Home's selection. **You** is `/profile` (below); the hub only
   points at it. iOS-style grouped rows throughout.
 - **Calendar recurrence (#52):** `calendar_event.recurrence`
@@ -500,7 +509,8 @@ names and the join-table roles: these are Limen's shapes, verified against
 the library rather than guessed, and they are NOT the better-auth names the
 Bun-era schema used. Domain tables kept their singular names:
 
-- `baby(id, familyId, name, birthDate, …)`
+- `baby(id, familyId, name, birthDate, sex?, avatarKey?, …)` — `avatarKey`
+  is the baby's photo (00032), a person's `users.avatar_key` transposed.
 - Every log table carries two people (00019): `caretakerId`, who did the
   care — optional on every create and update body, must be a family member
   (403 `NOT_MEMBER`), defaults to the caller — and `loggedById`, who saved
