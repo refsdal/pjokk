@@ -55,6 +55,16 @@ type Baby struct {
 	CreatedAt pgtype.Timestamptz
 }
 
+type BabyAbout struct {
+	BabyID      string
+	FamilyID    string
+	Comfort     *string
+	FallsAsleep *string
+	Diet        *string
+	Other       *string
+	UpdatedAt   pgtype.Timestamptz
+}
+
 type BathLog struct {
 	ID          string
 	FamilyID    string
