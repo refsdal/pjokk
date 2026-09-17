@@ -9,6 +9,18 @@ import { t } from "@/lib/i18n";
 export const DAYS_ALL = 127; // bit 0 = Monday … bit 6 = Sunday
 export const DAYS_WEEKDAYS = 31;
 export const DAYS_WEEKENDS = 96;
+// A barnehage sends the spare clothes home on Fridays (issue #113): the one
+// single-day choice the sheet offers, because it is the one people need.
+export const DAYS_FRIDAY = 1 << 4;
+
+// A custom reminder most barnehage families end up writing by hand. A
+// preset, not a new kind: it fills the ordinary custom reminder's label,
+// time and day, and every one of them can still be changed.
+export const SPARES_PRESET = {
+  label: "Check spare clothes and diapers",
+  atTime: "15:00",
+  days: DAYS_FRIDAY,
+} as const;
 
 export const kindLabel: Record<ReminderKind, string> = {
   feed: "Feed",
