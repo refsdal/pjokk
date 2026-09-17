@@ -437,6 +437,11 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   any section can be left out, and one list feeds both it and the PDF
   (jsPDF, lazy, in the browser like the report). File name
   `pjokk-<baby>-about.pdf`.
+- **Medicine sheet for the barnehage (Settings → Medicines, #113):** one
+  page per baby from the family's OWN catalogue entries, with blank lines
+  for when / how / from–until and a signature (`lib/medicine-sheet.ts`,
+  jsPDF in the browser). No dosing data of the app's own and no consent
+  wording. `pjokk-<baby>-medicines.pdf`.
 - **Operator console (`/admin`, system admins only):** Users, Families
   and Audit lists (server-side search, keyset paging, Load more), a page
   per family (spec `docs/superpowers/specs/2026-09-08-admin-family-management-design.md`)

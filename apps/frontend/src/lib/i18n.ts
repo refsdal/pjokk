@@ -309,6 +309,19 @@ const nb: Record<string, string> = {
   "Symptoms again": "Symptomer igjen",
   Recovered: "Frisk",
 
+  // The barnehage small items (issue #113).
+  "Spare clothes, Fridays": "Skiftetøy, fredager",
+  "Check spare clothes and diapers": "Sjekk skiftetøy og bleier",
+  Fridays: "Fredager",
+  "Sheet for daycare (PDF)": "Ark til barnehagen (PDF)",
+  "Medicine at daycare": "Medisin i barnehagen",
+  "Give it when": "Gis når",
+  How: "Hvordan",
+  "From / until": "Fra / til",
+  "Parent's signature": "Foresattes signatur",
+  "Doses and intervals are the family's own entries in Pjokk, not advice from the app.":
+    "Doser og intervaller er familiens egne oppføringer i Pjokk, ikke råd fra appen.",
+
   // The family's own nap anchor (issue #112).
   "Usual nap": "Vanlig lur",
   "Usual nap was": "Vanlig lur var",

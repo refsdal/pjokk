@@ -13,6 +13,7 @@ import { t } from "@/lib/i18n";
 import { nightSchedule } from "@/lib/night";
 import {
   DAYS_ALL,
+  DAYS_FRIDAY,
   DAYS_WEEKDAYS,
   DAYS_WEEKENDS,
   deviceTimeZone,
@@ -21,6 +22,7 @@ import {
   kindLabel,
   parseMinuteOfDay,
   quietLabel,
+  SPARES_PRESET,
 } from "@/lib/reminder-ui";
 import { toast } from "@/lib/toast";
 
@@ -107,6 +109,22 @@ export function ReminderSheet({
           onChange={changeKind}
         />
 
+        {kind === "custom" && (
+          <ChipGroup
+            options={[{ value: "spares", label: t("Spare clothes, Fridays") }]}
+            value={
+              label === t(SPARES_PRESET.label) && days === SPARES_PRESET.days
+                ? "spares"
+                : null
+            }
+            onChange={() => {
+              setLabel(t(SPARES_PRESET.label));
+              setAtTime(SPARES_PRESET.atTime);
+              setDays(SPARES_PRESET.days);
+            }}
+          />
+        )}
+
         {(kind === "custom" || kind === "medicine") && (
           <Input
             placeholder={
@@ -161,6 +179,7 @@ export function ReminderSheet({
                 { value: String(DAYS_ALL), label: t("Every day") },
                 { value: String(DAYS_WEEKDAYS), label: t("Weekdays") },
                 { value: String(DAYS_WEEKENDS), label: t("Weekends") },
+                { value: String(DAYS_FRIDAY), label: t("Fridays") },
               ]}
               value={String(days)}
               onChange={(v) => setDays(Number(v))}

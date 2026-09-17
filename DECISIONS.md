@@ -3066,3 +3066,25 @@ built and one deliberately was not.
 - Deriving the anchor from logged barnehage naps was floated in the issue
   and left out: a typed time is one field, and the About-me page already
   shows the logged median beside it.
+
+## 2026-09-17 — the barnehage small items
+
+Last of the barnehage series (#113; its first item, appetite, shipped
+earlier). Frontend only.
+
+- **The spare-clothes reminder is a preset, not a kind.** It fills the
+  ordinary custom reminder's label, time (15:00) and day, and every one of
+  them can still be changed. The day chips gain **Fridays** — the one
+  single-day choice the sheet offers, because a barnehage sends everything
+  home on Fridays and it is the one people need; a full weekday picker is
+  not.
+- **The medicine sheet prints the family's own catalogue and nothing
+  else.** Staff may not give medicine without the parents' written
+  instructions. One page per baby: each live entry with the family's dose
+  and interval, blank lines for what only a pen can add (when, how, from
+  and until), and lines for a signature and a date. The footer says the
+  numbers are the family's own entries, not advice from the app — the
+  medicine catalogue's stance (#49), on paper.
+- **No consent wording.** What a barnehage requires differs by
+  municipality and many have their own form; the page is the facts a family
+  copies onto that form, or hands over with it, not a legal document.
