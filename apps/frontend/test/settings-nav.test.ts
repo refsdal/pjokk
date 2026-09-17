@@ -42,4 +42,17 @@ describe("familySections", () => {
     expect(familySection("api-keys", false)).toBeUndefined();
     expect(familySection("api-keys", true)?.key).toBe("api-keys");
   });
+
+  it("hides a shared list no baby uses any more", () => {
+    const on = new Set(["sleep", "illness"]);
+    const keys = familySections(true, (k) => on.has(k)).map((s) => s.key);
+    expect(keys).toEqual([
+      "contacts",
+      "sleep-locations",
+      "care-days",
+      "api-keys",
+      "calendar-feed",
+      "data",
+    ]);
+  });
 });
