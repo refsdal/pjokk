@@ -153,6 +153,16 @@ WHERE "family_id" = sqlc.arg(family_id) AND "user_id" = sqlc.arg(user_id);
 DELETE FROM "care_day_quota"
 WHERE "family_id" = sqlc.arg(family_id) AND "user_id" = sqlc.arg(user_id);
 
+-- name: ClearMemberPickupPlan :exec
+-- A removed member stops being the planned pick-up in that family; the
+-- day keeps its time. And their one-day exceptions go (daycare place spec).
+UPDATE "daycare_pickup_plan" SET "user_id" = NULL
+WHERE "family_id" = sqlc.arg(family_id) AND "user_id" = sqlc.arg(user_id);
+
+-- name: DeleteMemberPickupOverrides :exec
+DELETE FROM "daycare_pickup_override"
+WHERE "family_id" = sqlc.arg(family_id) AND "user_id" = sqlc.arg(user_id);
+
 -- name: DeleteMemberCalendarAssignments :exec
 -- calendar_assignee has no family_id of its own; its event carries it.
 DELETE FROM "calendar_assignee" ca

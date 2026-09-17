@@ -282,6 +282,18 @@ func (s *service) RemoveMember(ctx context.Context, familyID, memberID string) e
 		}); err != nil {
 			return fmt.Errorf("auth: delete member care-day quota: %w", err)
 		}
+		if err := q.ClearMemberPickupPlan(ctx, gen.ClearMemberPickupPlanParams{
+			FamilyID: familyID,
+			UserID:   &member.UserID,
+		}); err != nil {
+			return fmt.Errorf("auth: clear member pick-up plan: %w", err)
+		}
+		if err := q.DeleteMemberPickupOverrides(ctx, gen.DeleteMemberPickupOverridesParams{
+			FamilyID: familyID,
+			UserID:   member.UserID,
+		}); err != nil {
+			return fmt.Errorf("auth: delete member pick-up overrides: %w", err)
+		}
 		if err := q.DeleteMemberPushSnoozes(ctx, gen.DeleteMemberPushSnoozesParams{
 			FamilyID: familyID,
 			UserID:   member.UserID,

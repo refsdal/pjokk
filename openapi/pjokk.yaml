@@ -2160,6 +2160,195 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/daycare-places:
+    get:
+      operationId: listDaycarePlaces
+      summary: >-
+        The family's barnehager as places: how to reach each, when it opens
+        and closes, and which babies attend. Any member may read; usually
+        one row.
+      tags: [daycare]
+      responses:
+        "200":
+          description: Places, by name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DaycarePlace"
+    post:
+      operationId: createDaycarePlace
+      summary: >-
+        Add a place (family admins). `babyIds` enrols those babies here, and
+        moves any of them from another place: a baby attends one at a time.
+      tags: [daycare]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DaycarePlaceInput"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DaycarePlace"
+        "400":
+          description: Unknown baby (INVALID_REFERENCE) or a zone that does not load (BAD_TZ).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/daycare-places/{id}:
+    put:
+      operationId: updateDaycarePlace
+      summary: >-
+        Replace a place, enrolments included (family admins). A PUT, not a
+        PATCH: the settings page holds every field, and a replayed offline
+        save is harmless.
+      tags: [daycare]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DaycarePlaceInput"
+      responses:
+        "200":
+          description: Saved, as it now reads.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DaycarePlace"
+        "400":
+          description: Unknown baby (INVALID_REFERENCE) or a zone that does not load (BAD_TZ).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No place with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteDaycarePlace
+      summary: Delete a place (family admins); its enrolments cascade, pick-up plans stay.
+      tags: [daycare]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No place with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/babies/{id}/pickup-plan:
+    get:
+      operationId: getPickupPlan
+      summary: >-
+        Who collects this baby from barnehage and when, Monday to Friday,
+        plus the one-day exceptions from yesterday on. Days nobody has
+        planned are simply absent.
+      tags: [daycare]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: The plan.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PickupPlan"
+        "404":
+          description: No baby with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      operationId: setPickupPlan
+      summary: >-
+        Replace the weekly grid in one transaction (family admins). A day
+        with neither a time nor a person is dropped. Every person must be a
+        member of the family.
+      tags: [daycare]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetPickupPlan"
+      responses:
+        "200":
+          description: Saved, as it now reads.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PickupPlan"
+        "400":
+          description: A weekday twice (DUPLICATE_DAY) or a person who is not a member (INVALID_REFERENCE).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No baby with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/babies/{id}/pickup-override:
+    put:
+      operationId: setPickupOverride
+      summary: >-
+        Who collects on ONE day instead of the grid's person; a null userId
+        clears the day. Any member may. `date` is the caller's own local
+        day: the server derives none.
+      tags: [daycare]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetPickupOverride"
+      responses:
+        "200":
+          description: Saved; the plan as it now reads.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PickupPlan"
+        "400":
+          description: Not a calendar date (BAD_DATE) or a person who is not a member (INVALID_REFERENCE).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No baby with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/illness:
     get:
       operationId: listIllnesses
@@ -6119,6 +6308,193 @@ components:
           description: One per CURRENT member, those with nothing used included.
           items:
             $ref: "#/components/schemas/CareDayTotal"
+    DaycarePlace:
+      type: object
+      required:
+        - id
+        - name
+        - address
+        - phone
+        - email
+        - website
+        - notes
+        - openMinute
+        - closeMinute
+        - alertLeadMin
+        - tz
+        - babyIds
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        website:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        openMinute:
+          type: integer
+          minimum: 0
+          maximum: 1439
+          nullable: true
+          description: Opens, minutes after local midnight in `tz`; one time for every weekday.
+        closeMinute:
+          type: integer
+          minimum: 0
+          maximum: 1439
+          nullable: true
+          description: Closes, minutes after local midnight in `tz`.
+        alertLeadMin:
+          type: integer
+          nullable: true
+          description: >-
+            The family's own number: how long before closing the planned
+            person is told she is still there. Null means no alert.
+        tz:
+          type: string
+          description: IANA zone the hours are wall-clock times in.
+        babyIds:
+          type: array
+          items:
+            type: string
+    DaycarePlaceInput:
+      type: object
+      required: [name, tz]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        address:
+          type: string
+          maxLength: 300
+          nullable: true
+        phone:
+          type: string
+          maxLength: 40
+          nullable: true
+        email:
+          type: string
+          maxLength: 200
+          nullable: true
+          description: Free text, like a contact's website; saving matters more than shape.
+        website:
+          type: string
+          maxLength: 200
+          nullable: true
+        notes:
+          type: string
+          maxLength: 2000
+          nullable: true
+        openMinute:
+          type: integer
+          minimum: 0
+          maximum: 1439
+          nullable: true
+        closeMinute:
+          type: integer
+          minimum: 0
+          maximum: 1439
+          nullable: true
+        alertLeadMin:
+          type: integer
+          minimum: 5
+          maximum: 180
+          nullable: true
+        tz:
+          type: string
+          minLength: 1
+          maxLength: 64
+        babyIds:
+          type: array
+          maxItems: 10
+          default: []
+          items:
+            type: string
+    PickupPlanDay:
+      type: object
+      required: [weekday, minute, userId]
+      properties:
+        weekday:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: ISO weekday, 1 = Monday. Barnehage is Monday to Friday.
+        minute:
+          type: integer
+          minimum: 0
+          maximum: 1439
+          nullable: true
+          description: >-
+            Expected pick-up, minutes after local midnight. A plan, not a
+            deadline; nothing fires on it.
+        userId:
+          type: string
+          nullable: true
+          description: Who collects; a member of the family, or nobody named.
+    PickupOverride:
+      type: object
+      required: [date, userId]
+      properties:
+        date:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}$
+        userId:
+          type: string
+    PickupPlan:
+      type: object
+      required: [days, overrides]
+      properties:
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/PickupPlanDay"
+        overrides:
+          type: array
+          description: One-day exceptions from yesterday (UTC) on, oldest first.
+          items:
+            $ref: "#/components/schemas/PickupOverride"
+    SetPickupPlan:
+      type: object
+      required: [days]
+      properties:
+        days:
+          type: array
+          maxItems: 5
+          items:
+            $ref: "#/components/schemas/PickupPlanDay"
+    SetPickupOverride:
+      type: object
+      required: [date, userId]
+      properties:
+        date:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}$
+        userId:
+          type: string
+          nullable: true
+          description: Null clears the day back to the grid.
+    DaycareToday:
+      type: object
+      required: [place, plan]
+      properties:
+        place:
+          allOf:
+            - $ref: "#/components/schemas/DaycarePlace"
+          nullable: true
+        plan:
+          $ref: "#/components/schemas/PickupPlan"
     CreateCareDay:
       type: object
       required: [date]
@@ -6711,6 +7087,7 @@ components:
         - activePlay
         - activeDaycare
         - handoverDue
+        - daycare
         - activeIllness
         - usualNapMinute
         - activeFeed
@@ -6774,6 +7151,15 @@ components:
             Backs Home's "How was the day?" card (issue #106).
           allOf:
             - $ref: "#/components/schemas/DaycareLog"
+          nullable: true
+        daycare:
+          description: >-
+            This baby's barnehage as a place and her pick-up plan, or null
+            when she has neither. The CLIENT resolves "today" against its
+            own date, so Home needs no second request and the server
+            guesses no local day for display.
+          allOf:
+            - $ref: "#/components/schemas/DaycareToday"
           nullable: true
         usualNapMinute:
           type: integer

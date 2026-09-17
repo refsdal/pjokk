@@ -65,6 +65,9 @@ var userOwned = map[string]bool{
 	"push_snooze":          true,
 	"care_day":             true,
 	"care_day_quota":       true,
+	// A one-day "X collects" is nothing without X. daycare_pickup_plan is
+	// NOT here: its person is nullable, and the day keeps its time.
+	"daycare_pickup_override": true,
 }
 
 // scopeColumns are the columns that carry a family's id.

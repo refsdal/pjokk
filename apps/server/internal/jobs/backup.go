@@ -58,6 +58,10 @@ var BackupTables = []string{
 	"illness",
 	"care_day",
 	"care_day_quota",
+	"daycare_place",
+	"daycare_enrolment",
+	"daycare_pickup_plan",
+	"daycare_pickup_override",
 	"baby_about",
 	// The running nursing/pump clocks. Transient, but a dump taken
 	// mid-feed should restore mid-feed, exactly as a running sleep_log does.

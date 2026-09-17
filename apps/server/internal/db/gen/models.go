@@ -149,6 +149,12 @@ type ContactBaby struct {
 	BabyID    string
 }
 
+type DaycareEnrolment struct {
+	BabyID   string
+	FamilyID string
+	PlaceID  string
+}
+
 type DaycareLog struct {
 	ID                string
 	FamilyID          string
@@ -161,6 +167,37 @@ type DaycareLog struct {
 	Notes             *string
 	CreatedAt         pgtype.Timestamptz
 	Mood              *string
+}
+
+type DaycarePickupOverride struct {
+	FamilyID string
+	BabyID   string
+	Date     pgtype.Date
+	UserID   string
+}
+
+type DaycarePickupPlan struct {
+	FamilyID     string
+	BabyID       string
+	Weekday      int32
+	PickupMinute *int32
+	UserID       *string
+}
+
+type DaycarePlace struct {
+	ID           string
+	FamilyID     string
+	Name         string
+	Address      *string
+	Phone        *string
+	Email        *string
+	Website      *string
+	Notes        *string
+	OpenMinute   *int32
+	CloseMinute  *int32
+	AlertLeadMin *int32
+	Tz           string
+	CreatedAt    pgtype.Timestamptz
 }
 
 type Device struct {
