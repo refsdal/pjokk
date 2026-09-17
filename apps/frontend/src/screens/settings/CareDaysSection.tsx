@@ -15,7 +15,6 @@ import {
 } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { formatDay, toLocalDateInput } from "@/lib/time";
-import { SectionTitle } from "./lib";
 
 // Days at home with an ill child (issue #108): this year per caretaker
 // against the number each set for themselves, the days themselves, and a
@@ -43,7 +42,6 @@ export function CareDaysSection({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <>
-      <SectionTitle>{t("Days at home with a sick child")}</SectionTitle>
       <Card className="space-y-4" data-testid="care-days">
         <div className="flex items-center justify-between">
           <Button

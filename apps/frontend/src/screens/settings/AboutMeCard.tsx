@@ -1,6 +1,6 @@
 import { IconFileTypePdf } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
-import type { BabyAbout } from "@pjokk/shared";
+import type { Baby, BabyAbout } from "@pjokk/shared";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -11,12 +11,11 @@ import {
 } from "@/lib/about-me";
 import { useAboutMe, useSaveBabyAbout } from "@/lib/data";
 import { t } from "@/lib/i18n";
-import { useSelectedBaby } from "@/lib/selected-baby";
 import { toast } from "@/lib/toast";
 import { formatVolume, useUnits } from "@/lib/units";
 import { cn, focusRing } from "@/lib/utils";
 
-// Settings → Data → "About <name>" (issue #109): the one page a barnehage
+// Settings → <baby> → "About <name>" (issue #109): the one page a barnehage
 // asks every family for before tilvenning. Most of it is already in the
 // logs; the four lines the logs cannot know are typed here and kept beside
 // the baby. The preview IS the page: every section can be left out before
@@ -45,23 +44,21 @@ const FIELDS: { key: keyof BabyAbout; label: string; hint: string }[] = [
   },
 ];
 
-export function AboutMeCard() {
-  const { baby } = useSelectedBaby();
+export function AboutMeCard({ baby }: { baby: Baby }) {
   const units = useUnits();
-  const data = useAboutMe(baby?.id);
+  const data = useAboutMe(baby.id);
   const save = useSaveBabyAbout();
   const [text, setText] = useState<BabyAbout | null>(null);
   const [left, setLeft] = useState<Set<AboutSectionKey>>(new Set());
   const [busy, setBusy] = useState(false);
 
   // Seed the fields once per baby, from the server; typing owns them after.
-  const babyId = baby?.id;
+  const babyId = baby.id;
   // biome-ignore lint/correctness/useExhaustiveDependencies: reseed only when the baby changes or its text first arrives
   useEffect(() => {
     setText(data.about ?? null);
   }, [babyId, data.about !== undefined]);
 
-  if (!baby) return null;
   const about = text ?? {
     comfort: null,
     fallsAsleep: null,

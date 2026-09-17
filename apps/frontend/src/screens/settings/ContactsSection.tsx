@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { contactIconFor } from "@/lib/contact-ui";
 import { useContacts } from "@/lib/data";
 import { t } from "@/lib/i18n";
-import { SectionTitle } from "./lib";
 
 export function ContactsSection() {
   const contacts = useContacts();
@@ -17,7 +16,6 @@ export function ContactsSection() {
 
   return (
     <>
-      <SectionTitle>{t("Contacts")}</SectionTitle>
       <Card className="divide-y divide-line p-0">
         {rows.map((c) => (
           <ContactRow key={c.id} contact={c} onEdit={() => setEditContact(c)} />
