@@ -148,6 +148,18 @@ WHERE d."family_id" = sqlc.arg(family_id)
 ORDER BY d."start_time" ASC, d."id" ASC
 LIMIT sqlc.arg(lim);
 
+-- name: ExportIllnesses :many
+SELECT
+    i."baby_id", bb."name" AS baby_name, i."start_time", i."end_time", i."symptoms",
+    COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, i."notes"
+FROM "illness" i
+JOIN "baby" bb ON bb."id" = i."baby_id"
+JOIN "users" u ON u."id" = i."caretaker_id"
+JOIN "users" lu ON lu."id" = i."logged_by_id"
+WHERE i."family_id" = sqlc.arg(family_id)
+ORDER BY i."start_time" ASC, i."id" ASC
+LIMIT sqlc.arg(lim);
+
 -- name: ExportVaccines :many
 SELECT
     v."baby_id", bb."name" AS baby_name, v."time", v."name", v."dose_number",

@@ -295,6 +295,14 @@ var operationAuthTiers = map[string]authTier{
 	"GetDaycareHandover": tierFamily,
 	"PutDaycareHandover": tierFamily,
 
+	// Illness episodes (issue #107, illness.go). Not for devices.
+	"ListIllnesses":    tierFamily,
+	"CreateIllness":    tierFamily,
+	"GetActiveIllness": tierFamily,
+	"RecoverIllness":   tierFamily,
+	"UpdateIllness":    tierFamily,
+	"DeleteIllness":    tierFamily,
+
 	"GetSummary": tierFamily,
 
 	// The six Phase 3 activity types (other-logs.ts's makeLogRoutes

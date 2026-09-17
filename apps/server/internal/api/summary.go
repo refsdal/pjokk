@@ -164,6 +164,15 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		return nil, err
 	}
 
+	// Ill right now, or not (illness.go, issue #107).
+	var activeIllness *gen.IllnessLog
+	if ill, err := d.Q.ActiveIllness(ctx, dbgen.ActiveIllnessParams{FamilyID: fam.FamilyID, BabyID: &babyID}); err == nil {
+		v := serIllness(dbgen.GetIllnessRow(ill))
+		activeIllness = &v
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+
 	// The shared nursing / pump timers (feed_timer.go), read the same way
 	// activeSleep / activePlay are: state, not screens.
 	activeFeed, err := d.activeFeedTimer(ctx, fam.FamilyID, babyID, "breast")
@@ -320,6 +329,7 @@ func (d Deps) GetSummary(ctx context.Context, req gen.GetSummaryRequestObject) (
 		ActivePlay:          activePlay,
 		ActiveDaycare:       activeDaycare,
 		HandoverDue:         handoverDue,
+		ActiveIllness:       activeIllness,
 		ActiveFeed:          activeFeed,
 		ActivePump:          activePump,
 		LastTemperature:     lastTemperature,

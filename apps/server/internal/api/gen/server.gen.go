@@ -89,7 +89,7 @@ type ServerInterface interface {
 	// BanAdminUser Ban an account: sets banned + ban_reason AND revokes every session the user holds, so the ban is enforced by absence rather than by every reader remembering to check a flag. Their API keys stop authenticating too (GetAPIKeyByHash joins on a non-banned creator). Audited as `user.ban`. System admin only.
 	// (POST /api/admin/users/{id}/ban)
 	BanAdminUser(w http.ResponseWriter, r *http.Request, id IdPath)
-	// DeleteAdminUser Delete an account safely. Every non-cascading reference to the user (log attribution on all twelve log kinds, vaccine documents and dismissals, invites, API keys, calendar events and audit rows) is reassigned to the tombstone "Deleted user" in ONE transaction, calendar assignments are dropped, the user's API keys are revoked, and only then is the account removed (sessions, memberships and push subscriptions cascade). POST rather than DELETE, matching the TypeScript predecessor's route. Audited as `user.delete`. System admin only.
+	// DeleteAdminUser Delete an account safely. Every non-cascading reference to the user (log attribution on all thirteen log kinds, vaccine documents and dismissals, invites, API keys, calendar events and audit rows) is reassigned to the tombstone "Deleted user" in ONE transaction, calendar assignments are dropped, the user's API keys are revoked, and only then is the account removed (sessions, memberships and push subscriptions cascade). POST rather than DELETE, matching the TypeScript predecessor's route. Audited as `user.delete`. System admin only.
 	// (POST /api/admin/users/{id}/delete)
 	DeleteAdminUser(w http.ResponseWriter, r *http.Request, id IdPath)
 	// ChangeAdminUserEmail Change a person's login address. Their sessions and a linked Google account stay (Google sign-in follows the Google account's id, not the address); password sign-in uses the new address from then on. Audited old → new. 409 EMAIL_TAKEN when another account holds it, 400 UNCHANGED when it is already theirs. System admin only.
@@ -272,6 +272,24 @@ type ServerInterface interface {
 	// AcknowledgeHelpRequest "On my way". ANY family member may acknowledge, not only the target — whoever is closer answers. Idempotent: a second acknowledge returns the row unchanged and sends nothing. The first one pushes "<name> is on the way" to the sender, unless the sender is acknowledging their own request.
 	// (POST /api/help/{id}/acknowledge)
 	AcknowledgeHelpRequest(w http.ResponseWriter, r *http.Request, id IdPath)
+	// ListIllnesses Illness episodes in the caller's active family, newest first (by startTime).
+	// (GET /api/illness)
+	ListIllnesses(w http.ResponseWriter, r *http.Request, params ListIllnessesParams)
+	// CreateIllness Start an illness episode (issue #107), or with an endTime log one that is over. A baby can only have one open episode at a time — a partial unique index, as for sleep and daycare.
+	// (POST /api/illness)
+	CreateIllness(w http.ResponseWriter, r *http.Request)
+	// GetActiveIllness The open illness episode for a baby, or null.
+	// (GET /api/illness/active)
+	GetActiveIllness(w http.ResponseWriter, r *http.Request, params GetActiveIllnessParams)
+	// DeleteIllness Delete an illness episode.
+	// (DELETE /api/illness/{id})
+	DeleteIllness(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdateIllness Partial update. `endTime` sent as `null` reopens the episode (409 if another is open). `lastSymptomAt` as `null` means "still has symptoms"; `clearHours` and `notes` as `null` clear them.
+	// (PATCH /api/illness/{id})
+	UpdateIllness(w http.ResponseWriter, r *http.Request, id IdPath)
+	// RecoverIllness Recovered: close the open episode. endTime defaults to now. A replay answers 404 rather than moving the end.
+	// (POST /api/illness/{id}/recover)
+	RecoverIllness(w http.ResponseWriter, r *http.Request, id IdPath)
 	// ListInvites Invite codes ever issued for the family, newest first — used and revoked ones included. Family admin only.
 	// (GET /api/invites)
 	ListInvites(w http.ResponseWriter, r *http.Request)
@@ -449,7 +467,7 @@ type ServerInterface interface {
 	// GetSummary Everything the home screen needs in one call: last feed, last diaper, active + last sleep, active play, and today's local-day totals.
 	// (GET /api/summary)
 	GetSummary(w http.ResponseWriter, r *http.Request, params GetSummaryParams)
-	// ListTimeline The merged feed of everything, newest first. Sleep, play and daycare entries sort by their startTime (active sessions have endTime null); every other kind sorts by time. filter=other selects the nine non-core kinds (medicine, bath, note, milestone, measurement, pump, play, daycare, vaccine) together; omitting filter returns all twelve.
+	// ListTimeline The merged feed of everything, newest first. Sleep, play, daycare and illness entries sort by their startTime (active sessions have endTime null); every other kind sorts by time. filter=other selects the ten non-core kinds (medicine, bath, note, milestone, measurement, pump, play, daycare, illness, vaccine) together; omitting filter returns all thirteen.
 	// (GET /api/timeline)
 	ListTimeline(w http.ResponseWriter, r *http.Request, params ListTimelineParams)
 	// ListVaccines Vaccine logs in the caller's active family, newest first. Each entry's `documents` array carries `url: "/api/files/{docId}"` for any attached file (see internal/api/files.go — uploading is disabled today, but existing documents still stream).
@@ -2661,6 +2679,177 @@ func (siw *ServerInterfaceWrapper) AcknowledgeHelpRequest(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// ListIllnesses operation middleware
+func (siw *ServerInterfaceWrapper) ListIllnesses(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListIllnessesParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListIllnesses(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateIllness operation middleware
+func (siw *ServerInterfaceWrapper) CreateIllness(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateIllness(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetActiveIllness operation middleware
+func (siw *ServerInterfaceWrapper) GetActiveIllness(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetActiveIllnessParams
+
+	// ------------- Optional query parameter "babyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "babyId", r.URL.Query(), &params.BabyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "babyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "babyId", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetActiveIllness(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteIllness operation middleware
+func (siw *ServerInterfaceWrapper) DeleteIllness(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteIllness(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateIllness operation middleware
+func (siw *ServerInterfaceWrapper) UpdateIllness(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateIllness(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RecoverIllness operation middleware
+func (siw *ServerInterfaceWrapper) RecoverIllness(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RecoverIllness(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListInvites operation middleware
 func (siw *ServerInterfaceWrapper) ListInvites(w http.ResponseWriter, r *http.Request) {
 
@@ -4634,6 +4823,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/daycare/{id}/handover", wrapper.PutDaycareHandover)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/daycare/{id}", wrapper.DeleteDaycare)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/daycare/{id}", wrapper.UpdateDaycare)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/illness", wrapper.ListIllnesses)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/illness", wrapper.CreateIllness)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/illness/active", wrapper.GetActiveIllness)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/illness/{id}/recover", wrapper.RecoverIllness)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/illness/{id}", wrapper.DeleteIllness)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/illness/{id}", wrapper.UpdateIllness)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/vaccines/dismissals", wrapper.ListVaccineDismissals)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/vaccines/dismissals", wrapper.CreateVaccineDismissal)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/vaccines/dismissals/{id}", wrapper.DeleteVaccineDismissal)
@@ -8139,6 +8334,252 @@ func (response AcknowledgeHelpRequest404JSONResponse) VisitAcknowledgeHelpReques
 	return err
 }
 
+type ListIllnessesRequestObject struct {
+	Params ListIllnessesParams
+}
+
+type ListIllnessesResponseObject interface {
+	VisitListIllnessesResponse(w http.ResponseWriter) error
+}
+
+type ListIllnesses200JSONResponse []IllnessLog
+
+func (response ListIllnesses200JSONResponse) VisitListIllnessesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateIllnessRequestObject struct {
+	Body *CreateIllnessJSONRequestBody
+}
+
+type CreateIllnessResponseObject interface {
+	VisitCreateIllnessResponse(w http.ResponseWriter) error
+}
+
+type CreateIllness201JSONResponse IllnessLog
+
+func (response CreateIllness201JSONResponse) VisitCreateIllnessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateIllness403JSONResponse Error
+
+func (response CreateIllness403JSONResponse) VisitCreateIllnessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateIllness404JSONResponse Error
+
+func (response CreateIllness404JSONResponse) VisitCreateIllnessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateIllness409JSONResponse Error
+
+func (response CreateIllness409JSONResponse) VisitCreateIllnessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetActiveIllnessRequestObject struct {
+	Params GetActiveIllnessParams
+}
+
+type GetActiveIllnessResponseObject interface {
+	VisitGetActiveIllnessResponse(w http.ResponseWriter) error
+}
+
+type GetActiveIllness200JSONResponse IllnessLog
+
+func (response GetActiveIllness200JSONResponse) VisitGetActiveIllnessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteIllnessRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteIllnessResponseObject interface {
+	VisitDeleteIllnessResponse(w http.ResponseWriter) error
+}
+
+type DeleteIllness200JSONResponse Ok
+
+func (response DeleteIllness200JSONResponse) VisitDeleteIllnessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteIllness404JSONResponse Error
+
+func (response DeleteIllness404JSONResponse) VisitDeleteIllnessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateIllnessRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdateIllnessJSONRequestBody
+}
+
+type UpdateIllnessResponseObject interface {
+	VisitUpdateIllnessResponse(w http.ResponseWriter) error
+}
+
+type UpdateIllness200JSONResponse IllnessLog
+
+func (response UpdateIllness200JSONResponse) VisitUpdateIllnessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateIllness403JSONResponse Error
+
+func (response UpdateIllness403JSONResponse) VisitUpdateIllnessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateIllness404JSONResponse Error
+
+func (response UpdateIllness404JSONResponse) VisitUpdateIllnessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateIllness409JSONResponse Error
+
+func (response UpdateIllness409JSONResponse) VisitUpdateIllnessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverIllnessRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *RecoverIllnessJSONRequestBody
+}
+
+type RecoverIllnessResponseObject interface {
+	VisitRecoverIllnessResponse(w http.ResponseWriter) error
+}
+
+type RecoverIllness200JSONResponse IllnessLog
+
+func (response RecoverIllness200JSONResponse) VisitRecoverIllnessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecoverIllness404JSONResponse Error
+
+func (response RecoverIllness404JSONResponse) VisitRecoverIllnessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListInvitesRequestObject struct {
 }
 
@@ -10732,7 +11173,7 @@ type StrictServerInterface interface {
 	// BanAdminUser Ban an account: sets banned + ban_reason AND revokes every session the user holds, so the ban is enforced by absence rather than by every reader remembering to check a flag. Their API keys stop authenticating too (GetAPIKeyByHash joins on a non-banned creator). Audited as `user.ban`. System admin only.
 	// (POST /api/admin/users/{id}/ban)
 	BanAdminUser(ctx context.Context, request BanAdminUserRequestObject) (BanAdminUserResponseObject, error)
-	// DeleteAdminUser Delete an account safely. Every non-cascading reference to the user (log attribution on all twelve log kinds, vaccine documents and dismissals, invites, API keys, calendar events and audit rows) is reassigned to the tombstone "Deleted user" in ONE transaction, calendar assignments are dropped, the user's API keys are revoked, and only then is the account removed (sessions, memberships and push subscriptions cascade). POST rather than DELETE, matching the TypeScript predecessor's route. Audited as `user.delete`. System admin only.
+	// DeleteAdminUser Delete an account safely. Every non-cascading reference to the user (log attribution on all thirteen log kinds, vaccine documents and dismissals, invites, API keys, calendar events and audit rows) is reassigned to the tombstone "Deleted user" in ONE transaction, calendar assignments are dropped, the user's API keys are revoked, and only then is the account removed (sessions, memberships and push subscriptions cascade). POST rather than DELETE, matching the TypeScript predecessor's route. Audited as `user.delete`. System admin only.
 	// (POST /api/admin/users/{id}/delete)
 	DeleteAdminUser(ctx context.Context, request DeleteAdminUserRequestObject) (DeleteAdminUserResponseObject, error)
 	// ChangeAdminUserEmail Change a person's login address. Their sessions and a linked Google account stay (Google sign-in follows the Google account's id, not the address); password sign-in uses the new address from then on. Audited old → new. 409 EMAIL_TAKEN when another account holds it, 400 UNCHANGED when it is already theirs. System admin only.
@@ -10915,6 +11356,24 @@ type StrictServerInterface interface {
 	// AcknowledgeHelpRequest "On my way". ANY family member may acknowledge, not only the target — whoever is closer answers. Idempotent: a second acknowledge returns the row unchanged and sends nothing. The first one pushes "<name> is on the way" to the sender, unless the sender is acknowledging their own request.
 	// (POST /api/help/{id}/acknowledge)
 	AcknowledgeHelpRequest(ctx context.Context, request AcknowledgeHelpRequestRequestObject) (AcknowledgeHelpRequestResponseObject, error)
+	// ListIllnesses Illness episodes in the caller's active family, newest first (by startTime).
+	// (GET /api/illness)
+	ListIllnesses(ctx context.Context, request ListIllnessesRequestObject) (ListIllnessesResponseObject, error)
+	// CreateIllness Start an illness episode (issue #107), or with an endTime log one that is over. A baby can only have one open episode at a time — a partial unique index, as for sleep and daycare.
+	// (POST /api/illness)
+	CreateIllness(ctx context.Context, request CreateIllnessRequestObject) (CreateIllnessResponseObject, error)
+	// GetActiveIllness The open illness episode for a baby, or null.
+	// (GET /api/illness/active)
+	GetActiveIllness(ctx context.Context, request GetActiveIllnessRequestObject) (GetActiveIllnessResponseObject, error)
+	// DeleteIllness Delete an illness episode.
+	// (DELETE /api/illness/{id})
+	DeleteIllness(ctx context.Context, request DeleteIllnessRequestObject) (DeleteIllnessResponseObject, error)
+	// UpdateIllness Partial update. `endTime` sent as `null` reopens the episode (409 if another is open). `lastSymptomAt` as `null` means "still has symptoms"; `clearHours` and `notes` as `null` clear them.
+	// (PATCH /api/illness/{id})
+	UpdateIllness(ctx context.Context, request UpdateIllnessRequestObject) (UpdateIllnessResponseObject, error)
+	// RecoverIllness Recovered: close the open episode. endTime defaults to now. A replay answers 404 rather than moving the end.
+	// (POST /api/illness/{id}/recover)
+	RecoverIllness(ctx context.Context, request RecoverIllnessRequestObject) (RecoverIllnessResponseObject, error)
 	// ListInvites Invite codes ever issued for the family, newest first — used and revoked ones included. Family admin only.
 	// (GET /api/invites)
 	ListInvites(ctx context.Context, request ListInvitesRequestObject) (ListInvitesResponseObject, error)
@@ -11092,7 +11551,7 @@ type StrictServerInterface interface {
 	// GetSummary Everything the home screen needs in one call: last feed, last diaper, active + last sleep, active play, and today's local-day totals.
 	// (GET /api/summary)
 	GetSummary(ctx context.Context, request GetSummaryRequestObject) (GetSummaryResponseObject, error)
-	// ListTimeline The merged feed of everything, newest first. Sleep, play and daycare entries sort by their startTime (active sessions have endTime null); every other kind sorts by time. filter=other selects the nine non-core kinds (medicine, bath, note, milestone, measurement, pump, play, daycare, vaccine) together; omitting filter returns all twelve.
+	// ListTimeline The merged feed of everything, newest first. Sleep, play, daycare and illness entries sort by their startTime (active sessions have endTime null); every other kind sorts by time. filter=other selects the ten non-core kinds (medicine, bath, note, milestone, measurement, pump, play, daycare, illness, vaccine) together; omitting filter returns all thirteen.
 	// (GET /api/timeline)
 	ListTimeline(ctx context.Context, request ListTimelineRequestObject) (ListTimelineResponseObject, error)
 	// ListVaccines Vaccine logs in the caller's active family, newest first. Each entry's `documents` array carries `url: "/api/files/{docId}"` for any attached file (see internal/api/files.go — uploading is disabled today, but existing documents still stream).
@@ -13539,6 +13998,184 @@ func (sh *strictHandler) AcknowledgeHelpRequest(w http.ResponseWriter, r *http.R
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(AcknowledgeHelpRequestResponseObject); ok {
 		if err := validResponse.VisitAcknowledgeHelpRequestResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListIllnesses operation middleware
+func (sh *strictHandler) ListIllnesses(w http.ResponseWriter, r *http.Request, params ListIllnessesParams) {
+	var request ListIllnessesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListIllnesses(ctx, request.(ListIllnessesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListIllnesses")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListIllnessesResponseObject); ok {
+		if err := validResponse.VisitListIllnessesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateIllness operation middleware
+func (sh *strictHandler) CreateIllness(w http.ResponseWriter, r *http.Request) {
+	var request CreateIllnessRequestObject
+
+	var body CreateIllnessJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateIllness(ctx, request.(CreateIllnessRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateIllness")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateIllnessResponseObject); ok {
+		if err := validResponse.VisitCreateIllnessResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetActiveIllness operation middleware
+func (sh *strictHandler) GetActiveIllness(w http.ResponseWriter, r *http.Request, params GetActiveIllnessParams) {
+	var request GetActiveIllnessRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetActiveIllness(ctx, request.(GetActiveIllnessRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetActiveIllness")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetActiveIllnessResponseObject); ok {
+		if err := validResponse.VisitGetActiveIllnessResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteIllness operation middleware
+func (sh *strictHandler) DeleteIllness(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteIllnessRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteIllness(ctx, request.(DeleteIllnessRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteIllness")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteIllnessResponseObject); ok {
+		if err := validResponse.VisitDeleteIllnessResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateIllness operation middleware
+func (sh *strictHandler) UpdateIllness(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdateIllnessRequestObject
+
+	request.Id = id
+
+	var body UpdateIllnessJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateIllness(ctx, request.(UpdateIllnessRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateIllness")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateIllnessResponseObject); ok {
+		if err := validResponse.VisitUpdateIllnessResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RecoverIllness operation middleware
+func (sh *strictHandler) RecoverIllness(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request RecoverIllnessRequestObject
+
+	request.Id = id
+
+	var body RecoverIllnessJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RecoverIllness(ctx, request.(RecoverIllnessRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RecoverIllness")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RecoverIllnessResponseObject); ok {
+		if err := validResponse.VisitRecoverIllnessResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

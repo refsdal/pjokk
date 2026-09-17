@@ -18,9 +18,9 @@ import (
 )
 
 // This file implements GET /api/timeline: the merged,
-// newest-first, keyset-paginated feed across all twelve log kinds (feeds,
+// newest-first, keyset-paginated feed across all thirteen log kinds (feeds,
 // diapers, sleeps, medicine, baths, notes, milestones, measurements, pumps,
-// plays, days at barnehage, vaccines).
+// plays, days at barnehage, illnesses, vaccines).
 //
 // # TimelineEntry's shape: an open object, not a oneOf union
 //
@@ -49,8 +49,8 @@ import (
 // SAME page size as everything else, and (when ?before was sent) filtered
 // by a keyset cursor via ROW COMPARISON "(t, id) < (cursor_t, cursor_id)".
 // Every result is wrapped in a timelineEntryRow carrying an int64
-// epoch-millisecond sortKey (sleep/play/daycare: startTime; everything else: time),
-// all twelve slices are concatenated, and sorted by (sortKey DESC, id DESC)
+// epoch-millisecond sortKey (sleep/play/daycare/illness: startTime; everything else: time),
+// all thirteen slices are concatenated, and sorted by (sortKey DESC, id DESC)
 // — the SAME total order every "Page" query's own ORDER BY uses, which is
 // what makes the keyset cursor (built from the LAST entry of the cut page)
 // correct: cutting the globally-sorted list at `limit` and asking each
@@ -234,6 +234,16 @@ func timelineDaycareRow(r dbgen.ListDaycaresPageRow) timelineEntryRow {
 	e.Set("pickupCaretakerId", r.PickupCaretakerID)
 	e.Set("pickupCaretakerName", r.PickupCaretakerName)
 	e.Set("mood", r.Mood)
+	return timelineEntryRow{sortKey: r.StartTime.Time.UnixMilli(), entry: e}
+}
+
+func timelineIllnessRow(r dbgen.ListIllnessesPageRow) timelineEntryRow {
+	e := timelineBase(gen.TimelineEntryKindIllness, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.LoggedByID, r.LoggedByName, r.Notes)
+	e.Set("startTime", r.StartTime.Time)
+	e.Set("endTime", tsPtr(r.EndTime))
+	e.Set("symptoms", r.Symptoms)
+	e.Set("lastSymptomAt", tsPtr(r.LastSymptomAt))
+	e.Set("clearHours", r.ClearHours)
 	return timelineEntryRow{sortKey: r.StartTime.Time.UnixMilli(), entry: e}
 }
 
@@ -444,6 +454,17 @@ func (d Deps) ListTimeline(ctx context.Context, req gen.ListTimelineRequestObjec
 		return nil, err
 	}
 
+	illnessRows, err := fetchTimelinePage(ctx, other,
+		func(ctx context.Context) ([]dbgen.ListIllnessesPageRow, error) {
+			return d.Q.ListIllnessesPage(ctx, dbgen.ListIllnessesPageParams{
+				FamilyID: fam.FamilyID, BabyID: babyID,
+				CursorTime: cursor.time, CursorID: cursor.id, Lim: limit, Q: q,
+			})
+		}, timelineIllnessRow)
+	if err != nil {
+		return nil, err
+	}
+
 	// Vaccines need a second, batched query for their documents — the same
 	// divergence ListVaccines (vaccines.go) has — so this source can't go
 	// through fetchTimelinePage's single-query shape.
@@ -478,12 +499,12 @@ func (d Deps) ListTimeline(ctx context.Context, req gen.ListTimelineRequestObjec
 
 	sources := [][]timelineEntryRow{
 		feedRows, diaperRows, sleepRows, medicineRows, bathRows, noteRows,
-		milestoneRows, measurementRows, pumpRows, playRows, daycareRows, vaccineRows,
+		milestoneRows, measurementRows, pumpRows, playRows, daycareRows, illnessRows, vaccineRows,
 	}
 
 	merged := make([]timelineEntryRow, 0, len(feedRows)+len(diaperRows)+len(sleepRows)+
 		len(medicineRows)+len(bathRows)+len(noteRows)+len(milestoneRows)+
-		len(measurementRows)+len(pumpRows)+len(playRows)+len(daycareRows)+len(vaccineRows))
+		len(measurementRows)+len(pumpRows)+len(playRows)+len(daycareRows)+len(illnessRows)+len(vaccineRows))
 	for _, s := range sources {
 		merged = append(merged, s...)
 	}

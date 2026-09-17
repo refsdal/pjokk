@@ -2083,6 +2083,172 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/illness:
+    get:
+      operationId: listIllnesses
+      summary: Illness episodes in the caller's active family, newest first (by startTime).
+      tags: [illness]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+        - $ref: "#/components/parameters/limitQuery"
+      responses:
+        "200":
+          description: Illness episodes, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IllnessLog"
+    post:
+      operationId: createIllness
+      summary: >-
+        Start an illness episode (issue #107), or with an endTime log one
+        that is over. A baby can only have one open episode at a time —
+        a partial unique index, as for sleep and daycare.
+      tags: [illness]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIllness"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IllnessLog"
+        "403":
+          description: >-
+            `caretakerId` names someone who is not a member of the caller's
+            family (NOT_MEMBER).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Unknown baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Baby already has an open episode (ALREADY_ACTIVE).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/illness/active:
+    get:
+      operationId: getActiveIllness
+      summary: The open illness episode for a baby, or null.
+      tags: [illness]
+      parameters:
+        - $ref: "#/components/parameters/babyIdQuery"
+      responses:
+        "200":
+          description: The open episode, or null.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/IllnessLog"
+                nullable: true
+  /api/illness/{id}/recover:
+    post:
+      operationId: recoverIllness
+      summary: >-
+        Recovered: close the open episode. endTime defaults to now. A
+        replay answers 404 rather than moving the end.
+      tags: [illness]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecoverIllness"
+      responses:
+        "200":
+          description: Closed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IllnessLog"
+        "404":
+          description: No such open episode.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/illness/{id}:
+    patch:
+      operationId: updateIllness
+      summary: >-
+        Partial update. `endTime` sent as `null` reopens the episode (409 if
+        another is open). `lastSymptomAt` as `null` means "still has
+        symptoms"; `clearHours` and `notes` as `null` clear them.
+      tags: [illness]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateIllness"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IllnessLog"
+        "403":
+          description: >-
+            `caretakerId` names someone who is not a member of the caller's
+            family (NOT_MEMBER).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No illness episode with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: >-
+            Clearing endTime would reopen an episode while another is
+            already open for this baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteIllness
+      summary: Delete an illness episode.
+      tags: [illness]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No illness episode with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/vaccines/dismissals:
     get:
       operationId: listVaccineDismissals
@@ -2532,12 +2698,12 @@ paths:
     get:
       operationId: listTimeline
       summary: >-
-        The merged feed of everything, newest first. Sleep, play and
-        daycare entries sort by their startTime (active sessions have
+        The merged feed of everything, newest first. Sleep, play, daycare
+        and illness entries sort by their startTime (active sessions have
         endTime null); every other kind sorts by time. filter=other selects
-        the nine non-core kinds (medicine, bath, note, milestone,
-        measurement, pump, play, daycare, vaccine) together; omitting filter
-        returns all twelve.
+        the ten non-core kinds (medicine, bath, note, milestone,
+        measurement, pump, play, daycare, illness, vaccine) together;
+        omitting filter returns all thirteen.
       tags: [timeline]
       parameters:
         - name: babyId
@@ -3899,7 +4065,7 @@ paths:
       operationId: deleteAdminUser
       summary: >-
         Delete an account safely. Every non-cascading reference to the user
-        (log attribution on all twelve log kinds, vaccine documents and
+        (log attribution on all thirteen log kinds, vaccine documents and
         dismissals, invites, API keys, calendar events and audit rows) is
         reassigned to the tombstone "Deleted user" in ONE transaction,
         calendar assignments are dropped, the user's API keys are revoked,
@@ -5516,6 +5682,152 @@ components:
           type: string
           enum: [good, ok, hard]
           nullable: true
+    IllnessSymptom:
+      type: string
+      enum: [fever, vomiting, diarrhoea, cough, cold, rash, eye, ear, other]
+    IllnessLog:
+      type: object
+      description: >-
+        One illness episode (issue #107): what ties Monday's fever to
+        Tuesday's vomiting, and what a "symptom-free since" clock counts
+        from. State like a sleep session: endTime null means still ill.
+        The app ships no medical judgement — `clearHours` is the family's
+        own number for this episode and `lastSymptomAt` what they told us;
+        the server compares neither to anything.
+      required:
+        - id
+        - babyId
+        - caretakerId
+        - caretakerName
+        - loggedById
+        - loggedByName
+        - startTime
+        - endTime
+        - symptoms
+        - lastSymptomAt
+        - clearHours
+        - notes
+      properties:
+        id:
+          type: string
+        babyId:
+          type: string
+        caretakerId:
+          type: string
+        caretakerName:
+          type: string
+        loggedById:
+          type: string
+          description: Who saved the row; set by the server, never by a client.
+        loggedByName:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+          description: null while she is still ill.
+        symptoms:
+          type: array
+          items:
+            $ref: "#/components/schemas/IllnessSymptom"
+        lastSymptomAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            When the last symptom was; null = still having symptoms. The
+            SPA moves it forward, at read time, past any fever reading
+            logged after it.
+        clearHours:
+          type: integer
+          nullable: true
+          description: >-
+            How many symptom-free hours this family wants before barnehage,
+            for THIS episode. null = no clock.
+        notes:
+          type: string
+          nullable: true
+    CreateIllness:
+      type: object
+      required: [babyId, startTime]
+      properties:
+        caretakerId:
+          type: string
+          description: >-
+            Who noted it (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller.
+        babyId:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+          description: Omit to open an episode.
+        symptoms:
+          type: array
+          maxItems: 9
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/IllnessSymptom"
+        lastSymptomAt:
+          type: string
+          format: date-time
+          nullable: true
+        clearHours:
+          type: integer
+          minimum: 1
+          maximum: 240
+          nullable: true
+        notes:
+          type: string
+          maxLength: 2000
+    UpdateIllness:
+      type: object
+      description: >-
+        Every field is optional; an empty object is a no-op. `endTime`,
+        `lastSymptomAt`, `clearHours` and `notes` may be sent as `null` to
+        CLEAR that column.
+      properties:
+        caretakerId:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+        symptoms:
+          type: array
+          maxItems: 9
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/IllnessSymptom"
+        lastSymptomAt:
+          type: string
+          format: date-time
+          nullable: true
+        clearHours:
+          type: integer
+          minimum: 1
+          maximum: 240
+          nullable: true
+        notes:
+          type: string
+          maxLength: 2000
+          nullable: true
+    RecoverIllness:
+      type: object
+      description: Defaults endTime to now on the server when omitted.
+      properties:
+        endTime:
+          type: string
+          format: date-time
     VaccineDocument:
       type: object
       description: >-
@@ -5683,7 +5995,7 @@ components:
         Modeled as an open object (kind + a handful of always-present fields
         typed, everything else additionalProperties) rather than a oneOf
         discriminated union: oapi-codegen has no clean Go representation for
-        twelve structurally different variants sharing one JSON shape.
+        thirteen structurally different variants sharing one JSON shape.
       required: [kind, id, babyId, caretakerId, caretakerName, loggedById, loggedByName, notes]
       properties:
         kind:
@@ -5700,6 +6012,7 @@ components:
             - pump
             - play
             - daycare
+            - illness
             - vaccine
         id:
           type: string
@@ -5957,6 +6270,7 @@ components:
         - activePlay
         - activeDaycare
         - handoverDue
+        - activeIllness
         - activeFeed
         - activePump
         - lastTemperature
@@ -6018,6 +6332,11 @@ components:
             Backs Home's "How was the day?" card (issue #106).
           allOf:
             - $ref: "#/components/schemas/DaycareLog"
+          nullable: true
+        activeIllness:
+          description: The open illness episode, or null (issue #107).
+          allOf:
+            - $ref: "#/components/schemas/IllnessLog"
           nullable: true
         activeFeed:
           description: The running nursing timer, or null (issue #44).
