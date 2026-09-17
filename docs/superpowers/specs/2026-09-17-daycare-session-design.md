@@ -108,7 +108,8 @@ has been answered.
   finished day** unfolds the pick-up time and a second chip row for who
   picked up, and the button becomes Save; folded by default, unlike the
   play sheet, because the drop-off is done at the gate with a child on one
-  arm. The same component edits.
+  arm. Unfolding prefills the drop-off from the previous day's clock time
+  (last-value prefill). The same component edits.
 - **While it runs.** A banner on Home, "At barnehage · 5 h 20 min since
   08:10", with a **Pick up** button: one tap, now, the caller. Tapping
   the body opens the edit sheet, for a drop-off logged late. The banner is

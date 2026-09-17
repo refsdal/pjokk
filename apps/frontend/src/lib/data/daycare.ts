@@ -1,4 +1,4 @@
-import { useMutation, type QueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
 import type { DaycareLog, Summary } from "@pjokk/shared";
 import { client, unwrap } from "../api";
 import { t } from "../i18n";
@@ -38,6 +38,21 @@ export type DeleteDaycareVars = { id: string };
 
 const saveError = (err: Error) =>
   toast(`${t("Could not save")} (${t("Daycare")}): ${err.message}`, "error");
+
+// The newest days, for the sheet's prefill. Invalidated with every other
+// log-derived view (keys.ts).
+export function useDaycares(babyId: string | undefined, limit = 1, on = true) {
+  return useQuery({
+    queryKey: ["daycare", babyId, limit],
+    enabled: !!babyId && on,
+    queryFn: async () =>
+      unwrap<DaycareLog[]>(
+        client.GET("/api/daycare", {
+          params: { query: { babyId: babyId!, limit } },
+        }),
+      ),
+  });
+}
 
 export function registerDaycareMutationDefaults(qc: QueryClient) {
   qc.setMutationDefaults(["dropOff"], {

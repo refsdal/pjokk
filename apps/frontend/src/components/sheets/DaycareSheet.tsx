@@ -10,12 +10,14 @@ import { TimeField } from "@/components/TimeField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  useDaycares,
   useDeleteDaycare,
   useDropOff,
   useLogDaycare,
   useMe,
   useUpdateDaycare,
 } from "@/lib/data";
+import { usualDropOff } from "@/lib/daycare-ui";
 import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 
@@ -68,6 +70,13 @@ export function DaycareSheet({
     setTime(edit ? new Date(edit.startTime) : null);
     setEndTime(edit?.endTime ? new Date(edit.endTime) : null);
   });
+
+  // The previous day, for the finished-day prefill (lib/daycare-ui.ts).
+  const recent = useDaycares(babyId, 1, open && !edit);
+  const unfoldFinished = () => {
+    if (!time) setTime(usualDropOff(recent.data?.[0]?.startTime));
+    setFinished(true);
+  };
 
   const dropOff = useDropOff();
   const logDaycare = useLogDaycare();
@@ -142,7 +151,14 @@ export function DaycareSheet({
         <p className="text-xs font-semibold tracking-wide text-muted uppercase">
           {t("Dropped off")}
         </p>
-        <TimeField key={`s${instance}`} value={time} onChange={setTime} />
+        {/* Keyed on `finished` too: unfolding may prefill the drop-off, and
+            the field reads its chip ("Pick time") from the value it mounts
+            with. */}
+        <TimeField
+          key={`s${instance}${finished}`}
+          value={time}
+          onChange={setTime}
+        />
 
         <CaretakerChips choice={who} edit={edit} label="Dropped off by" />
 
@@ -190,11 +206,7 @@ export function DaycareSheet({
             <Button size="full" onClick={startNow}>
               {t("Drop off")}
             </Button>
-            <Button
-              size="full"
-              variant="outline"
-              onClick={() => setFinished(true)}
-            >
+            <Button size="full" variant="outline" onClick={unfoldFinished}>
               {t("Log a finished day")}
             </Button>
           </>

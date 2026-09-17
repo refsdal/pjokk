@@ -56,9 +56,9 @@ test("drop off, see the banner, pick up, find the day on the timeline", async ({
       const s = await (
         await page.request.get(`/api/summary?babyId=${babyId}`)
       ).json();
-      return s.activeDaycare?.endTime ?? "none";
+      return s.activeDaycare ? "there" : "home";
     })
-    .toBeNull();
+    .toBe("there");
 
   await page.getByRole("button", { name: "Pick up", exact: true }).click();
   await expect(banner).toHaveCount(0, { timeout: 10_000 });
@@ -72,8 +72,21 @@ test("drop off, see the banner, pick up, find the day on the timeline", async ({
   await expect(edit.getByText("Edit daycare day")).toBeVisible();
   await expect(edit.getByText("Picked up")).toBeVisible();
 
-  // It lives under Other, with play and the rest.
+  // Last-value prefill: the next finished day opens on this one's drop-off
+  // time rather than on "Now".
   await page.keyboard.press("Escape");
+  await page.goto("/home");
+  await page.getByRole("button", { name: "More", exact: true }).click();
+  await page.getByRole("button", { name: "Daycare", exact: true }).click();
+  const again = page.getByRole("dialog");
+  await again.getByRole("button", { name: "Log a finished day" }).click();
+  await expect(
+    again.getByRole("button", { name: "Pick time" }).first(),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
+  await page.goto("/timeline");
+
+  // It lives under Other, with play and the rest.
   await page.getByRole("button", { name: "Other", exact: true }).click();
   await expect(row.first()).toBeVisible();
   await page.getByRole("button", { name: "Feeds", exact: true }).click();

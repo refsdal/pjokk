@@ -22,3 +22,18 @@ export function predatesDropOff(
   if (!last || !active) return false;
   return new Date(last).getTime() < new Date(active.startTime).getTime();
 }
+
+// Last-value prefill (CLAUDE.md §3) for a finished day logged after the
+// fact: the drop-off was probably when it was last time, so the field opens
+// on today at the previous day's clock time. Null — leave it on "Now" —
+// with no previous day, or when that clock time has not come yet today.
+export function usualDropOff(
+  lastStart: string | null | undefined,
+  now = new Date(),
+): Date | null {
+  if (!lastStart) return null;
+  const last = new Date(lastStart);
+  const today = new Date(now);
+  today.setHours(last.getHours(), last.getMinutes(), 0, 0);
+  return today.getTime() < now.getTime() ? today : null;
+}
