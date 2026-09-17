@@ -21,7 +21,10 @@ APP=pjokk-e2e-app
 PORT="${E2E_PORT:-3300}"
 
 down() {
-  docker rm -f "$APP" "$PG" >/dev/null 2>&1 || true
+  # -v: the Postgres image declares an anonymous volume for its data
+  # directory, and without it every run left ~65 MB behind under
+  # /var/lib/docker until a developer's root disk filled (2026-09-17).
+  docker rm -fv "$APP" "$PG" >/dev/null 2>&1 || true
   docker network rm "$NET" >/dev/null 2>&1 || true
   echo "e2e stack down"
 }
