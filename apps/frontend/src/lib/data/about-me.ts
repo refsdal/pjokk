@@ -84,6 +84,22 @@ export function useSaveBabyAbout() {
   });
 }
 
+// The recent sleeps the usual-nap suggestion reads (issue #126): the same
+// list, under the same key, as the About-me page's, so whichever opens
+// first fills the cache for the other.
+export function useRecentSleeps(babyId: string | undefined) {
+  return useQuery({
+    queryKey: ["sleep", babyId, 200],
+    enabled: !!babyId,
+    queryFn: async () =>
+      unwrap<SleepLog[]>(
+        client.GET("/api/sleep", {
+          params: { query: { babyId: babyId!, limit: 200 } },
+        }),
+      ),
+  });
+}
+
 // The family's own nap anchor (issue #112). Read off the summary, where
 // Home already has it; written here.
 export function useSetUsualNap() {

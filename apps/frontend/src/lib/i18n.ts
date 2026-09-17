@@ -322,6 +322,11 @@ const nb: Record<string, string> = {
   "Doses and intervals are the family's own entries in Pjokk, not advice from the app.":
     "Doser og intervaller er familiens egne oppføringer i Pjokk, ikke råd fra appen.",
 
+  // The usual nap, suggested from the logs (issue #126).
+  "Logged at daycare: around": "Logget i barnehagen: rundt",
+  "Logged at home: around": "Logget hjemme: rundt",
+  "Use this": "Bruk denne",
+
   // The family's own nap anchor (issue #112).
   "Usual nap": "Vanlig lur",
   "Usual nap was": "Vanlig lur var",

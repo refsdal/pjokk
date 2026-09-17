@@ -1,6 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import type { FeedLog, SleepLog } from "@pjokk/shared";
-import { clockLabel, foodRoutine, sleepRoutine } from "../src/lib/about-me";
+import {
+  clockLabel,
+  foodRoutine,
+  sleepRoutine,
+  usualNapSuggestion,
+} from "../src/lib/about-me";
 
 // "About <name>" (issue #109): what "usual" means when a stranger plans a
 // child's day by it.
@@ -134,5 +139,70 @@ describe("foodRoutine", () => {
     const r = foodRoutine([...feeds, ...old], now);
     expect(r.reactions).toEqual(["Egg"]);
     expect(r.foods).not.toContain("Egg");
+  });
+});
+
+// The usual nap time as a suggestion for the family's own anchor (issue
+// #126): barnehage naps first, then the long nap at home, or nothing.
+describe("usualNapSuggestion", () => {
+  const daycareNap = (d: number, h: number, m: number): SleepLog =>
+    ({
+      ...sleep("nap", at(d, h, m), at(d, h + 1, m + 20)),
+      daycareId: `day-${d}`,
+    }) as SleepLog;
+
+  it("goes by the barnehage's naps when there are three, whatever home looks like", () => {
+    const sleeps = [
+      daycareNap(1, 11, 30),
+      daycareNap(2, 11, 40),
+      daycareNap(3, 11, 35),
+      // Weekend naps at home, later and longer: not what the anchor is for.
+      sleep("nap", at(4, 13, 0), at(4, 15, 30)),
+      sleep("nap", at(5, 13, 10), at(5, 15, 30)),
+      sleep("nap", at(6, 13, 0), at(6, 15, 30)),
+    ];
+    expect(usualNapSuggestion(sleeps, now)).toEqual({
+      minute: 11 * 60 + 35,
+      source: "daycare",
+    });
+  });
+
+  it("falls back to the day's long nap at home, and says so", () => {
+    const sleeps = [1, 2, 3].flatMap((d) => [
+      sleep("nap", at(d, 12, 5), at(d, 14, 0)),
+      sleep("nap", at(d, 16, 30), at(d, 16, 50)), // a catnap is not the nap
+    ]);
+    expect(usualNapSuggestion(sleeps, now)).toEqual({
+      minute: 12 * 60 + 5,
+      source: "home",
+    });
+    // Two barnehage naps are not enough to go by; the home naps still are.
+    const mixed = [...sleeps, daycareNap(4, 11, 30), daycareNap(5, 11, 30)];
+    expect(usualNapSuggestion(mixed, now)?.source).toBe("home");
+  });
+
+  it("suggests nothing from too little, from old logs, or from a running nap", () => {
+    expect(
+      usualNapSuggestion([daycareNap(1, 11, 30), daycareNap(2, 11, 30)], now),
+    ).toBeNull();
+    expect(
+      usualNapSuggestion(
+        [40, 41, 42].map((d) => daycareNap(d, 11, 30)),
+        now,
+      ),
+    ).toBeNull();
+    const running = [1, 2, 3].map(
+      (d) => ({ ...daycareNap(d, 11, 30), endTime: null }) as SleepLog,
+    );
+    expect(usualNapSuggestion(running, now)).toBeNull();
+    // Night sleep is never a nap, however it is linked.
+    const nights = [1, 2, 3].map(
+      (d) =>
+        ({
+          ...sleep("night", at(d, 19, 0), at(d - 1, 6, 0)),
+          daycareId: "x",
+        }) as SleepLog,
+    );
+    expect(usualNapSuggestion(nights, now)).toBeNull();
   });
 });

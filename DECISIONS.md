@@ -3122,3 +3122,23 @@ rota out because the recurrence rules had no "weekdays".
   same estimate. `TestExpansionMatchesCountingFromZeroForEveryRule` walks
   every rule over eight years against counting from zero, and fails on the
   old 28-day value.
+
+## 2026-09-17 — the usual nap, suggested from the logs
+
+Second follow-up to the barnehage series (#126), answering the question
+#112 left open.
+
+- **A suggestion, never automation.** Settings shows "Logged at daycare:
+  around 11:35 · Use this" beside the field; one tap sets the anchor.
+  Nothing changes it silently. The anchor exists to keep home days in step
+  with the barnehage, and a family may want 11:30 on purpose when the logs
+  say 11:50; a number that moves on its own is one a parent stops trusting.
+- **Barnehage naps first** — sleep rows carrying a day's id, which the
+  pick-up handover writes — because that is the rhythm the anchor is for.
+  With fewer than three, the day's longest nap at home, labelled as such.
+- **One definition of "usual" in the app**: the About-me page's median,
+  five-minute rounding and three-day floor (`lib/about-me.ts`), reused, not
+  restated.
+- **Frontend only.** The sleep list already carries `daycareId`; the
+  suggestion reads the same 200-row list the About-me page does, under the
+  same query key.

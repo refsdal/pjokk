@@ -130,6 +130,52 @@ export function sleepRoutine(
   };
 }
 
+// The usual nap time, as a SUGGESTION for the family's own anchor (issue
+// #126, lib/nap-window.ts usualNap). A family that fills in the pick-up
+// handover tells Pjokk every weekday when the barnehage nap began, so the
+// Settings field should not make them type it.
+//
+// Barnehage naps first — rows that carry a day's id — because the anchor
+// exists to keep home days in step with THAT rhythm. With too few of those,
+// the day's longest nap at home, said to be so. The same median, the same
+// five-minute rounding and the same three-day floor as the page above: one
+// definition of "usual" in the app.
+export type NapSuggestion = { minute: number; source: "daycare" | "home" };
+
+export function usualNapSuggestion(
+  sleeps: SleepLog[],
+  now = new Date(),
+): NapSuggestion | null {
+  const naps = sleeps.filter(
+    (s) => s.type === "nap" && s.endTime && within(s.startTime, now),
+  );
+  const rounded = (minutes: number[]): number =>
+    (((Math.round(median(minutes)! / 5) * 5) % 1440) + 1440) % 1440;
+
+  const atDaycare = naps.filter((s) => s.daycareId);
+  if (atDaycare.length >= MIN_SAMPLES) {
+    return {
+      minute: rounded(atDaycare.map((s) => clockMinutes(s.startTime))),
+      source: "daycare",
+    };
+  }
+  const length = (s: SleepLog) =>
+    new Date(s.endTime!).getTime() - new Date(s.startTime).getTime();
+  const mainByDay = new Map<string, SleepLog>();
+  for (const n of naps) {
+    const k = dayKey(n.startTime);
+    const cur = mainByDay.get(k);
+    if (!cur || length(n) > length(cur)) mainByDay.set(k, n);
+  }
+  if (mainByDay.size < MIN_SAMPLES) return null;
+  return {
+    minute: rounded(
+      [...mainByDay.values()].map((s) => clockMinutes(s.startTime)),
+    ),
+    source: "home",
+  };
+}
+
 export type FoodRoutine = {
   bottlesPerDay: number | null;
   bottleMl: number | null;
