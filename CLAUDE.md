@@ -494,6 +494,18 @@ Bun-era schema used. Domain tables kept their singular names:
   over the day. Rows must fall inside the day (400 `OUTSIDE_DAY`).
   `Summary.handoverDue` backs Home's "How was the day?" card for 12 h
   after a pick-up.
+- `illness(id, familyId, babyId, caretakerId, loggedById, startTime,
+  endTime NULL while ill, symptoms text[], lastSymptomAt?, clearHours?,
+  notes?)` — an illness episode (#107, spec
+  `docs/superpowers/specs/2026-09-17-illness-and-care-days-design.md`),
+  state like `daycare_log`. **The app ships no medical judgement**, the
+  medicine interval's stance: `clearHours` is the FAMILY's number for this
+  episode (the sheet suggests 48 for vomiting or diarrhoea, FHI's guidance,
+  quoted and linked) and the card says when those hours will have passed
+  since the last symptom, never that she "may return". The server stores
+  both and compares neither; the clock is `lib/illness-ui.ts`, which also
+  moves it past a fever reading logged afterwards — the one fever
+  threshold in the codebase stays in `lib/measurements.ts`.
 - `milestone_photo(id, familyId, milestoneLogId, objectKey, width, height,
   size)` — up to three photos per milestone, server re-encoded to JPEG
   (EXIF gone) under a server-generated key, served only through
