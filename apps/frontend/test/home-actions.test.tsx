@@ -1,13 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import { IconPill } from "@tabler/icons-react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { HomeActions } from "../src/components/HomeActions";
+import { HomeActions, primaryGridClass } from "../src/components/HomeActions";
 
 // No DOM here (see router.test.ts): the markup is checked statically. The
 // tier is CSS — the More button is `md:hidden`, the unfolded tiles are
 // `hidden md:...` — so both are always in the markup and what changes is
 // which one the viewport shows (e2e/layout.spec.ts checks that).
 const noop = () => {};
+const allOn = { feeds: true, diapers: true, sleep: true };
 const actions = [
   {
     key: "medicine",
@@ -29,6 +30,7 @@ describe("HomeActions", () => {
   const html = renderToStaticMarkup(
     <HomeActions
       active={false}
+      show={allOn}
       onFeed={noop}
       onDiaper={noop}
       onSleep={noop}
@@ -58,6 +60,7 @@ describe("HomeActions", () => {
     const running = renderToStaticMarkup(
       <HomeActions
         active
+        show={allOn}
         onFeed={noop}
         onDiaper={noop}
         onSleep={noop}
@@ -67,5 +70,29 @@ describe("HomeActions", () => {
     );
     expect(running).toContain(">Sleeping…<");
     expect(running).toMatch(/disabled=""[^>]*>[\s\S]*?>Sleeping…</);
+  });
+
+  it("renders only the enabled primaries, More always", () => {
+    const html = renderToStaticMarkup(
+      <HomeActions
+        active={false}
+        show={{ feeds: true, diapers: false, sleep: true }}
+        onFeed={noop}
+        onDiaper={noop}
+        onSleep={noop}
+        onMore={noop}
+        actions={actions}
+      />,
+    );
+    expect(html).toContain(">Feed<");
+    expect(html).not.toContain(">Diaper<");
+    expect(html).toContain(">Sleep<");
+    expect(html).toContain(">More<");
+  });
+
+  it("picks the grid for the count of primaries plus More", () => {
+    expect(primaryGridClass(3)).toBe("grid-cols-2 md:grid-cols-3");
+    expect(primaryGridClass(2)).toBe("grid-cols-3 md:grid-cols-2");
+    expect(primaryGridClass(1)).toBe("grid-cols-2 md:grid-cols-1");
   });
 });

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { useTimeline } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { useSelectedBaby } from "@/lib/selected-baby";
+import { useTracking } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 
 // The Timeline tab: header, search, filter chips and paging. The rows,
@@ -19,6 +20,29 @@ import { cn } from "@/lib/utils";
 export function TimelineScreen() {
   const { baby } = useSelectedBaby();
   const [filter, setFilter] = useState<TimelineFilter | null>(null);
+  // The chips are the ENABLED kinds (spec
+  // 2026-09-17-per-baby-tracking-design.md); All still shows the history
+  // of a kind that was switched off.
+  const track = useTracking(baby);
+  const chipOptions: { value: TimelineFilter | "all"; label: string }[] = [
+    { value: "all", label: t("All") },
+    ...(track.has("feeds")
+      ? [{ value: "feeds" as const, label: t("Feeds") }]
+      : []),
+    ...(track.has("sleep")
+      ? [{ value: "sleep" as const, label: t("Sleep") }]
+      : []),
+    ...(track.has("diapers")
+      ? [{ value: "diapers" as const, label: t("Diapers") }]
+      : []),
+    ...(track.anyMore ? [{ value: "other" as const, label: t("Other") }] : []),
+  ];
+  const chipKeys = chipOptions.map((o) => o.value).join(",");
+  // A filter left over from before a switch went off: back to All.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: chipKeys stands for chipOptions
+  useEffect(() => {
+    if (filter && !chipKeys.split(",").includes(filter)) setFilter(null);
+  }, [filter, chipKeys]);
   // Search (issue #52): the field shows on demand so the default screen
   // stays dense; the term is debounced so a query is not fired per key.
   const [searchOpen, setSearchOpen] = useState(false);
@@ -73,13 +97,7 @@ export function TimelineScreen() {
 
       <ChipGroup
         className="flex-nowrap overflow-x-auto pb-3"
-        options={[
-          { value: "all", label: t("All") },
-          { value: "feeds", label: t("Feeds") },
-          { value: "sleep", label: t("Sleep") },
-          { value: "diapers", label: t("Diapers") },
-          { value: "other", label: t("Other") },
-        ]}
+        options={chipOptions}
         value={filter ?? "all"}
         onChange={(v) => setFilter(v === "all" ? null : (v as TimelineFilter))}
       />

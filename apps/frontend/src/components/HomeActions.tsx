@@ -7,18 +7,34 @@ import {
 import { LogButton } from "@/components/LogButton";
 import type { MoreAction } from "@/components/sheets/OtherLogSheet";
 import { t } from "@/lib/i18n";
+import type { CoreKey } from "@/lib/tracking";
 import { cn, focusRing } from "@/lib/utils";
 
 // Home's action column (spec §4).
 //
-// Compact: the 2×2 grid — Feed, Diaper, Sleep, More — exactly as before.
-// md and up: More disappears; the three primaries become a row, and the
-// thirteen More-sheet actions unfold beneath them as 44 px row tiles, two
-// across, under the sheet's own "Log something" title. Smaller and lighter
-// than the primaries on purpose, so the hierarchy stays: three big things,
-// then a list. Both forms are in the markup; the tier is CSS.
+// Compact: the 2×2 grid — Feed, Diaper, Sleep, More. md and up: More
+// disappears; the primaries become a row, and the More-sheet actions
+// unfold beneath them as 44 px row tiles, two across, under the sheet's
+// own "Log something" title. Smaller and lighter than the primaries on
+// purpose, so the hierarchy stays: three big things, then a list. Both
+// forms are in the markup; the tier is CSS.
+//
+// The primaries are the ENABLED ones (lib/tracking.ts, spec
+// 2026-09-17-per-baby-tracking-design.md) and the grid reflows to their
+// count; More always stays, because Ask for help lives there.
+
+// Tailwind needs literal class names: one per count. The phone keeps More
+// in the grid (3 + More = the 2×2; 2 + More = a row of three; 1 + More = a
+// row of two); md hides More, so the columns are the primaries alone.
+export function primaryGridClass(count: number): string {
+  if (count >= 3) return "grid-cols-2 md:grid-cols-3";
+  if (count === 2) return "grid-cols-3 md:grid-cols-2";
+  return "grid-cols-2 md:grid-cols-1";
+}
+
 export function HomeActions({
   active,
+  show,
   onFeed,
   onDiaper,
   onSleep,
@@ -26,34 +42,42 @@ export function HomeActions({
   actions,
 }: {
   active: boolean;
+  show: Record<CoreKey, boolean>;
   onFeed: () => void;
   onDiaper: () => void;
   onSleep: () => void;
   onMore: () => void;
   actions: MoreAction[];
 }) {
+  const count = Number(show.feeds) + Number(show.diapers) + Number(show.sleep);
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        <LogButton
-          icon={IconBabyBottle}
-          label={t("Feed")}
-          tintClass="text-feed"
-          onClick={onFeed}
-        />
-        <LogButton
-          icon={IconDiaper}
-          label={t("Diaper")}
-          tintClass="text-diaper"
-          onClick={onDiaper}
-        />
-        <LogButton
-          icon={IconMoon}
-          label={active ? t("Sleeping…") : t("Sleep")}
-          tintClass="text-sleep"
-          onClick={onSleep}
-          disabled={active}
-        />
+      <div className={cn("grid gap-3", primaryGridClass(count))}>
+        {show.feeds && (
+          <LogButton
+            icon={IconBabyBottle}
+            label={t("Feed")}
+            tintClass="text-feed"
+            onClick={onFeed}
+          />
+        )}
+        {show.diapers && (
+          <LogButton
+            icon={IconDiaper}
+            label={t("Diaper")}
+            tintClass="text-diaper"
+            onClick={onDiaper}
+          />
+        )}
+        {show.sleep && (
+          <LogButton
+            icon={IconMoon}
+            label={active ? t("Sleeping…") : t("Sleep")}
+            tintClass="text-sleep"
+            onClick={onSleep}
+            disabled={active}
+          />
+        )}
         <LogButton
           icon={IconPlus}
           label={t("More")}

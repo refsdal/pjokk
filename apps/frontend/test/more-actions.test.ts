@@ -60,4 +60,32 @@ describe("moreActions", () => {
       expect(a.tint.startsWith("text-")).toBe(true);
     }
   });
+
+  const handlers = {
+    onPick: () => {},
+    onPickPlay: () => {},
+    onPickDaycare: () => {},
+    onPickIllness: () => {},
+    onPickHelp: () => {},
+    onVaccines: () => {},
+  };
+
+  it("keeps only the tiles whose switch is on, and help always", () => {
+    const on = new Set(["medicine", "play", "vaccines"]);
+    const keys = moreActions(handlers, (k) => on.has(k)).map((a) => a.key);
+    expect(keys).toEqual([
+      "medicine",
+      "play:tummy",
+      "play:walk",
+      "play:play",
+      "vaccines",
+      "help",
+    ]);
+  });
+
+  it("with nothing on, only help remains", () => {
+    expect(moreActions(handlers, () => false).map((a) => a.key)).toEqual([
+      "help",
+    ]);
+  });
 });

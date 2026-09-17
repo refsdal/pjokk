@@ -23,6 +23,7 @@ import type {
   MedicineUnit,
   PlayType,
   TimelineEntry,
+  Feature,
 } from "@pjokk/shared";
 import {
   CaretakerChips,
@@ -53,6 +54,7 @@ import {
 import { minutesFromSeconds, totalSeconds } from "@/lib/feed-timer-ui";
 import { measurementScale, useUnits } from "@/lib/units";
 import { t } from "@/lib/i18n";
+import { otherKindFeature } from "@/lib/tracking";
 import { nextDoseFrom } from "@/lib/medicine-ui";
 import { daycareMeta } from "@/lib/daycare-ui";
 import { illnessMeta } from "@/lib/illness-ui";
@@ -100,15 +102,24 @@ export type MoreHandlers = {
 // vaccines screen, and asking another caretaker for help. ONE list, rendered by the
 // phone's More sheet below and by Home's unfolded tiles at md and up
 // (components/HomeActions.tsx) — test/more-actions.test.ts pins the order.
-export function moreActions(h: MoreHandlers): MoreAction[] {
-  return [
+//
+// `has` is the baby's tracking (lib/tracking.ts, spec
+// 2026-09-17-per-baby-tracking-design.md): a tile whose switch is off is
+// not listed. Help has no switch and always stays.
+export function moreActions(
+  h: MoreHandlers,
+  has: (key: Feature) => boolean = () => true,
+): MoreAction[] {
+  const all: (MoreAction & { feature: Feature | null })[] = [
     ...(Object.keys(otherKindMeta) as OtherKind[]).map((kind) => ({
       key: kind,
+      feature: otherKindFeature(kind),
       ...otherKindMeta[kind],
       pick: () => h.onPick(kind),
     })),
     ...playTypeOrder.map((type) => ({
       key: `play:${type}`,
+      feature: "play" as const,
       ...playKindMeta[type],
       pick: () => h.onPickPlay(type),
     })),
@@ -116,6 +127,7 @@ export function moreActions(h: MoreHandlers): MoreAction[] {
     // like play, and one tile rather than a kind per type.
     {
       key: "daycare",
+      feature: "daycare",
       ...daycareMeta,
       pick: h.onPickDaycare,
     },
@@ -123,6 +135,7 @@ export function moreActions(h: MoreHandlers): MoreAction[] {
     // at barnehage until Pick up.
     {
       key: "illness",
+      feature: "illness",
       ...illnessMeta,
       pick: h.onPickIllness,
     },
@@ -130,6 +143,7 @@ export function moreActions(h: MoreHandlers): MoreAction[] {
     // more room than a tray.
     {
       key: "vaccines",
+      feature: "vaccines",
       label: "Vaccines",
       icon: IconVaccine,
       tint: "text-growth",
@@ -139,12 +153,16 @@ export function moreActions(h: MoreHandlers): MoreAction[] {
     // More is the one place every extra action is reachable from.
     {
       key: "help",
+      feature: null,
       label: "Ask for help",
       icon: IconHandStop,
       tint: "text-danger",
       pick: h.onPickHelp,
     },
   ];
+  return all
+    .filter((a) => a.feature === null || has(a.feature))
+    .map(({ feature: _feature, ...a }) => a);
 }
 
 export function MoreSheet({
@@ -155,6 +173,7 @@ export function MoreSheet({
   onPickDaycare,
   onPickIllness,
   onPickHelp,
+  has = () => true,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -163,20 +182,24 @@ export function MoreSheet({
   onPickDaycare: () => void;
   onPickIllness: () => void;
   onPickHelp: () => void;
+  has?: (key: Feature) => boolean;
 }) {
   const navigate = useNavigate();
 
-  const tiles = moreActions({
-    onPick,
-    onPickPlay,
-    onPickDaycare,
-    onPickIllness,
-    onPickHelp,
-    onVaccines: () => {
-      onOpenChange(false);
-      void navigate({ to: "/vaccines" });
+  const tiles = moreActions(
+    {
+      onPick,
+      onPickPlay,
+      onPickDaycare,
+      onPickIllness,
+      onPickHelp,
+      onVaccines: () => {
+        onOpenChange(false);
+        void navigate({ to: "/vaccines" });
+      },
     },
-  });
+    has,
+  );
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange} title={t("Log something")}>
