@@ -82,3 +82,31 @@ test("a second baby joins the row and one tap switches", async ({ page, request 
   await page.goto("/stats");
   await expect(page.getByRole("button", { name: "Oskar", pressed: true })).toBeVisible();
 });
+
+// The selected pill's ring is drawn OUTSIDE its box, and the row is a
+// scroll container that clips: the pill must sit inside the row with room
+// for the ring on every side, however long the name.
+test("the selected pill's ring is not clipped by the row", async ({ page, request }) => {
+  await freshFamily(page, request, "ring");
+  const res = await page.request.post("/api/babies", {
+    data: { name: "Maximilian Alexander", birthDate: "2024-01-10T00:00:00Z" },
+  });
+  expect(res.ok()).toBeTruthy();
+  await page.goto("/home");
+  const long = page.getByRole("button", { name: "Maximilian Alexander", exact: true });
+  await expect(long).toBeVisible();
+  const room = () =>
+    page.evaluate(() => {
+      const fs = document.querySelector("header fieldset") as HTMLElement;
+      const f = fs.getBoundingClientRect();
+      const p = fs.querySelector("[aria-pressed=true]")!.getBoundingClientRect();
+      return { top: p.top - f.top, bottom: f.bottom - p.bottom, left: p.left - f.left, right: f.right - p.right };
+    });
+  for (const side of Object.values(await room())) expect(side).toBeGreaterThanOrEqual(2);
+  await long.click();
+  // Selected, the button is the pill: its name now carries the age too.
+  await expect(
+    page.getByRole("button", { name: /Maximilian Alexander/, pressed: true }),
+  ).toBeVisible();
+  for (const side of Object.values(await room())) expect(side).toBeGreaterThanOrEqual(2);
+});
