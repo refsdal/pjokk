@@ -53,8 +53,11 @@ export function TrackingCard({
   const Icon = meta.icon;
   const state = on ? t("On") : t("Off");
   return (
+    // A flex child of the strip's card wrapper, not h-full: the first card
+    // has the recommended-set card above it, and both must share the
+    // wrapper's height or the toggle ends up under the footer.
     <section
-      className="flex h-full w-full shrink-0 snap-center flex-col justify-between px-4"
+      className="flex min-h-0 w-full flex-1 flex-col justify-between px-4"
       data-testid={`tracking-card-${meta.key}`}
       aria-label={t(meta.label)}
     >
