@@ -7,6 +7,7 @@ import { registerDaycareMutationDefaults } from "./daycare";
 import { registerPlayMutationDefaults } from "./play";
 
 // One import site for the data layer; modules are split by domain.
+export * from "./about-me";
 export * from "./calendar";
 export * from "./care-days";
 export * from "./config";

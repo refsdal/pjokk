@@ -226,6 +226,47 @@ const nb: Record<string, string> = {
   "ate some": "spiste litt",
   "ate little": "spiste lite",
 
+  // "About <name>" for the barnehage (issue #109).
+  "About the child, for daycare": "Om barnet, til barnehagen",
+  "From us": "Fra oss",
+  "Comfort items": "Kosedyr og trøst",
+  "Falls asleep": "Sovner",
+  "Allergies and diet": "Allergier og kosthold",
+  "Also worth knowing": "Ellers greit å vite",
+  "Dummy, cuddly toy, blanket…": "Smokk, kosedyr, koseklut…",
+  "Rocked in the pram, a song, on her tummy…":
+    "Bysses i vogn, en sang, på magen…",
+  "Milk allergy, no pork, still breastfed mornings…":
+    "Melkeallergi, ikke svin, ammes fortsatt om morgenen…",
+  "Shy with new people, loves the sandpit…":
+    "Sjenert for nye, elsker sandkassa…",
+  "Sleep, as logged the last two weeks":
+    "Søvn, slik den er logget de siste to ukene",
+  "Food, as logged the last two weeks":
+    "Mat, slik den er logget de siste to ukene",
+  "Usually wakes": "Våkner vanligvis",
+  "Usual bedtime": "Vanlig leggetid",
+  "Naps a day": "Lurer per dag",
+  "The long nap": "Den lange luren",
+  "Usually naps in": "Sover vanligvis i",
+  around: "rundt",
+  "Meals a day": "Måltider per dag",
+  "Bottles a day": "Flasker per dag",
+  "Breastfeeds a day": "Amminger per dag",
+  Eats: "Spiser",
+  "Has reacted to": "Har reagert på",
+  "Medicines and supplements": "Medisiner og tilskudd",
+  "at least": "minst",
+  apart: "mellom",
+  "One page for the barnehage: routines from your logs, plus what only you know. Built on this device. Leave out any part before you make it.":
+    "Én side til barnehagen: rutiner fra loggene deres, pluss det bare dere vet. Lages på denne enheten. Ta bort det dere ikke vil ha med.",
+  Included: "Med",
+  "Left out": "Ikke med",
+  "Make the page": "Lag siden",
+  "Could not build the page": "Kunne ikke lage siden",
+  "Made with Pjokk from what the family has logged. Usual times are medians, rounded to five minutes.":
+    "Laget med Pjokk fra det familien har logget. Vanlige tider er medianer, rundet til fem minutter.",
+
   // Days at home with an ill child (issue #108).
   "Home today": "Hjemme i dag",
   "half day": "halv dag",

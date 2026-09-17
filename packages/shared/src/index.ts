@@ -57,6 +57,7 @@ export type IllnessSymptom = Schemas["IllnessSymptom"];
 export type CareDay = Schemas["CareDay"];
 export type CareDays = Schemas["CareDays"];
 export type CareDayTotal = Schemas["CareDayTotal"];
+export type BabyAbout = Schemas["BabyAbout"];
 export type Handover = Schemas["Handover"];
 export type HandoverMeal = Schemas["HandoverMeal"];
 export type DaycareMood = NonNullable<DaycareLog["mood"]>;

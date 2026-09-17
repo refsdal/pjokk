@@ -91,6 +91,24 @@ export interface paths {
         patch: operations["updateBaby"];
         trace?: never;
     };
+    "/api/babies/{id}/about": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What the logs cannot know about a child (issue #109): the free-text lines of the "About <name>" sheet for the barnehage. A baby nobody has written about answers four nulls, not a 404. */
+        get: operations["getBabyAbout"];
+        /** Replace the four lines. Blank or null clears one. Any member may. */
+        put: operations["putBabyAbout"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/family": {
         parameters: {
             query?: never;
@@ -2666,6 +2684,15 @@ export interface components {
             userId?: string;
             days: number | null;
         };
+        BabyAbout: {
+            /** @description Comfort items — dummy, cuddly toy, blanket. */
+            comfort: string | null;
+            /** @description How she falls asleep. */
+            fallsAsleep: string | null;
+            /** @description Allergies, intolerances and diet. */
+            diet: string | null;
+            other: string | null;
+        };
         /** @description One file attached to a vaccine log. Fetch through `/api/files/{id}` — the object store is never public. */
         VaccineDocument: {
             id: string;
@@ -4072,6 +4099,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Baby"];
+                };
+            };
+            /** @description No baby with this id in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getBabyAbout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The four lines. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BabyAbout"];
+                };
+            };
+            /** @description No baby with this id in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    putBabyAbout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BabyAbout"];
+            };
+        };
+        responses: {
+            /** @description Saved, as it now reads. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BabyAbout"];
                 };
             };
             /** @description No baby with this id in the caller's family. */
