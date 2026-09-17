@@ -336,6 +336,11 @@ const nb: Record<string, string> = {
   "Home days": "Hjemmedager",
   bed: "legging",
 
+  // The pick-up rota (issue #125). "Weekdays" is already translated, for
+  // the reminder sheet.
+  "Pick-up, weekdays": "Henting, hverdager",
+  "Pick-up": "Henting",
+
   // Barnehage on the calendar (issue #110).
   "Closed that day": "Stengt den dagen",
   "Daycare is closed today": "Barnehagen er stengt i dag",

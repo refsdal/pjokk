@@ -128,6 +128,7 @@ const (
 	CalendarEventRecurrenceDaily    CalendarEventRecurrence = "daily"
 	CalendarEventRecurrenceMonthly  CalendarEventRecurrence = "monthly"
 	CalendarEventRecurrenceNone     CalendarEventRecurrence = "none"
+	CalendarEventRecurrenceWeekdays CalendarEventRecurrence = "weekdays"
 	CalendarEventRecurrenceWeekly   CalendarEventRecurrence = "weekly"
 	CalendarEventRecurrenceYearly   CalendarEventRecurrence = "yearly"
 )
@@ -142,6 +143,8 @@ func (e CalendarEventRecurrence) Valid() bool {
 	case CalendarEventRecurrenceMonthly:
 		return true
 	case CalendarEventRecurrenceNone:
+		return true
+	case CalendarEventRecurrenceWeekdays:
 		return true
 	case CalendarEventRecurrenceWeekly:
 		return true
@@ -266,6 +269,7 @@ const (
 	CreateCalendarEventRecurrenceDaily    CreateCalendarEventRecurrence = "daily"
 	CreateCalendarEventRecurrenceMonthly  CreateCalendarEventRecurrence = "monthly"
 	CreateCalendarEventRecurrenceNone     CreateCalendarEventRecurrence = "none"
+	CreateCalendarEventRecurrenceWeekdays CreateCalendarEventRecurrence = "weekdays"
 	CreateCalendarEventRecurrenceWeekly   CreateCalendarEventRecurrence = "weekly"
 	CreateCalendarEventRecurrenceYearly   CreateCalendarEventRecurrence = "yearly"
 )
@@ -280,6 +284,8 @@ func (e CreateCalendarEventRecurrence) Valid() bool {
 	case CreateCalendarEventRecurrenceMonthly:
 		return true
 	case CreateCalendarEventRecurrenceNone:
+		return true
+	case CreateCalendarEventRecurrenceWeekdays:
 		return true
 	case CreateCalendarEventRecurrenceWeekly:
 		return true
@@ -1589,6 +1595,7 @@ const (
 	UpdateCalendarEventRecurrenceDaily    UpdateCalendarEventRecurrence = "daily"
 	UpdateCalendarEventRecurrenceMonthly  UpdateCalendarEventRecurrence = "monthly"
 	UpdateCalendarEventRecurrenceNone     UpdateCalendarEventRecurrence = "none"
+	UpdateCalendarEventRecurrenceWeekdays UpdateCalendarEventRecurrence = "weekdays"
 	UpdateCalendarEventRecurrenceWeekly   UpdateCalendarEventRecurrence = "weekly"
 	UpdateCalendarEventRecurrenceYearly   UpdateCalendarEventRecurrence = "yearly"
 )
@@ -1603,6 +1610,8 @@ func (e UpdateCalendarEventRecurrence) Valid() bool {
 	case UpdateCalendarEventRecurrenceMonthly:
 		return true
 	case UpdateCalendarEventRecurrenceNone:
+		return true
+	case UpdateCalendarEventRecurrenceWeekdays:
 		return true
 	case UpdateCalendarEventRecurrenceWeekly:
 		return true

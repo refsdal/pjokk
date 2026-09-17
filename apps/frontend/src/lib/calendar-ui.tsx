@@ -110,3 +110,13 @@ export function closedNotices(
     a.when === b.when ? 0 : a.when === "today" ? -1 : 1,
   );
 }
+
+// The pick-up rota preset (issue #125): what the event sheet fills in when
+// "Pick-up, weekdays" is tapped under the Daycare category. 15:30 is when a
+// Norwegian barnehage day usually ends; the family changes it once and the
+// series keeps it.
+export const PICKUP_PRESET = {
+  title: "Pick-up",
+  time: "15:30",
+  duration: "30",
+} as const;

@@ -18,7 +18,7 @@ import {
   useMembers,
   useUpdateCalendarEvent,
 } from "@/lib/data";
-import { calendarCategoryMeta } from "@/lib/calendar-ui";
+import { PICKUP_PRESET, calendarCategoryMeta } from "@/lib/calendar-ui";
 import { t } from "@/lib/i18n";
 
 type DurationChoice = "30" | "60" | "120" | "custom";
@@ -251,6 +251,28 @@ export function EventSheet({
           value={category}
           onChange={setCategory}
         />
+        {category === "daycare" && !edit && (
+          // The pick-up rota (issue #125): the most repeated event in a
+          // barnehage family's week, as one tap. A preset, not a kind — it
+          // fills ordinary fields, and every one can still be changed. The
+          // Responsible chips below already say who.
+          <ChipGroup
+            options={[{ value: "pickup", label: t("Pick-up, weekdays") }]}
+            value={
+              title === t(PICKUP_PRESET.title) && recurrence === "weekdays"
+                ? "pickup"
+                : null
+            }
+            onChange={() => {
+              setTitle(t(PICKUP_PRESET.title));
+              setClosed(false);
+              setAllDay(false);
+              setTime(PICKUP_PRESET.time);
+              setDuration(PICKUP_PRESET.duration);
+              setRecurrence("weekdays");
+            }}
+          />
+        )}
         {category === "daycare" && (
           <ChipGroup
             options={[{ value: "closed", label: t("Closed that day") }]}
@@ -376,6 +398,7 @@ export function EventSheet({
                 { value: "daily", label: t("Daily") },
                 { value: "weekly", label: t("Weekly") },
                 { value: "biweekly", label: t("Every 2 weeks") },
+                { value: "weekdays", label: t("Weekdays") },
                 { value: "monthly", label: t("Monthly") },
                 { value: "yearly", label: t("Yearly") },
               ]}

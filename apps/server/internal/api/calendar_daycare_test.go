@@ -84,3 +84,53 @@ func TestCalendarDetachedOccurrenceKeepsClosed(t *testing.T) {
 		t.Errorf("the series itself became closed: %s", still.Raw)
 	}
 }
+
+// A weekdays series (issue #125): the pick-up rota. Through the API it is
+// one row that lists once per weekday, takes the ordinary occurrence
+// exceptions, and reaches a subscribed calendar as a BYDAY rule.
+func TestCalendarWeekdaysSeries(t *testing.T) {
+	a := testrig.App(t)
+	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
+	_ = familyID
+	// Thursday 2026-10-01, 15:30 in Oslo (13:30 UTC, summer time).
+	start := time.Date(2026, 10, 1, 13, 30, 0, 0, time.UTC)
+	made := a.Do(http.MethodPost, "/api/calendar/events", cookie, map[string]any{
+		"title": "Pick-up", "category": "daycare", "startTime": rfc(start), "durationMin": 30, "recurrence": "weekdays",
+	})
+	if made.Status != http.StatusCreated || made.JSON["recurrence"] != "weekdays" {
+		t.Fatalf("POST = %d %s", made.Status, made.Raw)
+	}
+	id, _ := made.JSON["id"].(string)
+
+	list := func() []string {
+		t.Helper()
+		res := a.DoArray(http.MethodGet, "/api/calendar/events?from="+rfc(start.Add(-time.Hour))+"&to="+rfc(start.Add(8*24*time.Hour)), cookie, nil)
+		var days []string
+		for _, e := range res.JSON {
+			at, _ := time.Parse(time.RFC3339, e.(map[string]any)["startTime"].(string))
+			days = append(days, at.Weekday().String()[:3])
+		}
+		return days
+	}
+	if got := strings.Join(list(), " "); got != "Thu Fri Mon Tue Wed Thu" {
+		t.Errorf("eight days of a weekdays series = %q, want Thu Fri Mon Tue Wed Thu", got)
+	}
+
+	// "This event" deleted: Monday's pick-up goes, the rest stay.
+	monday := start.Add(4 * 24 * time.Hour)
+	if res := a.Do(http.MethodDelete, "/api/calendar/events/"+id+"?occurrence="+rfc(monday), cookie, nil); res.Status != http.StatusOK {
+		t.Fatalf("skip Monday = %d %s", res.Status, res.Raw)
+	}
+	if got := strings.Join(list(), " "); got != "Thu Fri Tue Wed Thu" {
+		t.Errorf("after skipping Monday = %q", got)
+	}
+	// A Saturday is not an occurrence, so it cannot be singled out.
+	saturday := start.Add(2 * 24 * time.Hour)
+	if res := a.Do(http.MethodDelete, "/api/calendar/events/"+id+"?occurrence="+rfc(saturday), cookie, nil); res.Status != http.StatusBadRequest {
+		t.Errorf("skipping a Saturday = %d, want 400", res.Status)
+	}
+
+	if res := a.Do(http.MethodPost, "/api/calendar/events", cookie, map[string]any{"title": "x", "startTime": rfc(start), "recurrence": "workdays"}); res.Status != http.StatusBadRequest {
+		t.Errorf("an unknown rule = %d, want 400", res.Status)
+	}
+}

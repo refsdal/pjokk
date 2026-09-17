@@ -116,7 +116,12 @@ func (d Deps) calendarICS(w http.ResponseWriter, r *http.Request) {
 		line("UID:" + row.ID + "@pjokk")
 		line("DTSTAMP:" + stamp)
 		line("CREATED:" + row.CreatedAt.Time.UTC().Format("20060102T150405Z"))
-		start := row.StartTime.Time.In(recur.Location)
+		// The series' FIRST OCCURRENCE, which is its stored start for every
+		// rule but one: a weekdays series stored with a weekend start
+		// begins on the Monday (issue #125), and RFC 5545 wants DTSTART to
+		// match the RRULE — a Saturday DTSTART with BYDAY=MO..FR shows up
+		// as a stray extra event in some calendar clients.
+		start := seriesOf(row.StartTime, row.Recurrence, row.RecurrenceUntil).Nth(0).In(recur.Location)
 		if row.AllDay {
 			line("DTSTART;VALUE=DATE:" + start.Format("20060102"))
 		} else {

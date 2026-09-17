@@ -27,6 +27,10 @@ const (
 	Daily    Rule = "daily"
 	Weekly   Rule = "weekly"
 	Biweekly Rule = "biweekly"
+	// Weekdays is Monday to Friday (issue #125): the pick-up rota, which is
+	// none of the other rules and the most repeated event in a barnehage
+	// family's week.
+	Weekdays Rule = "weekdays"
 	Monthly  Rule = "monthly"
 	Yearly   Rule = "yearly"
 )
@@ -45,7 +49,7 @@ func mustLoadLocation(name string) *time.Location {
 // Valid reports whether r is one of the known rules.
 func Valid(r Rule) bool {
 	switch r {
-	case None, Daily, Weekly, Biweekly, Monthly, Yearly:
+	case None, Daily, Weekly, Biweekly, Weekdays, Monthly, Yearly:
 		return true
 	}
 	return false
@@ -85,11 +89,13 @@ func (s Series) IsOccurrence(t time.Time) bool {
 // Nth returns the n-th occurrence (0 = Start) in Location, with day clamping
 // for the month/year rules.
 func (s Series) Nth(n int) time.Time {
-	if n == 0 || s.Rule == None {
+	if s.Rule == None || (n == 0 && s.Rule != Weekdays) {
 		return s.Start
 	}
 	local := s.Start.In(Location)
 	switch s.Rule {
+	case Weekdays:
+		return nthWeekday(local, n)
 	case Daily:
 		return time.Date(local.Year(), local.Month(), local.Day()+n, local.Hour(), local.Minute(), local.Second(), local.Nanosecond(), Location)
 	case Weekly:
@@ -102,6 +108,27 @@ func (s Series) Nth(n int) time.Time {
 		return clampedDate(local.Year()+n, local.Month(), local)
 	}
 	return s.Start
+}
+
+// nthWeekday is the n-th Monday-to-Friday on or after local's date, at
+// local's clock. A series stored with a weekend start (the API moves one to
+// the Monday, but a row is a row) begins on the following Monday rather
+// than put an occurrence on a Saturday. Whole weeks are jumped, so the cost
+// does not grow with n, and the date is built with time.Date so the clock
+// survives a DST change like every other rule.
+func nthWeekday(local time.Time, n int) time.Time {
+	offset := 0
+	switch local.Weekday() {
+	case time.Saturday:
+		offset = 2
+	case time.Sunday:
+		offset = 1
+	}
+	// 0 = Monday … 4 = Friday, for the (now weekday) first occurrence.
+	first := (int(local.Weekday()) + offset + 6) % 7
+	steps := first + n
+	offset += (steps/5)*7 + steps%5 - first
+	return time.Date(local.Year(), local.Month(), local.Day()+offset, local.Hour(), local.Minute(), local.Second(), local.Nanosecond(), Location)
 }
 
 // clampedDate builds year/month with local's day-of-month clamped to the
@@ -130,8 +157,12 @@ func (s Series) Between(from, to time.Time) []time.Time {
 		}
 		return nil
 	}
+	// Start near `from`, not at the series' first occurrence: counted from
+	// zero, a daily series went silent 400 days in and a weekday rota 80
+	// weeks in — long before a barnehage child stops being picked up.
 	var out []time.Time
-	for n := 0; n < maxOccurrences; n++ {
+	first := s.indexNear(from)
+	for n := first; n < first+maxOccurrences; n++ {
 		occ := s.Nth(n)
 		if !occ.Before(to) || !s.within(occ) {
 			break
@@ -152,17 +183,7 @@ func (s Series) NextOnOrAfter(t time.Time) (time.Time, bool) {
 		}
 		return s.Start, true
 	}
-	// Jump close: estimate n from the rule's rough period, then walk.
-	n := 0
-	if t.After(s.Start) {
-		period := s.roughPeriod()
-		if period > 0 {
-			n = int(t.Sub(s.Start)/period) - 1
-			if n < 0 {
-				n = 0
-			}
-		}
-	}
+	n := s.indexNear(t)
 	for steps := 0; steps < maxOccurrences*4; steps++ {
 		occ := s.Nth(n)
 		if !s.within(occ) {
@@ -174,6 +195,27 @@ func (s Series) NextOnOrAfter(t time.Time) (time.Time, bool) {
 		n++
 	}
 	return time.Time{}, false
+}
+
+// indexNear returns an occurrence index at or before the first occurrence
+// on or after t: elapsed time over the rule's period, less one, so a caller
+// walks forward from it and never starts past what it is looking for. That
+// only holds if roughPeriod is never SHORTER than the rule's real spacing —
+// a shorter period divides into more steps than have happened, and the walk
+// would begin beyond its answer and silently drop occurrences.
+func (s Series) indexNear(t time.Time) int {
+	if !t.After(s.Start) {
+		return 0
+	}
+	period := s.roughPeriod()
+	if period <= 0 {
+		return 0
+	}
+	n := int(t.Sub(s.Start)/period) - 1
+	if n < 0 {
+		n = 0
+	}
+	return n
 }
 
 func (s Series) within(occ time.Time) bool {
@@ -188,10 +230,18 @@ func (s Series) roughPeriod() time.Duration {
 		return 7 * 24 * time.Hour
 	case Biweekly:
 		return 14 * 24 * time.Hour
+	case Weekdays:
+		// Five a week is one every 33.6 h on average, but a Friday-to-Monday
+		// gap makes any average overshoot. 36 h never does: from a Friday
+		// start, 3+7k days on is occurrence 1+5k, and ⌊(72+168k)/36⌋-1 is
+		// 1+⌊4.67k⌋, never more.
+		return 36 * time.Hour
 	case Monthly:
-		return 28 * 24 * time.Hour
+		// The LONGEST month, not the shortest (see indexNear). This was 28
+		// days, which overshot once a series was about two years old.
+		return 31 * 24 * time.Hour
 	case Yearly:
-		return 365 * 24 * time.Hour
+		return 366 * 24 * time.Hour
 	}
 	return 0
 }
@@ -200,11 +250,13 @@ func (s Series) roughPeriod() time.Duration {
 // or "" for a one-off. UNTIL is rendered in UTC as the RFC requires when
 // DTSTART carries a TZID.
 func (s Series) RRule() string {
-	var freq string
+	var freq, byDay string
 	interval := 1
 	switch s.Rule {
 	case Daily:
 		freq = "DAILY"
+	case Weekdays:
+		freq, byDay = "WEEKLY", "MO,TU,WE,TH,FR"
 	case Weekly:
 		freq = "WEEKLY"
 	case Biweekly:
@@ -219,6 +271,9 @@ func (s Series) RRule() string {
 	out := "FREQ=" + freq
 	if interval > 1 {
 		out += fmt.Sprintf(";INTERVAL=%d", interval)
+	}
+	if byDay != "" {
+		out += ";BYDAY=" + byDay
 	}
 	if s.Until != nil {
 		out += ";UNTIL=" + s.Until.UTC().Format("20060102T150405Z")
