@@ -217,6 +217,15 @@ const nb: Record<string, string> = {
   "Could not stop: ": "Kunne ikke stoppe: ",
   activity: "aktivitet",
 
+  // How much of a solids meal she ate (issue #113).
+  Ate: "Spiste",
+  Well: "Godt",
+  Some: "Litt",
+  Little: "Lite",
+  "ate well": "spiste godt",
+  "ate some": "spiste litt",
+  "ate little": "spiste lite",
+
   // A day at barnehage (issue #105). "Daycare" itself is translated with
   // the contact types below.
   "At daycare": "I barnehagen",

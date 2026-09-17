@@ -175,6 +175,7 @@ export function registerLogMutationDefaults(qc: QueryClient) {
                 contents: vars.contents ?? null,
                 food: vars.food ?? null,
                 reaction: vars.reaction ?? null,
+                appetite: vars.appetite ?? null,
                 notes: null,
               },
             }

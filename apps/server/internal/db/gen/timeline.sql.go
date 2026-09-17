@@ -252,7 +252,7 @@ const listFeedsPage = `-- name: ListFeedsPage :many
 SELECT
     f."id", f."baby_id", f."caretaker_id", f."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
-    f."left_min", f."right_min", f."contents", f."food", f."reaction", f."notes"
+    f."left_min", f."right_min", f."contents", f."food", f."reaction", f."appetite", f."notes"
 FROM "feed_log" f
 JOIN "users" u ON u."id" = f."caretaker_id"
 JOIN "users" lu ON lu."id" = f."logged_by_id"
@@ -293,6 +293,7 @@ type ListFeedsPageRow struct {
 	Contents      *string
 	Food          *string
 	Reaction      *bool
+	Appetite      *string
 	Notes         *string
 }
 
@@ -357,6 +358,7 @@ func (q *Queries) ListFeedsPage(ctx context.Context, arg ListFeedsPageParams) ([
 			&i.Contents,
 			&i.Food,
 			&i.Reaction,
+			&i.Appetite,
 			&i.Notes,
 		); err != nil {
 			return nil, err

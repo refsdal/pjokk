@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { diaperDetail, feedDetail, sleepTitle } from "../src/lib/log-detail";
+import {
+  diaperDetail,
+  feedDetail,
+  sleepTitle,
+  solidsAmountIsSaved,
+} from "../src/lib/log-detail";
 import { sleepTypeAt } from "../src/lib/night";
 
 // The detail line is what a parent scrolls past a hundred times a week; it
@@ -74,5 +79,58 @@ describe("sleepTypeAt", () => {
     const day = { startHour: 1, endHour: 5 };
     expect(sleepTypeAt(at(3), day)).toBe("night");
     expect(sleepTypeAt(at(23), day)).toBe("nap");
+  });
+});
+
+// How much of a meal she ate (issue #113).
+describe("appetite", () => {
+  test("rides after the food, and only on solids", () => {
+    expect(
+      feedDetail(null, {
+        type: "solids",
+        food: "Fish cakes",
+        appetite: "well",
+      }),
+    ).toBe("Fish cakes · ate well");
+    expect(
+      feedDetail("40 g", {
+        type: "solids",
+        food: "Pear",
+        appetite: "little",
+        reaction: true,
+      }),
+    ).toBe("40 g · Pear · ate little · reaction");
+    expect(feedDetail("120 ml", { type: "bottle", appetite: "some" })).toBe(
+      "120 ml",
+    );
+  });
+
+  test("an untouched stepper is not a measurement once an appetite is given", () => {
+    const create = { touched: false, editAmount: undefined };
+    expect(solidsAmountIsSaved({ ...create, appetite: null })).toBe(true);
+    expect(solidsAmountIsSaved({ ...create, appetite: "well" })).toBe(false);
+    expect(
+      solidsAmountIsSaved({
+        touched: true,
+        editAmount: undefined,
+        appetite: "well",
+      }),
+    ).toBe(true);
+  });
+
+  test("an edit keeps what the row had unless the stepper is stepped", () => {
+    expect(
+      solidsAmountIsSaved({ touched: false, editAmount: null, appetite: null }),
+    ).toBe(false);
+    expect(
+      solidsAmountIsSaved({ touched: false, editAmount: 40, appetite: "well" }),
+    ).toBe(true);
+    expect(
+      solidsAmountIsSaved({
+        touched: true,
+        editAmount: null,
+        appetite: "some",
+      }),
+    ).toBe(true);
   });
 });
