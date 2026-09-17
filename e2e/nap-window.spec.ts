@@ -74,3 +74,62 @@ test("the awake card shows a nap window ahead, then past, and can be switched of
   await expect(page.getByText("Awake", { exact: true })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText("Past the usual nap window")).toHaveCount(0);
 });
+
+// The family's own anchor (issue #112): past twelve months the cited table
+// stops, and a barnehage's fixed nap sets the rhythm. When a family has
+// given the card its own number, the card says that instead of a window.
+test("a usual nap set in Settings replaces the window on the awake card", async ({
+  page,
+  request,
+}) => {
+  await freshFamily(page, request, "usualnap");
+  const babies = await (await page.request.get("/api/babies")).json();
+  const babyId = babies[0].id as string;
+  // She woke three hours ago from a sleep that began last evening: old
+  // enough that it is plainly not "the nap".
+  const end = new Date(Date.now() - 3 * 3_600_000);
+  const start = new Date(end.getTime() - 10 * 3_600_000);
+  const slept = await page.request.post("/api/sleep", {
+    data: { babyId, startTime: start.toISOString(), endTime: end.toISOString(), type: "night" },
+  });
+  expect(slept.status(), await slept.text()).toBe(201);
+
+  // Two hours ahead while that is still today; late in the evening the
+  // same rule is exercised from the other side, an hour behind.
+  const now = new Date();
+  const ahead = now.getHours() < 21;
+  const anchor = new Date(now.getTime() + (ahead ? 2 : -1) * 3_600_000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const clock = `${pad(anchor.getHours())}:${pad(anchor.getMinutes())}`;
+
+  await page.goto("/home");
+  await expect(page.getByText("Awake", { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/^Usual nap/)).toHaveCount(0);
+
+  await page.goto("/settings");
+  const field = page.getByTestId("usual-nap").getByLabel("Usual nap");
+  await field.fill(clock);
+  await expect
+    .poll(async () => {
+      const s = await (await page.request.get(`/api/summary?babyId=${babyId}`)).json();
+      return s.usualNapMinute;
+    })
+    .toBe(anchor.getHours() * 60 + anchor.getMinutes());
+  await page.getByTestId("usual-nap").screenshot({ path: shot("4-settings-usual-nap.png") });
+
+  await page.goto("/home");
+  await expect(
+    page.getByText(ahead ? `Usual nap ${clock}` : `Usual nap was ${clock}`, { exact: true }),
+  ).toBeVisible({ timeout: 10_000 });
+  // Instead of the age window, not beside it.
+  await expect(page.getByText(/Nap window|nap window/)).toHaveCount(0);
+  await settle(page);
+  await page.screenshot({ path: shot("5-home-usual-nap.png") });
+
+  // Cleared, the card goes back to the age table.
+  await page.goto("/settings");
+  await page.getByTestId("usual-nap").getByRole("button", { name: "Clear" }).click();
+  await page.goto("/home");
+  await expect(page.getByText(/^Usual nap/)).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByText(/nap window/i)).toBeVisible({ timeout: 10_000 });
+});

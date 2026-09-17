@@ -1,14 +1,27 @@
 import { ChipGroup } from "@/components/Chips";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useSetUsualNap, useSummary } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { setNapGuide, useNapGuide } from "@/lib/nap-window";
+import { useSelectedBaby } from "@/lib/selected-baby";
 import { SectionTitle } from "./lib";
+
+const pad = (n: number) => String(n).padStart(2, "0");
+const toClock = (minute: number) =>
+  `${pad(Math.floor(minute / 60))}:${pad(minute % 60)}`;
 
 // The nap-window guide's one switch (issue #46), with the one-line
 // disclaimer the feature owes: it is a typical-for-her-age guide from a
 // cited table, not advice, and tired signs beat any table.
 export function NapGuideSection() {
   const enabled = useNapGuide();
+  // The family's own anchor (issue #112): family data about the selected
+  // baby, unlike the switch above, which is this device's.
+  const { baby } = useSelectedBaby();
+  const summary = useSummary(baby?.id);
+  const setUsualNap = useSetUsualNap();
+  const usual = summary.data?.usualNapMinute ?? null;
   return (
     <>
       <SectionTitle>{t("Nap window")}</SectionTitle>
@@ -26,6 +39,47 @@ export function NapGuideSection() {
             "Shows a typical nap window for her age on the Awake card, from a pediatrician-reviewed table (Cleveland Clinic, 2024). A guide, not advice: babies differ from day to day, and tired signs beat any table.",
           )}
         </p>
+        {baby && (
+          <div
+            className="space-y-2 border-t border-line pt-3"
+            data-testid="usual-nap"
+          >
+            <p className="text-xs font-semibold tracking-wide text-muted uppercase">
+              {t("Usual nap")} · {baby.name}
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="time"
+                aria-label={t("Usual nap")}
+                value={usual === null ? "" : toClock(usual)}
+                onChange={(e) => {
+                  const [h, m] = e.target.value.split(":").map(Number);
+                  if (Number.isFinite(h) && Number.isFinite(m))
+                    setUsualNap.mutate({
+                      babyId: baby.id,
+                      minute: h! * 60 + m!,
+                    });
+                }}
+                className="h-12 min-w-0 flex-1 rounded-xl2 border border-line bg-surface px-4 text-base text-ink tabular-nums"
+              />
+              {usual !== null && (
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    setUsualNap.mutate({ babyId: baby.id, minute: null })
+                  }
+                >
+                  {t("Clear")}
+                </Button>
+              )}
+            </div>
+            <p className="text-sm text-muted">
+              {t(
+                "Your own number. When set, the Awake card says this instead of a window, on weekends too, which is what keeps home days in step with the barnehage. The table stops at 12 months, as its source does.",
+              )}
+            </p>
+          </div>
+        )}
       </Card>
     </>
   );
