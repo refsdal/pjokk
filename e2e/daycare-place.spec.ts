@@ -135,8 +135,13 @@ test("set up the place and the week, then see the plan while she is there", asyn
   await sheet.screenshot({ path: shot("day-sheet.png") });
   await ctx.close();
 
-  // The other parent's Home follows on its next read.
+  // The other parent's Home follows on its next read. Inside the 15 min
+  // lead before the 23:59 closing time the line is the closing time
+  // instead (daycareBannerLine), as the first assertion above allows —
+  // CI has run in that window.
   await page.reload();
-  await expect(note).toHaveText(/Pick-up( 15:30)? · Bo/, { timeout: 10_000 });
+  await expect(note).toHaveText(/Pick-up( 15:30)? · Bo|Closes 23:59/, {
+    timeout: 10_000,
+  });
   await page.screenshot({ path: shot("home.png") });
 });
