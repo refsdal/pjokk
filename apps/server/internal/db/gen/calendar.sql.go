@@ -235,8 +235,8 @@ const createCalendarEvent = `-- name: CreateCalendarEvent :one
 INSERT INTO "calendar_event"
     ("family_id", "created_by", "title", "description", "location",
      "category", "start_time", "all_day", "duration_min", "remind_minutes_before",
-     "recurrence", "recurrence_until")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+     "recurrence", "recurrence_until", "closed")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 RETURNING "id"
 `
 
@@ -253,6 +253,7 @@ type CreateCalendarEventParams struct {
 	RemindMinutesBefore *int32
 	Recurrence          string
 	RecurrenceUntil     pgtype.Timestamptz
+	Closed              bool
 }
 
 func (q *Queries) CreateCalendarEvent(ctx context.Context, arg CreateCalendarEventParams) (string, error) {
@@ -269,6 +270,7 @@ func (q *Queries) CreateCalendarEvent(ctx context.Context, arg CreateCalendarEve
 		arg.RemindMinutesBefore,
 		arg.Recurrence,
 		arg.RecurrenceUntil,
+		arg.Closed,
 	)
 	var id string
 	err := row.Scan(&id)
@@ -361,7 +363,7 @@ func (q *Queries) DeleteCalendarEventSkips(ctx context.Context, arg DeleteCalend
 
 const getCalendarEvent = `-- name: GetCalendarEvent :one
 SELECT
-    e."id", e."title", e."description", e."location", e."category",
+    e."id", e."title", e."description", e."location", e."category", e."closed",
     e."start_time", e."all_day", e."duration_min", e."remind_minutes_before",
     e."recurrence", e."recurrence_until",
     e."created_by", COALESCE(u."display_name", '') AS created_by_name
@@ -381,6 +383,7 @@ type GetCalendarEventRow struct {
 	Description         *string
 	Location            *string
 	Category            string
+	Closed              bool
 	StartTime           pgtype.Timestamptz
 	AllDay              bool
 	DurationMin         *int32
@@ -400,6 +403,7 @@ func (q *Queries) GetCalendarEvent(ctx context.Context, arg GetCalendarEventPara
 		&i.Description,
 		&i.Location,
 		&i.Category,
+		&i.Closed,
 		&i.StartTime,
 		&i.AllDay,
 		&i.DurationMin,
@@ -414,7 +418,7 @@ func (q *Queries) GetCalendarEvent(ctx context.Context, arg GetCalendarEventPara
 
 const listAllCalendarEvents = `-- name: ListAllCalendarEvents :many
 SELECT
-    e."id", e."title", e."description", e."location", e."category",
+    e."id", e."title", e."description", e."location", e."category", e."closed",
     e."start_time", e."all_day", e."duration_min", e."remind_minutes_before",
     e."recurrence", e."recurrence_until", e."created_at",
     e."created_by", COALESCE(u."display_name", '') AS created_by_name
@@ -430,6 +434,7 @@ type ListAllCalendarEventsRow struct {
 	Description         *string
 	Location            *string
 	Category            string
+	Closed              bool
 	StartTime           pgtype.Timestamptz
 	AllDay              bool
 	DurationMin         *int32
@@ -458,6 +463,7 @@ func (q *Queries) ListAllCalendarEvents(ctx context.Context, familyID string) ([
 			&i.Description,
 			&i.Location,
 			&i.Category,
+			&i.Closed,
 			&i.StartTime,
 			&i.AllDay,
 			&i.DurationMin,
@@ -481,7 +487,7 @@ func (q *Queries) ListAllCalendarEvents(ctx context.Context, familyID string) ([
 const listCalendarEvents = `-- name: ListCalendarEvents :many
 
 SELECT
-    e."id", e."title", e."description", e."location", e."category",
+    e."id", e."title", e."description", e."location", e."category", e."closed",
     e."start_time", e."all_day", e."duration_min", e."remind_minutes_before",
     e."recurrence", e."recurrence_until",
     e."created_by", COALESCE(u."display_name", '') AS created_by_name
@@ -508,6 +514,7 @@ type ListCalendarEventsRow struct {
 	Description         *string
 	Location            *string
 	Category            string
+	Closed              bool
 	StartTime           pgtype.Timestamptz
 	AllDay              bool
 	DurationMin         *int32
@@ -550,6 +557,7 @@ func (q *Queries) ListCalendarEvents(ctx context.Context, arg ListCalendarEvents
 			&i.Description,
 			&i.Location,
 			&i.Category,
+			&i.Closed,
 			&i.StartTime,
 			&i.AllDay,
 			&i.DurationMin,
@@ -576,14 +584,15 @@ SET
     "description" = CASE WHEN $3::bool THEN $4::text ELSE "description" END,
     "location" = CASE WHEN $5::bool THEN $6::text ELSE "location" END,
     "category" = CASE WHEN $7::bool THEN $8::text ELSE "category" END,
-    "start_time" = CASE WHEN $9::bool THEN $10::timestamptz ELSE "start_time" END,
-    "all_day" = CASE WHEN $11::bool THEN $12::bool ELSE "all_day" END,
-    "duration_min" = CASE WHEN $13::bool THEN $14::integer ELSE "duration_min" END,
-    "remind_minutes_before" = CASE WHEN $15::bool THEN $16::integer ELSE "remind_minutes_before" END,
-    "recurrence" = CASE WHEN $17::bool THEN $18::text ELSE "recurrence" END,
-    "recurrence_until" = CASE WHEN $19::bool THEN $20::timestamptz ELSE "recurrence_until" END,
-    "reminded_at" = CASE WHEN $21::bool THEN NULL ELSE "reminded_at" END
-WHERE "family_id" = $22 AND "id" = $23
+    "closed" = CASE WHEN $9::bool THEN $10::bool ELSE "closed" END,
+    "start_time" = CASE WHEN $11::bool THEN $12::timestamptz ELSE "start_time" END,
+    "all_day" = CASE WHEN $13::bool THEN $14::bool ELSE "all_day" END,
+    "duration_min" = CASE WHEN $15::bool THEN $16::integer ELSE "duration_min" END,
+    "remind_minutes_before" = CASE WHEN $17::bool THEN $18::integer ELSE "remind_minutes_before" END,
+    "recurrence" = CASE WHEN $19::bool THEN $20::text ELSE "recurrence" END,
+    "recurrence_until" = CASE WHEN $21::bool THEN $22::timestamptz ELSE "recurrence_until" END,
+    "reminded_at" = CASE WHEN $23::bool THEN NULL ELSE "reminded_at" END
+WHERE "family_id" = $24 AND "id" = $25
 `
 
 type UpdateCalendarEventParams struct {
@@ -595,6 +604,8 @@ type UpdateCalendarEventParams struct {
 	LocationVal            *string
 	CategorySet            bool
 	CategoryVal            *string
+	ClosedSet              bool
+	ClosedVal              bool
 	StartTimeSet           bool
 	StartTimeVal           pgtype.Timestamptz
 	AllDaySet              bool
@@ -622,6 +633,8 @@ func (q *Queries) UpdateCalendarEvent(ctx context.Context, arg UpdateCalendarEve
 		arg.LocationVal,
 		arg.CategorySet,
 		arg.CategoryVal,
+		arg.ClosedSet,
+		arg.ClosedVal,
 		arg.StartTimeSet,
 		arg.StartTimeVal,
 		arg.AllDaySet,

@@ -72,6 +72,14 @@ import (
 // clear_reminded_at parameter (queries/calendar.sql) is that reset,
 // computed here as `startTimeSet || remindMinutesBeforeSet`.
 
+// closedFor is the one rule about the "closed" flag (issue #110): it is a
+// fact about a barnehage event — the planning day, the summer weeks — and
+// means nothing on a doctor's appointment, so it is stored false anywhere
+// else whatever a client sent.
+func closedFor(category string, closed bool) bool {
+	return closed && category == "daycare"
+}
+
 // serCalendarEvent converts one calendar_event row, plus its baby and
 // assignee join rows, into the wire shape. GetCalendarEvent and
 // ListCalendarEvents produce two names for the event row; callers holding
@@ -85,6 +93,7 @@ func serCalendarEvent(row dbgen.GetCalendarEventRow,
 		Description:         row.Description,
 		Location:            row.Location,
 		Category:            gen.CalendarEventCategory(row.Category),
+		Closed:              row.Closed,
 		StartTime:           row.StartTime.Time,
 		SeriesStart:         row.StartTime.Time,
 		Recurrence:          gen.CalendarEventRecurrence(row.Recurrence),
@@ -170,6 +179,7 @@ type detachedEvent struct {
 	description *string
 	location    *string
 	category    string
+	closed      bool
 	start       time.Time
 	allDay      bool
 	durationMin *int32
@@ -197,6 +207,7 @@ func (d Deps) detachOccurrence(ctx context.Context, familyID string, series dbge
 		Description:         e.description,
 		Location:            e.location,
 		Category:            e.category,
+		Closed:              closedFor(e.category, e.closed),
 		StartTime:           ts(e.start),
 		AllDay:              e.allDay,
 		DurationMin:         e.durationMin,
@@ -352,6 +363,7 @@ func (d Deps) CreateCalendarEvent(ctx context.Context, req gen.CreateCalendarEve
 	if body.AllDay != nil {
 		allDay = *body.AllDay
 	}
+	closed := body.Closed != nil && *body.Closed
 	durationMin := body.DurationMin
 	if allDay {
 		durationMin = nil
@@ -379,6 +391,7 @@ func (d Deps) CreateCalendarEvent(ctx context.Context, req gen.CreateCalendarEve
 		Description:         body.Description,
 		Location:            body.Location,
 		Category:            string(category),
+		Closed:              closedFor(string(category), closed),
 		StartTime:           ts(body.StartTime),
 		AllDay:              allDay,
 		DurationMin:         durationMin,
@@ -439,6 +452,7 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 	remindSet, remindVal := patchField[int32](p, "remindMinutesBefore")
 	babyIdsSet, babyIdsVal := patchField[[]string](p, "babyIds")
 	assigneeIdsSet, assigneeIdsVal := patchField[[]string](p, "assigneeUserIds")
+	closedSet, closedVal := patchField[bool](p, "closed")
 	recurrenceSet, recurrenceVal := patchField[string](p, "recurrence")
 	untilSet, untilVal := patchField[time.Time](p, "recurrenceUntil")
 	if err := p.Err(); err != nil {
@@ -479,6 +493,23 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 	// therefore ALWAYS forced to (set=true, val=nil) once the event is (or
 	// becomes) all-day, overriding whatever the client's own durationMin
 	// patch decoded to.
+	// "Closed" is a fact about a barnehage event only (closedFor): held
+	// against the RESULTING category, so moving an event out of the
+	// category clears it rather than leave a flag nothing shows.
+	effectiveCategory := existing.Category
+	if categorySet && categoryVal != nil {
+		effectiveCategory = *categoryVal
+	}
+	effectiveClosed := existing.Closed
+	if closedSet && closedVal != nil {
+		effectiveClosed = *closedVal
+	}
+	if want := closedFor(effectiveCategory, effectiveClosed); want != existing.Closed {
+		closedSet, effectiveClosed = true, want
+	} else {
+		closedSet = false
+	}
+
 	effectiveAllDay := existing.AllDay
 	if allDaySet && allDayVal != nil {
 		effectiveAllDay = *allDayVal
@@ -503,7 +534,8 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 			title:       existing.Title,
 			description: existing.Description,
 			location:    existing.Location,
-			category:    existing.Category,
+			category:    effectiveCategory,
+			closed:      effectiveClosed,
 			start:       occurrence,
 			allDay:      effectiveAllDay,
 			durationMin: existing.DurationMin,
@@ -563,7 +595,7 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 
 	// The event row's own columns, as distinct from p.Any(): a patch
 	// carrying only babyIds/assigneeUserIds writes join tables only.
-	rowSet := titleSet || descSet || locSet || categorySet || startSet || allDaySet || durationSet || remindSet || recurrenceSet || untilSet
+	rowSet := closedSet || titleSet || descSet || locSet || categorySet || startSet || allDaySet || durationSet || remindSet || recurrenceSet || untilSet
 
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
@@ -584,6 +616,8 @@ func (d Deps) UpdateCalendarEvent(ctx context.Context, req gen.UpdateCalendarEve
 			LocationVal:            locVal,
 			CategorySet:            categorySet,
 			CategoryVal:            categoryVal,
+			ClosedSet:              closedSet,
+			ClosedVal:              effectiveClosed,
 			StartTimeSet:           startSet,
 			StartTimeVal:           tsFrom(startVal),
 			AllDaySet:              allDaySet,

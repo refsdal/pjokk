@@ -95,6 +95,7 @@ func (e BabySex) Valid() bool {
 // Defines values for CalendarEventCategory.
 const (
 	CalendarEventCategoryBabysitting CalendarEventCategory = "babysitting"
+	CalendarEventCategoryDaycare     CalendarEventCategory = "daycare"
 	CalendarEventCategoryDoctor      CalendarEventCategory = "doctor"
 	CalendarEventCategoryFamily      CalendarEventCategory = "family"
 	CalendarEventCategoryOther       CalendarEventCategory = "other"
@@ -105,6 +106,8 @@ const (
 func (e CalendarEventCategory) Valid() bool {
 	switch e {
 	case CalendarEventCategoryBabysitting:
+		return true
+	case CalendarEventCategoryDaycare:
 		return true
 	case CalendarEventCategoryDoctor:
 		return true
@@ -230,6 +233,7 @@ func (e CreateBabySex) Valid() bool {
 // Defines values for CreateCalendarEventCategory.
 const (
 	CreateCalendarEventCategoryBabysitting CreateCalendarEventCategory = "babysitting"
+	CreateCalendarEventCategoryDaycare     CreateCalendarEventCategory = "daycare"
 	CreateCalendarEventCategoryDoctor      CreateCalendarEventCategory = "doctor"
 	CreateCalendarEventCategoryFamily      CreateCalendarEventCategory = "family"
 	CreateCalendarEventCategoryOther       CreateCalendarEventCategory = "other"
@@ -240,6 +244,8 @@ const (
 func (e CreateCalendarEventCategory) Valid() bool {
 	switch e {
 	case CreateCalendarEventCategoryBabysitting:
+		return true
+	case CreateCalendarEventCategoryDaycare:
 		return true
 	case CreateCalendarEventCategoryDoctor:
 		return true
@@ -1550,6 +1556,7 @@ func (e UpdateBabySex) Valid() bool {
 // Defines values for UpdateCalendarEventCategory.
 const (
 	UpdateCalendarEventCategoryBabysitting UpdateCalendarEventCategory = "babysitting"
+	UpdateCalendarEventCategoryDaycare     UpdateCalendarEventCategory = "daycare"
 	UpdateCalendarEventCategoryDoctor      UpdateCalendarEventCategory = "doctor"
 	UpdateCalendarEventCategoryFamily      UpdateCalendarEventCategory = "family"
 	UpdateCalendarEventCategoryOther       UpdateCalendarEventCategory = "other"
@@ -1560,6 +1567,8 @@ const (
 func (e UpdateCalendarEventCategory) Valid() bool {
 	switch e {
 	case UpdateCalendarEventCategoryBabysitting:
+		return true
+	case UpdateCalendarEventCategoryDaycare:
 		return true
 	case UpdateCalendarEventCategoryDoctor:
 		return true
@@ -2477,13 +2486,16 @@ type CalendarEvent struct {
 		Id   string `json:"id"`
 		Name string `json:"name"`
 	} `json:"babies"`
-	Category      CalendarEventCategory `json:"category"`
-	CreatedBy     string                `json:"createdBy"`
-	CreatedByName string                `json:"createdByName"`
-	Description   *string               `json:"description"`
-	DurationMin   *int32                `json:"durationMin"`
-	Id            string                `json:"id"`
-	Location      *string               `json:"location"`
+	Category CalendarEventCategory `json:"category"`
+
+	// Closed The barnehage is closed that day (issue #110): a planning day, the summer weeks. Only meaningful for `category: daycare` — the server stores false on any other category. Home surfaces a closed day the evening before and on the day.
+	Closed        bool    `json:"closed"`
+	CreatedBy     string  `json:"createdBy"`
+	CreatedByName string  `json:"createdByName"`
+	Description   *string `json:"description"`
+	DurationMin   *int32  `json:"durationMin"`
+	Id            string  `json:"id"`
+	Location      *string `json:"location"`
 
 	// Recurrence Steps on the local calendar (Europe/Oslo), so a daily 08:00 stays 08:00 across DST; monthly/yearly clamp the day.
 	Recurrence CalendarEventRecurrence `json:"recurrence"`
@@ -2609,9 +2621,12 @@ type CreateCalendarEvent struct {
 	AssigneeUserIds *[]string                    `json:"assigneeUserIds,omitempty"`
 	BabyIds         *[]string                    `json:"babyIds,omitempty"`
 	Category        *CreateCalendarEventCategory `json:"category,omitempty"`
-	Description     *string                      `json:"description,omitempty"`
-	DurationMin     *int32                       `json:"durationMin,omitempty"`
-	Location        *string                      `json:"location,omitempty"`
+
+	// Closed The barnehage is closed that day (issue #110): a planning day, the summer weeks. Only meaningful for `category: daycare` — the server stores false on any other category. Home surfaces a closed day the evening before and on the day.
+	Closed      *bool   `json:"closed,omitempty"`
+	Description *string `json:"description,omitempty"`
+	DurationMin *int32  `json:"durationMin,omitempty"`
+	Location    *string `json:"location,omitempty"`
 
 	// Recurrence Omitted means none.
 	Recurrence *CreateCalendarEventRecurrence `json:"recurrence,omitempty"`
@@ -3894,10 +3909,13 @@ type UpdateBath struct {
 
 // UpdateCalendarEvent Every field is optional; an empty object is a no-op. `description`/`location`/`durationMin`/`remindMinutesBefore` may also be sent as `null` to CLEAR that column; `title`/`category`/ `startTime`/`allDay` are not nullable — only settable or omitted. `babyIds`/`assigneeUserIds`, when present, REPLACE the link set; omitted leaves it untouched (see internal/api/calendar.go).
 type UpdateCalendarEvent struct {
-	AllDay              *bool                          `json:"allDay,omitempty"`
-	AssigneeUserIds     *[]string                      `json:"assigneeUserIds,omitempty"`
-	BabyIds             *[]string                      `json:"babyIds,omitempty"`
-	Category            *UpdateCalendarEventCategory   `json:"category,omitempty"`
+	AllDay          *bool                        `json:"allDay,omitempty"`
+	AssigneeUserIds *[]string                    `json:"assigneeUserIds,omitempty"`
+	BabyIds         *[]string                    `json:"babyIds,omitempty"`
+	Category        *UpdateCalendarEventCategory `json:"category,omitempty"`
+
+	// Closed The barnehage is closed that day (issue #110): a planning day, the summer weeks. Only meaningful for `category: daycare` — the server stores false on any other category. Home surfaces a closed day the evening before and on the day.
+	Closed              *bool                          `json:"closed,omitempty"`
 	Description         *string                        `json:"description,omitempty"`
 	DurationMin         *int32                         `json:"durationMin,omitempty"`
 	Location            *string                        `json:"location,omitempty"`
