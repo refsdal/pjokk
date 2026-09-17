@@ -2432,6 +2432,19 @@ type Baby struct {
 // BabySex defines model for Baby.Sex.
 type BabySex string
 
+// BabyAbout defines model for BabyAbout.
+type BabyAbout struct {
+	// Comfort Comfort items — dummy, cuddly toy, blanket.
+	Comfort *string `json:"comfort"`
+
+	// Diet Allergies, intolerances and diet.
+	Diet *string `json:"diet"`
+
+	// FallsAsleep How she falls asleep.
+	FallsAsleep *string `json:"fallsAsleep"`
+	Other       *string `json:"other"`
+}
+
 // BanUser Every field is optional; an absent body bans with no stated reason.
 type BanUser struct {
 	Reason *string `json:"reason,omitempty"`
@@ -4502,6 +4515,9 @@ type CreateBabyJSONRequestBody = CreateBaby
 
 // UpdateBabyJSONRequestBody defines body for UpdateBaby for application/json ContentType.
 type UpdateBabyJSONRequestBody = UpdateBaby
+
+// PutBabyAboutJSONRequestBody defines body for PutBabyAbout for application/json ContentType.
+type PutBabyAboutJSONRequestBody = BabyAbout
 
 // CreateBathJSONRequestBody defines body for CreateBath for application/json ContentType.
 type CreateBathJSONRequestBody = CreateBath
