@@ -1,7 +1,8 @@
 import { ChipGroup } from "@/components/Chips";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useSetUsualNap, useSummary } from "@/lib/data";
+import { usualNapSuggestion } from "@/lib/about-me";
+import { useRecentSleeps, useSetUsualNap, useSummary } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { setNapGuide, useNapGuide } from "@/lib/nap-window";
 import { useSelectedBaby } from "@/lib/selected-baby";
@@ -22,6 +23,11 @@ export function NapGuideSection() {
   const summary = useSummary(baby?.id);
   const setUsualNap = useSetUsualNap();
   const usual = summary.data?.usualNapMinute ?? null;
+  // What the logs say (issue #126): offered, never applied. The anchor is
+  // the family's own number, and a number that moves on its own is one a
+  // parent stops trusting.
+  const sleeps = useRecentSleeps(baby?.id);
+  const suggestion = usualNapSuggestion(sleeps.data ?? []);
   return (
     <>
       <SectionTitle>{t("Nap window")}</SectionTitle>
@@ -73,6 +79,33 @@ export function NapGuideSection() {
                 </Button>
               )}
             </div>
+            {baby && suggestion && suggestion.minute !== usual && (
+              <div
+                className="flex items-center gap-2 rounded-xl2 border border-line bg-surface py-2 pr-2 pl-4"
+                data-testid="usual-nap-suggestion"
+              >
+                <p className="min-w-0 flex-1 text-sm text-ink-soft">
+                  {suggestion.source === "daycare"
+                    ? t("Logged at daycare: around")
+                    : t("Logged at home: around")}{" "}
+                  <span className="font-bold text-ink tabular-nums">
+                    {toClock(suggestion.minute)}
+                  </span>
+                </p>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    setUsualNap.mutate({
+                      babyId: baby.id,
+                      minute: suggestion.minute,
+                    })
+                  }
+                >
+                  {t("Use this")}
+                </Button>
+              </div>
+            )}
             <p className="text-sm text-muted">
               {t(
                 "Your own number. When set, the Awake card says this instead of a window, on weekends too, which is what keeps home days in step with the barnehage. The table stops at 12 months, as its source does.",

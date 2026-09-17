@@ -133,3 +133,59 @@ test("a usual nap set in Settings replaces the window on the awake card", async 
   await expect(page.getByText(/^Usual nap/)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByText(/nap window/i)).toBeVisible({ timeout: 10_000 });
 });
+
+// The usual nap, suggested from the logs (issue #126): a family that fills
+// in the pick-up handover has already said when the barnehage nap begins.
+// Offered beside the field, never applied on its own.
+test("the usual nap is suggested from the barnehage's logged naps", async ({
+  page,
+  request,
+}) => {
+  await freshFamily(page, request, "napsuggest");
+  const babies = await (await page.request.get("/api/babies")).json();
+  const babyId = babies[0].id as string;
+  const at = (daysAgo: number, h: number, m: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - daysAgo);
+    d.setHours(h, m, 0, 0);
+    return d.toISOString();
+  };
+
+  await page.goto("/settings");
+  const box = page.getByTestId("usual-nap");
+  await expect(box).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId("usual-nap-suggestion")).toHaveCount(0);
+
+  // Three days at barnehage, each with a handover nap: 11:30, 11:40, 11:35.
+  for (const [daysAgo, minute] of [
+    [3, 30],
+    [2, 40],
+    [1, 35],
+  ] as const) {
+    const day = await page.request.post("/api/daycare", {
+      data: { babyId, startTime: at(daysAgo, 8, 0), endTime: at(daysAgo, 15, 30) },
+    });
+    expect(day.status(), await day.text()).toBe(201);
+    const handover = await page.request.put(`/api/daycare/${(await day.json()).id}/handover`, {
+      data: {
+        naps: [{ startTime: at(daysAgo, 11, minute), endTime: at(daysAgo, 13, 0) }],
+        meals: [],
+        diapers: { wet: 0, dirty: 0 },
+        mood: null,
+      },
+    });
+    expect(handover.status(), await handover.text()).toBe(200);
+  }
+
+  await page.reload();
+  const suggestion = page.getByTestId("usual-nap-suggestion");
+  await expect(suggestion).toContainText("Logged at daycare: around 11:35", { timeout: 10_000 });
+  // Offered, not applied.
+  await expect(box.getByLabel("Usual nap")).toHaveValue("");
+  await box.screenshot({ path: shot("6-settings-nap-suggestion.png") });
+
+  await suggestion.getByRole("button", { name: "Use this" }).click();
+  await expect(box.getByLabel("Usual nap")).toHaveValue("11:35", { timeout: 10_000 });
+  // Nothing left to suggest once the anchor says the same.
+  await expect(suggestion).toHaveCount(0);
+});
