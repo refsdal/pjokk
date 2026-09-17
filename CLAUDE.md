@@ -506,6 +506,16 @@ Bun-era schema used. Domain tables kept their singular names:
   both and compares neither; the clock is `lib/illness-ui.ts`, which also
   moves it past a fever reading logged afterwards — the one fever
   threshold in the codebase stays in `lib/measurements.ts`.
+- `care_day(id, familyId, userId, babyId?, illnessId?, date, fraction
+  0.5|1, note?)` UNIQUE (familyId, userId, date), and
+  `care_day_quota(familyId, userId, days)` — days at home with an ill
+  child, Norway's «sykt barn-dager» (#108, same spec as `illness`). A
+  PERSON's row, not the child's: `user_id` CASCADEs, a removed member's
+  rows leave with them (`auth.sql`), and both tables are `userOwned` in
+  `internal/restore`. `date` is a calendar DATE sent by the client as its
+  own local day; the server derives none from a timestamp. **No default
+  quota and no entitlement arithmetic**: NAV's rule is reference text in
+  the SPA, and someone who has set no number sees "4 days", not "4 of 10".
 - `milestone_photo(id, familyId, milestoneLogId, objectKey, width, height,
   size)` — up to three photos per milestone, server re-encoded to JPEG
   (EXIF gone) under a server-generated key, served only through

@@ -226,6 +226,24 @@ const nb: Record<string, string> = {
   "ate some": "spiste litt",
   "ate little": "spiste lite",
 
+  // Days at home with an ill child (issue #108).
+  "Home today": "Hjemme i dag",
+  "half day": "halv dag",
+  "day 4 in a row. An employer may ask for a doctor's note.":
+    "dag 4 på rad. Arbeidsgiver kan be om legeerklæring.",
+  "Days at home with a sick child": "Sykt barn-dager",
+  "Previous year": "Forrige år",
+  "Next year": "Neste år",
+  "Set days": "Sett antall",
+  Change: "Endre",
+  "No number": "Ingen tall",
+  "Your own number, from your employer or NAV: usually 10 days a year with one or two children, 15 with three or more, doubled for a sole carer. Pjokk only counts.":
+    "Ditt eget tall, fra arbeidsgiver eller NAV: vanligvis 10 dager i året med ett eller to barn, 15 med tre eller flere, dobbelt ved aleneomsorg. Pjokk bare teller.",
+  "Add a day": "Legg til en dag",
+  "Whole day": "Hel dag",
+  "Half day": "Halv dag",
+  "Add day": "Legg til dag",
+
   // Illness episodes (issue #107).
   Illness: "Sykdom",
   None: "Ingen",

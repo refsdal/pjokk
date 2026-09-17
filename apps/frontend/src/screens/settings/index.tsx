@@ -11,6 +11,7 @@ import { legalUrl } from "@/lib/site";
 import { ApiKeysSection } from "./ApiKeysSection";
 import { AppearanceSection } from "./AppearanceSection";
 import { BabiesSection } from "./BabiesSection";
+import { CareDaysSection } from "./CareDaysSection";
 import { CalendarFeedCard } from "./CalendarFeedCard";
 import { ContactsSection } from "./ContactsSection";
 import { DevicesSection } from "./DevicesSection";
@@ -42,6 +43,7 @@ export function SettingsScreen() {
         <BabiesSection isAdmin={isAdmin} />
         <ContactsSection />
         <MedicinesSection />
+        <CareDaysSection isAdmin={isAdmin} />
 
         {isAdmin && (
           <>

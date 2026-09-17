@@ -2618,8 +2618,10 @@ type CreateCalendarEventRecurrence string
 
 // CreateCareDay defines model for CreateCareDay.
 type CreateCareDay struct {
-	BabyId    *string                `json:"babyId,omitempty"`
-	Date      string                 `json:"date"`
+	BabyId *string `json:"babyId,omitempty"`
+	Date   string  `json:"date"`
+
+	// Fraction A whole day when omitted.
 	Fraction  *CreateCareDayFraction `json:"fraction,omitempty"`
 	IllnessId *string                `json:"illnessId,omitempty"`
 	Note      *string                `json:"note,omitempty"`
@@ -2628,7 +2630,7 @@ type CreateCareDay struct {
 	UserId *string `json:"userId,omitempty"`
 }
 
-// CreateCareDayFraction defines model for CreateCareDay.Fraction.
+// CreateCareDayFraction A whole day when omitted.
 type CreateCareDayFraction float32
 
 // CreateContact defines model for CreateContact.
