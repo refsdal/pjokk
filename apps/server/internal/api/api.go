@@ -291,6 +291,9 @@ var operationAuthTiers = map[string]authTier{
 	"PickupDaycare":    tierFamily,
 	"UpdateDaycare":    tierFamily,
 	"DeleteDaycare":    tierFamily,
+	// The pick-up handover (issue #106, handover.go).
+	"GetDaycareHandover": tierFamily,
+	"PutDaycareHandover": tierFamily,
 
 	"GetSummary": tierFamily,
 

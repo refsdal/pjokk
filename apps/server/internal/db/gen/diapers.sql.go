@@ -66,7 +66,7 @@ func (q *Queries) DeleteDiaper(ctx context.Context, arg DeleteDiaperParams) (int
 
 const getDiaper = `-- name: GetDiaper :one
 SELECT
-    d."id", d."baby_id", d."caretaker_id", d."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    d."id", d."baby_id", d."caretaker_id", d."logged_by_id", d."daycare_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     d."time", d."type", d."color", d."consistency", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
@@ -84,6 +84,7 @@ type GetDiaperRow struct {
 	BabyID        string
 	CaretakerID   string
 	LoggedByID    string
+	DaycareID     *string
 	CaretakerName string
 	LoggedByName  string
 	Time          pgtype.Timestamptz
@@ -101,6 +102,7 @@ func (q *Queries) GetDiaper(ctx context.Context, arg GetDiaperParams) (GetDiaper
 		&i.BabyID,
 		&i.CaretakerID,
 		&i.LoggedByID,
+		&i.DaycareID,
 		&i.CaretakerName,
 		&i.LoggedByName,
 		&i.Time,
@@ -115,7 +117,7 @@ func (q *Queries) GetDiaper(ctx context.Context, arg GetDiaperParams) (GetDiaper
 const listDiapers = `-- name: ListDiapers :many
 
 SELECT
-    d."id", d."baby_id", d."caretaker_id", d."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    d."id", d."baby_id", d."caretaker_id", d."logged_by_id", d."daycare_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     d."time", d."type", d."color", d."consistency", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
@@ -137,6 +139,7 @@ type ListDiapersRow struct {
 	BabyID        string
 	CaretakerID   string
 	LoggedByID    string
+	DaycareID     *string
 	CaretakerName string
 	LoggedByName  string
 	Time          pgtype.Timestamptz
@@ -166,6 +169,7 @@ func (q *Queries) ListDiapers(ctx context.Context, arg ListDiapersParams) ([]Lis
 			&i.BabyID,
 			&i.CaretakerID,
 			&i.LoggedByID,
+			&i.DaycareID,
 			&i.CaretakerName,
 			&i.LoggedByName,
 			&i.Time,

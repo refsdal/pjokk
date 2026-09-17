@@ -136,6 +136,7 @@ func timelineBase(kind gen.TimelineEntryKind, id, babyID, caretakerID, caretaker
 
 func timelineFeedRow(r dbgen.ListFeedsPageRow) timelineEntryRow {
 	e := timelineBase(gen.TimelineEntryKindFeed, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.LoggedByID, r.LoggedByName, r.Notes)
+	e.Set("daycareId", r.DaycareID)
 	e.Set("time", r.Time.Time)
 	e.Set("type", r.Type)
 	e.Set("amountMl", r.AmountMl)
@@ -152,6 +153,7 @@ func timelineFeedRow(r dbgen.ListFeedsPageRow) timelineEntryRow {
 
 func timelineDiaperRow(r dbgen.ListDiapersPageRow) timelineEntryRow {
 	e := timelineBase(gen.TimelineEntryKindDiaper, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.LoggedByID, r.LoggedByName, r.Notes)
+	e.Set("daycareId", r.DaycareID)
 	e.Set("time", r.Time.Time)
 	e.Set("type", r.Type)
 	e.Set("color", r.Color)
@@ -161,6 +163,7 @@ func timelineDiaperRow(r dbgen.ListDiapersPageRow) timelineEntryRow {
 
 func timelineSleepRow(r dbgen.ListSleepsPageRow) timelineEntryRow {
 	e := timelineBase(gen.TimelineEntryKindSleep, r.ID, r.BabyID, r.CaretakerID, r.CaretakerName, r.LoggedByID, r.LoggedByName, r.Notes)
+	e.Set("daycareId", r.DaycareID)
 	e.Set("startTime", r.StartTime.Time)
 	e.Set("endTime", tsPtr(r.EndTime))
 	e.Set("location", r.Location)
@@ -230,6 +233,7 @@ func timelineDaycareRow(r dbgen.ListDaycaresPageRow) timelineEntryRow {
 	e.Set("endTime", tsPtr(r.EndTime))
 	e.Set("pickupCaretakerId", r.PickupCaretakerID)
 	e.Set("pickupCaretakerName", r.PickupCaretakerName)
+	e.Set("mood", r.Mood)
 	return timelineEntryRow{sortKey: r.StartTime.Time.UnixMilli(), entry: e}
 }
 

@@ -37,11 +37,15 @@ export function DaycareSheet({
   onOpenChange,
   babyId,
   edit = null,
+  onHandover,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   babyId: string;
   edit?: DaycareLog | null;
+  // Opens the handover sheet for a finished day (issue #106). The parent
+  // owns that sheet — one tray at a time — so this only hands the day over.
+  onHandover?: (day: DaycareLog) => void;
 }) {
   const me = useMe();
   const [time, setTime] = useState<Date | null>(null);
@@ -210,6 +214,19 @@ export function DaycareSheet({
               {t("Log a finished day")}
             </Button>
           </>
+        )}
+
+        {edit && !isRunningEdit && onHandover && (
+          <Button
+            size="full"
+            variant="outline"
+            onClick={() => {
+              onOpenChange(false);
+              onHandover(edit);
+            }}
+          >
+            {t("Handover")}
+          </Button>
         )}
 
         {edit && <DeleteButton onDelete={remove} />}

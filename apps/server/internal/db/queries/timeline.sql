@@ -29,7 +29,7 @@
 
 -- name: ListFeedsPage :many
 SELECT
-    f."id", f."baby_id", f."caretaker_id", f."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    f."id", f."baby_id", f."caretaker_id", f."logged_by_id", f."daycare_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
     f."left_min", f."right_min", f."contents", f."food", f."reaction", f."appetite", f."notes"
 FROM "feed_log" f
@@ -47,7 +47,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: ListDiapersPage :many
 SELECT
-    d."id", d."baby_id", d."caretaker_id", d."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    d."id", d."baby_id", d."caretaker_id", d."logged_by_id", d."daycare_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     d."time", d."type", d."color", d."consistency", d."notes"
 FROM "diaper_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
@@ -64,7 +64,7 @@ LIMIT sqlc.arg(lim);
 
 -- name: ListSleepsPage :many
 SELECT
-    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    s."id", s."baby_id", s."caretaker_id", s."logged_by_id", s."daycare_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     s."start_time", s."end_time", s."location", s."type", s."notes"
 FROM "sleep_log" s
 JOIN "users" u ON u."id" = s."caretaker_id"
@@ -202,7 +202,7 @@ LIMIT sqlc.arg(lim);
 SELECT
     d."id", d."baby_id", d."caretaker_id", d."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     d."pickup_caretaker_id", pu."display_name" AS pickup_caretaker_name,
-    d."start_time", d."end_time", d."notes"
+    d."start_time", d."end_time", d."notes", d."mood"
 FROM "daycare_log" d
 JOIN "users" u ON u."id" = d."caretaker_id"
 JOIN "users" lu ON lu."id" = d."logged_by_id"

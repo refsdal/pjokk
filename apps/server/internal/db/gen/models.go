@@ -130,6 +130,7 @@ type DaycareLog struct {
 	EndTime           pgtype.Timestamptz
 	Notes             *string
 	CreatedAt         pgtype.Timestamptz
+	Mood              *string
 }
 
 type Device struct {
@@ -159,6 +160,7 @@ type DiaperLog struct {
 	Color       *string
 	Consistency *string
 	LoggedByID  string
+	DaycareID   *string
 }
 
 type FamilyInvite struct {
@@ -192,6 +194,7 @@ type FeedLog struct {
 	Reaction    *bool
 	LoggedByID  string
 	Appetite    *string
+	DaycareID   *string
 }
 
 type FeedTimer struct {
@@ -462,6 +465,7 @@ type SleepLog struct {
 	CreatedAt   pgtype.Timestamptz
 	Type        *string
 	LoggedByID  string
+	DaycareID   *string
 }
 
 type Users struct {

@@ -2843,3 +2843,50 @@ handover, #106). Spec:
   would add the last meal's 40 g to the day's solids total.
 - **Three words, not a scale.** "Well / Some / Little" is how staff say
   it; a five-point scale would ask a parent to grade a lunch.
+
+## 2026-09-17 — the pick-up handover
+
+Third of the barnehage series (#106). Spec:
+`docs/superpowers/specs/2026-09-17-daycare-handover-design.md`.
+
+- **Ordinary rows, not a report table.** What the staff said is saved as
+  sleep, feed and diaper rows, so Timeline, Stats, the PDF report, the CSV
+  export and the reminders see a whole day with no special cases. The
+  handover document is a VIEW rebuilt from those rows; there is no second
+  copy to drift. Rejected: a `daycare_report` table rendered beside the
+  timeline, which would have left every weekday's naps out of the sleep
+  stats — the hole this exists to close.
+- **`daycare_id` says who really did it.** The people columns are NOT NULL
+  and must name a member; the staff are not users and never will be
+  (they run Kidplan or Vigilo, not a second app). The rows take whoever
+  typed the handover, and a row with `daycare_id` reads "at barnehage"
+  with the barnehage's mark where a face would be. A future leaderboard
+  counts `WHERE daycare_id IS NULL`. Rejected: a synthetic "Barnehage"
+  user per family, which would have to be kept out of members, invites,
+  reminders, pushes and account deletion for ever.
+- **PUT replaces, in one transaction.** Idempotent, so the sheet's edit
+  path is its create path and a replayed offline save writes once.
+- **`ON DELETE SET NULL`.** Deleting the day must not delete a nap that
+  happened.
+- **Diapers are a count, spread evenly, wet first.** "Three nappies" has
+  no times; the n-th of N sits at `start + n·span/(N+1)`. Home's Last
+  diaper card says "from the handover, time estimated" when its entry is
+  one.
+- **Only the hours she was there** (added after an e2e screenshot showed
+  the usual 11:30 nap saved for a day that ended 09:27 — a sleep in the
+  future). The sheet offers only what fits the day and blocks Save
+  otherwise; the server refuses the rest with `OUTSIDE_DAY`.
+- **Clock times carry over; observations never do.** Yesterday's nap and
+  meal times prefill. How she ate, how many nappies and how the day went
+  are about this day.
+- **Three meal slots with fixed clock times, not editable in the sheet.**
+  The rows are ordinary feeds and open in the feed sheet from the
+  timeline; a time picker per meal would triple the sheet for the rare
+  day it matters. A fourth meal written over the API is carried through a
+  replace untouched.
+- **The card is dismissed per device, the handover is due per family.**
+  "Not now" on the phone in the cloakroom should not silence the other
+  parent's. It stops asking 12 hours after the pick-up: by the next
+  morning's drop-off, yesterday's handover is nobody's question.
+- **Mood is three words** (good / okay / hard), set only through the
+  handover. No free text: the day's note already exists.

@@ -8,7 +8,7 @@ import {
   type Icon as TablerIcon,
 } from "@tabler/icons-react";
 import { useState } from "react";
-import type { TimelineEntry } from "@pjokk/shared";
+import type { DaycareLog, TimelineEntry } from "@pjokk/shared";
 import { DiaperSheet } from "@/components/sheets/DiaperSheet";
 import { FeedSheet } from "@/components/sheets/FeedSheet";
 import {
@@ -17,6 +17,7 @@ import {
   type OtherEntry,
 } from "@/components/sheets/OtherLogSheet";
 import { DaycareSheet } from "@/components/sheets/DaycareSheet";
+import { HandoverSheet } from "@/components/sheets/HandoverSheet";
 import { PlaySheet } from "@/components/sheets/PlaySheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
 import { VaccineSheet } from "@/components/sheets/VaccineSheet";
@@ -48,6 +49,10 @@ const isSession = (
   e: TimelineEntry,
 ): e is Extract<TimelineEntry, { kind: "sleep" | "play" | "daycare" }> =>
   e.kind === "sleep" || e.kind === "play" || e.kind === "daycare";
+// A row the barnehage reported at pick-up (issue #106) carries the day's id.
+// `in`, not a kind list: only sleep, feed and diaper rows have the field.
+export const isFromHandover = (e: TimelineEntry): boolean =>
+  "daycareId" in e && !!e.daycareId;
 const entryTime = (e: TimelineEntry): Date =>
   new Date(isSession(e) ? e.startTime : e.time);
 
@@ -249,6 +254,7 @@ function Row({
     entry.kind === "measurement" && isFever(entry.type, entry.value);
   const tint = fever ? "text-danger" : baseTint;
   const active = isSession(entry) && !entry.endTime;
+  const fromHandover = isFromHandover(entry);
   return (
     <button
       type="button"
@@ -300,10 +306,18 @@ function Row({
           {formatClock(entryTime(entry))}
         </span>
         <span className="block text-[11px] text-muted">
-          {t("by")} {entry.caretakerName}
+          {fromHandover ? t("at daycare") : `${t("by")} ${entry.caretakerName}`}
         </span>
       </span>
-      <Avatar src={avatarUrl} name={entry.caretakerName} size={8} />
+      {fromHandover ? (
+        // The staff did it, not the parent who typed it in (issue #106):
+        // the barnehage's mark where a face would be.
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted">
+          <daycareMeta.icon className="h-4 w-4" />
+        </span>
+      ) : (
+        <Avatar src={avatarUrl} name={entry.caretakerName} size={8} />
+      )}
     </button>
   );
 }
@@ -333,6 +347,7 @@ export function TimelineList({
   const feeds = useFeeds(babyId);
   const avatars = useMemberAvatars();
   const [editEntry, setEditEntry] = useState<TimelineEntry | null>(null);
+  const [handoverDay, setHandoverDay] = useState<DaycareLog | null>(null);
   // The catalogue for THIS baby carries each entry's newest linked dose;
   // the row that IS that dose gets the "next dose OK from" note.
   const catalogue = useMedicineCatalogue(babyId, !!babyId);
@@ -412,6 +427,12 @@ export function TimelineList({
         onOpenChange={(o) => !o && setEditEntry(null)}
         babyId={babyId ?? ""}
         edit={editEntry?.kind === "daycare" ? editEntry : null}
+        onHandover={setHandoverDay}
+      />
+      <HandoverSheet
+        open={!!handoverDay}
+        onOpenChange={(o) => !o && setHandoverDay(null)}
+        day={handoverDay}
       />
       <VaccineSheet
         open={editEntry?.kind === "vaccine"}

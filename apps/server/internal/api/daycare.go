@@ -68,6 +68,7 @@ func serDaycare(row dbgen.GetDaycareRow) gen.DaycareLog {
 		LoggedByName:        row.LoggedByName,
 		PickupCaretakerId:   row.PickupCaretakerID,
 		PickupCaretakerName: row.PickupCaretakerName,
+		Mood:                enumPtr[gen.DaycareLogMood](row.Mood),
 		Notes:               row.Notes,
 		StartTime:           row.StartTime.Time,
 		EndTime:             tsPtr(row.EndTime),

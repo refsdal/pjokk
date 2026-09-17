@@ -89,6 +89,7 @@ func serFeed(row dbgen.GetFeedRow) gen.FeedLog {
 		CaretakerName: row.CaretakerName,
 		LoggedById:    row.LoggedByID,
 		LoggedByName:  row.LoggedByName,
+		DaycareId:     row.DaycareID,
 		Notes:         row.Notes,
 		Time:          row.Time.Time,
 		Type:          gen.FeedLogType(row.Type),

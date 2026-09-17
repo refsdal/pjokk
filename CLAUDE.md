@@ -479,6 +479,21 @@ Bun-era schema used. Domain tables kept their singular names:
   `sleep_log` clone as `play_log` is, with a second person: `caretakerId`
   dropped off, `pickupCaretakerId` picked up. Code says `daycare`; the UI
   says "Barnehage" / "Daycare". Not in `deviceOperations`.
+- **The pick-up handover (#106, spec
+  `docs/superpowers/specs/2026-09-17-daycare-handover-design.md`) is a
+  view over ordinary rows, not a table**: what the staff said is saved as
+  `sleep_log` naps, solids `feed_log` meals and `diaper_log` rows that
+  carry `daycare_id` (nullable FK, `ON DELETE SET NULL`), plus
+  `daycare_log.mood good|ok|hard?`. `PUT /api/daycare/{id}/handover`
+  REPLACES them in one transaction (idempotent, so the edit path is the
+  create path and a replayed offline save is harmless); GET rebuilds the
+  document from the rows. Their people columns hold whoever typed it in —
+  the staff are not users — so a row with `daycareId` reads "at barnehage"
+  instead of "by <name>", and anything that credits care to a person must
+  count `WHERE daycare_id IS NULL`. Diapers are a count, spread evenly
+  over the day. Rows must fall inside the day (400 `OUTSIDE_DAY`).
+  `Summary.handoverDue` backs Home's "How was the day?" card for 12 h
+  after a pick-up.
 - `milestone_photo(id, familyId, milestoneLogId, objectKey, width, height,
   size)` — up to three photos per milestone, server re-encoded to JPEG
   (EXIF gone) under a server-generated key, served only through

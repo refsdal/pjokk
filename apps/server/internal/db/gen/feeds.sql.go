@@ -82,7 +82,7 @@ func (q *Queries) DeleteFeed(ctx context.Context, arg DeleteFeedParams) (int64, 
 
 const getFeed = `-- name: GetFeed :one
 SELECT
-    f."id", f."baby_id", f."caretaker_id", f."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    f."id", f."baby_id", f."caretaker_id", f."logged_by_id", f."daycare_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
     f."left_min", f."right_min", f."contents", f."food", f."reaction", f."appetite", f."notes"
 FROM "feed_log" f
@@ -101,6 +101,7 @@ type GetFeedRow struct {
 	BabyID        string
 	CaretakerID   string
 	LoggedByID    string
+	DaycareID     *string
 	CaretakerName string
 	LoggedByName  string
 	Time          pgtype.Timestamptz
@@ -125,6 +126,7 @@ func (q *Queries) GetFeed(ctx context.Context, arg GetFeedParams) (GetFeedRow, e
 		&i.BabyID,
 		&i.CaretakerID,
 		&i.LoggedByID,
+		&i.DaycareID,
 		&i.CaretakerName,
 		&i.LoggedByName,
 		&i.Time,
@@ -146,7 +148,7 @@ func (q *Queries) GetFeed(ctx context.Context, arg GetFeedParams) (GetFeedRow, e
 const listFeeds = `-- name: ListFeeds :many
 
 SELECT
-    f."id", f."baby_id", f."caretaker_id", f."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    f."id", f."baby_id", f."caretaker_id", f."logged_by_id", f."daycare_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
     f."left_min", f."right_min", f."contents", f."food", f."reaction", f."appetite", f."notes"
 FROM "feed_log" f
@@ -169,6 +171,7 @@ type ListFeedsRow struct {
 	BabyID        string
 	CaretakerID   string
 	LoggedByID    string
+	DaycareID     *string
 	CaretakerName string
 	LoggedByName  string
 	Time          pgtype.Timestamptz
@@ -213,6 +216,7 @@ func (q *Queries) ListFeeds(ctx context.Context, arg ListFeedsParams) ([]ListFee
 			&i.BabyID,
 			&i.CaretakerID,
 			&i.LoggedByID,
+			&i.DaycareID,
 			&i.CaretakerName,
 			&i.LoggedByName,
 			&i.Time,
