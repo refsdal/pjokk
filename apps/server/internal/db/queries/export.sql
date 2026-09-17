@@ -171,3 +171,17 @@ JOIN "users" lu ON lu."id" = v."logged_by_id"
 WHERE v."family_id" = sqlc.arg(family_id)
 ORDER BY v."time" ASC, v."id" ASC
 LIMIT sqlc.arg(lim);
+
+-- name: ExportCareDays :many
+-- Days at home with an ill child (issue #108). Not a log of the child's
+-- care but it belongs in "everything the family recorded": one row per
+-- person per day.
+SELECT
+    c."date", c."fraction", COALESCE(u."display_name", '') AS user_name,
+    COALESCE(bb."name", '') AS baby_name, c."note"
+FROM "care_day" c
+JOIN "users" u ON u."id" = c."user_id"
+LEFT JOIN "baby" bb ON bb."id" = c."baby_id"
+WHERE c."family_id" = sqlc.arg(family_id)
+ORDER BY c."date" ASC, c."id" ASC
+LIMIT sqlc.arg(lim);
