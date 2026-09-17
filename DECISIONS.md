@@ -3252,3 +3252,51 @@ Designed with the owner in conversation; his answers are marked.
   upcoming-events row as the timeline puts the caretaker's face; the text
   names stay because a stack of initials cannot tell Anne from Anders.
   The month and week grids are unchanged — their cells are too small.
+
+## 2026-09-17 — what to track: per-baby switches, a carousel, a light-up
+
+The owner's partner: the app "has grown to include way too much". One set
+of thirteen switches per baby (spec
+`docs/superpowers/specs/2026-09-17-per-baby-tracking-design.md`, plan
+`docs/superpowers/plans/2026-09-17-per-baby-tracking.md`).
+
+- **Hide the entry points, keep the history** (owner: option 1 of three).
+  Off removes the button, tile, chip, card, row, reminder kind and kiosk
+  card; the timeline's All still shows what was logged, the export is
+  untouched, and the server accepts every write. A switch is a
+  preference, not a permission — the alternative turned "hide" into a
+  gate, and the codebase has spent a year removing those.
+- **Admins only** (owner). The family agrees on one app; a member sees
+  the carousel read-only.
+- **Per baby, not per family, this round** (owner). Calendar, Contacts,
+  help and keys keep no switch; the Family page's shared lists follow
+  the union of the babies' switches.
+- **The recommendation is derived, never asked.** The birth date is
+  already typed; "straight out of hospital" is a question we can answer.
+  Bands at 4 and 12 months; a barnehage child keeps diapers (she is one
+  and in them until two or three) and drops feeds; barnehage is a fact,
+  not an age, so its card carries its own tag. Pump, vaccines, baths and
+  notes are never recommended: a family knows if it needs those.
+- **A carousel with buttons, not a wizard, not one screen** (owner wanted
+  a card per feature with an illustration; the first proposal was one
+  checklist). The app's no-swipe rule is about route navigation, so the
+  strip snaps and Back / Next drive it. "Use the recommended set" on card
+  one is the 3 a.m. path.
+- **The illustration is the feature.** Mocks built from the app's own
+  components (a real `StatusCard` for feeds and diapers), not artwork:
+  thirteen animations would double the bundle and need a night version
+  each. One CSS animation per card, played once on enabling.
+- **The light-up** (owner: "almost like it lights up when enabled, and
+  dimmed when disabled"). Off is desaturated and dimmed; on returns the
+  tint, plays the mock once, pulses one ring in the category tint from
+  the toggle, and ticks the phone once. Off just dims. Reduced motion
+  keeps the crossfade and the haptic.
+- **A column, not a table.** `features text[]`, backfilled to everything:
+  no restore, backup or deletion rule to add, and a whole-set PUT is
+  idempotent for an offline replay. New babies start empty and are
+  created BEFORE the carousel, so an abandoned carousel leaves a baby
+  with nothing tracked (Home shows the door) rather than no baby.
+- **More stays while anything is on.** Ask for help lives in More and has
+  no switch, so More never disappears on its own; the whole grid gives
+  way to the nothing-tracked card when the set is empty.
+

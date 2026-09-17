@@ -118,8 +118,9 @@ the array itself.
 
 - **Home.** The 2×2 grid becomes "the enabled core buttons, then More",
   and reflows: three core plus More is today's grid; two plus More is a
-  row of three; one is a full-width button; More disappears when no
-  More-kind is on. The status cards (last feed, last diaper, the Awake /
+  row of three; one plus More is a row of two. More stays, since Ask for
+  help lives there; the whole grid gives way to the nothing-tracked card
+  when the set is empty. The status cards (last feed, last diaper, the Awake /
   Sleeping card), the feed-timer banner, the play banner, the barnehage
   banner, the handover card, the closed-day line, the illness card and
   the today chips each follow their key. Night mode's three actions
