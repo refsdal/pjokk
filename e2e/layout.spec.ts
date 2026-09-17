@@ -141,3 +141,27 @@ test("night mode keeps three actions in the bottom half, right-aligned from 768 
     }
   }
 });
+
+// The primaries reflow to the enabled switches (spec
+// 2026-09-17-per-baby-tracking-design.md): two plus More share one row on
+// the phone; from md the two stand alone. Either way, Feed and Sleep sit
+// on the same line.
+test("the primaries reflow when a switch is off", async ({ page, request }) => {
+  await freshFamily(page, request, "layout-reflow");
+  const [baby] = (await (await page.request.get("/api/babies")).json()) as { id: string }[];
+  const res = await page.request.put(`/api/babies/${baby.id}/features`, {
+    data: { features: ["feeds", "sleep", "medicine"] },
+  });
+  expect(res.ok()).toBeTruthy();
+  await page.goto("/home");
+  const feed = page.getByRole("button", { name: "Feed", exact: true });
+  const sleep = page.getByRole("button", { name: "Sleep", exact: true });
+  await expect(feed).toBeVisible();
+  await expect(sleep).toBeVisible();
+  await expect(page.getByRole("button", { name: "Diaper", exact: true })).toHaveCount(0);
+  const a = await feed.boundingBox();
+  const b = await sleep.boundingBox();
+  expect(a).not.toBeNull();
+  expect(b).not.toBeNull();
+  expect(Math.abs(a!.y - b!.y)).toBeLessThan(2);
+});
