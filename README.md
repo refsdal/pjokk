@@ -227,8 +227,8 @@ Five things to know before you rely on it:
 
 - **Restoring.** `pjokk restore --from YYYY-MM-DD` (or `--file PATH`, for a
   snapshot downloaded from the console) migrates an **empty** database and
-  loads the snapshot into it, then puts milestone photos back from the photo
-  backup. It refuses a database that already holds a family or a user, so
+  loads the snapshot into it, then puts milestone photos and the babies'
+  photos back from the photo backup. It refuses a database that already holds a family or a user, so
   point `DATABASE_URL` at a fresh one — a mistyped URL cannot mix a snapshot
   into live data. Passwords are not in backups: afterwards, set yours with
   `pjokk set-password you@example.com`, which reads the password from stdin
@@ -252,15 +252,15 @@ Five things to know before you rely on it:
 - **Kiosk devices are kept.** The `device` table holds only hashes — of the
   one-time set-up code, the device token and the PIN (an HMAC keyed from
   `AUTH_SECRET`) — so, like API keys, a restored kiosk keeps working.
-- **Milestone photos are copied, not dumped.** The snapshot holds their rows
-  (object key, size); the bytes get one copy each under
+- **Milestone photos and baby photos are copied, not dumped.** The snapshot
+  holds their rows (object key, size); the bytes get one copy each under
   `photo-backups/current/` the night after upload, and a deleted photo's copy
   moves to `photo-backups/deleted/<date>/` and is pruned after the same 30
   days. A photo counts as live only while its row exists: deleting a family
   or a baby erases their photos from the store, and any stored photo left
   with no row behind it is erased by the same nightly job, its copy taking
-  the deleted photo's 30-day path. Avatars and vaccine documents are still
-  outside the backup.
+  the deleted photo's 30-day path. A person's profile photo and vaccine
+  documents are still outside the backup.
 
 If that is not enough for you, take an ordinary `pg_dump` of the same database
 on your own schedule. The two are complementary — and under `fs` the backups

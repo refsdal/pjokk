@@ -3213,3 +3213,42 @@ his answers are marked.
 - **Not built:** a weekend plan, per-weekday opening hours, an import from
   Contacts, kiosk access (`deviceOperations` is unchanged), a heads-up
   before the expected time.
+
+## 2026-09-17 — the baby header: a fixed row of faces, and a photo of the baby
+
+Designed with the owner in conversation; his answers are marked.
+
+- **A fixed row, the selected baby a pill** (owner asked whether a fixed
+  order "becomes quite easy to switch between them"; yes). The babies
+  keep list order (creation order, what Settings → Babies shows) whichever
+  is selected: each child has a fixed spot under the thumb, the ring says
+  which is current, and switching is one tap where the picker sheet took
+  two. "Current first" was considered and rejected because the target
+  would move after every switch.
+- **The name rides in the pill** (owner: "how would we fit all info there
+  if we also have name?"). The selected baby is avatar + name + age inside
+  one 44 px pill, the others bare 44 px faces; a bare row of initials could
+  not tell an E from an O, and a caption line would push every screen
+  down. Long names truncate; a fifth baby scrolls the row.
+- **The same header on every baby screen** (owner: "make sure that it
+  stays the same no matter which page"). `BabyHeader` is one component
+  mounted by Home, Timeline, Stats and Vaccines, the account face on the
+  right included — the account sheet moved out of Home with it. Calendar
+  and Settings are family-wide and show no baby selector: a selector on a
+  screen that does not react to it would be a lie.
+- **The baby's photo is family data, so it is backed up** (owner: "I want
+  them to also be in the backup"). `baby.avatar_key` copies the user
+  avatar mechanism (same client crop, same server re-encode, same key
+  scheme) but the object lives under `baby-avatars/`, a second source
+  tree of the nightly photo backup; a restore brings it back. A person's
+  profile photo stays outside the backup — re-uploadable, and theirs, not
+  the family's. The older milestone tree keeps its bare copy keys so the
+  existing backup is untouched.
+- **Any member may set or clear the photo**, the rule UpdateBaby already
+  applies to the baby's details. Never an API key; a kiosk device may read
+  it (its care station band shows the face) and never write it.
+- **Faces on the calendar** (owner's addition): the babies an event is
+  about, then the people responsible, stacked at the right edge of an
+  upcoming-events row as the timeline puts the caretaker's face; the text
+  names stay because a stack of initials cannot tell Anne from Anders.
+  The month and week grids are unchanged — their cells are too small.
