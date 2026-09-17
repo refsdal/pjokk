@@ -167,6 +167,7 @@ type DaycareLog struct {
 	Notes             *string
 	CreatedAt         pgtype.Timestamptz
 	Mood              *string
+	ClosingAlertedAt  pgtype.Timestamptz
 }
 
 type DaycarePickupOverride struct {

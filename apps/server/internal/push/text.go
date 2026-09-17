@@ -45,6 +45,11 @@ var nb = map[string]string{
 	"Time to pump":                   "Tid for pumping",
 	"Medicine reminder":              "Påminnelse: medisin",
 
+	// The barnehage closing alert (internal/jobs/daycare_closing.go).
+	"%s is still at daycare": "%s er fortsatt i barnehagen",
+	"%s closes at %s":        "%s stenger kl. %s",
+	"%s closed at %s":        "%s stengte kl. %s",
+
 	// Buttons.
 	"Log feed":      "Logg måltid",
 	"Log diaper":    "Logg bleie",

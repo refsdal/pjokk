@@ -134,6 +134,11 @@ func runNightly(ctx context.Context, d Deps) error {
 		log.Printf("cron: purged %d old help request(s)", helpPurged)
 	}
 
+	// A one-day "X collects" is of no use a month on (daycare_place.sql).
+	if _, err := d.Q.PrunePickupOverrides(ctx, pgtype.Date{Time: now.AddDate(0, 0, -30), Valid: true}); err != nil {
+		return err
+	}
+
 	prunedRuns, err := d.Q.PruneJobRuns(ctx, pgtype.Timestamptz{Time: now.Add(-jobRunRetention), Valid: true})
 	if err != nil {
 		return err
@@ -173,6 +178,14 @@ func runFrequent(ctx context.Context, d Deps) error {
 	}
 	if calendarSent > 0 {
 		log.Printf("cron: %d calendar reminder(s) sent", calendarSent)
+	}
+
+	closing, err := jobs.RunDaycareClosingAlerts(ctx, d.Deps, now)
+	if err != nil {
+		return err
+	}
+	if closing > 0 {
+		log.Printf("cron: %d barnehage closing alert(s) sent", closing)
 	}
 
 	snoozed, err := jobs.RunSnoozes(ctx, d.Deps, now)

@@ -264,6 +264,90 @@ func (q *Queries) GetDaycarePlaceForBaby(ctx context.Context, arg GetDaycarePlac
 	return i, err
 }
 
+const isUnbannedFamilyMember = `-- name: IsUnbannedFamilyMember :one
+SELECT EXISTS (
+    SELECT 1 FROM "organization_members" om
+    JOIN "users" u ON u."id" = om."user_id"
+    WHERE om."organization_id" = $1
+      AND om."user_id" = $2 AND NOT u."banned"
+)
+`
+
+type IsUnbannedFamilyMemberParams struct {
+	FamilyID string
+	UserID   string
+}
+
+func (q *Queries) IsUnbannedFamilyMember(ctx context.Context, arg IsUnbannedFamilyMemberParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isUnbannedFamilyMember, arg.FamilyID, arg.UserID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const listDaycareClosingCandidates = `-- name: ListDaycareClosingCandidates :many
+
+SELECT d."id", d."family_id", d."baby_id", d."start_time",
+       b."name" AS baby_name, p."name" AS place_name,
+       p."close_minute", p."alert_lead_min", p."tz"
+FROM "daycare_log" d
+JOIN "baby" b ON b."id" = d."baby_id"
+JOIN "daycare_enrolment" e ON e."baby_id" = d."baby_id"
+JOIN "daycare_place" p ON p."id" = e."place_id"
+WHERE d."end_time" IS NULL
+  AND d."closing_alerted_at" IS NULL
+  AND p."close_minute" IS NOT NULL
+  AND p."alert_lead_min" IS NOT NULL
+ORDER BY d."start_time"
+`
+
+type ListDaycareClosingCandidatesRow struct {
+	ID           string
+	FamilyID     string
+	BabyID       string
+	StartTime    pgtype.Timestamptz
+	BabyName     string
+	PlaceName    string
+	CloseMinute  *int32
+	AlertLeadMin *int32
+	Tz           string
+}
+
+// The closing alert (jobs/daycare_closing.go). Like reminders.sql's sweep,
+// the first query crosses families on purpose: it is the job's worklist,
+// never reachable from a request. The rest carry their family.
+// Running days, not yet alerted, at a place that has both a closing time
+// and a lead. Whether it is time is decided in Go, in the place's zone.
+func (q *Queries) ListDaycareClosingCandidates(ctx context.Context) ([]ListDaycareClosingCandidatesRow, error) {
+	rows, err := q.db.Query(ctx, listDaycareClosingCandidates)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDaycareClosingCandidatesRow
+	for rows.Next() {
+		var i ListDaycareClosingCandidatesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FamilyID,
+			&i.BabyID,
+			&i.StartTime,
+			&i.BabyName,
+			&i.PlaceName,
+			&i.CloseMinute,
+			&i.AlertLeadMin,
+			&i.Tz,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDaycarePlaces = `-- name: ListDaycarePlaces :many
 
 SELECT "id", "name", "address", "phone", "email", "website", "notes",
@@ -316,6 +400,39 @@ func (q *Queries) ListDaycarePlaces(ctx context.Context, familyID string) ([]Lis
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listFamilyAdminUserIDs = `-- name: ListFamilyAdminUserIDs :many
+SELECT om."user_id" FROM "organization_members" om
+JOIN "users" u ON u."id" = om."user_id"
+WHERE om."organization_id" = $1 AND NOT u."banned"
+  AND EXISTS (
+    SELECT 1 FROM "organization_member_roles" omr
+    WHERE omr."member_id" = om."id" AND omr."role" IN ('admin', 'owner')
+  )
+ORDER BY om."user_id"
+`
+
+// The parents: unbanned members holding admin or owner (auth.sql's
+// CountFamilyAdmins has the same role test).
+func (q *Queries) ListFamilyAdminUserIDs(ctx context.Context, organizationID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listFamilyAdminUserIDs, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var user_id string
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -397,6 +514,74 @@ func (q *Queries) ListPickupPlan(ctx context.Context, arg ListPickupPlanParams) 
 		return nil, err
 	}
 	return items, nil
+}
+
+const markDaycareClosingAlerted = `-- name: MarkDaycareClosingAlerted :exec
+UPDATE "daycare_log" SET "closing_alerted_at" = $1
+WHERE "family_id" = $2 AND "id" = $3
+`
+
+type MarkDaycareClosingAlertedParams struct {
+	ClosingAlertedAt pgtype.Timestamptz
+	FamilyID         string
+	ID               string
+}
+
+func (q *Queries) MarkDaycareClosingAlerted(ctx context.Context, arg MarkDaycareClosingAlertedParams) error {
+	_, err := q.db.Exec(ctx, markDaycareClosingAlerted, arg.ClosingAlertedAt, arg.FamilyID, arg.ID)
+	return err
+}
+
+const plannedPickupUser = `-- name: PlannedPickupUser :one
+SELECT c."user_id"::text AS user_id FROM (
+    SELECT o."user_id", 0 AS rank
+    FROM "daycare_pickup_override" o
+    WHERE o."family_id" = $1 AND o."baby_id" = $2
+      AND o."date" = $3::date
+    UNION ALL
+    SELECT pl."user_id", 1 AS rank
+    FROM "daycare_pickup_plan" pl
+    WHERE pl."family_id" = $1 AND pl."baby_id" = $2
+      AND pl."weekday" = $4::int AND pl."user_id" IS NOT NULL
+) c
+ORDER BY c.rank
+LIMIT 1
+`
+
+type PlannedPickupUserParams struct {
+	FamilyID string
+	BabyID   string
+	Date     pgtype.Date
+	Weekday  int32
+}
+
+// Who collects this baby on this local day: the one-day exception, else
+// the grid's person for the weekday — and only while they are an unbanned
+// member of the family (issue #92's rule for calendar assignees). No row
+// means nobody is named, and the parents hear instead.
+func (q *Queries) PlannedPickupUser(ctx context.Context, arg PlannedPickupUserParams) (string, error) {
+	row := q.db.QueryRow(ctx, plannedPickupUser,
+		arg.FamilyID,
+		arg.BabyID,
+		arg.Date,
+		arg.Weekday,
+	)
+	var user_id string
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
+const prunePickupOverrides = `-- name: PrunePickupOverrides :execrows
+DELETE FROM "daycare_pickup_override" WHERE "date" < $1::date
+`
+
+// A one-day exception is of no use once the day is long gone.
+func (q *Queries) PrunePickupOverrides(ctx context.Context, before pgtype.Date) (int64, error) {
+	result, err := q.db.Exec(ctx, prunePickupOverrides, before)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateDaycarePlace = `-- name: UpdateDaycarePlace :execrows
