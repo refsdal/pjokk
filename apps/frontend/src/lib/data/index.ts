@@ -4,6 +4,7 @@ import { registerIllnessMutationDefaults } from "./illness";
 import { registerLogMutationDefaults } from "./logs";
 import { registerOtherMutationDefaults } from "./other";
 import { registerDaycareMutationDefaults } from "./daycare";
+import { registerFamilyMutationDefaults } from "./family";
 import { registerPlayMutationDefaults } from "./play";
 
 // One import site for the data layer; modules are split by domain.
@@ -38,4 +39,5 @@ export function registerMutationDefaults(qc: QueryClient) {
   registerPlayMutationDefaults(qc);
   registerDaycareMutationDefaults(qc);
   registerIllnessMutationDefaults(qc);
+  registerFamilyMutationDefaults(qc);
 }

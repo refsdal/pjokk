@@ -18,6 +18,7 @@ export type { components, operations, paths } from "./api-schema";
 type Schemas = components["schemas"];
 
 export type Baby = Schemas["Baby"];
+export type Feature = Schemas["Feature"];
 export type FeedLog = Schemas["FeedLog"];
 export type DiaperLog = Schemas["DiaperLog"];
 export type SleepLog = Schemas["SleepLog"];
@@ -124,6 +125,25 @@ export const measurementTypes = everyOf<MeasurementType>()([
   "length",
   "head",
   "temperature",
+]);
+
+// The per-baby tracking switches (spec
+// docs/superpowers/specs/2026-09-17-per-baby-tracking-design.md), in the
+// order the catalogue and every list show them.
+export const features = everyOf<Feature>()([
+  "feeds",
+  "pump",
+  "sleep",
+  "diapers",
+  "medicine",
+  "measurements",
+  "milestones",
+  "bath",
+  "notes",
+  "play",
+  "daycare",
+  "illness",
+  "vaccines",
 ]);
 
 export const illnessSymptoms = everyOf<IllnessSymptom>()([
