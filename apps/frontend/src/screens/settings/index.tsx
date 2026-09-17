@@ -8,6 +8,7 @@ import { signOut } from "@/lib/auth-client";
 import { useMe } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { legalUrl } from "@/lib/site";
+import { AboutMeCard } from "./AboutMeCard";
 import { ApiKeysSection } from "./ApiKeysSection";
 import { AppearanceSection } from "./AppearanceSection";
 import { BabiesSection } from "./BabiesSection";
@@ -88,6 +89,9 @@ export function SettingsScreen() {
 
         <SectionTitle>{t("PDF report")}</SectionTitle>
         <ReportCard />
+
+        <SectionTitle>{t("About the child, for daycare")}</SectionTitle>
+        <AboutMeCard />
 
         <SectionTitle>{t("Calendar subscription")}</SectionTitle>
         <CalendarFeedCard />
