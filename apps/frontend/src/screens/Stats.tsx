@@ -34,7 +34,8 @@ import {
 } from "@/lib/growth";
 import { measurementMeta } from "@/lib/measurements";
 import { t } from "@/lib/i18n";
-import { lastNight, napLine } from "@/lib/stats-ui";
+import { daycareMeta } from "@/lib/daycare-ui";
+import { dayGroupLine, lastNight, napLine } from "@/lib/stats-ui";
 import {
   KG_PER_LB,
   formatMeasurementIn,
@@ -227,8 +228,12 @@ export function StatsScreen() {
           : weekdayFmt.format(date).replace(".", ""),
       night: Math.round((d.nightSleepMin / 60) * 10) / 10,
       day: Math.round(((d.sleepMin - d.nightSleepMin) / 60) * 10) / 10,
+      // `?? false`: absent from a snapshot cached before the field existed.
+      daycare: d.daycare ?? false,
     };
   });
+  const anyDaycare = chartData.some((d) => d.daycare);
+  const split = s?.daycareSplit ?? null;
   const night = s ? lastNight(s.nights) : null;
   // "3.2 bottle · 1.5 breast" — only the types with any feeds at all.
   const feedTypes = s
@@ -400,7 +405,69 @@ export function StatsScreen() {
               </BarChart>
             </ResponsiveContainer>
           </div>
+          {anyDaycare && (
+            // Barnehage days (issue #111), marked under their bars. An HTML
+            // row rather than a chart series: the chart has no margins and
+            // no Y axis, so n equal cells sit exactly under n bands.
+            <>
+              <div
+                className="flex pt-1"
+                aria-hidden
+                data-testid="daycare-marks"
+              >
+                {chartData.map((d, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: one cell per day, in order
+                  <span key={i} className="flex flex-1 justify-center">
+                    <span
+                      className={cn(
+                        "h-1.5 w-1.5 rounded-full",
+                        d.daycare ? "bg-accent" : "bg-transparent",
+                      )}
+                    />
+                  </span>
+                ))}
+              </div>
+              <p className="pt-2 text-xs text-muted">
+                <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-accent align-middle" />
+                {t("at daycare that day")}
+              </p>
+            </>
+          )}
         </Card>
+
+        {split && (
+          // Is the barnehage rhythm costing sleep? (issue #111) One card,
+          // two lines, only once the window holds both kinds of day.
+          <Card className="flex items-start gap-3" data-testid="daycare-split">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-2 text-accent">
+              <daycareMeta.icon className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <p className="text-xs font-semibold tracking-wide text-muted uppercase">
+                {t("Daycare days and home days")}
+              </p>
+              {(
+                [
+                  ["Daycare days", split.daycare],
+                  ["Home days", split.home],
+                ] as const
+              ).map(([label, g]) => (
+                <p key={label} className="text-sm text-ink">
+                  <span className="font-bold">
+                    {t(label)} ({g.days})
+                  </span>
+                  <span className="block text-ink-soft">
+                    {dayGroupLine(g, sleepFmt, {
+                      nap: t("nap"),
+                      bed: t("bed"),
+                      night: t("night"),
+                    })}
+                  </span>
+                </p>
+              ))}
+            </div>
+          </Card>
+        )}
 
         <button
           type="button"

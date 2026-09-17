@@ -1,4 +1,4 @@
-import type { StatsNight } from "@pjokk/shared";
+import type { Stats, StatsNight } from "@pjokk/shared";
 
 // The Stats screen's night arithmetic (issue #50), kept pure for the unit
 // test. The server already decided which night each session belongs to;
@@ -57,4 +57,31 @@ export function napLine(
 ): string | null {
   if (avgNapMin <= 0 || avgNaps <= 0) return null;
   return `${labels.nap} ${fmt(avgNapMin)} · ${avgNaps} ${labels.naps}`;
+}
+
+// Barnehage days against home days (issue #111). The server averaged; this
+// only words it. A figure the group has no data for is left out of its line
+// rather than shown as a zero.
+export type DayGroup = NonNullable<Stats["daycareSplit"]>["daycare"];
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+export const clockOfMinutes = (min: number): string =>
+  `${pad2(Math.floor(min / 60) % 24)}:${pad2(min % 60)}`;
+
+export function dayGroupLine(
+  g: DayGroup,
+  fmt: (min: number) => string,
+  labels: { nap: string; bed: string; night: string },
+): string {
+  return [
+    `${labels.nap} ${fmt(g.avgNapMin)}`,
+    g.avgBedtimeMin == null
+      ? null
+      : `${labels.bed} ${clockOfMinutes(g.avgBedtimeMin)}`,
+    g.avgNightSleepMin == null
+      ? null
+      : `${labels.night} ${fmt(g.avgNightSleepMin)}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }

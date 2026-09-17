@@ -10,7 +10,7 @@ import { client, unwrap } from "./api";
 import { ageInMonths, formatPercentile, growthPercentile } from "./growth";
 import { t } from "./i18n";
 import { isFever, measurementMeta } from "./measurements";
-import { lastNight } from "./stats-ui";
+import { dayGroupLine, lastNight } from "./stats-ui";
 import { formatClock, formatDay } from "./time";
 import { formatMeasurementIn, formatVolume, type Units } from "./units";
 import { buildSchedule } from "./vaccine-programme";
@@ -167,6 +167,23 @@ export async function buildReport(opts: {
         `${stats.avgFeeds} (${fbt.bottle} ${t("bottle")} · ${fbt.breast} ${t("breast")} · ${fbt.solids} ${t("solids")})`,
       ],
       [t("Diapers"), String(stats.avgDiapers)],
+      // Barnehage days against home days (issue #111), only when the
+      // window holds both kinds.
+      ...(stats.daycareSplit
+        ? (
+            [
+              ["Daycare days", stats.daycareSplit.daycare],
+              ["Home days", stats.daycareSplit.home],
+            ] as const
+          ).map(([label, g]) => [
+            `${t(label)} (${g.days})`,
+            dayGroupLine(g, minutes, {
+              nap: t("nap"),
+              bed: t("bed"),
+              night: t("night"),
+            }),
+          ])
+        : []),
     ],
   );
 
