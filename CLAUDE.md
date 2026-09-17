@@ -358,6 +358,13 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   then "In the nap window", then "Past the usual nap window"). A guide,
   never a prediction; it shows nothing without a birth date, past 12 months,
   or when the last wake is over 12 h old; per-device switch in Settings.
+  Past 12 months the table stops because its source does (#112: no
+  clinical source gives toddler wake windows), so a family can set its own
+  **usual nap** time per baby (`baby_about.usual_nap_minute`, minutes after
+  local midnight, on the summary as `usualNapMinute`). When set, the card
+  says "Usual nap 11:30" / "Usual nap was 11:30" INSTEAD of a window, at
+  any age and on weekends too; `lib/nap-window.ts` `usualNap` goes quiet
+  once a sleep has begun around or after the time, or three hours on.
 - **Log sheets (vaul):** type chips → prefilled stepper/fields → time chips
   (Now / 15 m ago / Pick time) → full-width Save at the very bottom. The SAME
   component handles create and edit.

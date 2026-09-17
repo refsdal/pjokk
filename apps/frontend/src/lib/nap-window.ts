@@ -77,6 +77,57 @@ export function describeNapWindow(w: NapWindow): string {
   }
 }
 
+// --- The family's own anchor (issue #112) --------------------------------
+//
+// Past twelve months the cited table stops, because its source does, and no
+// clinical source gives wake windows for toddlers (issue #112 has the
+// search). It is also the age at which a barnehage's fixed midday nap, not
+// a wake window, sets the rhythm. So a family can give the card its own
+// number — "she naps at 11:30" — and when they have, the card says that
+// instead of computing anything, at any age, weekends included, which is
+// what keeps a Saturday in step with the barnehage's week.
+
+export type UsualNap = { state: "upcoming" | "was"; at: Date };
+
+// How long after the usual time the card keeps saying so. Past this the
+// nap either happened unlogged or is not happening, and the line is noise.
+const USUAL_NAP_LINGER_MS = 3 * 3600_000;
+// A sleep that began this close before the usual time IS that nap.
+const USUAL_NAP_EARLY_MS = 90 * 60_000;
+
+/** The usual-nap line's state, or null when there is nothing to say: no
+ *  anchor, the nap has been had (a sleep began around or after it today),
+ *  or the time is long past. */
+export function usualNap({
+  minute,
+  lastSleepStart,
+  now = new Date(),
+}: {
+  minute: number | null | undefined;
+  lastSleepStart: Date | null | undefined;
+  now?: Date;
+}): UsualNap | null {
+  if (minute == null) return null;
+  const at = new Date(now);
+  at.setHours(0, minute, 0, 0);
+  if (
+    lastSleepStart &&
+    lastSleepStart.getTime() >= at.getTime() - USUAL_NAP_EARLY_MS &&
+    lastSleepStart.getTime() <= now.getTime()
+  ) {
+    return null;
+  }
+  if (now.getTime() < at.getTime()) return { state: "upcoming", at };
+  if (now.getTime() - at.getTime() > USUAL_NAP_LINGER_MS) return null;
+  return { state: "was", at };
+}
+
+export function describeUsualNap(n: UsualNap): string {
+  return n.state === "upcoming"
+    ? `${t("Usual nap")} ${formatClock(n.at)}`
+    : `${t("Usual nap was")} ${formatClock(n.at)}`;
+}
+
 // --- Device preference: the guide can be switched off -------------------
 // Per device, like night mode and the theme: a nursery tablet and a phone
 // may legitimately differ, and it is a display choice, not family data.

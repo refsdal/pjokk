@@ -69,7 +69,13 @@ import {
 import { predatesDropOff } from "@/lib/daycare-ui";
 import { appetiteWord, type FeedAppetite } from "@/lib/log-detail";
 import { t } from "@/lib/i18n";
-import { describeNapWindow, napWindow, useNapGuide } from "@/lib/nap-window";
+import {
+  describeNapWindow,
+  describeUsualNap,
+  napWindow,
+  useNapGuide,
+  usualNap,
+} from "@/lib/nap-window";
 import { useResumableSleep } from "@/lib/sleep-resume";
 import { napsLine, sleepNoun } from "@/lib/sleep-ui";
 import { useSelectedBaby } from "@/lib/selected-baby";
@@ -301,6 +307,22 @@ export function HomeScreen() {
           wakeAt: new Date(s.lastSleep.endTime),
         })
       : null;
+  // The family's own anchor wins over the age table (issue #112): it is
+  // their number, and past twelve months it is the only one there is.
+  const usual = napGuide
+    ? usualNap({
+        minute: s?.usualNapMinute,
+        lastSleepStart: s?.lastSleep ? new Date(s.lastSleep.startTime) : null,
+      })
+    : null;
+  const napNote =
+    s?.usualNapMinute != null
+      ? usual
+        ? describeUsualNap(usual)
+        : undefined
+      : nap
+        ? describeNapWindow(nap)
+        : undefined;
   const openHelp = s?.openHelp ?? null;
   const tempStatus = temperatureStatus(
     s?.lastTemperature?.value ?? 0,
@@ -482,7 +504,7 @@ export function HomeScreen() {
                   // Absent from a snapshot cached before the field existed.
                   s.lastNightLongestMin ?? null,
                 )}
-                note={nap ? describeNapWindow(nap) : undefined}
+                note={napNote}
                 tintClass="text-sleep"
                 onClick={() => setSheet("sleep")}
                 action={
