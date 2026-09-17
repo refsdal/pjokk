@@ -8,7 +8,7 @@ import {
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import type { VaccineLog } from "@pjokk/shared";
-import { BabySwitcher } from "@/components/BabySwitcher";
+import { BabyHeader } from "@/components/BabyHeader";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { VaccineSheet } from "@/components/sheets/VaccineSheet";
 import { Button } from "@/components/ui/button";
@@ -65,7 +65,8 @@ export function VaccinesScreen() {
 
   return (
     <div className="mx-auto max-w-md px-4 pt-safe md:max-w-lg md:px-6">
-      <div className="flex items-center gap-2 py-4">
+      <BabyHeader />
+      <div className="flex items-center gap-2 pt-1 pb-3">
         <button
           type="button"
           aria-label={t("Back")}
@@ -77,7 +78,6 @@ export function VaccinesScreen() {
         <h1 className="flex-1 text-2xl font-extrabold text-ink">
           {t("Vaccines")}
         </h1>
-        <BabySwitcher compact />
       </div>
 
       <div className="space-y-4 pb-tabbar">

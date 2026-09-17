@@ -1,7 +1,7 @@
 import { IconSearch } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import type { TimelineFilter } from "@pjokk/shared";
-import { BabySwitcher } from "@/components/BabySwitcher";
+import { BabyHeader } from "@/components/BabyHeader";
 import { ChipGroup } from "@/components/Chips";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { TimelineList } from "@/components/TimelineList";
@@ -35,7 +35,8 @@ export function TimelineScreen() {
 
   return (
     <div className="mx-auto max-w-md px-4 pt-safe md:max-w-2xl md:px-6">
-      <div className="flex items-center justify-between gap-2 py-4">
+      <BabyHeader />
+      <div className="flex items-center justify-between gap-2 pt-1 pb-3">
         <h1 className="text-2xl font-extrabold text-ink">{t("Timeline")}</h1>
         <div className="flex items-center gap-2">
           <button
@@ -56,7 +57,6 @@ export function TimelineScreen() {
           >
             <IconSearch className="h-5 w-5" />
           </button>
-          <BabySwitcher compact />
         </div>
       </div>
       {searchOpen && (

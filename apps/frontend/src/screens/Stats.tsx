@@ -21,7 +21,7 @@ import { ErrorState } from "@/components/QueryStates";
 import { ChipGroup } from "@/components/Chips";
 import { Card } from "@/components/ui/card";
 import { OtherLogSheet } from "@/components/sheets/OtherLogSheet";
-import { BabySwitcher } from "@/components/BabySwitcher";
+import { BabyHeader } from "@/components/BabyHeader";
 import { useMeasurements, useStats } from "@/lib/data";
 import { useSelectedBaby } from "@/lib/selected-baby";
 import {
@@ -277,9 +277,9 @@ export function StatsScreen() {
 
   return (
     <div className="mx-auto max-w-md px-4 pt-safe md:max-w-3xl md:px-6">
-      <div className="flex items-center justify-between gap-2 pt-4 pb-2">
+      <BabyHeader />
+      <div className="flex items-center justify-between gap-2 pt-1 pb-2">
         <h1 className="text-2xl font-extrabold text-ink">{t("Stats")}</h1>
-        <BabySwitcher compact />
       </div>
       {/* Own row: sharing the title line made the chips wrap on narrow
           phones. */}

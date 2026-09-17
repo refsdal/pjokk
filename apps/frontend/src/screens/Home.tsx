@@ -22,8 +22,7 @@ import {
   ActivePumpBanner,
   ActiveSleepBanner,
 } from "@/components/ActiveSessionBanner";
-import { Avatar } from "@/components/Avatar";
-import { BabySwitcher } from "@/components/BabySwitcher";
+import { BabyHeader } from "@/components/BabyHeader";
 import { HelpCard } from "@/components/HelpCard";
 import { InstallBanner } from "@/components/InstallBanner";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
@@ -39,7 +38,6 @@ import { TemperatureSparkline } from "@/components/TemperatureSparkline";
 import { useMeasurements } from "@/lib/data/other";
 import type { TemperatureStatus, TemperatureTrend } from "@/lib/measurements";
 import { Button } from "@/components/ui/button";
-import { AccountSheet } from "@/components/sheets/AccountSheet";
 import { DiaperSheet } from "@/components/sheets/DiaperSheet";
 import { FeedSheet } from "@/components/sheets/FeedSheet";
 import { HelpSheet } from "@/components/sheets/HelpSheet";
@@ -60,7 +58,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   prefetchOtherLists,
   useFeeds,
-  useMe,
   useResumeSleep,
   useSummary,
   useWakeSleep,
@@ -82,7 +79,7 @@ import { useSelectedBaby } from "@/lib/selected-baby";
 import { formatDuration, formatElapsed } from "@/lib/time";
 import { useAppearance } from "@/lib/appearance";
 import { useHotkeys } from "@/lib/hotkeys";
-import { cn, focusRing } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import {
   formatMeasurementIn,
   formatVolume,
@@ -113,7 +110,6 @@ type OpenSheet =
   | "handover"
   | "illness"
   | "help"
-  | "account"
   | null;
 
 function feedDetail(
@@ -161,7 +157,6 @@ const TREND_LABEL: Record<TemperatureTrend, string> = {
 };
 
 export function HomeScreen() {
-  const me = useMe();
   const units = useUnits();
   const { babies, baby } = useSelectedBaby();
   const summary = useSummary(baby?.id);
@@ -360,22 +355,7 @@ export function HomeScreen() {
     // right acts", spec §4). xl: a third pane, Recent, in the middle.
     <div className="mx-auto max-w-md px-4 pt-safe md:grid md:max-w-none md:grid-cols-[minmax(0,1fr)_minmax(320px,440px)] md:items-start md:gap-6 md:px-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_440px] xl:px-8">
       <div className="min-w-0">
-        {/* Baby header */}
-        <header className="flex items-center justify-between py-4">
-          <BabySwitcher />
-          <button
-            type="button"
-            aria-label={t("Account")}
-            onClick={() => setSheet("account")}
-            className={cn("rounded-full active:scale-95", focusRing)}
-          >
-            <Avatar
-              src={me.data?.avatarUrl}
-              name={me.data?.displayName ?? "?"}
-              size={11}
-            />
-          </button>
-        </header>
+        <BabyHeader />
 
         <div className="space-y-3">
           {/* Below the baby header, above everything else: a call for help is
@@ -658,10 +638,6 @@ export function HomeScreen() {
       <HelpSheet
         open={sheet === "help"}
         onOpenChange={(o) => setSheet(o ? "help" : null)}
-      />
-      <AccountSheet
-        open={sheet === "account"}
-        onOpenChange={(o) => setSheet(o ? "account" : null)}
       />
 
       {/* Day-mode Home only: night mode is three actions and nothing else. */}

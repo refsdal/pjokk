@@ -345,6 +345,7 @@ export function EventSheet({
               options={(babies.data ?? []).map((b) => ({
                 value: b.id,
                 label: b.name,
+                leading: <Avatar src={b.avatarUrl} name={b.name} size={5} />,
               }))}
               values={babyIds}
               onToggle={(id) =>
