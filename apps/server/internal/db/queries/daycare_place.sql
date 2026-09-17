@@ -92,3 +92,70 @@ WHERE "daycare_pickup_override"."family_id" = EXCLUDED."family_id";
 -- name: DeletePickupOverride :exec
 DELETE FROM "daycare_pickup_override"
 WHERE "family_id" = $1 AND "baby_id" = $2 AND "date" = $3;
+
+-- The closing alert (jobs/daycare_closing.go). Like reminders.sql's sweep,
+-- the first query crosses families on purpose: it is the job's worklist,
+-- never reachable from a request. The rest carry their family.
+
+-- name: ListDaycareClosingCandidates :many
+-- Running days, not yet alerted, at a place that has both a closing time
+-- and a lead. Whether it is time is decided in Go, in the place's zone.
+SELECT d."id", d."family_id", d."baby_id", d."start_time",
+       b."name" AS baby_name, p."name" AS place_name,
+       p."close_minute", p."alert_lead_min", p."tz"
+FROM "daycare_log" d
+JOIN "baby" b ON b."id" = d."baby_id"
+JOIN "daycare_enrolment" e ON e."baby_id" = d."baby_id"
+JOIN "daycare_place" p ON p."id" = e."place_id"
+WHERE d."end_time" IS NULL
+  AND d."closing_alerted_at" IS NULL
+  AND p."close_minute" IS NOT NULL
+  AND p."alert_lead_min" IS NOT NULL
+ORDER BY d."start_time";
+
+-- name: MarkDaycareClosingAlerted :exec
+UPDATE "daycare_log" SET "closing_alerted_at" = $1
+WHERE "family_id" = $2 AND "id" = $3;
+
+-- name: PlannedPickupUser :one
+-- Who collects this baby on this local day: the one-day exception, else
+-- the grid's person for the weekday. No row means nobody is named. The job
+-- then checks the person is still an unbanned member (IsUnbannedFamilyMember,
+-- issue #92's rule for calendar assignees); otherwise the parents hear.
+SELECT c."user_id"::text AS user_id FROM (
+    SELECT o."user_id", 0 AS rank
+    FROM "daycare_pickup_override" o
+    WHERE o."family_id" = sqlc.arg(family_id) AND o."baby_id" = sqlc.arg(baby_id)
+      AND o."date" = sqlc.arg(date)::date
+    UNION ALL
+    SELECT pl."user_id", 1 AS rank
+    FROM "daycare_pickup_plan" pl
+    WHERE pl."family_id" = sqlc.arg(family_id) AND pl."baby_id" = sqlc.arg(baby_id)
+      AND pl."weekday" = sqlc.arg(weekday)::int AND pl."user_id" IS NOT NULL
+) c
+ORDER BY c.rank
+LIMIT 1;
+
+-- name: IsUnbannedFamilyMember :one
+SELECT EXISTS (
+    SELECT 1 FROM "organization_members" om
+    JOIN "users" u ON u."id" = om."user_id"
+    WHERE om."organization_id" = sqlc.arg(family_id)
+      AND om."user_id" = sqlc.arg(user_id) AND NOT u."banned"
+);
+
+-- name: ListFamilyAdminUserIDs :many
+-- The parents: unbanned members holding admin or owner (auth.sql's
+-- CountFamilyAdmins has the same role test).
+SELECT om."user_id" FROM "organization_members" om
+JOIN "users" u ON u."id" = om."user_id"
+WHERE om."organization_id" = $1 AND NOT u."banned"
+  AND EXISTS (
+    SELECT 1 FROM "organization_member_roles" omr
+    WHERE omr."member_id" = om."id" AND omr."role" IN ('admin', 'owner')
+  )
+ORDER BY om."user_id";
+
+-- name: PrunePickupOverrides :execrows
+-- A one-day exception is of no use once the day is long gone.
+DELETE FROM "daycare_pickup_override" WHERE "date" < sqlc.arg(before)::date;
