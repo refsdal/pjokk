@@ -394,12 +394,20 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   WHO P3/P50/P97 curves. WHO growth reference data ships as bundled static
   JSON (`data/who-*-for-age-lms.json`, weight, length and head, 0–60 months,
   each cited in the file; no API).
-- **Settings:** iOS-style grouped rows. Family (Babies, Caretakers, Invite
-  link w/ QR), Preferences (Notifications, Units, Night mode schedule), Data
-  (Export CSV, API access, and a **Calendar subscription** link — #52 —
+- **Settings:** a hub, not a list — three scopes, three places. **Family**
+  (`/settings/family`): caretakers + invite link w/ QR and devices inline,
+  then one row per shared section, each its own page at
+  `/settings/family/$section` (contacts, medicines, sleep locations,
+  sick-child days, API keys, the **Calendar subscription** link — #52,
   which mints a read-only `pjk_` key into `/api/calendar.ics?key=…`; the
   route lifts the query key into the Authorization header and then runs
-  the ordinary key middleware, so the URL is a credential like any key).
+  the ordinary key middleware, so the URL is a credential like any key —
+  and Export CSV). `lib/settings-nav.ts` is the ONE list behind both the
+  rows and the route, admin-only flag included. **One page per baby**
+  (`/settings/baby/$babyId`): details, usual nap, "About <name>", the
+  medicine sheet, the PDF report — these take the baby from the URL and
+  never from Home's selection. **You** is `/profile` (below); the hub only
+  points at it. iOS-style grouped rows throughout.
 - **Calendar recurrence (#52):** `calendar_event.recurrence`
   (none|daily|weekly|biweekly|weekdays|monthly|yearly) + `recurrence_until`
   (`weekdays` is Monday to Friday, #125: the pick-up rota, offered as a
@@ -426,15 +434,17 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
 - **Profile (`/profile`):** the person, not the family — full name,
   nickname (shown instead of the name everywhere, via the users
   `display_name` generated column), phone (private), photo, display
-  units. Reached from the account sheet and Settings → Account. Global
-  across families.
-- **PDF report (Settings → Data, #53):** the last 7 or 30 days for the
+  units; then everything that is the person's or this device's:
+  notifications and reminders, theme, language, night mode schedule, the
+  nap-window switch, install, the admin console link, sign out. Reached
+  from the account sheet and Settings → You. Global across families.
+- **PDF report (Settings → <baby>, #53):** the last 7 or 30 days for the
   selected baby — averages, day by day, latest growth with WHO
   percentiles, temperatures with the fever flag, medicines, the vaccine
   schedule — built in the browser with jsPDF (lazy-loaded; `lib/report.ts`)
   from the same API reads the screens use. Never server-side. Tables, no
   charts. File name `pjokk-<baby>-<from>-<to>.pdf`.
-- **"About <name>" (Settings → Data, #109, spec
+- **"About <name>" (Settings → <baby>, #109, spec
   `docs/superpowers/specs/2026-09-17-about-me-page-design.md`):** the one
   page a barnehage asks for before tilvenning — routines read off the last
   two weeks of logs (`lib/about-me.ts`: medians rounded to five minutes, at
@@ -443,7 +453,7 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   any section can be left out, and one list feeds both it and the PDF
   (jsPDF, lazy, in the browser like the report). File name
   `pjokk-<baby>-about.pdf`.
-- **Medicine sheet for the barnehage (Settings → Medicines, #113):** one
+- **Medicine sheet for the barnehage (Settings → <baby>, #113):** one
   page per baby from the family's OWN catalogue entries, with blank lines
   for when / how / from–until and a signature (`lib/medicine-sheet.ts`,
   jsPDF in the browser). No dosing data of the app's own and no consent
