@@ -6364,11 +6364,17 @@ components:
       additionalProperties: true
     StatsDay:
       type: object
-      required: [date, sleepMin, nightSleepMin, intakeMl, feeds, feedsByType, diapers]
+      required: [date, daycare, sleepMin, nightSleepMin, intakeMl, feeds, feedsByType, diapers]
       properties:
         date:
           type: string
           description: YYYY-MM-DD in the requester's local time.
+        daycare:
+          type: boolean
+          description: >-
+            A barnehage session STARTED on this local day (issue #111). The
+            Stats chart marks these days; `daycareSplit` averages them
+            against the rest.
         sleepMin:
           type: integer
           format: int32
@@ -6387,6 +6393,42 @@ components:
         diapers:
           type: integer
           format: int32
+    StatsDayGroup:
+      type: object
+      description: >-
+        Sleep averaged over one kind of day (issue #111). `avgNapMin` is
+        the mean daytime sleep per day, a nap counted whole against the day
+        it started, no-nap days included. The two night figures belong to
+        the night that FOLLOWED the day, and are null when no such night was
+        logged in the group.
+      required: [days, avgNapMin, avgNightSleepMin, avgBedtimeMin]
+      properties:
+        days:
+          type: integer
+          format: int32
+        avgNapMin:
+          type: integer
+          format: int32
+        avgNightSleepMin:
+          type: integer
+          format: int32
+          nullable: true
+        avgBedtimeMin:
+          type: integer
+          format: int32
+          nullable: true
+          description: >-
+            Minutes after local midnight (0–1439) of the night's first
+            session, averaged on the evening's own line so 23:50 and 00:10
+            meet at midnight, not noon.
+    StatsDaycareSplit:
+      type: object
+      required: [daycare, home]
+      properties:
+        daycare:
+          $ref: "#/components/schemas/StatsDayGroup"
+        home:
+          $ref: "#/components/schemas/StatsDayGroup"
     StatsWeight:
       type: object
       required: [value, time, prevValue, prevTime]
@@ -6457,7 +6499,18 @@ components:
         - avgFeedsByType
         - avgDiapers
         - weight
+        - daycareSplit
       properties:
+        daycareSplit:
+          description: >-
+            Barnehage days against home days (issue #111): is the single
+            midday nap pushing bedtime, are nights worse after barnehage?
+            Completed days only — today is left out of both groups — and
+            null unless the window holds at least two days of each kind: one
+            day is an anecdote.
+          allOf:
+            - $ref: "#/components/schemas/StatsDaycareSplit"
+          nullable: true
         days:
           type: array
           items:

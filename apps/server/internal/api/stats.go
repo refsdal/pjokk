@@ -97,6 +97,10 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 	if err != nil {
 		return nil, err
 	}
+	dropOffs, err := d.Q.DaycareStartsInRange(ctx, dbgen.DaycareStartsInRangeParams{FamilyID: fam.FamilyID, BabyID: babyID, FromTs: fromTS, ToTs: toTS})
+	if err != nil {
+		return nil, err
+	}
 	// TS: `fam.measurement.list({ babyId: q.babyId, limit: 100 })` — the
 	// weight computed below reads only the first two type==="weight" rows
 	// out of this newest-first-100 list, matching TS exactly (ListMeasurements
@@ -117,6 +121,12 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 		solids       int32
 		diapers      int32
 	}
+	// A local day is a barnehage day if she was dropped off on it.
+	daycareDays := make(map[int64]bool, len(dropOffs))
+	for _, at := range dropOffs {
+		daycareDays[dayIndex(at.Time.UnixMilli())] = true
+	}
+
 	buckets := make(map[int64]*bucket, days)
 	for i := startIdx; i <= todayIdx; i++ {
 		buckets[i] = &bucket{}
@@ -154,6 +164,10 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 	type night struct {
 		longestMs int64
 		sessions  int32
+		// For the barnehage split (stats_daycare.go): the night's total
+		// sleep, and when its first session began.
+		totalMs      int64
+		firstStartMs int64
 	}
 	nights := make(map[int64]*night, days+1)
 	for i := startIdx - 1; i <= todayIdx; i++ {
@@ -170,6 +184,8 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 	// running sessions (no length yet) are both skipped.
 	var napMs int64
 	var napCount int64
+	// The same naps, per day they started on, for the barnehage split.
+	napMsByDay := make(map[int64]int64, days)
 
 	// TS lines 76-89: split each session across the local midnights it
 	// crosses. Active sessions (EndTime not Valid) count up to now.
@@ -179,6 +195,7 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 			if start := sl.StartTime.Time.UnixMilli(); start >= rangeFrom {
 				napMs += sl.EndTime.Time.UnixMilli() - start
 				napCount++
+				napMsByDay[dayIndex(start)] += sl.EndTime.Time.UnixMilli() - start
 			}
 		}
 		if isNight {
@@ -190,6 +207,10 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 				n.sessions++
 				if d := end - sl.StartTime.Time.UnixMilli(); d > n.longestMs {
 					n.longestMs = d
+				}
+				n.totalMs += end - sl.StartTime.Time.UnixMilli()
+				if start := sl.StartTime.Time.UnixMilli(); n.sessions == 1 || start < n.firstStartMs {
+					n.firstStartMs = start
 				}
 			}
 		}
@@ -251,6 +272,7 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 		date := time.UnixMilli(i * summaryDayMs).UTC().Format("2006-01-02")
 		statsDays = append(statsDays, gen.StatsDay{
 			Date:          date,
+			Daycare:       daycareDays[i],
 			SleepMin:      sleepMin,
 			NightSleepMin: nightMin,
 			IntakeMl:      b.intakeMl,
@@ -311,7 +333,21 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 		weight = &w
 	}
 
+	// Barnehage days against home days (issue #111, stats_daycare.go).
+	// Completed days only: today's nap and tonight's night are not over.
+	completed := make([]daySleep, 0, days)
+	for i := startIdx; i < todayIdx; i++ {
+		ds := daySleep{daycare: daycareDays[i], napMs: napMsByDay[i]}
+		if n := nights[i]; n.sessions > 0 {
+			ds.hasNight = true
+			ds.nightMs = n.totalMs
+			ds.bedtimeMs = n.firstStartMs - (i*summaryDayMs + tzMs)
+		}
+		completed = append(completed, ds)
+	}
+
 	return gen.GetStats200JSONResponse{
+		DaycareSplit:     daycareSplit(completed),
 		Days:             statsDays,
 		Nights:           statsNights,
 		AvgSleepMin:      avgSleepMin,
