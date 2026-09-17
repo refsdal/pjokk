@@ -127,7 +127,7 @@ test("adds a photo to a milestone from the sheet, sees it on the timeline, delet
   await settle(page);
   await page.screenshot({ path: shot("2-timeline-thumbnail.png") });
 
-  await page.goto("/settings");
+  await page.goto("/settings/family/data");
   await expect(page.getByText(/^Photos: .* MB of 500 MB$/)).toBeVisible({ timeout: 10_000 });
   await settle(page);
   await page

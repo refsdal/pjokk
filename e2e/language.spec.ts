@@ -27,7 +27,7 @@ test("a language picked on one device follows the person to another", async ({
     })
     .toBe("auto/en");
 
-  await page.goto("/settings");
+  await page.goto("/profile");
   await page.getByRole("button", { name: "Norsk", exact: true }).click();
   await expect(page.getByText("Språk", { exact: true })).toBeVisible();
   await expect
@@ -49,7 +49,7 @@ test("a language picked on one device follows the person to another", async ({
   ).toBeVisible({ timeout: 10_000 });
 
   // Back to Auto there: stored for the person, and resolved on the device.
-  await phone.goto("/settings");
+  await phone.goto("/profile");
   await phone.getByRole("button", { name: "Auto", exact: true }).first().click();
   await expect
     .poll(async () => {

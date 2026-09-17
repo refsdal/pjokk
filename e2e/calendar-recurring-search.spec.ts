@@ -74,15 +74,14 @@ test("a weekly event repeats in the calendar and the ICS feed", async ({
   // context here carries the session.)
 
   // Settings mints the link and shows it once.
-  await page.goto("/settings");
+  await page.goto("/settings/family/calendar-feed");
   await page.getByRole("button", { name: "Create calendar link" }).click();
   const link = page.getByText(/\/api\/calendar\.ics\?key=pjk_/);
   await expect(link).toBeVisible({ timeout: 10_000 });
   await link.scrollIntoViewIfNeeded();
   await settle(page);
-  await page
-    .getByText("Calendar subscription", { exact: true })
-    .locator("xpath=following-sibling::*[1]")
+  await link
+    .locator("xpath=ancestor::div[contains(@class,'rounded-xl2')][1]")
     .screenshot({ path: shot("3-settings-calendar-link.png") });
 });
 

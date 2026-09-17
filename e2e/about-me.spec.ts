@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { expect, test } from "./fixtures";
-import { freshFamily } from "./helpers";
+import { freshFamily, openBabySettings } from "./helpers";
 
 // "About <name>" for the barnehage (issue #109): routines read off the
 // logs, four lines only the family knows, any section left out before the
@@ -42,7 +42,7 @@ test("the page previews what the logs know, takes what they cannot, and download
   });
   expect(egg.status()).toBe(201);
 
-  await page.goto("/settings");
+  await openBabySettings(page);
   const card = page.getByTestId("about-me");
   await card.scrollIntoViewIfNeeded();
   await expect(card.getByText("Usually wakes:")).toBeVisible({ timeout: 10_000 });

@@ -18,7 +18,7 @@ test("an admin adds a device; the tablet enrols and logs as a caretaker", async 
   const named = await page.request.patch("/api/me", { data: { name: "Anne Admin" } });
   expect(named.ok(), `name the admin: ${named.status()}`).toBeTruthy();
 
-  await page.goto("/settings");
+  await page.goto("/settings/family");
   await page.getByRole("button", { name: "Add device" }).click();
   await page.getByRole("button", { name: "Create device" }).click();
   const codeText = page.getByTestId("device-code");
@@ -45,7 +45,7 @@ test("an admin adds a device; the tablet enrols and logs as a caretaker", async 
   // The admin's own timeline credits the tablet's entry to its caretaker.
   await page.goto("/timeline");
   await expect(page.getByText(/by Anne Admin/).first()).toBeVisible({ timeout: 10_000 });
-  await page.goto("/settings");
+  await page.goto("/settings/family");
   await expect(page.getByText(/Set up .* · Last used/)).toBeVisible();
 
   // Leaving with the PIN un-enrols the tablet.
@@ -65,7 +65,7 @@ test("revoking a device in Settings drops the tablet to sign-in", async ({ page,
   await redeemKioskCode(tablet.page, code);
   await expect(tablet.page.getByTestId("kiosk-clock")).toBeVisible();
 
-  await page.goto("/settings");
+  await page.goto("/settings/family");
   await page.getByRole("button", { name: /Nursery tablet/ }).click();
   const sheet = page.getByRole("dialog");
   await sheet.getByRole("button", { name: "Revoke" }).click();

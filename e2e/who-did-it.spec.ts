@@ -25,7 +25,7 @@ test("a diaper logged for a partner shows the partner on the timeline", async ({
 
   // The partner joins via an invite, exactly as invite.spec.ts does, and
   // gets a name so the chips and the timeline have a word to show.
-  await page.goto("/settings");
+  await page.goto("/settings/family");
   await page.getByRole("button", { name: "New invite link" }).click();
   const link = await page.getByText(/\/join\//).first().textContent();
   const code = link!.trim().split("/join/")[1]?.trim();

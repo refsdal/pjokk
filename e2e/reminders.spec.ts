@@ -23,7 +23,7 @@ test("adds a gap reminder and a fixed-time reminder, then removes one", async ({
 }) => {
   await freshFamily(page, request, "reminders");
 
-  await page.goto("/settings");
+  await page.goto("/profile");
   const section = page.getByText("No reminders yet", { exact: false });
   await expect(section).toBeVisible({ timeout: 10_000 });
 

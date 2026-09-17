@@ -25,7 +25,7 @@ test("catalogue entries become chips with a prefilled dose and a next-dose cauti
   await freshFamily(page, request, "medicine");
 
   // ---- Settings → Medicines: paracetamol every 6 h, vitamin D supplement --
-  await page.goto("/settings");
+  await page.goto("/settings/family/medicines");
   await page.getByRole("button", { name: "Add medicine" }).click();
   const sheet = page.getByRole("dialog");
   await sheet.getByPlaceholder("Name (e.g. Paracetamol)").fill("Paracetamol");
@@ -48,8 +48,8 @@ test("catalogue entries become chips with a prefilled dose and a next-dose cauti
   });
   await settle(page);
   await page
-    .getByText("Medicines", { exact: true })
-    .locator("xpath=following-sibling::*[1]")
+    .getByRole("button", { name: "Add medicine" })
+    .locator("..")
     .screenshot({ path: shot("2-medicines-list.png") });
 
   // ---- The log sheet: chips, prefilled dose, save ------------------------

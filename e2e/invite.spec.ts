@@ -14,7 +14,7 @@ import { apiSignIn, apiSignup, freshEmail, freshFamily } from "./helpers";
 test("a second caretaker joins via an invite link", async ({ browser, page, request }, testInfo) => {
   await freshFamily(page, request, "inviter");
 
-  await page.goto("/settings");
+  await page.goto("/settings/family");
   await page.getByRole("button", { name: "New invite link" }).click();
   const link = await page.getByText(/\/join\//).first().textContent();
   expect(link, "invite link rendered").toBeTruthy();
@@ -37,7 +37,7 @@ test("a second caretaker joins via an invite link", async ({ browser, page, requ
 
 test("a brand-new invitee auto-redeems on opening the join link", async ({ page, request, browser }, testInfo) => {
   await freshFamily(page, request, "autojoin");
-  await page.goto("/settings");
+  await page.goto("/settings/family");
   await page.getByRole("button", { name: "New invite link" }).click();
   const link = await page.getByText(/\/join\//).first().textContent();
   const code = link!.trim().split("/join/")[1]?.trim();

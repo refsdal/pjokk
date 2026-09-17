@@ -37,7 +37,7 @@ test("a nursing timer started on one phone runs, and stops, on the other", async
   await freshFamily(page, request, "timer");
 
   // ---- A second caretaker joins via an invite (as in help.spec.ts) -----
-  await page.goto("/settings");
+  await page.goto("/settings/family");
   await page.getByRole("button", { name: "New invite link" }).click();
   const link = await page.getByText(/\/join\//).first().textContent();
   const code = link!.trim().split("/join/")[1]?.trim();

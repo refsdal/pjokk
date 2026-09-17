@@ -102,7 +102,7 @@ test("a finished day names who dropped off and who picked up", async ({
   await page.request.patch("/api/me", { data: { name: "Anne Admin" } });
 
   // The partner joins via an invite, as who-did-it.spec.ts does.
-  await page.goto("/settings");
+  await page.goto("/settings/family");
   await page.getByRole("button", { name: "New invite link" }).click();
   const link = await page.getByText(/\/join\//).first().textContent();
   const code = link!.trim().split("/join/")[1]?.trim();
