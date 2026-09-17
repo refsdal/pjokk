@@ -2923,3 +2923,38 @@ Fourth of the barnehage series (#107). Spec:
   to read — cut off. Two lines, neither truncated.
 - **Timeline rows count days, not a clock span**: an illness runs over
   several.
+
+## 2026-09-17 — days at home with an ill child
+
+Fifth of the barnehage series (#108). Spec:
+`docs/superpowers/specs/2026-09-17-illness-and-care-days-design.md`.
+
+- **Pjokk only counts.** Norway's «sykt barn-dager» are 10 a year with one
+  or two children, 15 with three or more, doubled for a sole carer, and
+  more with a chronically ill child — and an employer's terms can differ.
+  The app knows none of that for certain, and being wrong about someone's
+  leave is not a harmless bug. So `care_day_quota` has **no default**: each
+  person sets their own number, and until they do the line reads "4 days",
+  not "4 of 10". NAV's rule is reference text with a link.
+- **A person's row, not the child's.** `user_id` cascades and a removed
+  member's days leave with them, the way a reminder does — unlike the log
+  tables, whose caretaker survives on the tombstone because the care still
+  happened to the child.
+- **A calendar date, never an instant.** Whose leave it was is a fact
+  about a day on a payslip. The client sends its own local `YYYY-MM-DD`;
+  the server has no timezone and derives nothing.
+- **A day need not have an illness** (the child-minder was ill; the
+  barnehage sent her home), and deleting the illness keeps the day counted
+  (`ON DELETE SET NULL`).
+- **One face, three states.** On the illness card a tap walks not home →
+  whole day → half day → not home. A whole day is the common case and
+  costs one tap; the row shows for a family of one too.
+- **The fourth day in a row gets one quiet line** ("an employer may ask
+  for a doctor's note"): calendar days, half days included. A note, never
+  a block.
+- **Ordinary online mutations, not the offline-resumable defaults.** This
+  is bookkeeping done on the sofa, not a log taken in the dark; a save that
+  fails should say so at once rather than queue.
+- **Any member may record a day for any member**, as they log each other's
+  care; only the yearly number is personal (one's own, or anyone's as a
+  family admin).

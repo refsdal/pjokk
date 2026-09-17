@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { IllnessLog } from "@pjokk/shared";
+import { HomeTodayChips } from "@/components/HomeTodayChips";
 import { Button } from "@/components/ui/button";
 import { useRecoverIllness, useUpdateIllness } from "@/lib/data";
 import { t } from "@/lib/i18n";
@@ -89,6 +90,7 @@ export function IllnessCard({
           </span>
         </span>
       </button>
+      {!optimistic && <HomeTodayChips illnessId={illness.id} />}
       <div className="flex gap-2">
         {clock.state === "symptoms" ? (
           <Button
