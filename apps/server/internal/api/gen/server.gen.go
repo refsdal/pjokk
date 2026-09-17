@@ -149,6 +149,21 @@ type ServerInterface interface {
 	// UpdateCalendarEvent Partial update. `description`/`location`/`durationMin`/ `remindMinutesBefore` may be sent as `null` to CLEAR that column; `title`/`category`/`startTime`/`allDay` are not nullable — only settable or omitted. An event that IS (or becomes, via this same PATCH) all-day always has durationMin cleared. Changing `startTime` or `remindMinutesBefore` re-arms the reminder sweep (clears remindedAt). `babyIds`/`assigneeUserIds`, when present, REPLACE the link set; omitted leaves it untouched. With `occurrence`, that one occurrence is taken out of the series and a standalone event carrying the patch (over the series' fields, links and reminder) is created in its place; the response is that NEW event, and recurrence fields in the body are ignored. An edit to the whole series that changes its start or rule clears its skipped occurrences.
 	// (PATCH /api/calendar/events/{id})
 	UpdateCalendarEvent(w http.ResponseWriter, r *http.Request, id IdPath, params UpdateCalendarEventParams)
+	// ListCareDays Days at home with an ill child (issue #108) in one calendar year: the rows, newest first, and every current member's total against the number they set for themselves.
+	// (GET /api/care-days)
+	ListCareDays(w http.ResponseWriter, r *http.Request, params ListCareDaysParams)
+	// CreateCareDay Record that someone stayed home. `userId` defaults to the caller and must be a member (403 NOT_MEMBER); one row per person per date (409 DUPLICATE). `illnessId`, when given, must be this family's (404), and lends the day its baby.
+	// (POST /api/care-days)
+	CreateCareDay(w http.ResponseWriter, r *http.Request)
+	// SetCareDayQuota Set a person's own yearly number of days, or clear it with `null`. One's own, or anyone's as a family admin (403 otherwise). The app ships no default and computes no entitlement.
+	// (PUT /api/care-days/quota)
+	SetCareDayQuota(w http.ResponseWriter, r *http.Request)
+	// DeleteCareDay Delete a day.
+	// (DELETE /api/care-days/{id})
+	DeleteCareDay(w http.ResponseWriter, r *http.Request, id IdPath)
+	// UpdateCareDay Change a day's date, fraction or note. `note` as `null` clears it.
+	// (PATCH /api/care-days/{id})
+	UpdateCareDay(w http.ResponseWriter, r *http.Request, id IdPath)
 	// GetConfig Public client configuration: which account-creation paths the /login and /join screens should offer. No session required, and no secrets in the response — just two booleans-worth of config the client could otherwise only infer indirectly (e.g. by trying a credential signup and reading the 403).
 	// (GET /api/config)
 	GetConfig(w http.ResponseWriter, r *http.Request)
@@ -1722,6 +1737,119 @@ func (siw *ServerInterfaceWrapper) UpdateCalendarEvent(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateCalendarEvent(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCareDays operation middleware
+func (siw *ServerInterfaceWrapper) ListCareDays(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListCareDaysParams
+
+	// ------------- Required query parameter "year" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "year", r.URL.Query(), &params.Year, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "year"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "year", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCareDays(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateCareDay operation middleware
+func (siw *ServerInterfaceWrapper) CreateCareDay(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateCareDay(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetCareDayQuota operation middleware
+func (siw *ServerInterfaceWrapper) SetCareDayQuota(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetCareDayQuota(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteCareDay operation middleware
+func (siw *ServerInterfaceWrapper) DeleteCareDay(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteCareDay(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateCareDay operation middleware
+func (siw *ServerInterfaceWrapper) UpdateCareDay(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateCareDay(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4829,6 +4957,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/illness/{id}/recover", wrapper.RecoverIllness)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/illness/{id}", wrapper.DeleteIllness)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/illness/{id}", wrapper.UpdateIllness)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/care-days", wrapper.ListCareDays)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/care-days", wrapper.CreateCareDay)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/care-days/quota", wrapper.SetCareDayQuota)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/care-days/{id}", wrapper.DeleteCareDay)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/care-days/{id}", wrapper.UpdateCareDay)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/vaccines/dismissals", wrapper.ListVaccineDismissals)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/vaccines/dismissals", wrapper.CreateVaccineDismissal)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/vaccines/dismissals/{id}", wrapper.DeleteVaccineDismissal)
@@ -6609,6 +6742,243 @@ func (response UpdateCalendarEvent404JSONResponse) VisitUpdateCalendarEventRespo
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCareDaysRequestObject struct {
+	Params ListCareDaysParams
+}
+
+type ListCareDaysResponseObject interface {
+	VisitListCareDaysResponse(w http.ResponseWriter) error
+}
+
+type ListCareDays200JSONResponse CareDays
+
+func (response ListCareDays200JSONResponse) VisitListCareDaysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCareDayRequestObject struct {
+	Body *CreateCareDayJSONRequestBody
+}
+
+type CreateCareDayResponseObject interface {
+	VisitCreateCareDayResponse(w http.ResponseWriter) error
+}
+
+type CreateCareDay201JSONResponse CareDay
+
+func (response CreateCareDay201JSONResponse) VisitCreateCareDayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCareDay400JSONResponse Error
+
+func (response CreateCareDay400JSONResponse) VisitCreateCareDayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCareDay403JSONResponse Error
+
+func (response CreateCareDay403JSONResponse) VisitCreateCareDayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCareDay404JSONResponse Error
+
+func (response CreateCareDay404JSONResponse) VisitCreateCareDayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCareDay409JSONResponse Error
+
+func (response CreateCareDay409JSONResponse) VisitCreateCareDayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetCareDayQuotaRequestObject struct {
+	Body *SetCareDayQuotaJSONRequestBody
+}
+
+type SetCareDayQuotaResponseObject interface {
+	VisitSetCareDayQuotaResponse(w http.ResponseWriter) error
+}
+
+type SetCareDayQuota200JSONResponse Ok
+
+func (response SetCareDayQuota200JSONResponse) VisitSetCareDayQuotaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetCareDayQuota403JSONResponse Error
+
+func (response SetCareDayQuota403JSONResponse) VisitSetCareDayQuotaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteCareDayRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type DeleteCareDayResponseObject interface {
+	VisitDeleteCareDayResponse(w http.ResponseWriter) error
+}
+
+type DeleteCareDay200JSONResponse Ok
+
+func (response DeleteCareDay200JSONResponse) VisitDeleteCareDayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteCareDay404JSONResponse Error
+
+func (response DeleteCareDay404JSONResponse) VisitDeleteCareDayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCareDayRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *UpdateCareDayJSONRequestBody
+}
+
+type UpdateCareDayResponseObject interface {
+	VisitUpdateCareDayResponse(w http.ResponseWriter) error
+}
+
+type UpdateCareDay200JSONResponse CareDay
+
+func (response UpdateCareDay200JSONResponse) VisitUpdateCareDayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCareDay400JSONResponse Error
+
+func (response UpdateCareDay400JSONResponse) VisitUpdateCareDayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCareDay404JSONResponse Error
+
+func (response UpdateCareDay404JSONResponse) VisitUpdateCareDayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCareDay409JSONResponse Error
+
+func (response UpdateCareDay409JSONResponse) VisitUpdateCareDayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11233,6 +11603,21 @@ type StrictServerInterface interface {
 	// UpdateCalendarEvent Partial update. `description`/`location`/`durationMin`/ `remindMinutesBefore` may be sent as `null` to CLEAR that column; `title`/`category`/`startTime`/`allDay` are not nullable — only settable or omitted. An event that IS (or becomes, via this same PATCH) all-day always has durationMin cleared. Changing `startTime` or `remindMinutesBefore` re-arms the reminder sweep (clears remindedAt). `babyIds`/`assigneeUserIds`, when present, REPLACE the link set; omitted leaves it untouched. With `occurrence`, that one occurrence is taken out of the series and a standalone event carrying the patch (over the series' fields, links and reminder) is created in its place; the response is that NEW event, and recurrence fields in the body are ignored. An edit to the whole series that changes its start or rule clears its skipped occurrences.
 	// (PATCH /api/calendar/events/{id})
 	UpdateCalendarEvent(ctx context.Context, request UpdateCalendarEventRequestObject) (UpdateCalendarEventResponseObject, error)
+	// ListCareDays Days at home with an ill child (issue #108) in one calendar year: the rows, newest first, and every current member's total against the number they set for themselves.
+	// (GET /api/care-days)
+	ListCareDays(ctx context.Context, request ListCareDaysRequestObject) (ListCareDaysResponseObject, error)
+	// CreateCareDay Record that someone stayed home. `userId` defaults to the caller and must be a member (403 NOT_MEMBER); one row per person per date (409 DUPLICATE). `illnessId`, when given, must be this family's (404), and lends the day its baby.
+	// (POST /api/care-days)
+	CreateCareDay(ctx context.Context, request CreateCareDayRequestObject) (CreateCareDayResponseObject, error)
+	// SetCareDayQuota Set a person's own yearly number of days, or clear it with `null`. One's own, or anyone's as a family admin (403 otherwise). The app ships no default and computes no entitlement.
+	// (PUT /api/care-days/quota)
+	SetCareDayQuota(ctx context.Context, request SetCareDayQuotaRequestObject) (SetCareDayQuotaResponseObject, error)
+	// DeleteCareDay Delete a day.
+	// (DELETE /api/care-days/{id})
+	DeleteCareDay(ctx context.Context, request DeleteCareDayRequestObject) (DeleteCareDayResponseObject, error)
+	// UpdateCareDay Change a day's date, fraction or note. `note` as `null` clears it.
+	// (PATCH /api/care-days/{id})
+	UpdateCareDay(ctx context.Context, request UpdateCareDayRequestObject) (UpdateCareDayResponseObject, error)
 	// GetConfig Public client configuration: which account-creation paths the /login and /join screens should offer. No session required, and no secrets in the response — just two booleans-worth of config the client could otherwise only infer indirectly (e.g. by trying a credential signup and reading the 403).
 	// (GET /api/config)
 	GetConfig(ctx context.Context, request GetConfigRequestObject) (GetConfigResponseObject, error)
@@ -12832,6 +13217,153 @@ func (sh *strictHandler) UpdateCalendarEvent(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateCalendarEventResponseObject); ok {
 		if err := validResponse.VisitUpdateCalendarEventResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCareDays operation middleware
+func (sh *strictHandler) ListCareDays(w http.ResponseWriter, r *http.Request, params ListCareDaysParams) {
+	var request ListCareDaysRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCareDays(ctx, request.(ListCareDaysRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCareDays")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCareDaysResponseObject); ok {
+		if err := validResponse.VisitListCareDaysResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateCareDay operation middleware
+func (sh *strictHandler) CreateCareDay(w http.ResponseWriter, r *http.Request) {
+	var request CreateCareDayRequestObject
+
+	var body CreateCareDayJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateCareDay(ctx, request.(CreateCareDayRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateCareDay")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateCareDayResponseObject); ok {
+		if err := validResponse.VisitCreateCareDayResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetCareDayQuota operation middleware
+func (sh *strictHandler) SetCareDayQuota(w http.ResponseWriter, r *http.Request) {
+	var request SetCareDayQuotaRequestObject
+
+	var body SetCareDayQuotaJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetCareDayQuota(ctx, request.(SetCareDayQuotaRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetCareDayQuota")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetCareDayQuotaResponseObject); ok {
+		if err := validResponse.VisitSetCareDayQuotaResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteCareDay operation middleware
+func (sh *strictHandler) DeleteCareDay(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request DeleteCareDayRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteCareDay(ctx, request.(DeleteCareDayRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteCareDay")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteCareDayResponseObject); ok {
+		if err := validResponse.VisitDeleteCareDayResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateCareDay operation middleware
+func (sh *strictHandler) UpdateCareDay(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request UpdateCareDayRequestObject
+
+	request.Id = id
+
+	var body UpdateCareDayJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateCareDay(ctx, request.(UpdateCareDayRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateCareDay")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateCareDayResponseObject); ok {
+		if err := validResponse.VisitUpdateCareDayResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

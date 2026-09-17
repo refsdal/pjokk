@@ -101,6 +101,24 @@ type CalendarEventSkip struct {
 	CreatedAt       pgtype.Timestamptz
 }
 
+type CareDay struct {
+	ID        string
+	FamilyID  string
+	UserID    string
+	BabyID    *string
+	IllnessID *string
+	Date      pgtype.Date
+	Fraction  float64
+	Note      *string
+	CreatedAt pgtype.Timestamptz
+}
+
+type CareDayQuota struct {
+	FamilyID string
+	UserID   string
+	Days     int32
+}
+
 type Contact struct {
 	ID        string
 	FamilyID  string

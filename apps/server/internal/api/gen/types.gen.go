@@ -149,6 +149,24 @@ func (e CalendarEventRecurrence) Valid() bool {
 	}
 }
 
+// Defines values for CareDayFraction.
+const (
+	CareDayFractionN05 CareDayFraction = 0.5
+	CareDayFractionN1  CareDayFraction = 1
+)
+
+// Valid indicates whether the value is a known member of the CareDayFraction enum.
+func (e CareDayFraction) Valid() bool {
+	switch e {
+	case CareDayFractionN05:
+		return true
+	case CareDayFractionN1:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ContactIcon.
 const (
 	ContactIconDaycare     ContactIcon = "daycare"
@@ -260,6 +278,24 @@ func (e CreateCalendarEventRecurrence) Valid() bool {
 	case CreateCalendarEventRecurrenceWeekly:
 		return true
 	case CreateCalendarEventRecurrenceYearly:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateCareDayFraction.
+const (
+	CreateCareDayFractionN05 CreateCareDayFraction = 0.5
+	CreateCareDayFractionN1  CreateCareDayFraction = 1
+)
+
+// Valid indicates whether the value is a known member of the CreateCareDayFraction enum.
+func (e CreateCareDayFraction) Valid() bool {
+	switch e {
+	case CreateCareDayFractionN05:
+		return true
+	case CreateCareDayFractionN1:
 		return true
 	default:
 		return false
@@ -1568,6 +1604,24 @@ func (e UpdateCalendarEventRecurrence) Valid() bool {
 	}
 }
 
+// Defines values for UpdateCareDayFraction.
+const (
+	UpdateCareDayFractionN05 UpdateCareDayFraction = 0.5
+	UpdateCareDayFractionN1  UpdateCareDayFraction = 1
+)
+
+// Valid indicates whether the value is a known member of the UpdateCareDayFraction enum.
+func (e UpdateCareDayFraction) Valid() bool {
+	switch e {
+	case UpdateCareDayFractionN05:
+		return true
+	case UpdateCareDayFractionN1:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UpdateContactIcon.
 const (
 	UpdateContactIconDaycare     UpdateContactIcon = "daycare"
@@ -2439,6 +2493,41 @@ type CalendarEventCategory string
 // CalendarEventRecurrence Steps on the local calendar (Europe/Oslo), so a daily 08:00 stays 08:00 across DST; monthly/yearly clamp the day.
 type CalendarEventRecurrence string
 
+// CareDay One person's one calendar day at home with an ill child (issue #108), whole or half. `date` is a calendar date in the person's own day, never an instant.
+type CareDay struct {
+	BabyId    *string         `json:"babyId"`
+	Date      string          `json:"date"`
+	Fraction  CareDayFraction `json:"fraction"`
+	Id        string          `json:"id"`
+	IllnessId *string         `json:"illnessId"`
+	Note      *string         `json:"note"`
+	UserId    string          `json:"userId"`
+	UserName  string          `json:"userName"`
+}
+
+// CareDayFraction defines model for CareDay.Fraction.
+type CareDayFraction float32
+
+// CareDayTotal defines model for CareDayTotal.
+type CareDayTotal struct {
+	// Quota The person's own number, or null when they have set none.
+	Quota *int `json:"quota"`
+
+	// Used Days used in the year; halves count 0.5.
+	Used     float32 `json:"used"`
+	UserId   string  `json:"userId"`
+	UserName string  `json:"userName"`
+}
+
+// CareDays defines model for CareDays.
+type CareDays struct {
+	Days []CareDay `json:"days"`
+
+	// Totals One per CURRENT member, those with nothing used included.
+	Totals []CareDayTotal `json:"totals"`
+	Year   int            `json:"year"`
+}
+
 // Contact One entry in the family's address book. Zero linked babies means the contact belongs to the whole family. Free (no plan gate — see internal/api/contacts.go).
 type Contact struct {
 	// Babies Zero babies = a contact the whole family shares.
@@ -2526,6 +2615,21 @@ type CreateCalendarEventCategory string
 
 // CreateCalendarEventRecurrence Omitted means none.
 type CreateCalendarEventRecurrence string
+
+// CreateCareDay defines model for CreateCareDay.
+type CreateCareDay struct {
+	BabyId    *string                `json:"babyId,omitempty"`
+	Date      string                 `json:"date"`
+	Fraction  *CreateCareDayFraction `json:"fraction,omitempty"`
+	IllnessId *string                `json:"illnessId,omitempty"`
+	Note      *string                `json:"note,omitempty"`
+
+	// UserId Who stayed home; a member of the caller's family. Defaults to the caller.
+	UserId *string `json:"userId,omitempty"`
+}
+
+// CreateCareDayFraction defines model for CreateCareDay.Fraction.
+type CreateCareDayFraction float32
 
 // CreateContact defines model for CreateContact.
 type CreateContact struct {
@@ -3482,6 +3586,14 @@ type ReminderKind string
 // ReminderMode defines model for Reminder.Mode.
 type ReminderMode string
 
+// SetCareDayQuota defines model for SetCareDayQuota.
+type SetCareDayQuota struct {
+	Days *int `json:"days"`
+
+	// UserId Defaults to the caller. Someone else's needs a family admin.
+	UserId *string `json:"userId,omitempty"`
+}
+
 // SetFeedTimerSide defines model for SetFeedTimerSide.
 type SetFeedTimerSide struct {
 	// Side null pauses a nursing timer.
@@ -3786,6 +3898,16 @@ type UpdateCalendarEventCategory string
 
 // UpdateCalendarEventRecurrence defines model for UpdateCalendarEvent.Recurrence.
 type UpdateCalendarEventRecurrence string
+
+// UpdateCareDay defines model for UpdateCareDay.
+type UpdateCareDay struct {
+	Date     *string                `json:"date,omitempty"`
+	Fraction *UpdateCareDayFraction `json:"fraction,omitempty"`
+	Note     *string                `json:"note,omitempty"`
+}
+
+// UpdateCareDayFraction defines model for UpdateCareDay.Fraction.
+type UpdateCareDayFraction float32
 
 // UpdateContact Every field is optional; an empty object is a no-op. `role`/`icon`/`phone`/`email`/`website`/`notes` may also be sent as `null` to CLEAR that column; `name` is not nullable — only settable or omitted. `babyIds`, when present, REPLACES the link set; omitted leaves it untouched.
 type UpdateContact struct {
@@ -4142,6 +4264,11 @@ type UpdateCalendarEventParams struct {
 	Occurrence *time.Time `form:"occurrence,omitempty" json:"occurrence,omitempty"`
 }
 
+// ListCareDaysParams defines parameters for ListCareDays.
+type ListCareDaysParams struct {
+	Year int `form:"year" json:"year"`
+}
+
 // ListDaycaresParams defines parameters for ListDaycares.
 type ListDaycaresParams struct {
 	// BabyId Restrict the result to one baby in the caller's family.
@@ -4385,6 +4512,15 @@ type CreateCalendarEventJSONRequestBody = CreateCalendarEvent
 
 // UpdateCalendarEventJSONRequestBody defines body for UpdateCalendarEvent for application/json ContentType.
 type UpdateCalendarEventJSONRequestBody = UpdateCalendarEvent
+
+// CreateCareDayJSONRequestBody defines body for CreateCareDay for application/json ContentType.
+type CreateCareDayJSONRequestBody = CreateCareDay
+
+// SetCareDayQuotaJSONRequestBody defines body for SetCareDayQuota for application/json ContentType.
+type SetCareDayQuotaJSONRequestBody = SetCareDayQuota
+
+// UpdateCareDayJSONRequestBody defines body for UpdateCareDay for application/json ContentType.
+type UpdateCareDayJSONRequestBody = UpdateCareDay
 
 // CreateContactJSONRequestBody defines body for CreateContact for application/json ContentType.
 type CreateContactJSONRequestBody = CreateContact

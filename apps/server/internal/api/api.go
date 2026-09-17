@@ -303,6 +303,15 @@ var operationAuthTiers = map[string]authTier{
 	"UpdateIllness":    tierFamily,
 	"DeleteIllness":    tierFamily,
 
+	// Days at home with an ill child (issue #108, care_days.go). The quota
+	// is tierFamily too: "one's own, or anyone's as admin" is a rule about
+	// the body, so the handler checks it.
+	"ListCareDays":    tierFamily,
+	"CreateCareDay":   tierFamily,
+	"UpdateCareDay":   tierFamily,
+	"DeleteCareDay":   tierFamily,
+	"SetCareDayQuota": tierFamily,
+
 	"GetSummary": tierFamily,
 
 	// The six Phase 3 activity types (other-logs.ts's makeLogRoutes

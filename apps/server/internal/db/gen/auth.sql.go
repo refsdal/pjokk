@@ -192,6 +192,38 @@ func (q *Queries) DeleteMemberCalendarAssignments(ctx context.Context, arg Delet
 	return err
 }
 
+const deleteMemberCareDayQuota = `-- name: DeleteMemberCareDayQuota :exec
+DELETE FROM "care_day_quota"
+WHERE "family_id" = $1 AND "user_id" = $2
+`
+
+type DeleteMemberCareDayQuotaParams struct {
+	FamilyID string
+	UserID   string
+}
+
+func (q *Queries) DeleteMemberCareDayQuota(ctx context.Context, arg DeleteMemberCareDayQuotaParams) error {
+	_, err := q.db.Exec(ctx, deleteMemberCareDayQuota, arg.FamilyID, arg.UserID)
+	return err
+}
+
+const deleteMemberCareDays = `-- name: DeleteMemberCareDays :exec
+DELETE FROM "care_day"
+WHERE "family_id" = $1 AND "user_id" = $2
+`
+
+type DeleteMemberCareDaysParams struct {
+	FamilyID string
+	UserID   string
+}
+
+// A removed member's days at home in that family, and the number they set
+// (issue #108): their own leave record, which leaves with them.
+func (q *Queries) DeleteMemberCareDays(ctx context.Context, arg DeleteMemberCareDaysParams) error {
+	_, err := q.db.Exec(ctx, deleteMemberCareDays, arg.FamilyID, arg.UserID)
+	return err
+}
+
 const deleteMemberPushSnoozes = `-- name: DeleteMemberPushSnoozes :exec
 DELETE FROM "push_snooze"
 WHERE "family_id" = $1 AND "user_id" = $2
@@ -218,8 +250,8 @@ type DeleteMemberRemindersParams struct {
 	UserID   string
 }
 
-// The three deletes below are a removed member's scheduled pushes in that
-// family (issue #92), run inside RemoveMember's transaction. None of these
+// The deletes below are a removed member's own rows in that family — their
+// scheduled pushes (issue #92) and their days at home (issue #108) — run inside RemoveMember's transaction. None of these
 // tables references organization_members, so nothing cascades from the
 // membership, and a person who has left cannot reach the reminders routes
 // to delete their own. Each is scoped to the one family: the same person's

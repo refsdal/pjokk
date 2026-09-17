@@ -356,6 +356,27 @@ func rowIllness(r dbgen.ExportIllnessesRow) exportRow {
 	}
 }
 
+// rowCareDay is a day at home with an ill child (issue #108): "time" is the
+// calendar date at midnight UTC (it has no instant), "detail" says whole or
+// half, and "caretaker" is who stayed home.
+func rowCareDay(r dbgen.ExportCareDaysRow) exportRow {
+	detail := "full day"
+	if r.Fraction < 1 {
+		detail = "half day"
+	}
+	return exportRow{
+		sortTime: r.Date.Time,
+		cells: map[string]*string{
+			"kind":      str("care_day"),
+			"baby":      str(r.BabyName),
+			"time":      str(r.Date.Time.Format(dateLayout)),
+			"detail":    str(detail),
+			"caretaker": str(r.UserName),
+			"notes":     r.Note,
+		},
+	}
+}
+
 func rowPlay(r dbgen.ExportPlaysRow) exportRow {
 	var durationMin *string
 	if r.EndTime.Valid {
@@ -511,6 +532,15 @@ func (d Deps) exportCSV(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, v := range illnesses {
 		rows = append(rows, rowIllness(v))
+	}
+
+	careDays, err := d.Q.ExportCareDays(ctx, dbgen.ExportCareDaysParams{FamilyID: fam.FamilyID, Lim: lim})
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+	for _, v := range careDays {
+		rows = append(rows, rowCareDay(v))
 	}
 
 	vaccines, err := d.Q.ExportVaccines(ctx, dbgen.ExportVaccinesParams{FamilyID: fam.FamilyID, Lim: lim})
