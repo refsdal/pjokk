@@ -126,6 +126,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/babies/{id}/features": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Replace what the family tracks for this baby (spec 2026-09-17-per-baby-tracking-design.md). Family-admin only; never a kiosk device. Whole-set replacement so a replayed offline save is harmless. Duplicates are dropped; order is the enum's. The server gates nothing on the set: a write for an off kind is still accepted. */
+        put: operations["setBabyFeatures"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/family": {
         parameters: {
             query?: never;
@@ -2133,6 +2150,8 @@ export interface components {
             birthDate: string;
             /** @enum {string|null} */
             sex: "girl" | "boy" | null;
+            /** @description What the family tracks for this baby (spec 2026-09-17-per-baby-tracking-design.md): the ENABLED keys. A switch that is off hides a feature's entry points in the app and holds its reminders; the server still accepts every write. All thirteen for a baby that predates the column, none for a new baby until the carousel runs. */
+            features: components["schemas"]["Feature"][];
             /** @description "/api/babies/{id}/avatar?v=<key>" when the baby has a photo, null otherwise (the client shows the initial). The photo routes are hand-mounted outside this document, like a person's (internal/api/baby_avatar.go): `PUT /api/babies/{id}/avatar` (multipart field `file`, JPEG or PNG, at most 512 KB and 1024 px; re-encoded server-side, EXIF stripped) and `DELETE /api/babies/{id}/avatar` both answer with the Baby and are open to any family member, never an API key or a kiosk device; `GET /api/babies/{id}/avatar` streams the JPEG to a member or to the family's own kiosk device, 404 for anyone else. */
             avatarUrl: string | null;
         };
@@ -2844,6 +2863,14 @@ export interface components {
             /** @description Allergies, intolerances and diet. */
             diet: string | null;
             other: string | null;
+        };
+        /**
+         * @description One per-baby tracking switch, in the app's display order.
+         * @enum {string}
+         */
+        Feature: "feeds" | "pump" | "sleep" | "diapers" | "medicine" | "measurements" | "milestones" | "bath" | "notes" | "play" | "daycare" | "illness" | "vaccines";
+        SetBabyFeatures: {
+            features: components["schemas"]["Feature"][];
         };
         SetUsualNap: {
             minute: number | null;
@@ -4402,6 +4429,51 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description No baby with this id in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setBabyFeatures: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetBabyFeatures"];
+            };
+        };
+        responses: {
+            /** @description The baby, as it now reads. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Baby"];
+                };
+            };
+            /** @description Family admin only. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description No baby with this id in the caller's family. */

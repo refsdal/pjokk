@@ -842,6 +842,57 @@ func (e DiaperLogType) Valid() bool {
 	}
 }
 
+// Defines values for Feature.
+const (
+	FeatureBath         Feature = "bath"
+	FeatureDaycare      Feature = "daycare"
+	FeatureDiapers      Feature = "diapers"
+	FeatureFeeds        Feature = "feeds"
+	FeatureIllness      Feature = "illness"
+	FeatureMeasurements Feature = "measurements"
+	FeatureMedicine     Feature = "medicine"
+	FeatureMilestones   Feature = "milestones"
+	FeatureNotes        Feature = "notes"
+	FeaturePlay         Feature = "play"
+	FeaturePump         Feature = "pump"
+	FeatureSleep        Feature = "sleep"
+	FeatureVaccines     Feature = "vaccines"
+)
+
+// Valid indicates whether the value is a known member of the Feature enum.
+func (e Feature) Valid() bool {
+	switch e {
+	case FeatureBath:
+		return true
+	case FeatureDaycare:
+		return true
+	case FeatureDiapers:
+		return true
+	case FeatureFeeds:
+		return true
+	case FeatureIllness:
+		return true
+	case FeatureMeasurements:
+		return true
+	case FeatureMedicine:
+		return true
+	case FeatureMilestones:
+		return true
+	case FeatureNotes:
+		return true
+	case FeaturePlay:
+		return true
+	case FeaturePump:
+		return true
+	case FeatureSleep:
+		return true
+	case FeatureVaccines:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FeedLogAppetite.
 const (
 	FeedLogAppetiteLittle FeedLogAppetite = "little"
@@ -2444,9 +2495,12 @@ type Baby struct {
 	// AvatarUrl "/api/babies/{id}/avatar?v=<key>" when the baby has a photo, null otherwise (the client shows the initial). The photo routes are hand-mounted outside this document, like a person's (internal/api/baby_avatar.go): `PUT /api/babies/{id}/avatar` (multipart field `file`, JPEG or PNG, at most 512 KB and 1024 px; re-encoded server-side, EXIF stripped) and `DELETE /api/babies/{id}/avatar` both answer with the Baby and are open to any family member, never an API key or a kiosk device; `GET /api/babies/{id}/avatar` streams the JPEG to a member or to the family's own kiosk device, 404 for anyone else.
 	AvatarUrl *string   `json:"avatarUrl"`
 	BirthDate time.Time `json:"birthDate"`
-	Id        string    `json:"id"`
-	Name      string    `json:"name"`
-	Sex       *BabySex  `json:"sex"`
+
+	// Features What the family tracks for this baby (spec 2026-09-17-per-baby-tracking-design.md): the ENABLED keys. A switch that is off hides a feature's entry points in the app and holds its reminders; the server still accepts every write. All thirteen for a baby that predates the column, none for a new baby until the carousel runs.
+	Features []Feature `json:"features"`
+	Id       string    `json:"id"`
+	Name     string    `json:"name"`
+	Sex      *BabySex  `json:"sex"`
 }
 
 // BabySex defines model for Baby.Sex.
@@ -3189,6 +3243,9 @@ type FamilyRestoreReport struct {
 	Warnings []string         `json:"warnings"`
 }
 
+// Feature One per-baby tracking switch, in the app's display order.
+type Feature string
+
 // FeedLog defines model for FeedLog.
 type FeedLog struct {
 	AmountMl *int32 `json:"amountMl"`
@@ -3699,6 +3756,11 @@ type ReminderKind string
 
 // ReminderMode defines model for Reminder.Mode.
 type ReminderMode string
+
+// SetBabyFeatures defines model for SetBabyFeatures.
+type SetBabyFeatures struct {
+	Features []Feature `json:"features"`
+}
 
 // SetCareDayQuota defines model for SetCareDayQuota.
 type SetCareDayQuota struct {
@@ -4677,6 +4739,9 @@ type UpdateBabyJSONRequestBody = UpdateBaby
 
 // PutBabyAboutJSONRequestBody defines body for PutBabyAbout for application/json ContentType.
 type PutBabyAboutJSONRequestBody = BabyAbout
+
+// SetBabyFeaturesJSONRequestBody defines body for SetBabyFeatures for application/json ContentType.
+type SetBabyFeaturesJSONRequestBody = SetBabyFeatures
 
 // SetPickupOverrideJSONRequestBody defines body for SetPickupOverride for application/json ContentType.
 type SetPickupOverrideJSONRequestBody = SetPickupOverride

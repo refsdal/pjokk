@@ -117,3 +117,23 @@ WHERE "family_id" = $1 AND "id" = $2 AND "avatar_key" IS NOT NULL;
 SELECT "avatar_key"::text
 FROM "baby"
 WHERE "family_id" = $1 AND "avatar_key" IS NOT NULL;
+
+-- name: SetBabyFeatures :one
+-- The per-baby tracking switches (00033), replaced whole. RETURNING * so
+-- the route answers with the Baby, as UpdateBaby does.
+UPDATE "baby"
+SET "features" = $3
+WHERE "family_id" = $1 AND "id" = $2
+RETURNING *;
+
+-- name: BabyTracks :one
+-- Does this baby — or, with no baby, ANY baby of the family — track this
+-- feature? What the reminder and closing-alert jobs ask before firing
+-- (internal/jobs): a reminder with no baby applies to each baby that has
+-- the kind on, so it is held only when none does.
+SELECT EXISTS (
+    SELECT 1 FROM "baby"
+    WHERE "family_id" = sqlc.arg(family_id)
+      AND (sqlc.narg(baby_id)::text IS NULL OR "id" = sqlc.narg(baby_id))
+      AND sqlc.arg(feature)::text = ANY("features")
+)::bool AS tracked;

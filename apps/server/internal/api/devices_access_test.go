@@ -85,6 +85,7 @@ func TestDeviceIsRefusedOutsideTheAllowlist(t *testing.T) {
 		{http.MethodGet, "/api/reminders", nil},
 		{http.MethodGet, "/api/keys", nil},
 		{http.MethodPost, "/api/invites", map[string]any{}},
+		{http.MethodPut, "/api/babies/" + w.babyID + "/features", map[string]any{"features": []string{"sleep"}}},
 	} {
 		res := w.do(c.method, c.path, w.memberID, c.body)
 		if res.Status != http.StatusForbidden || res.JSON["code"] != "NOT_FOR_DEVICES" {

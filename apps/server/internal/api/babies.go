@@ -57,6 +57,7 @@ func serBaby(b dbgen.Baby) gen.Baby {
 		BirthDate: b.BirthDate.Time,
 		Sex:       babySexPtr(b.Sex),
 		AvatarUrl: babyAvatarURL(b.ID, b.AvatarKey),
+		Features:  featuresOf(b.Features),
 	}
 }
 

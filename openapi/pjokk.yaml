@@ -250,6 +250,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/babies/{id}/features:
+    put:
+      operationId: setBabyFeatures
+      summary: >-
+        Replace what the family tracks for this baby (spec
+        2026-09-17-per-baby-tracking-design.md). Family-admin only; never a
+        kiosk device. Whole-set replacement so a replayed offline save is
+        harmless. Duplicates are dropped; order is the enum's. The server
+        gates nothing on the set: a write for an off kind is still accepted.
+      tags: [babies]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetBabyFeatures"
+      responses:
+        "200":
+          description: The baby, as it now reads.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Baby"
+        "403":
+          description: Family admin only.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No baby with this id in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/family:
     get:
       operationId: getFamily
@@ -4947,7 +4984,7 @@ components:
           enum: [true]
     Baby:
       type: object
-      required: [id, name, birthDate, sex, avatarUrl]
+      required: [id, name, birthDate, sex, avatarUrl, features]
       properties:
         id:
           type: string
@@ -4960,6 +4997,17 @@ components:
           type: string
           enum: [girl, boy]
           nullable: true
+        features:
+          type: array
+          description: >-
+            What the family tracks for this baby (spec
+            2026-09-17-per-baby-tracking-design.md): the ENABLED keys. A
+            switch that is off hides a feature's entry points in the app and
+            holds its reminders; the server still accepts every write. All
+            thirteen for a baby that predates the column, none for a new
+            baby until the carousel runs.
+          items:
+            $ref: "#/components/schemas/Feature"
         avatarUrl:
           type: string
           nullable: true
@@ -6578,6 +6626,31 @@ components:
           type: string
           maxLength: 500
           nullable: true
+    Feature:
+      type: string
+      description: One per-baby tracking switch, in the app's display order.
+      enum:
+        - feeds
+        - pump
+        - sleep
+        - diapers
+        - medicine
+        - measurements
+        - milestones
+        - bath
+        - notes
+        - play
+        - daycare
+        - illness
+        - vaccines
+    SetBabyFeatures:
+      type: object
+      required: [features]
+      properties:
+        features:
+          type: array
+          items:
+            $ref: "#/components/schemas/Feature"
     SetUsualNap:
       type: object
       required: [minute]
