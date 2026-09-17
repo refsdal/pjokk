@@ -1,5 +1,5 @@
 -- Merged-timeline pagination (timeline.ts). One "Page"
--- query per source, all twelve shaped identically: family+baby scoped
+-- query per source, all thirteen shaped identically: family+baby scoped
 -- (baby_id is REQUIRED here, unlike ListFeeds/ListDiapers/… — the
 -- /api/timeline route always has a babyId), an optional keyset cursor via
 -- ROW COMPARISON "(t, id) < (cursor_t, cursor_id)" — never two separate
@@ -215,6 +215,23 @@ WHERE d."family_id" = sqlc.arg(family_id)
   )
   AND (sqlc.narg(q)::text IS NULL OR d."notes" ILIKE sqlc.narg(q)::text)
 ORDER BY d."start_time" DESC, d."id" DESC
+LIMIT sqlc.arg(lim);
+
+-- name: ListIllnessesPage :many
+SELECT
+    i."id", i."baby_id", i."caretaker_id", i."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    i."start_time", i."end_time", i."symptoms", i."last_symptom_at", i."clear_hours", i."notes"
+FROM "illness" i
+JOIN "users" u ON u."id" = i."caretaker_id"
+JOIN "users" lu ON lu."id" = i."logged_by_id"
+WHERE i."family_id" = sqlc.arg(family_id)
+  AND i."baby_id" = sqlc.arg(baby_id)
+  AND (
+    sqlc.narg(cursor_time)::timestamptz IS NULL
+    OR (i."start_time", i."id") < (sqlc.narg(cursor_time)::timestamptz, sqlc.narg(cursor_id)::text)
+  )
+  AND (sqlc.narg(q)::text IS NULL OR i."notes" ILIKE sqlc.narg(q)::text)
+ORDER BY i."start_time" DESC, i."id" DESC
 LIMIT sqlc.arg(lim);
 
 -- name: ListVaccinesPage :many

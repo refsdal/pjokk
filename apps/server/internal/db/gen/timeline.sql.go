@@ -303,7 +303,7 @@ type ListFeedsPageRow struct {
 }
 
 // Merged-timeline pagination (timeline.ts). One "Page"
-// query per source, all twelve shaped identically: family+baby scoped
+// query per source, all thirteen shaped identically: family+baby scoped
 // (baby_id is REQUIRED here, unlike ListFeeds/ListDiapers/… — the
 // /api/timeline route always has a babyId), an optional keyset cursor via
 // ROW COMPARISON "(t, id) < (cursor_t, cursor_id)" — never two separate
@@ -365,6 +365,88 @@ func (q *Queries) ListFeedsPage(ctx context.Context, arg ListFeedsPageParams) ([
 			&i.Food,
 			&i.Reaction,
 			&i.Appetite,
+			&i.Notes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listIllnessesPage = `-- name: ListIllnessesPage :many
+SELECT
+    i."id", i."baby_id", i."caretaker_id", i."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
+    i."start_time", i."end_time", i."symptoms", i."last_symptom_at", i."clear_hours", i."notes"
+FROM "illness" i
+JOIN "users" u ON u."id" = i."caretaker_id"
+JOIN "users" lu ON lu."id" = i."logged_by_id"
+WHERE i."family_id" = $1
+  AND i."baby_id" = $2
+  AND (
+    $3::timestamptz IS NULL
+    OR (i."start_time", i."id") < ($3::timestamptz, $4::text)
+  )
+  AND ($5::text IS NULL OR i."notes" ILIKE $5::text)
+ORDER BY i."start_time" DESC, i."id" DESC
+LIMIT $6
+`
+
+type ListIllnessesPageParams struct {
+	FamilyID   string
+	BabyID     string
+	CursorTime pgtype.Timestamptz
+	CursorID   *string
+	Q          *string
+	Lim        int32
+}
+
+type ListIllnessesPageRow struct {
+	ID            string
+	BabyID        string
+	CaretakerID   string
+	LoggedByID    string
+	CaretakerName string
+	LoggedByName  string
+	StartTime     pgtype.Timestamptz
+	EndTime       pgtype.Timestamptz
+	Symptoms      []string
+	LastSymptomAt pgtype.Timestamptz
+	ClearHours    *int32
+	Notes         *string
+}
+
+func (q *Queries) ListIllnessesPage(ctx context.Context, arg ListIllnessesPageParams) ([]ListIllnessesPageRow, error) {
+	rows, err := q.db.Query(ctx, listIllnessesPage,
+		arg.FamilyID,
+		arg.BabyID,
+		arg.CursorTime,
+		arg.CursorID,
+		arg.Q,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListIllnessesPageRow
+	for rows.Next() {
+		var i ListIllnessesPageRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.BabyID,
+			&i.CaretakerID,
+			&i.LoggedByID,
+			&i.CaretakerName,
+			&i.LoggedByName,
+			&i.StartTime,
+			&i.EndTime,
+			&i.Symptoms,
+			&i.LastSymptomAt,
+			&i.ClearHours,
 			&i.Notes,
 		); err != nil {
 			return nil, err

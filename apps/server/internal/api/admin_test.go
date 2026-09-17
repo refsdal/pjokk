@@ -478,6 +478,7 @@ func TestAdminDeleteUserCoversEveryAttributionTable(t *testing.T) {
 	seed("/api/pumps", map[string]any{"babyId": babyID, "time": now.Format(time.RFC3339), "amountMl": 60})
 	seed("/api/play", map[string]any{"babyId": babyID, "type": "tummy", "startTime": now.Add(-time.Hour).Format(time.RFC3339), "endTime": now.Format(time.RFC3339)})
 	seed("/api/daycare", map[string]any{"babyId": babyID, "startTime": now.Add(-7 * time.Hour).Format(time.RFC3339), "endTime": now.Format(time.RFC3339), "pickupCaretakerId": victimID})
+	seed("/api/illness", map[string]any{"babyId": babyID, "startTime": now.Add(-24 * time.Hour).Format(time.RFC3339), "symptoms": []string{"fever"}})
 	vaccine := seed("/api/vaccines", map[string]any{"babyId": babyID, "time": now.Format(time.RFC3339), "name": "Rotavirus"})
 	seed("/api/vaccines/dismissals", map[string]any{"babyId": babyID, "slotKey": "6w-rota"})
 	seed("/api/invites", map[string]any{"role": "member"})
@@ -530,6 +531,8 @@ func TestAdminDeleteUserCoversEveryAttributionTable(t *testing.T) {
 		{"daycare_log", "caretaker_id"},
 		{"daycare_log", "logged_by_id"},
 		{"daycare_log", "pickup_caretaker_id"},
+		{"illness", "caretaker_id"},
+		{"illness", "logged_by_id"},
 		{"vaccine_log", "caretaker_id"},
 		{"vaccine_document", "uploaded_by"},
 		{"vaccine_dismissal", "dismissed_by"},
@@ -1264,6 +1267,8 @@ var reassignedUserReferences = map[string]bool{
 	"daycare_log.caretaker_id":        true,
 	"daycare_log.logged_by_id":        true,
 	"daycare_log.pickup_caretaker_id": true,
+	"illness.caretaker_id":            true,
+	"illness.logged_by_id":            true,
 	"feed_timer.caretaker_id":         true,
 	"vaccine_log.caretaker_id":        true,
 	"sleep_log.logged_by_id":          true,

@@ -977,6 +977,45 @@ func (e HandoverMealAppetite) Valid() bool {
 	}
 }
 
+// Defines values for IllnessSymptom.
+const (
+	IllnessSymptomCold      IllnessSymptom = "cold"
+	IllnessSymptomCough     IllnessSymptom = "cough"
+	IllnessSymptomDiarrhoea IllnessSymptom = "diarrhoea"
+	IllnessSymptomEar       IllnessSymptom = "ear"
+	IllnessSymptomEye       IllnessSymptom = "eye"
+	IllnessSymptomFever     IllnessSymptom = "fever"
+	IllnessSymptomOther     IllnessSymptom = "other"
+	IllnessSymptomRash      IllnessSymptom = "rash"
+	IllnessSymptomVomiting  IllnessSymptom = "vomiting"
+)
+
+// Valid indicates whether the value is a known member of the IllnessSymptom enum.
+func (e IllnessSymptom) Valid() bool {
+	switch e {
+	case IllnessSymptomCold:
+		return true
+	case IllnessSymptomCough:
+		return true
+	case IllnessSymptomDiarrhoea:
+		return true
+	case IllnessSymptomEar:
+		return true
+	case IllnessSymptomEye:
+		return true
+	case IllnessSymptomFever:
+		return true
+	case IllnessSymptomOther:
+		return true
+	case IllnessSymptomRash:
+		return true
+	case IllnessSymptomVomiting:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for InviteRole.
 const (
 	InviteRoleAdmin  InviteRole = "admin"
@@ -1409,6 +1448,7 @@ const (
 	TimelineEntryKindDaycare     TimelineEntryKind = "daycare"
 	TimelineEntryKindDiaper      TimelineEntryKind = "diaper"
 	TimelineEntryKindFeed        TimelineEntryKind = "feed"
+	TimelineEntryKindIllness     TimelineEntryKind = "illness"
 	TimelineEntryKindMeasurement TimelineEntryKind = "measurement"
 	TimelineEntryKindMedicine    TimelineEntryKind = "medicine"
 	TimelineEntryKindMilestone   TimelineEntryKind = "milestone"
@@ -1429,6 +1469,8 @@ func (e TimelineEntryKind) Valid() bool {
 	case TimelineEntryKindDiaper:
 		return true
 	case TimelineEntryKindFeed:
+		return true
+	case TimelineEntryKindIllness:
 		return true
 	case TimelineEntryKindMeasurement:
 		return true
@@ -2584,6 +2626,22 @@ type CreateHelpRequest struct {
 	Message  *string `json:"message,omitempty"`
 }
 
+// CreateIllness defines model for CreateIllness.
+type CreateIllness struct {
+	BabyId string `json:"babyId"`
+
+	// CaretakerId Who noted it (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller.
+	CaretakerId *string `json:"caretakerId,omitempty"`
+	ClearHours  *int    `json:"clearHours,omitempty"`
+
+	// EndTime Omit to open an episode.
+	EndTime       *time.Time        `json:"endTime,omitempty"`
+	LastSymptomAt *time.Time        `json:"lastSymptomAt,omitempty"`
+	Notes         *string           `json:"notes,omitempty"`
+	StartTime     time.Time         `json:"startTime"`
+	Symptoms      *[]IllnessSymptom `json:"symptoms,omitempty"`
+}
+
 // CreateInvite Every field is optional; an empty (or absent) body uses every default.
 type CreateInvite struct {
 	ExpiresInHours *int              `json:"expiresInHours,omitempty"`
@@ -3083,6 +3141,33 @@ type HelpRequest struct {
 	ToUserId string `json:"toUserId"`
 }
 
+// IllnessLog One illness episode (issue #107): what ties Monday's fever to Tuesday's vomiting, and what a "symptom-free since" clock counts from. State like a sleep session: endTime null means still ill. The app ships no medical judgement — `clearHours` is the family's own number for this episode and `lastSymptomAt` what they told us; the server compares neither to anything.
+type IllnessLog struct {
+	BabyId        string `json:"babyId"`
+	CaretakerId   string `json:"caretakerId"`
+	CaretakerName string `json:"caretakerName"`
+
+	// ClearHours How many symptom-free hours this family wants before barnehage, for THIS episode. null = no clock.
+	ClearHours *int `json:"clearHours"`
+
+	// EndTime null while she is still ill.
+	EndTime *time.Time `json:"endTime"`
+	Id      string     `json:"id"`
+
+	// LastSymptomAt When the last symptom was; null = still having symptoms. The SPA moves it forward, at read time, past any fever reading logged after it.
+	LastSymptomAt *time.Time `json:"lastSymptomAt"`
+
+	// LoggedById Who saved the row; set by the server, never by a client.
+	LoggedById   string           `json:"loggedById"`
+	LoggedByName string           `json:"loggedByName"`
+	Notes        *string          `json:"notes"`
+	StartTime    time.Time        `json:"startTime"`
+	Symptoms     []IllnessSymptom `json:"symptoms"`
+}
+
+// IllnessSymptom defines model for IllnessSymptom.
+type IllnessSymptom string
+
 // Invite defines model for Invite.
 type Invite struct {
 	Code      string     `json:"code"`
@@ -3341,6 +3426,11 @@ type PushTestResult struct {
 	Sent int `json:"sent"`
 }
 
+// RecoverIllness Defaults endTime to now on the server when omitted.
+type RecoverIllness struct {
+	EndTime *time.Time `json:"endTime,omitempty"`
+}
+
 // Redeem defines model for Redeem.
 type Redeem struct {
 	Code string `json:"code"`
@@ -3569,7 +3659,10 @@ type Summary struct {
 
 	// ActiveFeed The running nursing timer, or null (issue
 	ActiveFeed *FeedTimer `json:"activeFeed"`
-	ActivePlay *PlayLog   `json:"activePlay"`
+
+	// ActiveIllness The open illness episode, or null (issue
+	ActiveIllness *IllnessLog `json:"activeIllness"`
+	ActivePlay    *PlayLog    `json:"activePlay"`
 
 	// ActivePump The running pump timer, or null.
 	ActivePump  *FeedTimer `json:"activePump"`
@@ -3621,7 +3714,7 @@ type Timeline struct {
 	NextCursor *string `json:"nextCursor"`
 }
 
-// TimelineEntry One row in the merged timeline. `kind`, `id`, `babyId`, `caretakerId`, `caretakerName` and `notes` are present on every entry regardless of kind; everything else is kind-specific and only present for the kinds that have it (e.g. `startTime`/`endTime` on sleep, play and daycare, `time` on the other nine, `documents` only on vaccine) — see internal/api/timeline.go's per-kind entry builders, ported field-for-field from apps/api/src/routes/timeline.ts's merge. Modeled as an open object (kind + a handful of always-present fields typed, everything else additionalProperties) rather than a oneOf discriminated union: oapi-codegen has no clean Go representation for twelve structurally different variants sharing one JSON shape.
+// TimelineEntry One row in the merged timeline. `kind`, `id`, `babyId`, `caretakerId`, `caretakerName` and `notes` are present on every entry regardless of kind; everything else is kind-specific and only present for the kinds that have it (e.g. `startTime`/`endTime` on sleep, play and daycare, `time` on the other nine, `documents` only on vaccine) — see internal/api/timeline.go's per-kind entry builders, ported field-for-field from apps/api/src/routes/timeline.ts's merge. Modeled as an open object (kind + a handful of always-present fields typed, everything else additionalProperties) rather than a oneOf discriminated union: oapi-codegen has no clean Go representation for thirteen structurally different variants sharing one JSON shape.
 type TimelineEntry struct {
 	BabyId        string            `json:"babyId"`
 	CaretakerId   string            `json:"caretakerId"`
@@ -3771,6 +3864,17 @@ type UpdateFeedSide string
 
 // UpdateFeedType defines model for UpdateFeed.Type.
 type UpdateFeedType string
+
+// UpdateIllness Every field is optional; an empty object is a no-op. `endTime`, `lastSymptomAt`, `clearHours` and `notes` may be sent as `null` to CLEAR that column.
+type UpdateIllness struct {
+	CaretakerId   *string           `json:"caretakerId,omitempty"`
+	ClearHours    *int              `json:"clearHours,omitempty"`
+	EndTime       *time.Time        `json:"endTime,omitempty"`
+	LastSymptomAt *time.Time        `json:"lastSymptomAt,omitempty"`
+	Notes         *string           `json:"notes,omitempty"`
+	StartTime     *time.Time        `json:"startTime,omitempty"`
+	Symptoms      *[]IllnessSymptom `json:"symptoms,omitempty"`
+}
 
 // UpdateMe Every field optional. `nickname` and `phone` accept `null` to clear; the handler reads the raw body (internal/api/patch.go) to tell null from absent.
 type UpdateMe struct {
@@ -4076,6 +4180,21 @@ type GetFeedTimerParams struct {
 	BabyId string `form:"babyId" json:"babyId"`
 }
 
+// ListIllnessesParams defines parameters for ListIllnesses.
+type ListIllnessesParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+
+	// Limit Maximum number of rows to return.
+	Limit *LimitQuery `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// GetActiveIllnessParams defines parameters for GetActiveIllness.
+type GetActiveIllnessParams struct {
+	// BabyId Restrict the result to one baby in the caller's family.
+	BabyId *BabyIdQuery `form:"babyId,omitempty" json:"babyId,omitempty"`
+}
+
 // ListMeasurementsParams defines parameters for ListMeasurements.
 type ListMeasurementsParams struct {
 	// BabyId Restrict the result to one baby in the caller's family.
@@ -4320,6 +4439,15 @@ type UpdateFeedJSONRequestBody = UpdateFeed
 
 // CreateHelpRequestJSONRequestBody defines body for CreateHelpRequest for application/json ContentType.
 type CreateHelpRequestJSONRequestBody = CreateHelpRequest
+
+// CreateIllnessJSONRequestBody defines body for CreateIllness for application/json ContentType.
+type CreateIllnessJSONRequestBody = CreateIllness
+
+// UpdateIllnessJSONRequestBody defines body for UpdateIllness for application/json ContentType.
+type UpdateIllnessJSONRequestBody = UpdateIllness
+
+// RecoverIllnessJSONRequestBody defines body for RecoverIllness for application/json ContentType.
+type RecoverIllnessJSONRequestBody = RecoverIllness
 
 // CreateInviteJSONRequestBody defines body for CreateInvite for application/json ContentType.
 type CreateInviteJSONRequestBody = CreateInvite
