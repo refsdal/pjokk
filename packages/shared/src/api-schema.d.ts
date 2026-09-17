@@ -902,6 +902,59 @@ export interface paths {
         patch: operations["updateIllness"];
         trace?: never;
     };
+    "/api/care-days": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Days at home with an ill child (issue #108) in one calendar year: the rows, newest first, and every current member's total against the number they set for themselves. */
+        get: operations["listCareDays"];
+        put?: never;
+        /** Record that someone stayed home. `userId` defaults to the caller and must be a member (403 NOT_MEMBER); one row per person per date (409 DUPLICATE). `illnessId`, when given, must be this family's (404), and lends the day its baby. */
+        post: operations["createCareDay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/care-days/quota": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set a person's own yearly number of days, or clear it with `null`. One's own, or anyone's as a family admin (403 otherwise). The app ships no default and computes no entitlement. */
+        put: operations["setCareDayQuota"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/care-days/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a day. */
+        delete: operations["deleteCareDay"];
+        options?: never;
+        head?: never;
+        /** Change a day's date, fraction or note. `note` as `null` clears it. */
+        patch: operations["updateCareDay"];
+        trace?: never;
+    };
     "/api/vaccines/dismissals": {
         parameters: {
             query?: never;
@@ -2562,6 +2615,56 @@ export interface components {
         RecoverIllness: {
             /** Format: date-time */
             endTime?: string;
+        };
+        /** @description One person's one calendar day at home with an ill child (issue #108), whole or half. `date` is a calendar date in the person's own day, never an instant. */
+        CareDay: {
+            id: string;
+            userId: string;
+            userName: string;
+            babyId: string | null;
+            illnessId: string | null;
+            date: string;
+            /** @enum {number} */
+            fraction: 0.5 | 1;
+            note: string | null;
+        };
+        CareDayTotal: {
+            userId: string;
+            userName: string;
+            /** @description Days used in the year; halves count 0.5. */
+            used: number;
+            /** @description The person's own number, or null when they have set none. */
+            quota: number | null;
+        };
+        CareDays: {
+            year: number;
+            days: components["schemas"]["CareDay"][];
+            /** @description One per CURRENT member, those with nothing used included. */
+            totals: components["schemas"]["CareDayTotal"][];
+        };
+        CreateCareDay: {
+            /** @description Who stayed home; a member of the caller's family. Defaults to the caller. */
+            userId?: string;
+            date: string;
+            /**
+             * @description A whole day when omitted.
+             * @enum {number}
+             */
+            fraction?: 0.5 | 1;
+            babyId?: string;
+            illnessId?: string;
+            note?: string;
+        };
+        UpdateCareDay: {
+            date?: string;
+            /** @enum {number} */
+            fraction?: 0.5 | 1;
+            note?: string | null;
+        };
+        SetCareDayQuota: {
+            /** @description Defaults to the caller. Someone else's needs a family admin. */
+            userId?: string;
+            days: number | null;
         };
         /** @description One file attached to a vaccine log. Fetch through `/api/files/{id}` — the object store is never public. */
         VaccineDocument: {
@@ -6720,6 +6823,207 @@ export interface operations {
                 };
             };
             /** @description Clearing endTime would reopen an episode while another is already open for this baby. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listCareDays: {
+        parameters: {
+            query: {
+                year: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The year. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareDays"];
+                };
+            };
+        };
+    };
+    createCareDay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCareDay"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareDay"];
+                };
+            };
+            /** @description Not a calendar date (BAD_DATE). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `userId` is not a member of the caller's family (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unknown illness or baby. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description That person already has a row for that date (DUPLICATE). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setCareDayQuota: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetCareDayQuota"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description Someone else's number and the caller is not an admin (FORBIDDEN), or `userId` is not a member (NOT_MEMBER). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteCareDay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description No such day in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateCareDay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCareDay"];
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareDay"];
+                };
+            };
+            /** @description Not a calendar date (BAD_DATE). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such day in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description That person already has a row for the new date (DUPLICATE). */
             409: {
                 headers: {
                     [name: string]: unknown;

@@ -8,6 +8,7 @@ import { registerPlayMutationDefaults } from "./play";
 
 // One import site for the data layer; modules are split by domain.
 export * from "./calendar";
+export * from "./care-days";
 export * from "./config";
 export * from "./contacts";
 export * from "./devices";

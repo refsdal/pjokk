@@ -6055,7 +6055,7 @@ components:
         fraction:
           type: number
           enum: [0.5, 1]
-          default: 1
+          description: A whole day when omitted.
         babyId:
           type: string
         illnessId:
