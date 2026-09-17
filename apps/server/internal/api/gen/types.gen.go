@@ -3714,9 +3714,12 @@ type Stats struct {
 	AvgNaps float64 `json:"avgNaps"`
 
 	// AvgNightSleepMin Per day, minutes of sessions typed `night`; the rest of avgSleepMin is day sleep (naps and untyped sessions).
-	AvgNightSleepMin int32      `json:"avgNightSleepMin"`
-	AvgSleepMin      int32      `json:"avgSleepMin"`
-	Days             []StatsDay `json:"days"`
+	AvgNightSleepMin int32 `json:"avgNightSleepMin"`
+	AvgSleepMin      int32 `json:"avgSleepMin"`
+
+	// DaycareSplit Barnehage days against home days (issue #111): is the single midday nap pushing bedtime, are nights worse after barnehage? Completed days only — today is left out of both groups — and null unless the window holds at least two days of each kind: one day is an anecdote.
+	DaycareSplit *StatsDaycareSplit `json:"daycareSplit"`
+	Days         []StatsDay         `json:"days"`
 
 	// Nights One entry per local day of the window plus the day before it (oldest first): the night that began on each. The extra night is what lets a one-day window still answer "last night".
 	Nights []StatsNight `json:"nights"`
@@ -3726,7 +3729,10 @@ type Stats struct {
 // StatsDay defines model for StatsDay.
 type StatsDay struct {
 	// Date YYYY-MM-DD in the requester's local time.
-	Date        string           `json:"date"`
+	Date string `json:"date"`
+
+	// Daycare A barnehage session STARTED on this local day (issue #111). The Stats chart marks these days; `daycareSplit` averages them against the rest.
+	Daycare     bool             `json:"daycare"`
 	Diapers     int32            `json:"diapers"`
 	Feeds       int32            `json:"feeds"`
 	FeedsByType StatsFeedsByType `json:"feedsByType"`
@@ -3735,6 +3741,24 @@ type StatsDay struct {
 	// NightSleepMin The part of sleepMin from sessions typed `night` (issue
 	NightSleepMin int32 `json:"nightSleepMin"`
 	SleepMin      int32 `json:"sleepMin"`
+}
+
+// StatsDayGroup Sleep averaged over one kind of day (issue #111). `avgNapMin` is the mean daytime sleep per day, a nap counted whole against the day it started, no-nap days included. The two night figures belong to the night that FOLLOWED the day, and are null when no such night was logged in the group.
+type StatsDayGroup struct {
+	// AvgBedtimeMin Minutes after local midnight (0–1439) of the night's first session, averaged on the evening's own line so 23:50 and 00:10 meet at midnight, not noon.
+	AvgBedtimeMin    *int32 `json:"avgBedtimeMin"`
+	AvgNapMin        int32  `json:"avgNapMin"`
+	AvgNightSleepMin *int32 `json:"avgNightSleepMin"`
+	Days             int32  `json:"days"`
+}
+
+// StatsDaycareSplit defines model for StatsDaycareSplit.
+type StatsDaycareSplit struct {
+	// Daycare Sleep averaged over one kind of day (issue #111). `avgNapMin` is the mean daytime sleep per day, a nap counted whole against the day it started, no-nap days included. The two night figures belong to the night that FOLLOWED the day, and are null when no such night was logged in the group.
+	Daycare StatsDayGroup `json:"daycare"`
+
+	// Home Sleep averaged over one kind of day (issue #111). `avgNapMin` is the mean daytime sleep per day, a nap counted whole against the day it started, no-nap days included. The two night figures belong to the night that FOLLOWED the day, and are null when no such night was logged in the group.
+	Home StatsDayGroup `json:"home"`
 }
 
 // StatsFeedsByType defines model for StatsFeedsByType.
