@@ -17,6 +17,7 @@ const sleep = (over: Partial<SleepLog> = {}): SleepLog => ({
   caretakerName: "Kari",
   loggedById: "u1",
   loggedByName: "Kari",
+  daycareId: null,
   startTime: minAgo(120),
   endTime: minAgo(5),
   location: null,
