@@ -3,6 +3,8 @@ import {
   describeNapWindow,
   napWindow,
   wakeWindowFor,
+  describeUsualNap,
+  usualNap,
 } from "../src/lib/nap-window";
 
 const min = (n: number) => n * 60_000;
@@ -91,5 +93,61 @@ describe("describeNapWindow", () => {
         napWindow({ birthDate: threeMonths, wakeAt: at(now, -200), now })!,
       ),
     ).toBe("Past the usual nap window");
+  });
+});
+
+// The family's own anchor (issue #112): past twelve months the cited table
+// stops, and a barnehage's fixed nap sets the rhythm.
+describe("usualNap", () => {
+  const at = (h: number, m = 0) => new Date(2026, 8, 19, h, m); // a Saturday
+  const minute = 11 * 60 + 30;
+
+  test("says the usual time while it is ahead, then that it was", () => {
+    expect(usualNap({ minute, lastSleepStart: null, now: at(9) })).toEqual({
+      state: "upcoming",
+      at: at(11, 30),
+    });
+    expect(
+      usualNap({ minute, lastSleepStart: null, now: at(12, 15) })?.state,
+    ).toBe("was");
+    expect(describeUsualNap({ state: "upcoming", at: at(11, 30) })).toBe(
+      "Usual nap 11:30",
+    );
+    expect(describeUsualNap({ state: "was", at: at(11, 30) })).toBe(
+      "Usual nap was 11:30",
+    );
+  });
+
+  test("goes quiet once she has had it: a sleep that began around or after the time", () => {
+    expect(
+      usualNap({ minute, lastSleepStart: at(11, 10), now: at(13) }),
+    ).toBeNull();
+    expect(
+      usualNap({ minute, lastSleepStart: at(10, 5), now: at(13) }),
+    ).toBeNull();
+    // The night she woke from this morning is not the nap.
+    const lastNight = new Date(2026, 8, 18, 19, 0);
+    expect(
+      usualNap({ minute, lastSleepStart: lastNight, now: at(9) })?.state,
+    ).toBe("upcoming");
+    // An early catnap at 08:30 is not it either.
+    expect(
+      usualNap({ minute, lastSleepStart: at(8, 30), now: at(10) })?.state,
+    ).toBe("upcoming");
+  });
+
+  test("stops saying it three hours on, and says nothing with no anchor", () => {
+    expect(
+      usualNap({ minute, lastSleepStart: null, now: at(14, 29) })?.state,
+    ).toBe("was");
+    expect(
+      usualNap({ minute, lastSleepStart: null, now: at(14, 31) }),
+    ).toBeNull();
+    expect(
+      usualNap({ minute: null, lastSleepStart: null, now: at(9) }),
+    ).toBeNull();
+    expect(
+      usualNap({ minute: undefined, lastSleepStart: null, now: at(9) }),
+    ).toBeNull();
   });
 });

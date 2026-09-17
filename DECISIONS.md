@@ -3032,3 +3032,37 @@ design.
   Recharts' second-axis behaviour to depend on.
 - **The arithmetic is a pure function** (`stats_daycare.go`) with its own
   internal test, beside an API test with a fixed clock.
+
+## 2026-09-17 — the family's own nap anchor, and no table past 12 months
+
+Ninth of the barnehage series (#112). The issue had two parts; one was
+built and one deliberately was not.
+
+- **The wake-window table is NOT extended past 12 months.** The file's own
+  rule is a clinical source, cited, never memory, and the table stops where
+  the source stops. Cleveland Clinic's page ends at 10–12 months (re-read
+  2026-09-17). Everything found for 12–24 months is commercial
+  sleep-consultant content — Taking Cara Babies, Huckleberry's blog,
+  Pampers, wake-window calculators — roughly in agreement, none a clinical
+  reference, several selling a programme, one a competitor. Citing below
+  the bar or writing numbers from memory are both wrong for a line a tired
+  parent plans an afternoon by. Recorded on the issue.
+- **Instead, the family's own number.** Past twelve months a barnehage's
+  fixed midday nap sets the rhythm, not a wake window, so "Usual nap 11:30"
+  is also the better answer for the age, and it needs no source.
+- **It replaces the window rather than sit beside it**, at any age: two
+  guide lines would be one too many, and a family that typed a time has
+  said which it wants. On weekends too — that is what keeps home days in
+  step with the barnehage's week.
+- **It goes quiet once she has had the nap** (a sleep that began within 90
+  minutes before the time, or after it) and three hours past the time.
+  This morning's night sleep and an 08:30 catnap are not the nap.
+- **Family data, on `baby_about`**, not a device preference like the
+  guide's on/off switch: every caretaker's Home should say the same time.
+  Its own `PUT`, touching one column, so the About-me page's four-line
+  replace cannot clear it and the reverse.
+- **A wall-clock minute with no timezone**, like a reminder's `at_minute`:
+  the server stores it and compares it with nothing.
+- Deriving the anchor from logged barnehage naps was floated in the issue
+  and left out: a typed time is one field, and the About-me page already
+  shows the logged median beside it.

@@ -109,6 +109,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/babies/{id}/usual-nap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** The family's own nap anchor (issue #112): minutes after LOCAL midnight, or null for none. When set, Home's Awake card says "Usual nap 11:30" instead of computing a wake window. Any member may. */
+        put: operations["setUsualNap"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/family": {
         parameters: {
             query?: never;
@@ -2693,6 +2710,9 @@ export interface components {
             diet: string | null;
             other: string | null;
         };
+        SetUsualNap: {
+            minute: number | null;
+        };
         /** @description One file attached to a vaccine log. Fetch through `/api/files/{id}` — the object store is never public. */
         VaccineDocument: {
             id: string;
@@ -2921,6 +2941,8 @@ export interface components {
             activeDaycare: components["schemas"]["DaycareLog"] | null;
             /** @description The newest day at barnehage that ended within the last 12 hours and has no handover yet (no linked rows, no mood), or null. Backs Home's "How was the day?" card (issue #106). */
             handoverDue: components["schemas"]["DaycareLog"] | null;
+            /** @description The family's own nap anchor for this baby, minutes after local midnight, or null (issue #112). A wall-clock time with no timezone: the device compares it with its own clock. */
+            usualNapMinute: number | null;
             /** @description The open illness episode, or null (issue */
             activeIllness: components["schemas"]["IllnessLog"] | null;
             /** @description The running nursing timer, or null (issue */
@@ -4195,6 +4217,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BabyAbout"];
+                };
+            };
+            /** @description No baby with this id in the caller's family. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setUsualNap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource id. */
+                id: components["parameters"]["idPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetUsualNap"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
                 };
             };
             /** @description No baby with this id in the caller's family. */

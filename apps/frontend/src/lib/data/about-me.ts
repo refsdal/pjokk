@@ -83,3 +83,21 @@ export function useSaveBabyAbout() {
       qc.setQueryData(["baby-about", babyId], saved),
   });
 }
+
+// The family's own nap anchor (issue #112). Read off the summary, where
+// Home already has it; written here.
+export function useSetUsualNap() {
+  const qc = useQueryClient();
+  return useMutation<unknown, Error, { babyId: string; minute: number | null }>(
+    {
+      mutationFn: async ({ babyId, minute }) =>
+        unwrap(
+          client.PUT("/api/babies/{id}/usual-nap", {
+            params: { path: { id: babyId } },
+            body: { minute },
+          }),
+        ),
+      onSettled: () => qc.invalidateQueries({ queryKey: ["summary"] }),
+    },
+  );
+}
