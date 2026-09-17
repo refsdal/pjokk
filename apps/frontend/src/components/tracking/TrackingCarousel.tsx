@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Baby, Feature } from "@pjokk/shared";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -38,16 +38,47 @@ export function TrackingCarousel({
   const months = ageMonths(new Date(baby.birthDate));
   const last = featureCards.length; // the summary's index
 
+  // The card a button asked for, while the smooth scroll is still on its
+  // way there. Without it the scroll handler below reads the strip's
+  // position mid-flight and sets the index BACK, so Done turns into Next
+  // for a few frames after "Use the recommended set" — and a tap in
+  // those frames lands on Next (seen on a slow CI runner). A swipe has no
+  // target, so its position is trusted at once.
+  const target = useRef<number | null>(null);
   const goTo = (i: number) => {
     const el = strip.current;
-    if (el) el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
+    if (!el) return;
+    target.current = i;
+    el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
     setIndex(i);
   };
-  const onScroll = () => {
+  const positionIndex = () => {
     const el = strip.current;
-    if (!el || el.clientWidth === 0) return;
-    setIndex(Math.round(el.scrollLeft / el.clientWidth));
+    if (!el || el.clientWidth === 0) return null;
+    return Math.round(el.scrollLeft / el.clientWidth);
   };
+  const onScroll = () => {
+    const i = positionIndex();
+    if (i === null) return;
+    if (target.current !== null) {
+      if (i === target.current) target.current = null; // arrived
+      return;
+    }
+    setIndex(i);
+  };
+  // A programmatic scroll a swipe interrupted never "arrives": once the
+  // strip has come to rest anywhere, the position is the truth again.
+  useEffect(() => {
+    const el = strip.current;
+    if (!el) return;
+    const settle = () => {
+      target.current = null;
+      const i = positionIndex();
+      if (i !== null) setIndex(i);
+    };
+    el.addEventListener("scrollend", settle);
+    return () => el.removeEventListener("scrollend", settle);
+  }, []);
   const set = (features: Feature[]) =>
     save.mutate({ babyId: baby.id, features });
   const flip = (key: Feature, on: boolean) =>

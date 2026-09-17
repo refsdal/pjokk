@@ -56,6 +56,25 @@ test("a new baby chooses on the carousel; the recommended set reflows Home", asy
   await expect(
     page.getByTestId("tracking-card-feeds").getByRole("switch"),
   ).toHaveAttribute("aria-checked", "false");
+  // "Use the recommended set" jumps to the summary with a smooth scroll.
+  // Done must appear once and STAY: the scroll handler used to read the
+  // strip's position mid-flight and swap Next back in for a few frames,
+  // and a tap in those frames went nowhere.
+  const swaps: string[] = [];
+  await page.exposeFunction("noteFooter", (s: string) => {
+    swaps.push(s);
+  });
+  await page.evaluate(() => {
+    const note = (window as unknown as { noteFooter: (s: string) => void }).noteFooter;
+    let last = "";
+    new MutationObserver(() => {
+      const now = document.querySelector('[data-testid="tracking-done"]') ? "done" : "next";
+      if (now !== last) {
+        last = now;
+        note(now);
+      }
+    }).observe(document.body, { subtree: true, childList: true });
+  });
   await page.getByTestId("use-recommended").click();
   const summary = page.getByTestId("tracking-summary");
   await expect(summary).toContainText("Feeds");
@@ -63,6 +82,8 @@ test("a new baby chooses on the carousel; the recommended set reflows Home", asy
   await expect(summary).toContainText("Diapers");
   await expect(summary).toContainText("Growth and temperature");
   await expect(summary).not.toContainText("Milestones");
+  await page.waitForTimeout(800); // longer than the smooth scroll
+  expect(swaps).toEqual(["done"]);
   await page.getByTestId("tracking-done").click();
 
   await expect(page).toHaveURL(/\/home/);
