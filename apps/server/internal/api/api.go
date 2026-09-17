@@ -312,6 +312,10 @@ var operationAuthTiers = map[string]authTier{
 	"DeleteCareDay":   tierFamily,
 	"SetCareDayQuota": tierFamily,
 
+	// The "About <name>" sheet's free-text lines (issue #109).
+	"GetBabyAbout": tierFamily,
+	"PutBabyAbout": tierFamily,
+
 	"GetSummary": tierFamily,
 
 	// The six Phase 3 activity types (other-logs.ts's makeLogRoutes

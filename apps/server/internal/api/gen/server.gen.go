@@ -125,6 +125,12 @@ type ServerInterface interface {
 	// UpdateBaby Partial update. An empty body is a no-op that returns the baby unchanged.
 	// (PATCH /api/babies/{id})
 	UpdateBaby(w http.ResponseWriter, r *http.Request, id IdPath)
+	// GetBabyAbout What the logs cannot know about a child (issue #109): the free-text lines of the "About <name>" sheet for the barnehage. A baby nobody has written about answers four nulls, not a 404.
+	// (GET /api/babies/{id}/about)
+	GetBabyAbout(w http.ResponseWriter, r *http.Request, id IdPath)
+	// PutBabyAbout Replace the four lines. Blank or null clears one. Any member may.
+	// (PUT /api/babies/{id}/about)
+	PutBabyAbout(w http.ResponseWriter, r *http.Request, id IdPath)
 	// ListBaths Bath logs in the caller's active family, newest first.
 	// (GET /api/baths)
 	ListBaths(w http.ResponseWriter, r *http.Request, params ListBathsParams)
@@ -1481,6 +1487,58 @@ func (siw *ServerInterfaceWrapper) UpdateBaby(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateBaby(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetBabyAbout operation middleware
+func (siw *ServerInterfaceWrapper) GetBabyAbout(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBabyAbout(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutBabyAbout operation middleware
+func (siw *ServerInterfaceWrapper) PutBabyAbout(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutBabyAbout(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4882,6 +4940,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/babies", wrapper.CreateBaby)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/babies/{id}", wrapper.DeleteBaby)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/babies/{id}", wrapper.UpdateBaby)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/babies/{id}/about", wrapper.GetBabyAbout)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/babies/{id}/about", wrapper.PutBabyAbout)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/family", wrapper.GetFamily)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/family/members", wrapper.ListFamilyMembers)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/family/members/{memberId}", wrapper.DeleteFamilyMember)
@@ -6401,6 +6461,79 @@ func (response UpdateBaby200JSONResponse) VisitUpdateBabyResponse(w http.Respons
 type UpdateBaby404JSONResponse Error
 
 func (response UpdateBaby404JSONResponse) VisitUpdateBabyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetBabyAboutRequestObject struct {
+	Id IdPath `json:"id"`
+}
+
+type GetBabyAboutResponseObject interface {
+	VisitGetBabyAboutResponse(w http.ResponseWriter) error
+}
+
+type GetBabyAbout200JSONResponse BabyAbout
+
+func (response GetBabyAbout200JSONResponse) VisitGetBabyAboutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetBabyAbout404JSONResponse Error
+
+func (response GetBabyAbout404JSONResponse) VisitGetBabyAboutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutBabyAboutRequestObject struct {
+	Id   IdPath `json:"id"`
+	Body *PutBabyAboutJSONRequestBody
+}
+
+type PutBabyAboutResponseObject interface {
+	VisitPutBabyAboutResponse(w http.ResponseWriter) error
+}
+
+type PutBabyAbout200JSONResponse BabyAbout
+
+func (response PutBabyAbout200JSONResponse) VisitPutBabyAboutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutBabyAbout404JSONResponse Error
+
+func (response PutBabyAbout404JSONResponse) VisitPutBabyAboutResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -11579,6 +11712,12 @@ type StrictServerInterface interface {
 	// UpdateBaby Partial update. An empty body is a no-op that returns the baby unchanged.
 	// (PATCH /api/babies/{id})
 	UpdateBaby(ctx context.Context, request UpdateBabyRequestObject) (UpdateBabyResponseObject, error)
+	// GetBabyAbout What the logs cannot know about a child (issue #109): the free-text lines of the "About <name>" sheet for the barnehage. A baby nobody has written about answers four nulls, not a 404.
+	// (GET /api/babies/{id}/about)
+	GetBabyAbout(ctx context.Context, request GetBabyAboutRequestObject) (GetBabyAboutResponseObject, error)
+	// PutBabyAbout Replace the four lines. Blank or null clears one. Any member may.
+	// (PUT /api/babies/{id}/about)
+	PutBabyAbout(ctx context.Context, request PutBabyAboutRequestObject) (PutBabyAboutResponseObject, error)
 	// ListBaths Bath logs in the caller's active family, newest first.
 	// (GET /api/baths)
 	ListBaths(ctx context.Context, request ListBathsRequestObject) (ListBathsResponseObject, error)
@@ -12983,6 +13122,65 @@ func (sh *strictHandler) UpdateBaby(w http.ResponseWriter, r *http.Request, id I
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateBabyResponseObject); ok {
 		if err := validResponse.VisitUpdateBabyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetBabyAbout operation middleware
+func (sh *strictHandler) GetBabyAbout(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request GetBabyAboutRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetBabyAbout(ctx, request.(GetBabyAboutRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetBabyAbout")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetBabyAboutResponseObject); ok {
+		if err := validResponse.VisitGetBabyAboutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutBabyAbout operation middleware
+func (sh *strictHandler) PutBabyAbout(w http.ResponseWriter, r *http.Request, id IdPath) {
+	var request PutBabyAboutRequestObject
+
+	request.Id = id
+
+	var body PutBabyAboutJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutBabyAbout(ctx, request.(PutBabyAboutRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutBabyAbout")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutBabyAboutResponseObject); ok {
+		if err := validResponse.VisitPutBabyAboutResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
