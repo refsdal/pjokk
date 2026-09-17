@@ -409,6 +409,15 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   schedule — built in the browser with jsPDF (lazy-loaded; `lib/report.ts`)
   from the same API reads the screens use. Never server-side. Tables, no
   charts. File name `pjokk-<baby>-<from>-<to>.pdf`.
+- **"About <name>" (Settings → Data, #109, spec
+  `docs/superpowers/specs/2026-09-17-about-me-page-design.md`):** the one
+  page a barnehage asks for before tilvenning — routines read off the last
+  two weeks of logs (`lib/about-me.ts`: medians rounded to five minutes, at
+  least three days behind every figure, a reaction never expires) plus four
+  free-text lines kept in `baby_about`. The card's preview IS the page:
+  any section can be left out, and one list feeds both it and the PDF
+  (jsPDF, lazy, in the browser like the report). File name
+  `pjokk-<baby>-about.pdf`.
 - **Operator console (`/admin`, system admins only):** Users, Families
   and Audit lists (server-side search, keyset paging, Load more), a page
   per family (spec `docs/superpowers/specs/2026-09-08-admin-family-management-design.md`)

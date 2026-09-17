@@ -2958,3 +2958,24 @@ Fifth of the barnehage series (#108). Spec:
 - **Any member may record a day for any member**, as they log each other's
   care; only the yearly number is personal (one's own, or anyone's as a
   family admin).
+
+## 2026-09-17 — "About <name>", one page for the barnehage
+
+Sixth of the barnehage series (#109). Spec:
+`docs/superpowers/specs/2026-09-17-about-me-page-design.md`.
+
+- **"Usual" is a median, rounded to five minutes, with at least three days
+  behind it** — or the line is left out. A stranger plans a child's day by
+  this page; one dreadful morning must not move it, and two naps are an
+  anecdote. A reaction to a food is the one line that never expires.
+- **The preview is the page.** One list of sections feeds the card and the
+  PDF, each with an Included / Left out switch, so a family decides what it
+  hands over before anything is made. Built in the browser; nothing leaves
+  the device but the file.
+- **`baby_about` is its own table**, not four columns on `baby`: the baby
+  row has a full-row `UPDATE … RETURNING *` and a dozen readers, and the
+  text is wanted in exactly one place.
+- **Contacts are the address book's entries with a phone number.** The
+  issue imagined an "emergency contact" flag; there is none, and adding one
+  to save a parent a switch was not worth a migration. Members' own phone
+  numbers stay private to their profiles.
