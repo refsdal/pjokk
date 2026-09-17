@@ -121,6 +121,21 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 		solids       int32
 		diapers      int32
 	}
+	// Ill days (issue #127, stats_ill.go): the local days an illness
+	// episode touched.
+	illnesses, err := d.Q.IllnessesInRange(ctx, dbgen.IllnessesInRangeParams{FamilyID: fam.FamilyID, BabyID: babyID, FromTs: fromTS, ToTs: toTS})
+	if err != nil {
+		return nil, err
+	}
+	spans := make([]illSpan, len(illnesses))
+	for i, ill := range illnesses {
+		spans[i] = illSpan{startMs: ill.StartTime.Time.UnixMilli(), endMs: -1}
+		if ill.EndTime.Valid {
+			spans[i].endMs = ill.EndTime.Time.UnixMilli()
+		}
+	}
+	illDays := illDayIndexes(spans, rangeFrom, rangeTo, now, dayIndex)
+
 	// A local day is a barnehage day if she was dropped off on it.
 	daycareDays := make(map[int64]bool, len(dropOffs))
 	for _, at := range dropOffs {
@@ -273,6 +288,7 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 		statsDays = append(statsDays, gen.StatsDay{
 			Date:          date,
 			Daycare:       daycareDays[i],
+			Ill:           illDays[i],
 			SleepMin:      sleepMin,
 			NightSleepMin: nightMin,
 			IntakeMl:      b.intakeMl,
@@ -348,6 +364,8 @@ func (d Deps) GetStats(ctx context.Context, req gen.GetStatsRequestObject) (gen.
 
 	return gen.GetStats200JSONResponse{
 		DaycareSplit:     daycareSplit(completed),
+		IllDays:          int32(len(illDays)),
+		IllEpisodes:      int32(len(illnesses)),
 		Days:             statsDays,
 		Nights:           statsNights,
 		AvgSleepMin:      avgSleepMin,

@@ -57,3 +57,45 @@ test("the split appears once there are barnehage days and home days", async ({
   await card.scrollIntoViewIfNeeded();
   await page.screenshot({ path: shot("stats.png"), fullPage: true });
 });
+
+// Ill days (issue #127): "how much has she actually been ill?". One quiet
+// row, only when the window has any, and the chart rings the days.
+test("ill days are counted against the window and ringed under the chart", async ({
+  page,
+  request,
+}) => {
+  await freshFamily(page, request, "illdays");
+  const babies = await (await page.request.get("/api/babies")).json();
+  const babyId = babies[0].id as string;
+  const at = (daysAgo: number, h: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - daysAgo);
+    d.setHours(h, 0, 0, 0);
+    return d.toISOString();
+  };
+
+  await page.goto("/stats");
+  await expect(page.getByText("Sleep per day")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId("ill-days")).toHaveCount(0);
+
+  // Three days of it, four to two days ago; over since.
+  const ill = await page.request.post("/api/illness", {
+    data: { babyId, startTime: at(4, 15), endTime: at(2, 9), symptoms: ["vomiting"] },
+  });
+  expect(ill.status(), await ill.text()).toBe(201);
+
+  await page.reload();
+  await expect(page.getByTestId("ill-days-value")).toHaveText("3 of 7 days · 1 episode", {
+    timeout: 10_000,
+  });
+  await expect(page.getByTestId("daycare-marks").locator('[data-ill="true"]')).toHaveCount(3);
+  await expect(page.getByText("ill that day")).toBeVisible();
+  await page.getByTestId("ill-days").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: shot("ill-days.png"), fullPage: true });
+
+  // The month view counts the same days against thirty.
+  await page.getByRole("button", { name: "Month", exact: true }).click();
+  await expect(page.getByTestId("ill-days-value")).toHaveText("3 of 30 days · 1 episode", {
+    timeout: 10_000,
+  });
+});

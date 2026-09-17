@@ -3142,3 +3142,30 @@ Second follow-up to the barnehage series (#126), answering the question
 - **Frontend only.** The sleep list already carries `daycareId`; the
   suggestion reads the same 200-row list the About-me page does, under the
   same query key.
+
+## 2026-09-17 — ill days in Stats
+
+Third follow-up to the barnehage series (#127): the count #107's issue
+asked for and its PR did not build.
+
+- **Days, not episodes or hours.** `Stats.illDays` is how many local days
+  of the window an illness episode touched; in the month view that is "ill
+  days this month". A day two episodes share is one ill day, an open
+  episode runs to today rather than to the window's end, and one that ends
+  exactly at local midnight did not touch the day that begins there.
+- **Cut at the same midnight as everything else in Stats**: the pure
+  `illDayIndexes` takes GetStats' own local-day function.
+- **One quiet row, only when there is something to say.** A healthy month
+  has no row. No year view and no history chart: Stats stays deliberately
+  minimal, and the window toggle is the only time control it has.
+- **A ring, not a second colour, under the chart.** Barnehage days are a
+  filled dot in the accent; ill days are a hollow ring. The accent and the
+  coral are close, colour alone fails for colour blindness, and night mode
+  collapses every tint onto one amber ramp — the rule the temperature
+  card's arrows already follow.
+- **Two things a screenshot caught.** A lone ring sat a few pixels right of
+  its day label because each cell reserved an invisible slot for the
+  barnehage dot; cells now render only the marks that apply. And the row
+  first read "Ill 3 of 7 days", which in the app's typeface looks like the
+  Roman numeral III; it is now an "Ill days" label over "3 of 7 days · 1
+  episode", the shape the other Stats cards have.

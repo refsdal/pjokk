@@ -65,3 +65,13 @@ WHERE "family_id" = sqlc.arg(family_id) AND "id" = sqlc.arg(id);
 -- name: DeleteIllness :execrows
 DELETE FROM "illness"
 WHERE "family_id" = $1 AND "id" = $2;
+
+-- name: IllnessesInRange :many
+-- Episodes OVERLAPPING [from, to), for Stats' ill-day count (issue #127): a
+-- range-overlap test like summary.sql's SleepsInRange, and an open episode
+-- (end_time IS NULL) is open-ended.
+SELECT "start_time", "end_time"
+FROM "illness"
+WHERE "family_id" = sqlc.arg(family_id) AND "baby_id" = sqlc.arg(baby_id)
+  AND "start_time" < sqlc.arg(to_ts)::timestamptz
+  AND ("end_time" IS NULL OR "end_time" > sqlc.arg(from_ts)::timestamptz);

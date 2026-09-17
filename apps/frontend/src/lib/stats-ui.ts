@@ -85,3 +85,19 @@ export function dayGroupLine(
     .filter(Boolean)
     .join(" · ");
 }
+
+// Ill days (issue #127): "6 of 30 days · 2 episodes" under an "Ill days"
+// label, or null when the window has none — a healthy month needs no row.
+// The label is the card's, not part of the line: set in the app's typeface
+// a leading "Ill" reads as the Roman numeral III. The words are passed in
+// so the strings stay in the screen, next to the other translated copy.
+export function illLine(
+  illDays: number,
+  illEpisodes: number,
+  windowDays: number,
+  labels: { of: string; days: string; episode: string; episodes: string },
+): string | null {
+  if (illDays <= 0) return null;
+  const episodes = `${illEpisodes} ${illEpisodes === 1 ? labels.episode : labels.episodes}`;
+  return `${illDays} ${labels.of} ${windowDays} ${labels.days} · ${episodes}`;
+}

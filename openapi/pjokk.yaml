@@ -6402,7 +6402,7 @@ components:
       additionalProperties: true
     StatsDay:
       type: object
-      required: [date, daycare, sleepMin, nightSleepMin, intakeMl, feeds, feedsByType, diapers]
+      required: [date, daycare, ill, sleepMin, nightSleepMin, intakeMl, feeds, feedsByType, diapers]
       properties:
         date:
           type: string
@@ -6413,6 +6413,12 @@ components:
             A barnehage session STARTED on this local day (issue #111). The
             Stats chart marks these days; `daycareSplit` averages them
             against the rest.
+        ill:
+          type: boolean
+          description: >-
+            An illness episode touched this local day (issue #127): it began
+            on it, ended on it, or ran across it. An open episode counts up
+            to today.
         sleepMin:
           type: integer
           format: int32
@@ -6538,7 +6544,20 @@ components:
         - avgDiapers
         - weight
         - daycareSplit
+        - illDays
+        - illEpisodes
       properties:
+        illDays:
+          type: integer
+          format: int32
+          description: >-
+            How many local days of the window an illness episode touched
+            (issue #127). In the 30-day view this is "ill days this month".
+            A day two episodes share is counted once.
+        illEpisodes:
+          type: integer
+          format: int32
+          description: How many illness episodes overlap the window.
         daycareSplit:
           description: >-
             Barnehage days against home days (issue #111): is the single
