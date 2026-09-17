@@ -65,6 +65,60 @@ func (q *Queries) ExportBaths(ctx context.Context, arg ExportBathsParams) ([]Exp
 	return items, nil
 }
 
+const exportCareDays = `-- name: ExportCareDays :many
+SELECT
+    c."date", c."fraction", COALESCE(u."display_name", '') AS user_name,
+    COALESCE(bb."name", '') AS baby_name, c."note"
+FROM "care_day" c
+JOIN "users" u ON u."id" = c."user_id"
+LEFT JOIN "baby" bb ON bb."id" = c."baby_id"
+WHERE c."family_id" = $1
+ORDER BY c."date" ASC, c."id" ASC
+LIMIT $2
+`
+
+type ExportCareDaysParams struct {
+	FamilyID string
+	Lim      int32
+}
+
+type ExportCareDaysRow struct {
+	Date     pgtype.Date
+	Fraction float64
+	UserName string
+	BabyName string
+	Note     *string
+}
+
+// Days at home with an ill child (issue #108). Not a log of the child's
+// care but it belongs in "everything the family recorded": one row per
+// person per day.
+func (q *Queries) ExportCareDays(ctx context.Context, arg ExportCareDaysParams) ([]ExportCareDaysRow, error) {
+	rows, err := q.db.Query(ctx, exportCareDays, arg.FamilyID, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ExportCareDaysRow
+	for rows.Next() {
+		var i ExportCareDaysRow
+		if err := rows.Scan(
+			&i.Date,
+			&i.Fraction,
+			&i.UserName,
+			&i.BabyName,
+			&i.Note,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const exportDaycares = `-- name: ExportDaycares :many
 SELECT
     d."baby_id", bb."name" AS baby_name, d."start_time", d."end_time",

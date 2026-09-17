@@ -2249,6 +2249,161 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/care-days:
+    get:
+      operationId: listCareDays
+      summary: >-
+        Days at home with an ill child (issue #108) in one calendar year:
+        the rows, newest first, and every current member's total against
+        the number they set for themselves.
+      tags: [care-days]
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 2000
+            maximum: 2100
+      responses:
+        "200":
+          description: The year.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CareDays"
+    post:
+      operationId: createCareDay
+      summary: >-
+        Record that someone stayed home. `userId` defaults to the caller and
+        must be a member (403 NOT_MEMBER); one row per person per date (409
+        DUPLICATE). `illnessId`, when given, must be this family's (404),
+        and lends the day its baby.
+      tags: [care-days]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCareDay"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CareDay"
+        "400":
+          description: Not a calendar date (BAD_DATE).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "`userId` is not a member of the caller's family (NOT_MEMBER)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Unknown illness or baby.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: That person already has a row for that date (DUPLICATE).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/care-days/quota:
+    put:
+      operationId: setCareDayQuota
+      summary: >-
+        Set a person's own yearly number of days, or clear it with `null`.
+        One's own, or anyone's as a family admin (403 otherwise). The app
+        ships no default and computes no entitlement.
+      tags: [care-days]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetCareDayQuota"
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "403":
+          description: >-
+            Someone else's number and the caller is not an admin
+            (FORBIDDEN), or `userId` is not a member (NOT_MEMBER).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/care-days/{id}:
+    patch:
+      operationId: updateCareDay
+      summary: Change a day's date, fraction or note. `note` as `null` clears it.
+      tags: [care-days]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCareDay"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CareDay"
+        "400":
+          description: Not a calendar date (BAD_DATE).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No such day in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: That person already has a row for the new date (DUPLICATE).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteCareDay
+      summary: Delete a day.
+      tags: [care-days]
+      parameters:
+        - $ref: "#/components/parameters/idPath"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "404":
+          description: No such day in the caller's family.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/vaccines/dismissals:
     get:
       operationId: listVaccineDismissals
@@ -5828,6 +5983,111 @@ components:
         endTime:
           type: string
           format: date-time
+    CareDay:
+      type: object
+      description: >-
+        One person's one calendar day at home with an ill child (issue
+        #108), whole or half. `date` is a calendar date in the person's own
+        day, never an instant.
+      required: [id, userId, userName, babyId, illnessId, date, fraction, note]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        userName:
+          type: string
+        babyId:
+          type: string
+          nullable: true
+        illnessId:
+          type: string
+          nullable: true
+        date:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}$
+        fraction:
+          type: number
+          enum: [0.5, 1]
+        note:
+          type: string
+          nullable: true
+    CareDayTotal:
+      type: object
+      required: [userId, userName, used, quota]
+      properties:
+        userId:
+          type: string
+        userName:
+          type: string
+        used:
+          type: number
+          description: Days used in the year; halves count 0.5.
+        quota:
+          type: integer
+          nullable: true
+          description: The person's own number, or null when they have set none.
+    CareDays:
+      type: object
+      required: [year, days, totals]
+      properties:
+        year:
+          type: integer
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/CareDay"
+        totals:
+          type: array
+          description: One per CURRENT member, those with nothing used included.
+          items:
+            $ref: "#/components/schemas/CareDayTotal"
+    CreateCareDay:
+      type: object
+      required: [date]
+      properties:
+        userId:
+          type: string
+          description: Who stayed home; a member of the caller's family. Defaults to the caller.
+        date:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}$
+        fraction:
+          type: number
+          enum: [0.5, 1]
+          default: 1
+        babyId:
+          type: string
+        illnessId:
+          type: string
+        note:
+          type: string
+          maxLength: 500
+    UpdateCareDay:
+      type: object
+      properties:
+        date:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}$
+        fraction:
+          type: number
+          enum: [0.5, 1]
+        note:
+          type: string
+          maxLength: 500
+          nullable: true
+    SetCareDayQuota:
+      type: object
+      required: [days]
+      properties:
+        userId:
+          type: string
+          description: Defaults to the caller. Someone else's needs a family admin.
+        days:
+          type: integer
+          minimum: 0
+          maximum: 366
+          nullable: true
     VaccineDocument:
       type: object
       description: >-

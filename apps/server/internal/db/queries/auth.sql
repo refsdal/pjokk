@@ -128,8 +128,8 @@ WHERE "organization_id" = $1 AND "member_id" = $2;
 DELETE FROM "organization_members"
 WHERE "organization_id" = $1 AND "id" = $2;
 
--- The three deletes below are a removed member's scheduled pushes in that
--- family (issue #92), run inside RemoveMember's transaction. None of these
+-- The deletes below are a removed member's own rows in that family — their
+-- scheduled pushes (issue #92) and their days at home (issue #108) — run inside RemoveMember's transaction. None of these
 -- tables references organization_members, so nothing cascades from the
 -- membership, and a person who has left cannot reach the reminders routes
 -- to delete their own. Each is scoped to the one family: the same person's
@@ -141,6 +141,16 @@ WHERE "family_id" = sqlc.arg(family_id) AND "user_id" = sqlc.arg(user_id);
 
 -- name: DeleteMemberPushSnoozes :exec
 DELETE FROM "push_snooze"
+WHERE "family_id" = sqlc.arg(family_id) AND "user_id" = sqlc.arg(user_id);
+
+-- name: DeleteMemberCareDays :exec
+-- A removed member's days at home in that family, and the number they set
+-- (issue #108): their own leave record, which leaves with them.
+DELETE FROM "care_day"
+WHERE "family_id" = sqlc.arg(family_id) AND "user_id" = sqlc.arg(user_id);
+
+-- name: DeleteMemberCareDayQuota :exec
+DELETE FROM "care_day_quota"
 WHERE "family_id" = sqlc.arg(family_id) AND "user_id" = sqlc.arg(user_id);
 
 -- name: DeleteMemberCalendarAssignments :exec
