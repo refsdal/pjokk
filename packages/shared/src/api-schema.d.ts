@@ -2791,6 +2791,8 @@ export interface components {
             date: string;
             /** @description A barnehage session STARTED on this local day (issue #111). The Stats chart marks these days; `daycareSplit` averages them against the rest. */
             daycare: boolean;
+            /** @description An illness episode touched this local day (issue #127): it began on it, ended on it, or ran across it. An open episode counts up to today. */
+            ill: boolean;
             /** Format: int32 */
             sleepMin: number;
             /**
@@ -2858,6 +2860,16 @@ export interface components {
             solids: number;
         };
         Stats: {
+            /**
+             * Format: int32
+             * @description How many local days of the window an illness episode touched (issue #127). In the 30-day view this is "ill days this month". A day two episodes share is counted once.
+             */
+            illDays: number;
+            /**
+             * Format: int32
+             * @description How many illness episodes overlap the window.
+             */
+            illEpisodes: number;
             /** @description Barnehage days against home days (issue #111): is the single midday nap pushing bedtime, are nights worse after barnehage? Completed days only — today is left out of both groups — and null unless the window holds at least two days of each kind: one day is an anecdote. */
             daycareSplit: components["schemas"]["StatsDaycareSplit"] | null;
             days: components["schemas"]["StatsDay"][];

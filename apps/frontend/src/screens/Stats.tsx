@@ -35,7 +35,8 @@ import {
 import { measurementMeta } from "@/lib/measurements";
 import { t } from "@/lib/i18n";
 import { daycareMeta } from "@/lib/daycare-ui";
-import { dayGroupLine, lastNight, napLine } from "@/lib/stats-ui";
+import { illnessMeta } from "@/lib/illness-ui";
+import { dayGroupLine, illLine, lastNight, napLine } from "@/lib/stats-ui";
 import {
   KG_PER_LB,
   formatMeasurementIn,
@@ -229,10 +230,21 @@ export function StatsScreen() {
       night: Math.round((d.nightSleepMin / 60) * 10) / 10,
       day: Math.round(((d.sleepMin - d.nightSleepMin) / 60) * 10) / 10,
       // `?? false`: absent from a snapshot cached before the field existed.
+      date: d.date,
       daycare: d.daycare ?? false,
+      ill: d.ill ?? false,
     };
   });
   const anyDaycare = chartData.some((d) => d.daycare);
+  const anyIll = chartData.some((d) => d.ill);
+  const ill = s
+    ? illLine(s.illDays ?? 0, s.illEpisodes ?? 0, s.days.length, {
+        of: t("of"),
+        days: t("days"),
+        episode: t("episode"),
+        episodes: t("episodes"),
+      })
+    : null;
   const split = s?.daycareSplit ?? null;
   const night = s ? lastNight(s.nights) : null;
   // "3.2 bottle · 1.5 breast" — only the types with any feeds at all.
@@ -405,35 +417,79 @@ export function StatsScreen() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-          {anyDaycare && (
-            // Barnehage days (issue #111), marked under their bars. An HTML
-            // row rather than a chart series: the chart has no margins and
-            // no Y axis, so n equal cells sit exactly under n bands.
+          {(anyDaycare || anyIll) && (
+            // Barnehage days (issue #111) and ill days (issue #127), marked
+            // under their bars. An HTML row rather than a chart series: the
+            // chart has no margins and no Y axis, so n equal cells sit
+            // exactly under n bands. Two SHAPES, a dot and a ring, because
+            // the accent and the coral are close, colour alone fails for
+            // colour blindness, and night mode collapses both onto amber.
             <>
               <div
                 className="flex pt-1"
                 aria-hidden
                 data-testid="daycare-marks"
               >
-                {chartData.map((d, i) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: one cell per day, in order
-                  <span key={i} className="flex flex-1 justify-center">
-                    <span
-                      className={cn(
-                        "h-1.5 w-1.5 rounded-full",
-                        d.daycare ? "bg-accent" : "bg-transparent",
-                      )}
-                    />
+                {chartData.map((d) => (
+                  <span
+                    key={d.date}
+                    className="flex h-1.5 flex-1 justify-center gap-0.5"
+                  >
+                    {/* Only the marks that apply, so one mark sits centred
+                        under its bar and two sit either side of the centre:
+                        a reserved-but-invisible slot pushed a lone ring off
+                        its label. The fixed height keeps an empty cell's
+                        row. */}
+                    {d.daycare && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                    )}
+                    {d.ill && (
+                      <span
+                        data-ill="true"
+                        className="h-1.5 w-1.5 rounded-full border border-growth"
+                      />
+                    )}
                   </span>
                 ))}
               </div>
-              <p className="pt-2 text-xs text-muted">
-                <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-accent align-middle" />
-                {t("at daycare that day")}
+              <p className="flex flex-wrap gap-x-4 pt-2 text-xs text-muted">
+                {anyDaycare && (
+                  <span>
+                    <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-accent align-middle" />
+                    {t("at daycare that day")}
+                  </span>
+                )}
+                {anyIll && (
+                  <span>
+                    <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full border border-growth align-middle" />
+                    {t("ill that day")}
+                  </span>
+                )}
               </p>
             </>
           )}
         </Card>
+
+        {ill && (
+          // "How much has she actually been ill?" (issue #127) One quiet
+          // row, only when the window has any: a healthy month needs none.
+          <Card className="flex items-center gap-3" data-testid="ill-days">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-2 text-growth">
+              <illnessMeta.icon className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold tracking-wide text-muted uppercase">
+                {t("Ill days")}
+              </p>
+              <p
+                className="text-base font-bold text-ink"
+                data-testid="ill-days-value"
+              >
+                {ill}
+              </p>
+            </div>
+          </Card>
+        )}
 
         {split && (
           // Is the barnehage rhythm costing sleep? (issue #111) One card,

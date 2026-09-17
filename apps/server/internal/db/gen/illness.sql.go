@@ -170,6 +170,54 @@ func (q *Queries) GetIllness(ctx context.Context, arg GetIllnessParams) (GetIlln
 	return i, err
 }
 
+const illnessesInRange = `-- name: IllnessesInRange :many
+SELECT "start_time", "end_time"
+FROM "illness"
+WHERE "family_id" = $1 AND "baby_id" = $2
+  AND "start_time" < $3::timestamptz
+  AND ("end_time" IS NULL OR "end_time" > $4::timestamptz)
+`
+
+type IllnessesInRangeParams struct {
+	FamilyID string
+	BabyID   string
+	ToTs     pgtype.Timestamptz
+	FromTs   pgtype.Timestamptz
+}
+
+type IllnessesInRangeRow struct {
+	StartTime pgtype.Timestamptz
+	EndTime   pgtype.Timestamptz
+}
+
+// Episodes OVERLAPPING [from, to), for Stats' ill-day count (issue #127): a
+// range-overlap test like summary.sql's SleepsInRange, and an open episode
+// (end_time IS NULL) is open-ended.
+func (q *Queries) IllnessesInRange(ctx context.Context, arg IllnessesInRangeParams) ([]IllnessesInRangeRow, error) {
+	rows, err := q.db.Query(ctx, illnessesInRange,
+		arg.FamilyID,
+		arg.BabyID,
+		arg.ToTs,
+		arg.FromTs,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []IllnessesInRangeRow
+	for rows.Next() {
+		var i IllnessesInRangeRow
+		if err := rows.Scan(&i.StartTime, &i.EndTime); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listIllnesses = `-- name: ListIllnesses :many
 
 SELECT

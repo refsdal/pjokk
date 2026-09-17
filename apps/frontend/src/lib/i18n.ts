@@ -334,6 +334,12 @@ const nb: Record<string, string> = {
   "Your own number. When set, the Awake card says this instead of a window, on weekends too, which is what keeps home days in step with the barnehage. The table stops at 12 months, as its source does.":
     "Deres eget tall. Når det er satt, sier Våken-kortet dette i stedet for et vindu, også i helgene, slik at hjemmedagene holder takt med barnehagen. Tabellen stopper ved 12 måneder, slik kilden gjør.",
 
+  // Ill days in Stats (issue #127).
+  "Ill days": "Dager syk",
+  episode: "sykdomsperiode",
+  episodes: "sykdomsperioder",
+  "ill that day": "syk den dagen",
+
   // Barnehage days against home days in Stats (issue #111).
   "at daycare that day": "i barnehagen den dagen",
   "Daycare days and home days": "Barnehagedager og hjemmedager",

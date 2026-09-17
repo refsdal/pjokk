@@ -3,6 +3,7 @@ import {
   clockOfMinutes,
   dayGroupLine,
   formatMinutes,
+  illLine,
   lastNight,
   napLine,
 } from "../src/lib/stats-ui";
@@ -94,5 +95,24 @@ describe("dayGroupLine", () => {
       ),
     ).toBe("nap 0:00");
     expect(clockOfMinutes(5)).toBe("00:05");
+  });
+});
+
+// Ill days (issue #127).
+describe("illLine", () => {
+  const labels = {
+    of: "of",
+    days: "days",
+    episode: "episode",
+    episodes: "episodes",
+  };
+
+  test("counts ill days against the window, with the episodes", () => {
+    expect(illLine(6, 2, 30, labels)).toBe("6 of 30 days · 2 episodes");
+    expect(illLine(1, 1, 7, labels)).toBe("1 of 7 days · 1 episode");
+  });
+
+  test("a healthy window has no row at all", () => {
+    expect(illLine(0, 0, 30, labels)).toBeNull();
   });
 });

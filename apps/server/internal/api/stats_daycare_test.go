@@ -77,3 +77,48 @@ func TestStatsDaycareSplit(t *testing.T) {
 		t.Errorf("daycareSplit with no barnehage = %v (present %v), want an explicit null", v, present)
 	}
 }
+
+// Ill days through the API (issue #127). Fixed clock, tz=0: today is
+// Saturday 2026-01-10, the 7-day window is the 4th to the 10th.
+func TestStatsIllDays(t *testing.T) {
+	a := testrig.App(t)
+	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
+	babyID := a.NewBaby(familyID, "Nora")
+	a.SetNow(time.Date(2026, 1, 10, 12, 0, 0, 0, time.UTC))
+	at := func(d, h int) string { return time.Date(2026, 1, d, h, 0, 0, 0, time.UTC).Format(time.RFC3339) }
+
+	none := a.Do(http.MethodGet, "/api/stats?babyId="+babyID+"&days=7&tz=0", cookie, nil)
+	if none.JSON["illDays"] != float64(0) || none.JSON["illEpisodes"] != float64(0) {
+		t.Errorf("with no illness: illDays %v, illEpisodes %v, want 0 and 0", none.JSON["illDays"], none.JSON["illEpisodes"])
+	}
+
+	// Omgangssyke from the afternoon of the 5th to the morning of the 7th,
+	// and a cold that began yesterday and is still open.
+	for _, body := range []map[string]any{
+		{"babyId": babyID, "startTime": at(5, 15), "endTime": at(7, 9), "symptoms": []string{"vomiting"}},
+		{"babyId": babyID, "startTime": at(9, 8), "symptoms": []string{"cold"}},
+	} {
+		if res := a.Do(http.MethodPost, "/api/illness", cookie, body); res.Status != http.StatusCreated {
+			t.Fatalf("seed illness: %d %s", res.Status, res.Raw)
+		}
+	}
+	res := a.Do(http.MethodGet, "/api/stats?babyId="+babyID+"&days=7&tz=0", cookie, nil)
+	if res.JSON["illDays"] != float64(5) || res.JSON["illEpisodes"] != float64(2) {
+		t.Errorf("illDays %v, illEpisodes %v, want 5 (5th, 6th, 7th, 9th, 10th) and 2", res.JSON["illDays"], res.JSON["illEpisodes"])
+	}
+	ill := map[string]bool{}
+	for _, d := range res.JSON["days"].([]any) {
+		m := d.(map[string]any)
+		ill[m["date"].(string)] = m["ill"].(bool)
+	}
+	for date, want := range map[string]bool{"2026-01-04": false, "2026-01-05": true, "2026-01-06": true, "2026-01-07": true, "2026-01-08": false, "2026-01-09": true, "2026-01-10": true} {
+		if ill[date] != want {
+			t.Errorf("%s ill = %v, want %v", date, ill[date], want)
+		}
+	}
+	// A one-day window sees only today's.
+	today := a.Do(http.MethodGet, "/api/stats?babyId="+babyID+"&days=1&tz=0", cookie, nil)
+	if today.JSON["illDays"] != float64(1) || today.JSON["illEpisodes"] != float64(1) {
+		t.Errorf("one-day window: illDays %v, illEpisodes %v, want 1 and 1", today.JSON["illDays"], today.JSON["illEpisodes"])
+	}
+}

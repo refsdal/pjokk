@@ -3735,6 +3735,12 @@ type Stats struct {
 	DaycareSplit *StatsDaycareSplit `json:"daycareSplit"`
 	Days         []StatsDay         `json:"days"`
 
+	// IllDays How many local days of the window an illness episode touched (issue #127). In the 30-day view this is "ill days this month". A day two episodes share is counted once.
+	IllDays int32 `json:"illDays"`
+
+	// IllEpisodes How many illness episodes overlap the window.
+	IllEpisodes int32 `json:"illEpisodes"`
+
 	// Nights One entry per local day of the window plus the day before it (oldest first): the night that began on each. The extra night is what lets a one-day window still answer "last night".
 	Nights []StatsNight `json:"nights"`
 	Weight *StatsWeight `json:"weight"`
@@ -3750,7 +3756,10 @@ type StatsDay struct {
 	Diapers     int32            `json:"diapers"`
 	Feeds       int32            `json:"feeds"`
 	FeedsByType StatsFeedsByType `json:"feedsByType"`
-	IntakeMl    int32            `json:"intakeMl"`
+
+	// Ill An illness episode touched this local day (issue #127): it began on it, ended on it, or ran across it. An open episode counts up to today.
+	Ill      bool  `json:"ill"`
+	IntakeMl int32 `json:"intakeMl"`
 
 	// NightSleepMin The part of sleepMin from sessions typed `night` (issue
 	NightSleepMin int32 `json:"nightSleepMin"`

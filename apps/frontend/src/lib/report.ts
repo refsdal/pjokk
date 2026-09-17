@@ -167,6 +167,15 @@ export async function buildReport(opts: {
         `${stats.avgFeeds} (${fbt.bottle} ${t("bottle")} · ${fbt.breast} ${t("breast")} · ${fbt.solids} ${t("solids")})`,
       ],
       [t("Diapers"), String(stats.avgDiapers)],
+      // Ill days (issue #127), only when there were any.
+      ...(stats.illDays > 0
+        ? [
+            [
+              t("Ill days"),
+              `${stats.illDays} ${t("of")} ${stats.days.length} ${t("days")} · ${stats.illEpisodes} ${stats.illEpisodes === 1 ? t("episode") : t("episodes")}`,
+            ],
+          ]
+        : []),
       // Barnehage days against home days (issue #111), only when the
       // window holds both kinds.
       ...(stats.daycareSplit
