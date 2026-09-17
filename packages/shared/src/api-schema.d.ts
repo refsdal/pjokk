@@ -3282,7 +3282,7 @@ export interface components {
              * @description Steps on the local calendar (Europe/Oslo), so a daily 08:00 stays 08:00 across DST; monthly/yearly clamp the day.
              * @enum {string}
              */
-            recurrence: "none" | "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
+            recurrence: "none" | "daily" | "weekly" | "biweekly" | "weekdays" | "monthly" | "yearly";
             /**
              * Format: date-time
              * @description Last allowed occurrence start (inclusive); null = forever.
@@ -3340,7 +3340,7 @@ export interface components {
              * @description Omitted means none.
              * @enum {string}
              */
-            recurrence?: "none" | "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
+            recurrence?: "none" | "daily" | "weekly" | "biweekly" | "weekdays" | "monthly" | "yearly";
             /**
              * Format: date-time
              * @description Inclusive on the occurrence start; ignored when recurrence is none.
@@ -3366,7 +3366,7 @@ export interface components {
             babyIds?: string[];
             assigneeUserIds?: string[];
             /** @enum {string} */
-            recurrence?: "none" | "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
+            recurrence?: "none" | "daily" | "weekly" | "biweekly" | "weekdays" | "monthly" | "yearly";
             /** Format: date-time */
             recurrenceUntil?: string | null;
         };

@@ -3088,3 +3088,37 @@ earlier). Frontend only.
 - **No consent wording.** What a barnehage requires differs by
   municipality and many have their own form; the page is the facts a family
   copies onto that form, or hands over with it, not a legal document.
+
+## 2026-09-17 — a weekdays recurrence, and the pick-up preset
+
+First follow-up to the barnehage series (#125); #110 had left the pick-up
+rota out because the recurrence rules had no "weekdays".
+
+- **`weekdays` is a rule like the others**, stepped in `internal/recur` on
+  the Europe/Oslo calendar, so 15:30 stays 15:30 across a DST change, and
+  emitted to subscribed calendars as `FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR`.
+  Skipping or detaching one occurrence works as for any series. Rejected: a
+  general "which days" picker — a rota is Monday to Friday, and a family
+  that alternates weeks already has two biweekly series for it.
+- **A series typed with a weekend start begins on the Monday.** `Nth(0)` is
+  the first weekday on or after the stored start, and the ICS feed's
+  DTSTART is that first occurrence: RFC 5545 wants DTSTART to match the
+  RRULE, and a Saturday DTSTART beside BYDAY=MO..FR shows up as a stray
+  extra event in some clients.
+- **The pick-up is a preset, not a kind**, offered under the Daycare
+  category on a new event: it fills the title, 15:30, thirty minutes and
+  the weekdays rule, and every one of them can still be changed. The
+  Responsible chips already say who.
+- **Found and fixed on the way: the occurrence jump could overshoot.**
+  `NextOnOrAfter` estimated an index by dividing elapsed time by the rule's
+  period, and for monthly that period was 28 days — shorter than a month, so
+  the estimate ran AHEAD of the truth and a monthly series silently lost an
+  occurrence about 26 months in (the reminder job uses this lookup). The
+  period is now never shorter than the rule's real spacing (31 days, 366
+  days, and 36 h for weekdays, where a Friday-to-Monday gap defeats any
+  average). Separately, list expansion counted from the series' first
+  occurrence and stopped at 400, so a daily series went silent after 400
+  days and a weekday rota would have after 80 weeks; it now starts from the
+  same estimate. `TestExpansionMatchesCountingFromZeroForEveryRule` walks
+  every rule over eight years against counting from zero, and fails on the
+  old 28-day value.

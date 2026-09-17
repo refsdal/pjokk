@@ -397,7 +397,9 @@ No FAB, no swipe navigation (fights PWA back-gesture), no onboarding tutorials
   route lifts the query key into the Authorization header and then runs
   the ordinary key middleware, so the URL is a credential like any key).
 - **Calendar recurrence (#52):** `calendar_event.recurrence`
-  (none|daily|weekly|biweekly|monthly|yearly) + `recurrence_until`. A
+  (none|daily|weekly|biweekly|weekdays|monthly|yearly) + `recurrence_until`
+  (`weekdays` is Monday to Friday, #125: the pick-up rota, offered as a
+  "Pick-up, weekdays" preset under the Daycare category). A
   series is ONE row; `internal/recur` expands it at read time (stepping on
   the Europe/Oslo calendar so a daily 08:00 stays 08:00 across DST,
   clamping the day for monthly/yearly), the list returns one entry per

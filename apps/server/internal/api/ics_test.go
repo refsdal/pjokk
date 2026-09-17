@@ -79,3 +79,40 @@ func TestCalendarICSFeed(t *testing.T) {
 		t.Errorf("cookie = %d, want 200", res.Status)
 	}
 }
+
+// A weekdays series in the feed (issue #125): a BYDAY rule, and a DTSTART
+// that is the first OCCURRENCE — a series typed with a Saturday start
+// begins on the Monday, and a Saturday DTSTART beside BYDAY=MO..FR shows up
+// as a stray extra event in some calendar clients.
+func TestCalendarICSWeekdaysSeries(t *testing.T) {
+	a := testrig.App(t)
+	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
+	var userID string
+	if err := a.Deps.Pool.QueryRow(context.Background(), `SELECT "id" FROM "users" WHERE "email" = $1`, "parent@example.com").Scan(&userID); err != nil {
+		t.Fatal(err)
+	}
+	token := a.CreateAPIKey(familyID, userID)
+	// Saturday 2026-10-03, 15:30 in Oslo.
+	a.Do(http.MethodPost, "/api/calendar/events", cookie, map[string]any{
+		"title": "Pick-up", "category": "daycare", "durationMin": 30, "recurrence": "weekdays",
+		"startTime": time.Date(2026, 10, 3, 13, 30, 0, 0, time.UTC).Format(time.RFC3339),
+	})
+	res := a.DoRequest(httptest.NewRequest(http.MethodGet, "/api/calendar.ics?key="+token, nil))
+	if res.Status != http.StatusOK {
+		t.Fatalf("status = %d %s", res.Status, res.Raw)
+	}
+	body := string(res.Raw)
+	for _, want := range []string{
+		"RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+		"DTSTART;TZID=Europe/Oslo:20261005T153000", // Monday the 5th
+		"DTEND;TZID=Europe/Oslo:20261005T160000",
+		"CATEGORIES:daycare",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("feed lacks %q:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "20261003T") {
+		t.Errorf("feed carries the Saturday start:\n%s", body)
+	}
+}

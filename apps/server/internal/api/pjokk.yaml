@@ -7512,7 +7512,7 @@ components:
             occurrence in the window, all sharing the id (issue #52).
         recurrence:
           type: string
-          enum: [none, daily, weekly, biweekly, monthly, yearly]
+          enum: [none, daily, weekly, biweekly, weekdays, monthly, yearly]
           description: >-
             Steps on the local calendar (Europe/Oslo), so a daily 08:00
             stays 08:00 across DST; monthly/yearly clamp the day.
@@ -7616,7 +7616,7 @@ components:
             type: string
         recurrence:
           type: string
-          enum: [none, daily, weekly, biweekly, monthly, yearly]
+          enum: [none, daily, weekly, biweekly, weekdays, monthly, yearly]
           description: Omitted means none.
         recurrenceUntil:
           type: string
@@ -7683,7 +7683,7 @@ components:
             type: string
         recurrence:
           type: string
-          enum: [none, daily, weekly, biweekly, monthly, yearly]
+          enum: [none, daily, weekly, biweekly, weekdays, monthly, yearly]
         recurrenceUntil:
           type: string
           format: date-time
