@@ -241,6 +241,47 @@ func (q *Queries) DaycareHold(ctx context.Context, arg DaycareHoldParams) (Dayca
 	return i, err
 }
 
+const daycareStartsInRange = `-- name: DaycareStartsInRange :many
+SELECT "start_time" FROM "daycare_log"
+WHERE "family_id" = $1 AND "baby_id" = $2
+  AND "start_time" >= $3::timestamptz
+  AND "start_time" < $4::timestamptz
+`
+
+type DaycareStartsInRangeParams struct {
+	FamilyID string
+	BabyID   string
+	FromTs   pgtype.Timestamptz
+	ToTs     pgtype.Timestamptz
+}
+
+// When she was dropped off inside the window (issue #111): Stats calls a
+// local day a barnehage day if a session STARTED on it.
+func (q *Queries) DaycareStartsInRange(ctx context.Context, arg DaycareStartsInRangeParams) ([]pgtype.Timestamptz, error) {
+	rows, err := q.db.Query(ctx, daycareStartsInRange,
+		arg.FamilyID,
+		arg.BabyID,
+		arg.FromTs,
+		arg.ToTs,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.Timestamptz
+	for rows.Next() {
+		var start_time pgtype.Timestamptz
+		if err := rows.Scan(&start_time); err != nil {
+			return nil, err
+		}
+		items = append(items, start_time)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteDaycare = `-- name: DeleteDaycare :execrows
 DELETE FROM "daycare_log"
 WHERE "family_id" = $1 AND "id" = $2

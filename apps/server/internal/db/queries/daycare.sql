@@ -157,3 +157,11 @@ VALUES (sqlc.arg(family_id), sqlc.arg(baby_id), sqlc.arg(user_id), sqlc.arg(user
 -- name: CreateHandoverDiaper :exec
 INSERT INTO "diaper_log" ("family_id", "baby_id", "caretaker_id", "logged_by_id", "daycare_id", "time", "type")
 VALUES (sqlc.arg(family_id), sqlc.arg(baby_id), sqlc.arg(user_id), sqlc.arg(user_id), sqlc.arg(daycare_id), sqlc.arg(time), sqlc.arg(type));
+
+-- name: DaycareStartsInRange :many
+-- When she was dropped off inside the window (issue #111): Stats calls a
+-- local day a barnehage day if a session STARTED on it.
+SELECT "start_time" FROM "daycare_log"
+WHERE "family_id" = sqlc.arg(family_id) AND "baby_id" = sqlc.arg(baby_id)
+  AND "start_time" >= sqlc.arg(from_ts)::timestamptz
+  AND "start_time" < sqlc.arg(to_ts)::timestamptz;
