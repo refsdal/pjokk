@@ -65,7 +65,7 @@ test("a caretaker asks another for help and gets an answer", async ({
   // ---- 2. Target: a second caretaker joins via an invite ---------------
   // Same shape as invite.spec.ts: admin mints the code, the invitee opens
   // /join/<code> in their own context and is auto-redeemed on mount.
-  await page.goto("/settings");
+  await page.goto("/settings/family");
   await page.getByRole("button", { name: "New invite link" }).click();
   const link = await page.getByText(/\/join\//).first().textContent();
   const code = link!.trim().split("/join/")[1]?.trim();

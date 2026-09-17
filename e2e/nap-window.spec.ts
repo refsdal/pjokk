@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { freshFamily } from "./helpers";
+import { freshFamily, openBabySettings } from "./helpers";
 
 // The nap-window guide on Home (issue #46), against the real artifact. The
 // fixture baby was born 2026-06-15, so through early September it sits in
@@ -59,16 +59,19 @@ test("the awake card shows a nap window ahead, then past, and can be switched of
   await page.screenshot({ path: shot("2-home-window-past.png") });
 
   // Settings: the switch and its disclaimer.
-  await page.goto("/settings");
+  await page.goto("/profile");
   await expect(page.getByText(/A guide, not advice/)).toBeVisible();
   await settle(page);
   await page
     .getByText(/A guide, not advice/)
     .locator("..")
     .screenshot({ path: shot("3-settings-nap-guide.png") });
-  // The guide's Off is the first Off chip on the page (night mode's comes
-  // later in the Appearance section).
-  await page.getByRole("button", { name: "Off", exact: true }).first().click();
+  // The guide's own Off: night mode has an Off chip on this page too.
+  await page
+    .getByText(/A guide, not advice/)
+    .locator("..")
+    .getByRole("button", { name: "Off", exact: true })
+    .click();
 
   await page.goto("/home");
   await expect(page.getByText("Awake", { exact: true })).toBeVisible({ timeout: 10_000 });
@@ -106,7 +109,7 @@ test("a usual nap set in Settings replaces the window on the awake card", async 
   await expect(page.getByText("Awake", { exact: true })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText(/^Usual nap/)).toHaveCount(0);
 
-  await page.goto("/settings");
+  await openBabySettings(page);
   const field = page.getByTestId("usual-nap").getByLabel("Usual nap");
   await field.fill(clock);
   await expect
@@ -127,7 +130,7 @@ test("a usual nap set in Settings replaces the window on the awake card", async 
   await page.screenshot({ path: shot("5-home-usual-nap.png") });
 
   // Cleared, the card goes back to the age table.
-  await page.goto("/settings");
+  await openBabySettings(page);
   await page.getByTestId("usual-nap").getByRole("button", { name: "Clear" }).click();
   await page.goto("/home");
   await expect(page.getByText(/^Usual nap/)).toHaveCount(0, { timeout: 10_000 });
@@ -151,7 +154,7 @@ test("the usual nap is suggested from the barnehage's logged naps", async ({
     return d.toISOString();
   };
 
-  await page.goto("/settings");
+  await openBabySettings(page);
   const box = page.getByTestId("usual-nap");
   await expect(box).toBeVisible({ timeout: 10_000 });
   await expect(page.getByTestId("usual-nap-suggestion")).toHaveCount(0);

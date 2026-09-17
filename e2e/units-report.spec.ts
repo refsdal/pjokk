@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { freshFamily } from "./helpers";
+import { freshFamily, openBabySettings } from "./helpers";
 
 // Issue #53 against the real artifact: imperial display units chosen on
 // the profile change what Home, the feed sheet's stepper and the timeline
@@ -87,7 +87,7 @@ test("the PDF report downloads with the baby's name and the range in the file na
     const res = await page.request.post(data[0], { data: { babyId, ...data[1] } });
     expect(res.status(), await res.text()).toBe(201);
   }
-  await page.goto("/settings");
+  await openBabySettings(page);
   const card = page.getByText("PDF report", { exact: true }).locator("xpath=following-sibling::*[1]");
   await card.scrollIntoViewIfNeeded();
   await settle(page);

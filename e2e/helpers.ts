@@ -238,3 +238,17 @@ export async function holdToLeave(page: Page) {
   await page.mouse.up();
   return pad;
 }
+
+/**
+ * Opens Settings → <baby>: the page that holds everything about one child
+ * (usual nap, the "About" page, the medicine sheet, the PDF report). Through
+ * the hub rather than by URL, so the row that leads there is exercised too.
+ * Without a name it opens the first baby, which is the only one a
+ * freshFamily has.
+ */
+export async function openBabySettings(page: Page, name?: string): Promise<void> {
+  await page.goto("/settings");
+  const rows = page.locator('a[href^="/settings/baby/"]');
+  await (name ? rows.filter({ hasText: name }) : rows).first().click();
+  await expect(page).toHaveURL(/\/settings\/baby\//);
+}

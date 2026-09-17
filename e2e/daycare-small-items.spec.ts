@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { expect, test } from "./fixtures";
-import { freshFamily } from "./helpers";
+import { freshFamily, openBabySettings } from "./helpers";
 
 // The barnehage small items (issue #113): a preset for the custom reminder
 // every barnehage family ends up writing by hand, and a medicine sheet for
@@ -14,7 +14,7 @@ test("the spare-clothes preset fills an ordinary custom reminder", async ({
   request,
 }) => {
   await freshFamily(page, request, "spares");
-  await page.goto("/settings");
+  await page.goto("/profile");
   await page.getByRole("button", { name: "Add reminder", exact: true }).click();
   const sheet = page.getByRole("dialog");
   // The preset belongs to Custom, and only shows there.
@@ -43,9 +43,9 @@ test("the medicine sheet for daycare downloads once there is a medicine", async 
   request,
 }) => {
   await freshFamily(page, request, "medsheet");
-  await page.goto("/settings");
+  await openBabySettings(page);
   // Nothing to print from an empty catalogue.
-  await expect(page.getByRole("button", { name: /Sheet for daycare/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Sheet for daycare/ })).toBeDisabled();
 
   const made = await page.request.post("/api/medicines", {
     data: { name: "Paracet", defaultAmount: 2.5, unit: "ml", minIntervalMin: 360 },

@@ -94,15 +94,16 @@ test("Settings keeps the install instructions reachable after a dismissal", asyn
   await freshFamily(page, request, "installsettings");
   await page.getByRole("button", { name: "Dismiss", exact: true }).click();
 
-  await page.goto("/settings");
+  await page.goto("/profile");
   await page.getByRole("button", { name: "Add to home screen" }).click();
   await expect(
     page.getByText("Scroll down and tap Add to Home Screen"),
   ).toBeVisible();
 
-  // While on Settings: the footer's version is the binary's own build
+  // On Settings: the footer's version is the binary's own build
   // version, stamped by scripts/build-artifacts.sh from PJOKK_VERSION —
   // the same string the preview image is tagged with in CI — or "dev".
+  await page.goto("/settings");
   await expect(
     page.getByText(`Pjokk ${process.env.PJOKK_VERSION ?? "dev"}`),
   ).toBeVisible();

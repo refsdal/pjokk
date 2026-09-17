@@ -65,7 +65,7 @@ test("home today on the illness card, then the year in Settings", async ({
   await expect(me).toHaveAttribute("aria-pressed", "true");
 
   // Settings: four days, no number set, so no "of".
-  await page.goto("/settings");
+  await page.goto("/settings/family/care-days");
   const total = page.getByTestId("care-total-me");
   await expect(total).toHaveText("4 days", { timeout: 10_000 });
   const section = page.getByTestId("care-days");
