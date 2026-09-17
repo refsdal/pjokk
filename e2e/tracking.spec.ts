@@ -34,6 +34,24 @@ test("a new baby chooses on the carousel; the recommended set reflows Home", asy
 
   await expect(page).toHaveURL(/\/settings\/baby\/[^/]+\/tracking\?new=/);
   await expect(page.getByTestId("tracking-card-feeds")).toBeVisible();
+  // The first card carries the recommended-set card on top: the switch
+  // must still sit inside the strip with room for the light-up ring, and
+  // the strip must never scroll vertically (it clips the ring otherwise).
+  const fit = await page.evaluate(() => {
+    const strip = document.querySelector('[data-testid="tracking-strip"]') as HTMLElement;
+    const s = strip.getBoundingClientRect();
+    const b = document
+      .querySelector('[data-testid="tracking-card-feeds"] [role=switch]')!
+      .getBoundingClientRect();
+    return {
+      right: s.right - b.right,
+      bottom: s.bottom - b.bottom,
+      overflow: strip.scrollHeight - strip.clientHeight,
+    };
+  });
+  expect(fit.overflow).toBe(0);
+  expect(fit.right).toBeGreaterThanOrEqual(14);
+  expect(fit.bottom).toBeGreaterThanOrEqual(14);
   // Every card is a switch, off until chosen.
   await expect(
     page.getByTestId("tracking-card-feeds").getByRole("switch"),

@@ -65,7 +65,10 @@ export function TrackingCarousel({
       <div
         ref={strip}
         onScroll={onScroll}
-        className="flex flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none]"
+        // overflow-y-hidden: a scroll container clips its box-shadows, so
+        // the light-up ring must stay inside the strip and the strip must
+        // never scroll vertically (which would push the ring to the edge).
+        className="flex flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none]"
         data-testid="tracking-strip"
       >
         {featureCards.map((meta, i) => (

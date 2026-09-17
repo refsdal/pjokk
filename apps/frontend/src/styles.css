@@ -277,7 +277,9 @@ input[type="number"] {
 }
 .animate-tracking-lit {
   --ping-start: 60%;
-  --ping-spread: 16px;
+  /* 12, not 16: the switch sits 16 px from the strip's edge, and the strip
+     clips (see TrackingCarousel). */
+  --ping-spread: 12px;
   animation: ring-ping 0.4s ease-out 1;
 }
 
