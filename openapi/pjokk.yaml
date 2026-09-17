@@ -4532,6 +4532,7 @@ components:
         - contents
         - food
         - reaction
+        - appetite
       properties:
         id:
           type: string
@@ -4594,6 +4595,15 @@ components:
           description: >-
             Whether a solids feed produced a reaction (details go in
             `notes`). null = not recorded, which is not the same as false.
+        appetite:
+          type: string
+          enum: [well, some, little]
+          nullable: true
+          description: >-
+            How much of a solids meal she ate (issue #113) — what a
+            barnehage reports, and what a parent knows about a lunch nobody
+            weighed. Only meaningful for `type: solids`; null = not
+            recorded.
     CreateFeed:
       type: object
       required: [babyId, time, type]
@@ -4643,6 +4653,9 @@ components:
           maxLength: 100
         reaction:
           type: boolean
+        appetite:
+          type: string
+          enum: [well, some, little]
         notes:
           type: string
           maxLength: 1000
@@ -4704,6 +4717,10 @@ components:
           nullable: true
         reaction:
           type: boolean
+          nullable: true
+        appetite:
+          type: string
+          enum: [well, some, little]
           nullable: true
         notes:
           type: string

@@ -146,6 +146,7 @@ func timelineFeedRow(r dbgen.ListFeedsPageRow) timelineEntryRow {
 	e.Set("contents", r.Contents)
 	e.Set("food", r.Food)
 	e.Set("reaction", r.Reaction)
+	e.Set("appetite", r.Appetite)
 	return timelineEntryRow{sortKey: r.Time.Time.UnixMilli(), entry: e}
 }
 

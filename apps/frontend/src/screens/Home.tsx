@@ -61,6 +61,7 @@ import {
   type OtherKind,
 } from "@/lib/data";
 import { predatesDropOff } from "@/lib/daycare-ui";
+import { appetiteWord, type FeedAppetite } from "@/lib/log-detail";
 import { t } from "@/lib/i18n";
 import { describeNapWindow, napWindow, useNapGuide } from "@/lib/nap-window";
 import { useResumableSleep } from "@/lib/sleep-resume";
@@ -107,6 +108,7 @@ function feedDetail(
     amountMl: number | null;
     side: string | null;
     durationMin: number | null;
+    appetite?: FeedAppetite | null;
   },
   units: Units,
 ): string {
@@ -116,7 +118,9 @@ function feedDetail(
     return [feed.side, feed.durationMin ? `${feed.durationMin} min` : null]
       .filter(Boolean)
       .join(" · ");
-  return feed.amountMl != null ? `${feed.amountMl} g` : t("solids");
+  if (feed.amountMl != null) return `${feed.amountMl} g`;
+  // A meal nobody weighed (issue #113): how it went, when that was said.
+  return feed.appetite ? t(appetiteWord[feed.appetite]) : t("solids");
 }
 
 // Colour carries the status, the arrow carries the direction. Both, because
