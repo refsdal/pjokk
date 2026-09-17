@@ -1,7 +1,8 @@
 import { Card } from "@/components/ui/card";
-import { useMe } from "@/lib/data";
+import { useBabies, useMe } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { type FamilySectionGroup, familySections } from "@/lib/settings-nav";
+import { familyTracks } from "@/lib/tracking";
 import { DevicesSection } from "./DevicesSection";
 import { FamilySection } from "./FamilySection";
 import { NavRow, SectionTitle, SettingsPage } from "./lib";
@@ -18,7 +19,8 @@ export function FamilyPage() {
   const me = useMe();
   const role = me.data?.memberRole;
   const isAdmin = role === "admin" || role === "owner";
-  const sections = familySections(isAdmin);
+  const babies = useBabies();
+  const sections = familySections(isAdmin, (k) => familyTracks(babies.data, k));
 
   return (
     <SettingsPage title={t("Family")} back={{ to: "/settings" }}>

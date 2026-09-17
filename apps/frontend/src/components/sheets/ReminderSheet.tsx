@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Baby } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
 import { Sheet, useSheetReset } from "@/components/Sheet";
@@ -25,6 +25,7 @@ import {
   SPARES_PRESET,
 } from "@/lib/reminder-ui";
 import { toast } from "@/lib/toast";
+import { familyTracks, reminderKindFeature, tracks } from "@/lib/tracking";
 
 // Add a reminder (issue #45). Chips, not forms: kind, then "after a gap" or
 // "at a time", then the one number that mode needs. The only keyboard is
@@ -69,6 +70,25 @@ export function ReminderSheet({
     if (k === "custom") setMode("at_time");
   };
 
+  // Only the kinds the baby tracks (spec
+  // 2026-09-17-per-baby-tracking-design.md): the chosen baby's switches,
+  // or any baby's for a family-wide reminder. Custom has no switch.
+  const kinds = (
+    ["feed", "diaper", "pump", "medicine", "custom"] as ReminderKind[]
+  ).filter((k) => {
+    const f = reminderKindFeature(k);
+    if (!f) return true;
+    const chosen = babyId ? babies.find((b) => b.id === babyId) : undefined;
+    return chosen ? tracks(chosen, f) : familyTracks(babies, f);
+  });
+  const kindKeys = kinds.join(",");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: kindKeys stands for kinds
+  useEffect(() => {
+    if (open && !kindKeys.split(",").includes(kind)) {
+      changeKind((kindKeys.split(",")[0] as ReminderKind) ?? "custom");
+    }
+  }, [open, kind, kindKeys]);
+
   const atMinute = parseMinuteOfDay(atTime);
   const trimmedLabel = label.trim();
   const canSave =
@@ -102,9 +122,7 @@ export function ReminderSheet({
     <Sheet open={open} onOpenChange={onOpenChange} title={t("Add reminder")}>
       <div className="space-y-5 pb-4">
         <ChipGroup
-          options={(
-            ["feed", "diaper", "pump", "medicine", "custom"] as ReminderKind[]
-          ).map((k) => ({ value: k, label: t(kindLabel[k]) }))}
+          options={kinds.map((k) => ({ value: k, label: t(kindLabel[k]) }))}
           value={kind}
           onChange={changeKind}
         />

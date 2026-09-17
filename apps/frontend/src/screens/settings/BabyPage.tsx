@@ -14,8 +14,9 @@ import {
 import { t } from "@/lib/i18n";
 import { formatAge } from "@/lib/time";
 import { toast } from "@/lib/toast";
+import { enabledLabels, useTracking } from "@/lib/tracking";
 import { AboutMeCard } from "./AboutMeCard";
-import { SectionTitle, SettingsPage } from "./lib";
+import { NavRow, SectionTitle, SettingsPage } from "./lib";
 import { MedicineSheetCard } from "./MedicineSheetCard";
 import { UsualNapCard } from "./NapGuideSection";
 import { ReportCard } from "./ReportCard";
@@ -34,6 +35,7 @@ export function BabyPage({ babyId }: { babyId: string }) {
   const role = me.data?.memberRole;
   const isAdmin = role === "admin" || role === "owner";
   const baby = babies.data?.find((b) => b.id === babyId);
+  const track = useTracking(baby);
 
   if (!baby) {
     // Deleted a moment ago (the sheet below does that), a stale link, or
@@ -134,14 +136,41 @@ export function BabyPage({ babyId }: { babyId: string }) {
         canDelete={isAdmin}
       />
 
-      <SectionTitle>{t("Usual nap")}</SectionTitle>
-      <UsualNapCard baby={baby} />
+      {/* What the family tracks for her (spec
+          2026-09-17-per-baby-tracking-design.md): the door to the carousel,
+          and the cards below follow their switches. */}
+      <SectionTitle>{t("What to track")}</SectionTitle>
+      <Card className="p-0">
+        <NavRow
+          to="/settings/baby/$babyId/tracking"
+          params={{ babyId: baby.id }}
+          label={t("What to track")}
+          sub={
+            track.any
+              ? enabledLabels(baby)
+                  .map((l) => t(l))
+                  .join(" · ")
+              : t("Nothing tracked yet")
+          }
+        />
+      </Card>
 
-      <SectionTitle>{t("About the child, for daycare")}</SectionTitle>
-      <AboutMeCard baby={baby} />
+      {track.has("sleep") && (
+        <>
+          <SectionTitle>{t("Usual nap")}</SectionTitle>
+          <UsualNapCard baby={baby} />
+        </>
+      )}
 
-      <SectionTitle>{t("Medicines, for daycare")}</SectionTitle>
-      <MedicineSheetCard baby={baby} />
+      {track.has("daycare") && (
+        <>
+          <SectionTitle>{t("About the child, for daycare")}</SectionTitle>
+          <AboutMeCard baby={baby} />
+
+          <SectionTitle>{t("Medicines, for daycare")}</SectionTitle>
+          <MedicineSheetCard baby={baby} />
+        </>
+      )}
 
       <SectionTitle>{t("PDF report")}</SectionTitle>
       <ReportCard baby={baby} />

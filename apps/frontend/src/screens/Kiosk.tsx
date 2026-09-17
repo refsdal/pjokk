@@ -60,6 +60,7 @@ import { useResumableSleep } from "@/lib/sleep-resume";
 import { napsLine } from "@/lib/sleep-ui";
 import { sleepTypeAt } from "@/lib/night";
 import { useSelectedBaby } from "@/lib/selected-baby";
+import { useTracking } from "@/lib/tracking";
 import { formatVolume, type Units } from "@/lib/units";
 import { DeviceGate } from "@/screens/kiosk/DeviceGate";
 
@@ -95,6 +96,10 @@ function useNow(intervalMs: number): Date {
 
 export function KioskScreen() {
   const { babies, baby } = useSelectedBaby();
+  // The three cards and the medicine strip follow the baby's switches
+  // (spec 2026-09-17-per-baby-tracking-design.md); a tablet reads the
+  // same babies list as a phone.
+  const track = useTracking(baby);
   const summary = useSummary(baby?.id);
   const feeds = useFeeds(baby?.id);
   const locations = useSleepLocations();
@@ -314,7 +319,7 @@ export function KioskScreen() {
         selected={caretaker}
         onSelect={setCaretaker}
       />
-      {!night && nap && (
+      {!night && track.has("sleep") && nap && (
         <p
           className="pt-2.5 text-center text-lg font-semibold text-accent"
           data-testid="kiosk-nap"
@@ -323,146 +328,231 @@ export function KioskScreen() {
         </p>
       )}
 
-      <div className="grid gap-3.5 pt-5 md:grid-cols-3">
-        <KioskCard
-          testId="kiosk-sleep"
-          icon={IconMoon}
-          tint="text-sleep"
-          label={sleepView.state === "sleeping" ? t("Sleeping") : t("Awake")}
-          headline={sleepView.headline}
-          detail={sleepView.detail}
-          sub={
-            night || !s
-              ? null
-              : napsLine(
-                  s.today,
-                  s.lastNightMin,
-                  (min) => durationShort(min * 60_000),
-                  s.lastNightLongestMin ?? null,
-                )
-          }
-          tone={sleepView.state === "sleeping" ? "live" : "normal"}
+      {!track.has("sleep") && !track.has("feeds") && !track.has("diapers") && (
+        <p
+          className="pt-8 text-center text-lg text-muted"
+          data-testid="kiosk-nothing"
         >
-          {activeSleep ? (
-            <KioskAction
-              label={t("Wake")}
-              primary
-              onClick={() =>
-                act((caretakerId) =>
-                  wakeSleep.mutate(
-                    { id: activeSleep.id, endTime: iso(), caretakerId },
-                    { onError: onWriteError },
-                  ),
-                )
-              }
-            />
-          ) : (
-            <>
-              {resumable && (
+          {t("Nothing is tracked for")} {baby.name} {t("yet")}
+        </p>
+      )}
+      <div className="grid gap-3.5 pt-5 md:grid-cols-3">
+        {track.has("sleep") && (
+          <KioskCard
+            testId="kiosk-sleep"
+            icon={IconMoon}
+            tint="text-sleep"
+            label={sleepView.state === "sleeping" ? t("Sleeping") : t("Awake")}
+            headline={sleepView.headline}
+            detail={sleepView.detail}
+            sub={
+              night || !s
+                ? null
+                : napsLine(
+                    s.today,
+                    s.lastNightMin,
+                    (min) => durationShort(min * 60_000),
+                    s.lastNightLongestMin ?? null,
+                  )
+            }
+            tone={sleepView.state === "sleeping" ? "live" : "normal"}
+          >
+            {activeSleep ? (
+              <KioskAction
+                label={t("Wake")}
+                primary
+                onClick={() =>
+                  act((caretakerId) =>
+                    wakeSleep.mutate(
+                      { id: activeSleep.id, endTime: iso(), caretakerId },
+                      { onError: onWriteError },
+                    ),
+                  )
+                }
+              />
+            ) : (
+              <>
+                {resumable && (
+                  <KioskAction
+                    label={t("Resume")}
+                    onClick={() =>
+                      act((caretakerId) =>
+                        resumeSleep.mutate(
+                          { id: resumable.id, babyId, caretakerId },
+                          { onError: onWriteError },
+                        ),
+                      )
+                    }
+                  />
+                )}
                 <KioskAction
-                  label={t("Resume")}
+                  label={t("Sleep")}
+                  hint={lastLocation ?? undefined}
+                  primary
+                  onClick={() => act((c) => startSleepAt(lastLocation, c))}
+                />
+                {otherLocations.map((name) => (
+                  <KioskAction
+                    key={name}
+                    label={name}
+                    onClick={() => act((c) => startSleepAt(name, c))}
+                  />
+                ))}
+              </>
+            )}
+          </KioskCard>
+        )}
+
+        {track.has("feeds") && (
+          <KioskCard
+            testId="kiosk-feed"
+            icon={IconBabyBottle}
+            tint="text-feed"
+            label={t("Feed")}
+            headline={feedView.headline}
+            detail={feedView.detail}
+            sub={
+              night || !s
+                ? null
+                : `${s.today.feeds} ${t("feeds")} · ${formatVolume(s.today.intakeMl, units)} ${t("today")}`
+            }
+            tone={feedView.live ? "live" : feedCaution ? "caution" : "normal"}
+          >
+            {activeFeed ? (
+              <>
+                <KioskAction
+                  label={t("Switch")}
                   onClick={() =>
                     act((caretakerId) =>
-                      resumeSleep.mutate(
-                        { id: resumable.id, babyId, caretakerId },
+                      switchSide.mutate(
+                        {
+                          caretakerId,
+                          id: activeFeed.id,
+                          babyId,
+                          side:
+                            activeFeed.runningSide === "left"
+                              ? "right"
+                              : "left",
+                        },
                         { onError: onWriteError },
                       ),
                     )
                   }
                 />
-              )}
-              <KioskAction
-                label={t("Sleep")}
-                hint={lastLocation ?? undefined}
-                primary
-                onClick={() => act((c) => startSleepAt(lastLocation, c))}
-              />
-              {otherLocations.map((name) => (
                 <KioskAction
-                  key={name}
-                  label={name}
-                  onClick={() => act((c) => startSleepAt(name, c))}
+                  label={t("Stop")}
+                  primary
+                  onClick={() =>
+                    act((caretakerId) =>
+                      stopTimer.mutate(
+                        {
+                          caretakerId,
+                          id: activeFeed.id,
+                          babyId,
+                          kind: "breast",
+                          time: iso(),
+                        },
+                        { onError: onWriteError },
+                      ),
+                    )
+                  }
                 />
-              ))}
-            </>
-          )}
-        </KioskCard>
+              </>
+            ) : (
+              <>
+                <KioskAction
+                  label={t("Bottle")}
+                  hint={bottleLabel}
+                  primary
+                  onClick={() =>
+                    act((caretakerId) =>
+                      logFeed.mutate(
+                        {
+                          caretakerId,
+                          babyId,
+                          time: iso(),
+                          type: "bottle",
+                          amountMl: bottle.amountMl,
+                          contents: bottle.contents ?? undefined,
+                        },
+                        {
+                          onSuccess: (row) =>
+                            setUndo({
+                              kind: "feed",
+                              id: row.id,
+                              text: undoText("feed", bottleLabel),
+                              caretakerId,
+                            }),
+                          onError: onWriteError,
+                        },
+                      ),
+                    )
+                  }
+                />
+                {(["left", "right"] as const).map((side) => (
+                  <KioskAction
+                    key={side}
+                    label={side === "left" ? t("Breast L") : t("Breast R")}
+                    onClick={() =>
+                      act((caretakerId) =>
+                        startTimer.mutate(
+                          {
+                            caretakerId,
+                            babyId,
+                            kind: "breast",
+                            side,
+                            startTime: iso(),
+                          },
+                          { onError: onWriteError },
+                        ),
+                      )
+                    }
+                  />
+                ))}
+              </>
+            )}
+          </KioskCard>
+        )}
 
-        <KioskCard
-          testId="kiosk-feed"
-          icon={IconBabyBottle}
-          tint="text-feed"
-          label={t("Feed")}
-          headline={feedView.headline}
-          detail={feedView.detail}
-          sub={
-            night || !s
-              ? null
-              : `${s.today.feeds} ${t("feeds")} · ${formatVolume(s.today.intakeMl, units)} ${t("today")}`
-          }
-          tone={feedView.live ? "live" : feedCaution ? "caution" : "normal"}
-        >
-          {activeFeed ? (
-            <>
+        {track.has("diapers") && (
+          <KioskCard
+            testId="kiosk-diaper"
+            icon={IconDiaper}
+            tint="text-diaper"
+            label={t("Diaper")}
+            headline={
+              s?.lastDiaper
+                ? elapsedShort(new Date(s.lastDiaper.time), now)
+                : "—"
+            }
+            detail={
+              s?.lastDiaper
+                ? `${t("ago")} · ${t(s.lastDiaper.type)}`
+                : t("No diaper logged yet")
+            }
+            sub={
+              night || !s
+                ? null
+                : `${s.today.wet} ${t("wet")} · ${s.today.dirty} ${t("dirty")} · ${s.today.both} ${t("both")}`
+            }
+            tone={diaperCaution ? "caution" : "normal"}
+          >
+            {(["wet", "dirty", "both"] as const).map((type) => (
               <KioskAction
-                label={t("Switch")}
+                key={type}
+                label={t(
+                  type === "wet" ? "Wet" : type === "dirty" ? "Dirty" : "Both",
+                )}
                 onClick={() =>
                   act((caretakerId) =>
-                    switchSide.mutate(
-                      {
-                        caretakerId,
-                        id: activeFeed.id,
-                        babyId,
-                        side:
-                          activeFeed.runningSide === "left" ? "right" : "left",
-                      },
-                      { onError: onWriteError },
-                    ),
-                  )
-                }
-              />
-              <KioskAction
-                label={t("Stop")}
-                primary
-                onClick={() =>
-                  act((caretakerId) =>
-                    stopTimer.mutate(
-                      {
-                        caretakerId,
-                        id: activeFeed.id,
-                        babyId,
-                        kind: "breast",
-                        time: iso(),
-                      },
-                      { onError: onWriteError },
-                    ),
-                  )
-                }
-              />
-            </>
-          ) : (
-            <>
-              <KioskAction
-                label={t("Bottle")}
-                hint={bottleLabel}
-                primary
-                onClick={() =>
-                  act((caretakerId) =>
-                    logFeed.mutate(
-                      {
-                        caretakerId,
-                        babyId,
-                        time: iso(),
-                        type: "bottle",
-                        amountMl: bottle.amountMl,
-                        contents: bottle.contents ?? undefined,
-                      },
+                    logDiaper.mutate(
+                      { caretakerId, babyId, time: iso(), type },
                       {
                         onSuccess: (row) =>
                           setUndo({
-                            kind: "feed",
+                            kind: "diaper",
                             id: row.id,
-                            text: undoText("feed", bottleLabel),
+                            text: undoText("diaper", type),
                             caretakerId,
                           }),
                         onError: onWriteError,
@@ -471,79 +561,12 @@ export function KioskScreen() {
                   )
                 }
               />
-              {(["left", "right"] as const).map((side) => (
-                <KioskAction
-                  key={side}
-                  label={side === "left" ? t("Breast L") : t("Breast R")}
-                  onClick={() =>
-                    act((caretakerId) =>
-                      startTimer.mutate(
-                        {
-                          caretakerId,
-                          babyId,
-                          kind: "breast",
-                          side,
-                          startTime: iso(),
-                        },
-                        { onError: onWriteError },
-                      ),
-                    )
-                  }
-                />
-              ))}
-            </>
-          )}
-        </KioskCard>
-
-        <KioskCard
-          testId="kiosk-diaper"
-          icon={IconDiaper}
-          tint="text-diaper"
-          label={t("Diaper")}
-          headline={
-            s?.lastDiaper ? elapsedShort(new Date(s.lastDiaper.time), now) : "—"
-          }
-          detail={
-            s?.lastDiaper
-              ? `${t("ago")} · ${t(s.lastDiaper.type)}`
-              : t("No diaper logged yet")
-          }
-          sub={
-            night || !s
-              ? null
-              : `${s.today.wet} ${t("wet")} · ${s.today.dirty} ${t("dirty")} · ${s.today.both} ${t("both")}`
-          }
-          tone={diaperCaution ? "caution" : "normal"}
-        >
-          {(["wet", "dirty", "both"] as const).map((type) => (
-            <KioskAction
-              key={type}
-              label={t(
-                type === "wet" ? "Wet" : type === "dirty" ? "Dirty" : "Both",
-              )}
-              onClick={() =>
-                act((caretakerId) =>
-                  logDiaper.mutate(
-                    { caretakerId, babyId, time: iso(), type },
-                    {
-                      onSuccess: (row) =>
-                        setUndo({
-                          kind: "diaper",
-                          id: row.id,
-                          text: undoText("diaper", type),
-                          caretakerId,
-                        }),
-                      onError: onWriteError,
-                    },
-                  ),
-                )
-              }
-            />
-          ))}
-        </KioskCard>
+            ))}
+          </KioskCard>
+        )}
       </div>
 
-      {!night && medicines.length > 0 && (
+      {!night && track.has("medicine") && medicines.length > 0 && (
         <div className="space-y-3 pt-3.5">
           {medicines.map((m) => (
             <KioskMedicineStrip
