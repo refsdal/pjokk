@@ -383,6 +383,27 @@ func (e CreateDiaperType) Valid() bool {
 	}
 }
 
+// Defines values for CreateFeedAppetite.
+const (
+	CreateFeedAppetiteLittle CreateFeedAppetite = "little"
+	CreateFeedAppetiteSome   CreateFeedAppetite = "some"
+	CreateFeedAppetiteWell   CreateFeedAppetite = "well"
+)
+
+// Valid indicates whether the value is a known member of the CreateFeedAppetite enum.
+func (e CreateFeedAppetite) Valid() bool {
+	switch e {
+	case CreateFeedAppetiteLittle:
+		return true
+	case CreateFeedAppetiteSome:
+		return true
+	case CreateFeedAppetiteWell:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateFeedContents.
 const (
 	CreateFeedContentsBreastMilk CreateFeedContents = "breast_milk"
@@ -746,6 +767,27 @@ func (e DiaperLogType) Valid() bool {
 	case DiaperLogTypeDry:
 		return true
 	case DiaperLogTypeWet:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FeedLogAppetite.
+const (
+	FeedLogAppetiteLittle FeedLogAppetite = "little"
+	FeedLogAppetiteSome   FeedLogAppetite = "some"
+	FeedLogAppetiteWell   FeedLogAppetite = "well"
+)
+
+// Valid indicates whether the value is a known member of the FeedLogAppetite enum.
+func (e FeedLogAppetite) Valid() bool {
+	switch e {
+	case FeedLogAppetiteLittle:
+		return true
+	case FeedLogAppetiteSome:
+		return true
+	case FeedLogAppetiteWell:
 		return true
 	default:
 		return false
@@ -1532,6 +1574,27 @@ func (e UpdateDiaperType) Valid() bool {
 	case UpdateDiaperTypeDry:
 		return true
 	case UpdateDiaperTypeWet:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateFeedAppetite.
+const (
+	UpdateFeedAppetiteLittle UpdateFeedAppetite = "little"
+	UpdateFeedAppetiteSome   UpdateFeedAppetite = "some"
+	UpdateFeedAppetiteWell   UpdateFeedAppetite = "well"
+)
+
+// Valid indicates whether the value is a known member of the UpdateFeedAppetite enum.
+func (e UpdateFeedAppetite) Valid() bool {
+	switch e {
+	case UpdateFeedAppetiteLittle:
+		return true
+	case UpdateFeedAppetiteSome:
+		return true
+	case UpdateFeedAppetiteWell:
 		return true
 	default:
 		return false
@@ -2421,8 +2484,9 @@ type CreateDiaperType string
 
 // CreateFeed defines model for CreateFeed.
 type CreateFeed struct {
-	AmountMl *int32 `json:"amountMl,omitempty"`
-	BabyId   string `json:"babyId"`
+	AmountMl *int32              `json:"amountMl,omitempty"`
+	Appetite *CreateFeedAppetite `json:"appetite,omitempty"`
+	BabyId   string              `json:"babyId"`
 
 	// CaretakerId Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller.
 	CaretakerId *string             `json:"caretakerId,omitempty"`
@@ -2437,6 +2501,9 @@ type CreateFeed struct {
 	Time        time.Time           `json:"time"`
 	Type        CreateFeedType      `json:"type"`
 }
+
+// CreateFeedAppetite defines model for CreateFeed.Appetite.
+type CreateFeedAppetite string
 
 // CreateFeedContents defines model for CreateFeed.Contents.
 type CreateFeedContents string
@@ -2802,10 +2869,13 @@ type FamilyRestoreReport struct {
 
 // FeedLog defines model for FeedLog.
 type FeedLog struct {
-	AmountMl      *int32 `json:"amountMl"`
-	BabyId        string `json:"babyId"`
-	CaretakerId   string `json:"caretakerId"`
-	CaretakerName string `json:"caretakerName"`
+	AmountMl *int32 `json:"amountMl"`
+
+	// Appetite How much of a solids meal she ate (issue #113) — what a barnehage reports, and what a parent knows about a lunch nobody weighed. Only meaningful for `type: solids`; null = not recorded.
+	Appetite      *FeedLogAppetite `json:"appetite"`
+	BabyId        string           `json:"babyId"`
+	CaretakerId   string           `json:"caretakerId"`
+	CaretakerName string           `json:"caretakerName"`
 
 	// Contents What a bottle held. Only meaningful for `type: bottle`; null = not recorded.
 	Contents    *FeedLogContents `json:"contents"`
@@ -2828,6 +2898,9 @@ type FeedLog struct {
 	Time     time.Time    `json:"time"`
 	Type     FeedLogType  `json:"type"`
 }
+
+// FeedLogAppetite How much of a solids meal she ate (issue #113) — what a barnehage reports, and what a parent knows about a lunch nobody weighed. Only meaningful for `type: solids`; null = not recorded.
+type FeedLogAppetite string
 
 // FeedLogContents What a bottle held. Only meaningful for `type: bottle`; null = not recorded.
 type FeedLogContents string
@@ -3559,7 +3632,8 @@ type UpdateDiaperType string
 
 // UpdateFeed Every field is optional; an empty object is a no-op. `amountMl`, `side`, `durationMin`, `leftMin`, `rightMin` and `notes` may also be sent as `null` to CLEAR that column; `time`/`type` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs, which the generated request type alone cannot provide).
 type UpdateFeed struct {
-	AmountMl *int32 `json:"amountMl,omitempty"`
+	AmountMl *int32              `json:"amountMl,omitempty"`
+	Appetite *UpdateFeedAppetite `json:"appetite,omitempty"`
 
 	// CaretakerId Who did the care: a member of the caller's family (403 NOT_MEMBER otherwise). Not nullable — omit it to leave the caretaker unchanged.
 	CaretakerId *string             `json:"caretakerId,omitempty"`
@@ -3574,6 +3648,9 @@ type UpdateFeed struct {
 	Time        *time.Time          `json:"time,omitempty"`
 	Type        *UpdateFeedType     `json:"type,omitempty"`
 }
+
+// UpdateFeedAppetite defines model for UpdateFeed.Appetite.
+type UpdateFeedAppetite string
 
 // UpdateFeedContents defines model for UpdateFeed.Contents.
 type UpdateFeedContents string

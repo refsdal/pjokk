@@ -191,6 +191,7 @@ type FeedLog struct {
 	Food        *string
 	Reaction    *bool
 	LoggedByID  string
+	Appetite    *string
 }
 
 type FeedTimer struct {

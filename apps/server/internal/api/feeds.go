@@ -100,6 +100,7 @@ func serFeed(row dbgen.GetFeedRow) gen.FeedLog {
 		Contents:      enumPtr[gen.FeedLogContents](row.Contents),
 		Food:          row.Food,
 		Reaction:      row.Reaction,
+		Appetite:      enumPtr[gen.FeedLogAppetite](row.Appetite),
 	}
 }
 
@@ -157,6 +158,7 @@ func (d Deps) CreateFeed(ctx context.Context, req gen.CreateFeedRequestObject) (
 				Contents:    enumStr(body.Contents),
 				Food:        body.Food,
 				Reaction:    body.Reaction,
+				Appetite:    enumStr(body.Appetite),
 				Notes:       body.Notes,
 			})
 		},
@@ -197,6 +199,7 @@ func (d Deps) UpdateFeed(ctx context.Context, req gen.UpdateFeedRequestObject) (
 	contentsSet, contentsVal := patchField[string](p, "contents")
 	foodSet, foodVal := patchField[string](p, "food")
 	reactionSet, reactionVal := patchField[bool](p, "reaction")
+	appetiteSet, appetiteVal := patchField[string](p, "appetite")
 	notesSet, notesVal := patchField[string](p, "notes")
 	caretakerSet, caretakerVal := patchField[string](p, "caretakerId")
 
@@ -240,6 +243,8 @@ func (d Deps) UpdateFeed(ctx context.Context, req gen.UpdateFeedRequestObject) (
 				FoodVal:        foodVal,
 				ReactionSet:    reactionSet,
 				ReactionVal:    reactionVal,
+				AppetiteSet:    appetiteSet,
+				AppetiteVal:    appetiteVal,
 				CaretakerIDSet: caretakerSet,
 				CaretakerIDVal: caretakerVal,
 				NotesSet:       notesSet,

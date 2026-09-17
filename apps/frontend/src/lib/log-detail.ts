@@ -10,6 +10,7 @@ import { t } from "@/lib/i18n";
 // detail line reads ("120 ml · formula"), the capitalised ones are chips.
 
 export type FeedContents = "formula" | "breast_milk" | "mixed";
+export type FeedAppetite = "well" | "some" | "little";
 export type DiaperColor =
   | "yellow"
   | "green"
@@ -25,6 +26,36 @@ export const feedContentsOptions: { value: FeedContents; label: string }[] = [
   { value: "breast_milk", label: "Breast milk" },
   { value: "mixed", label: "Mixed" },
 ];
+
+// How much of a solids meal she ate (issue #113): what a barnehage reports,
+// and what a parent knows about a lunch nobody weighed.
+export const feedAppetiteOptions: { value: FeedAppetite; label: string }[] = [
+  { value: "well", label: "Well" },
+  { value: "some", label: "Some" },
+  { value: "little", label: "Little" },
+];
+
+export const appetiteWord: Record<FeedAppetite, string> = {
+  well: "ate well",
+  some: "ate some",
+  little: "ate little",
+};
+
+// Whether the solids sheet's grams are a measurement worth saving. The
+// stepper always shows a number (last-value prefill), so an untouched one
+// says nothing: stepping it always counts; otherwise an edit keeps what the
+// row had (grams or none — a barnehage handover meal has none), and a new
+// meal keeps the prefilled grams unless an appetite already says how it
+// went. `editAmount` is undefined on create.
+export function solidsAmountIsSaved(o: {
+  touched: boolean;
+  editAmount: number | null | undefined;
+  appetite: FeedAppetite | null;
+}): boolean {
+  if (o.touched) return true;
+  if (o.editAmount !== undefined) return o.editAmount !== null;
+  return o.appetite === null;
+}
 
 export const diaperColorOptions: { value: DiaperColor; label: string }[] = [
   { value: "yellow", label: "Yellow" },
@@ -51,13 +82,15 @@ const contentsWord: Record<FeedContents, string> = {
 };
 
 /** Detail line for a feed row: the amount first, then what the bottle held
- *  or what the solids were, then a reaction flag. Nulls simply drop out. */
+ *  or what the solids were and how much of them she ate, then a reaction
+ *  flag. Nulls simply drop out. */
 export function feedDetail(
   amount: string | null,
   e: {
     type: "bottle" | "breast" | "solids";
     contents?: FeedContents | null;
     food?: string | null;
+    appetite?: FeedAppetite | null;
     reaction?: boolean | null;
   },
 ): string | null {
@@ -65,6 +98,7 @@ export function feedDetail(
     amount,
     e.type === "bottle" && e.contents ? t(contentsWord[e.contents]) : null,
     e.type === "solids" && e.food ? e.food : null,
+    e.type === "solids" && e.appetite ? t(appetiteWord[e.appetite]) : null,
     e.type === "solids" && e.reaction ? t("reaction") : null,
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : null;

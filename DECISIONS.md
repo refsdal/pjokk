@@ -2824,3 +2824,22 @@ made on his behalf. Spec:
 - **Not for kiosks** (`deviceOperations` unchanged: a nursery tablet at
   home has no part in a drop-off), **not on night Home** (three actions,
   by rule), and not in the PDF report, the importers or Stats (#111).
+
+## 2026-09-17 — appetite on solids
+
+Second of the barnehage series (#113, and the prerequisite for the
+handover, #106). Spec:
+`docs/superpowers/specs/2026-09-17-daycare-handover-design.md`.
+
+- **`feed_log.appetite` (`well | some | little`, nullable)**, one more
+  optional detail column beside food and reaction: what a barnehage reports
+  for a meal, and what a parent knows about a toddler's lunch nobody
+  weighed. Solids only. Never prefills — an observation of THIS meal.
+- **An untouched stepper is not a measurement.** The solids stepper always
+  shows a number (last-value prefill), so once an appetite says how the
+  meal went the grams are only saved if the stepper was stepped in this
+  sheet; it dims to say so. An edit keeps what the row had, so a meal that
+  never had grams stays that way. Without the rule every "ate well" lunch
+  would add the last meal's 40 g to the day's solids total.
+- **Three words, not a scale.** "Well / Some / Little" is how staff say
+  it; a five-point scale would ask a parent to grade a lunch.

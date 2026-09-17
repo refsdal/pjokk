@@ -24,7 +24,14 @@ import {
 import { clock, minutesFromSeconds, sideSeconds } from "@/lib/feed-timer-ui";
 import { t } from "@/lib/i18n";
 import { useUnits, volumeScale } from "@/lib/units";
-import { type FeedContents, feedContentsOptions } from "@/lib/log-detail";
+import {
+  type FeedAppetite,
+  type FeedContents,
+  feedAppetiteOptions,
+  feedContentsOptions,
+  solidsAmountIsSaved,
+} from "@/lib/log-detail";
+import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 
 type FeedType = "bottle" | "breast" | "solids";
@@ -107,6 +114,15 @@ export function FeedSheet({
   const [contents, setContents] = useState<FeedContents | null>(null);
   const [food, setFood] = useState("");
   const [reaction, setReaction] = useState(false);
+  // How much of the meal she ate (issue #113). An observation of THIS meal,
+  // like a reaction: it never prefills.
+  const [appetite, setAppetite] = useState<FeedAppetite | null>(null);
+  // Nobody weighs a toddler's lunch. The solids stepper always shows a
+  // number (the last meal's, by prefill), but an untouched one is not a
+  // measurement: once an appetite says how the meal went, the grams are
+  // only sent if this sheet's stepper was stepped — and an edit of a meal
+  // that never had grams (a barnehage handover) keeps it that way.
+  const [amountTouched, setAmountTouched] = useState(false);
   const [leftMin, setLeftMin] = useState(10);
   const [rightMin, setRightMin] = useState(0);
   const [now, setNow] = useState(() => Date.now());
@@ -137,6 +153,7 @@ export function FeedSheet({
       setAmountMl(last?.amountMl ?? 40);
       setFood(last?.food ?? "");
       setReaction(false);
+      setAppetite(null);
     }
     if (feedType === "breast") {
       const sides = sidesFromFeed(last) ?? { left: 10, right: 0 };
@@ -153,6 +170,8 @@ export function FeedSheet({
     setNotes(edit?.notes ?? "");
     who.reset();
     setNow(Date.now());
+    setAmountTouched(false);
+    setAppetite(edit?.appetite ?? null);
     if (edit) {
       setType(edit.type);
       setAmountMl(edit.amountMl ?? (edit.type === "solids" ? 40 : 120));
@@ -230,18 +249,27 @@ export function FeedSheet({
     liveLeft > 0 && liveRight > 0 ? "both" : liveRight > 0 ? "right" : "left";
   const canSave = type !== "breast" || (liveLeft + liveRight > 0 && !timerBusy);
 
+  const sendsAmount =
+    type !== "solids" ||
+    solidsAmountIsSaved({
+      touched: amountTouched,
+      editAmount: edit ? edit.amountMl : undefined,
+      appetite,
+    });
+
   const save = () => {
     if (!canSave) return;
     const when = (time ?? new Date()).toISOString();
     const trimmedNotes = notes.trim();
     const trimmedFood = food.trim().slice(0, 100);
+    const appetiteOut = type === "solids" ? appetite : null;
     if (edit) {
       updateFeed.mutate({
         id: edit.id,
         patch: {
           time: when,
           type,
-          amountMl: type === "breast" ? null : amountMl,
+          amountMl: type === "breast" || !sendsAmount ? null : amountMl,
           side: type === "breast" ? breastSide : null,
           durationMin: type === "breast" ? liveLeft + liveRight : null,
           leftMin: type === "breast" ? liveLeft : null,
@@ -250,6 +278,7 @@ export function FeedSheet({
           contents: type === "bottle" ? contents : null,
           food: type === "solids" ? trimmedFood || null : null,
           reaction: type === "solids" && reaction ? true : null,
+          appetite: appetiteOut,
           notes: trimmedNotes || null,
           ...who.field(),
         },
@@ -280,10 +309,13 @@ export function FeedSheet({
               leftMin: liveLeft,
               rightMin: liveRight,
             }
-          : { amountMl }),
+          : sendsAmount
+            ? { amountMl }
+            : {}),
         ...(type === "bottle" && contents ? { contents } : {}),
         ...(type === "solids" && trimmedFood ? { food: trimmedFood } : {}),
         ...(type === "solids" && reaction ? { reaction: true } : {}),
+        ...(appetiteOut ? { appetite: appetiteOut } : {}),
         ...(trimmedNotes ? { notes: trimmedNotes } : {}),
         ...who.field(),
       });
@@ -369,14 +401,21 @@ export function FeedSheet({
           />
         )}
         {type === "solids" && (
-          <Stepper
-            value={amountMl}
-            onChange={setAmountMl}
-            step={5}
-            min={5}
-            max={500}
-            unit="g"
-          />
+          // Dimmed while the number will not be saved (see amountTouched):
+          // stepping it is how a parent says "I did weigh this".
+          <div className={cn(!sendsAmount && "opacity-50")}>
+            <Stepper
+              value={amountMl}
+              onChange={(v) => {
+                setAmountMl(v);
+                setAmountTouched(true);
+              }}
+              step={5}
+              min={5}
+              max={500}
+              unit="g"
+            />
+          </div>
         )}
 
         {type === "bottle" && (
@@ -405,6 +444,20 @@ export function FeedSheet({
                 <option key={f} value={f} />
               ))}
             </datalist>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold tracking-wide text-muted uppercase">
+                {t("Ate")}
+              </p>
+              <ChipGroup
+                options={feedAppetiteOptions.map((o) => ({
+                  value: o.value,
+                  label: t(o.label),
+                }))}
+                value={appetite}
+                // Optional field: tapping the selected chip clears it.
+                onChange={(v) => setAppetite(v === appetite ? null : v)}
+              />
+            </div>
             <ChipGroup
               options={[{ value: "reaction", label: t("Reaction") }]}
               value={reaction ? "reaction" : null}

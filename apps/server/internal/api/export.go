@@ -138,11 +138,16 @@ func rowFeed(r dbgen.ExportFeedsRow) exportRow {
 			unit = str("ml")
 		}
 	}
-	// A bottle's detail is what it held; a solids feed's is the food plus a
-	// "reaction" flag when one was recorded.
+	// A bottle's detail is what it held; a solids feed's is the food, how
+	// much of it she ate ("ate well", issue #113), and a "reaction" flag
+	// when one was recorded.
 	var reaction *string
 	if r.Reaction != nil && *r.Reaction {
 		reaction = str("reaction")
+	}
+	var appetite *string
+	if r.Appetite != nil {
+		appetite = str("ate " + *r.Appetite)
 	}
 	return exportRow{
 		sortTime: r.Time.Time,
@@ -151,7 +156,7 @@ func rowFeed(r dbgen.ExportFeedsRow) exportRow {
 			"baby":         str(r.BabyName),
 			"time":         fmtTS(r.Time),
 			"type":         str(r.Type),
-			"detail":       joinDetail(r.Contents, r.Food, reaction),
+			"detail":       joinDetail(r.Contents, r.Food, appetite, reaction),
 			"amount":       fmtInt32(r.AmountMl),
 			"unit":         unit,
 			"side":         r.Side,

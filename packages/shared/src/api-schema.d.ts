@@ -2004,6 +2004,11 @@ export interface components {
             food: string | null;
             /** @description Whether a solids feed produced a reaction (details go in `notes`). null = not recorded, which is not the same as false. */
             reaction: boolean | null;
+            /**
+             * @description How much of a solids meal she ate (issue #113) — what a barnehage reports, and what a parent knows about a lunch nobody weighed. Only meaningful for `type: solids`; null = not recorded.
+             * @enum {string|null}
+             */
+            appetite: "well" | "some" | "little" | null;
         };
         CreateFeed: {
             /** @description Who did the care (as opposed to who is saving the row): a member of the caller's family, 403 NOT_MEMBER otherwise. Defaults to the caller. */
@@ -2027,6 +2032,8 @@ export interface components {
             contents?: "formula" | "breast_milk" | "mixed";
             food?: string;
             reaction?: boolean;
+            /** @enum {string} */
+            appetite?: "well" | "some" | "little";
             notes?: string;
         };
         /** @description Every field is optional; an empty object is a no-op. `amountMl`, `side`, `durationMin`, `leftMin`, `rightMin` and `notes` may also be sent as `null` to CLEAR that column; `time`/`type` are not nullable — only settable or omitted (see internal/api/feeds.go for the omitted-vs-null presence-detection pattern this endpoint needs, which the generated request type alone cannot provide). */
@@ -2051,6 +2058,8 @@ export interface components {
             contents?: "formula" | "breast_milk" | "mixed" | null;
             food?: string | null;
             reaction?: boolean | null;
+            /** @enum {string|null} */
+            appetite?: "well" | "some" | "little" | null;
             notes?: string | null;
         };
         /** @description A running nursing or pump timer, shared by the whole family (issue #44). Elapsed time is computed by the reader: the banked `leftSec`/`rightSec` plus, while `runningSide` is set, now minus `sideStartedAt`. The server banks the running stretch on its own clock at every switch, pause and stop. */

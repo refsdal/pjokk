@@ -17,7 +17,7 @@
 SELECT
     f."id", f."baby_id", f."caretaker_id", f."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
-    f."left_min", f."right_min", f."contents", f."food", f."reaction", f."notes"
+    f."left_min", f."right_min", f."contents", f."food", f."reaction", f."appetite", f."notes"
 FROM "feed_log" f
 JOIN "users" u ON u."id" = f."caretaker_id"
 JOIN "users" lu ON lu."id" = f."logged_by_id"
@@ -30,7 +30,7 @@ LIMIT sqlc.arg(lim);
 SELECT
     f."id", f."baby_id", f."caretaker_id", f."logged_by_id", COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name,
     f."time", f."type", f."amount_ml", f."side", f."duration_min",
-    f."left_min", f."right_min", f."contents", f."food", f."reaction", f."notes"
+    f."left_min", f."right_min", f."contents", f."food", f."reaction", f."appetite", f."notes"
 FROM "feed_log" f
 JOIN "users" u ON u."id" = f."caretaker_id"
 JOIN "users" lu ON lu."id" = f."logged_by_id"
@@ -39,8 +39,8 @@ WHERE f."family_id" = $1 AND f."id" = $2;
 -- name: CreateFeed :one
 INSERT INTO "feed_log"
     ("family_id", "baby_id", "caretaker_id", "time", "type", "amount_ml",
-     "side", "duration_min", "left_min", "right_min", "contents", "food", "reaction", "notes", "logged_by_id")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+     "side", "duration_min", "left_min", "right_min", "contents", "food", "reaction", "notes", "logged_by_id", "appetite")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 RETURNING "id";
 
 -- name: UpdateFeed :execrows
@@ -57,6 +57,7 @@ SET
     "contents" = CASE WHEN sqlc.arg(contents_set)::bool THEN sqlc.narg(contents_val)::text ELSE "contents" END,
     "food" = CASE WHEN sqlc.arg(food_set)::bool THEN sqlc.narg(food_val)::text ELSE "food" END,
     "reaction" = CASE WHEN sqlc.arg(reaction_set)::bool THEN sqlc.narg(reaction_val)::boolean ELSE "reaction" END,
+    "appetite" = CASE WHEN sqlc.arg(appetite_set)::bool THEN sqlc.narg(appetite_val)::text ELSE "appetite" END,
     "notes" = CASE WHEN sqlc.arg(notes_set)::bool THEN sqlc.narg(notes_val)::text ELSE "notes" END
 WHERE "family_id" = sqlc.arg(family_id) AND "id" = sqlc.arg(id);
 

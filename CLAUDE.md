@@ -457,11 +457,11 @@ Bun-era schema used. Domain tables kept their singular names:
   endTime NULL while active, location?, type nap|night?, notes?)`
 - `feed_log(id, familyId, babyId, caretakerId, time, type bottle|breast|solids,
   amountMl?, side?, durationMin?, contents formula|breast_milk|mixed?,
-  food?, reaction bool?, notes?)`
+  food?, reaction bool?, appetite well|some|little?, notes?)`
 - `diaper_log(id, familyId, babyId, caretakerId, time, type
   wet|dirty|both|dry, color?, consistency normal|loose|firm?, notes?)`
-- The optional detail columns (bottle contents, solids food + reaction,
-  diaper colour/consistency, sleep nap-vs-night) are nullable and never
+- The optional detail columns (bottle contents, solids food + reaction +
+  appetite, diaper colour/consistency, sleep nap-vs-night) are nullable and never
   required on the wire: NULL means "not recorded", the two-tap happy path
   never sends them, and the sleep `type` is defaulted by the SPA from the
   device's night-mode schedule because the server has no timezone to guess

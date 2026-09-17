@@ -16,7 +16,7 @@
 -- name: ExportFeeds :many
 SELECT
     f."baby_id", bb."name" AS baby_name, f."time", f."type", f."amount_ml",
-    f."side", f."duration_min", f."contents", f."food", f."reaction",
+    f."side", f."duration_min", f."contents", f."food", f."reaction", f."appetite",
     COALESCE(u."display_name", '') AS caretaker_name, COALESCE(lu."display_name", '') AS logged_by_name, f."notes"
 FROM "feed_log" f
 JOIN "baby" bb ON bb."id" = f."baby_id"
