@@ -13,7 +13,7 @@ import { cn, focusRing } from "@/lib/utils";
 //
 // Compact: the 2×2 grid — Feed, Diaper, Sleep, More — exactly as before.
 // md and up: More disappears; the three primaries become a row, and the
-// eleven More-sheet actions unfold beneath them as 44 px row tiles, two
+// twelve More-sheet actions unfold beneath them as 44 px row tiles, two
 // across, under the sheet's own "Log something" title. Smaller and lighter
 // than the primaries on purpose, so the hierarchy stays: three big things,
 // then a list. Both forms are in the markup; the tier is CSS.
