@@ -15,11 +15,20 @@ import {
   useUploadAvatar,
 } from "@/lib/data";
 import { t } from "@/lib/i18n";
+import { signOut } from "@/lib/auth-client";
 import { toast } from "@/lib/toast";
+import { AppearanceSection } from "./settings/AppearanceSection";
+import { InstallSection } from "./settings/InstallSection";
 import { SectionTitle } from "./settings/lib";
+import { NapGuideSection } from "./settings/NapGuideSection";
+import { NotificationsSection } from "./settings/NotificationsSection";
 
-// /profile — the person, as opposed to Settings, which is the family and the
-// device (spec §4). Global: the same nickname and photo in every family.
+// /profile — the person, as opposed to Settings, which is the family and its
+// babies (spec §4). Who you are is global: the same nickname and photo in
+// every family. Below that sit the settings that are yours or this
+// device's — notifications, appearance, night mode, the nap guide, install,
+// sign out — which the Settings restructure moved here from the old single
+// Settings scroll.
 export function ProfileScreen() {
   const me = useMe();
   const updateMe = useUpdateMe();
@@ -223,6 +232,39 @@ export function ProfileScreen() {
             {t("Save")}
           </Button>
         </Card>
+
+        {/* The sections below bring their own SectionTitle spacing; the
+            wrapper undoes this column's space-y so they sit as they did
+            on Settings. */}
+        <div className="space-y-0">
+          <SectionTitle>{t("Notifications")}</SectionTitle>
+          <NotificationsSection />
+
+          <AppearanceSection />
+          <NapGuideSection />
+          <InstallSection />
+
+          <SectionTitle>{t("Account")}</SectionTitle>
+          <Card className="space-y-3">
+            {profile.role === "admin" && (
+              <Link
+                to="/admin"
+                className="block rounded-xl2 border border-line px-4 py-3 font-semibold text-ink active:bg-surface-2"
+              >
+                {t("Admin console")}
+              </Link>
+            )}
+            <Button
+              size="full"
+              variant="outline"
+              onClick={() =>
+                void signOut().then(() => window.location.assign("/login"))
+              }
+            >
+              {t("Sign out")}
+            </Button>
+          </Card>
+        </div>
       </div>
     </div>
   );

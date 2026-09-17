@@ -167,7 +167,7 @@ export function FamilySection({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <>
-      <SectionTitle>{t("Family")}</SectionTitle>
+      <SectionTitle>{t("Caretakers")}</SectionTitle>
       <Card className="divide-y divide-line p-0">
         {(members.data ?? []).map((m) => {
           const manageable = isAdmin && m.userId !== me.data?.userId;

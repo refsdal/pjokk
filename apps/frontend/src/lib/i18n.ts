@@ -537,6 +537,21 @@ const nb: Record<string, string> = {
 
   // Settings
   Family: "Familie",
+  // Settings structure: hub, Family page, baby page
+  Caretakers: "Omsorgspersoner",
+  caretaker: "omsorgsperson",
+  caretakers: "omsorgspersoner",
+  "shared lists · data": "felles lister · data",
+  You: "Deg",
+  "Notifications · appearance · account": "Varsler · utseende · konto",
+  "Shared by the family": "Felles for familien",
+  "Data and integrations": "Data og integrasjoner",
+  Export: "Eksport",
+  Edit: "Rediger",
+  "Medicines, for daycare": "Medisiner, til barnehagen",
+  "One page with the family's medicines and blank lines for when, how and how long, to sign and hand to the staff.":
+    "Én side med familiens medisiner og tomme linjer for når, hvordan og hvor lenge, til å signere og gi til de ansatte.",
+  "Edit the medicines": "Rediger medisinene",
   admin: "admin",
   member: "medlem",
   "Invite a caretaker": "Inviter en omsorgsperson",

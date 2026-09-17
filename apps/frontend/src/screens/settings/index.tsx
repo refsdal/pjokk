@@ -1,100 +1,86 @@
-import { IconChevronRight } from "@tabler/icons-react";
-import { Link } from "@tanstack/react-router";
+import { IconPlus, IconUsers } from "@tabler/icons-react";
+import { useState } from "react";
 import { Avatar } from "@/components/Avatar";
-import { Button } from "@/components/ui/button";
+import { BabySheet } from "@/components/sheets/BabySheet";
 import { Card } from "@/components/ui/card";
-import { API_BASE } from "@/lib/api";
-import { signOut } from "@/lib/auth-client";
-import { useMe } from "@/lib/data";
+import { useBabies, useMe, useMembers } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { legalUrl } from "@/lib/site";
-import { AboutMeCard } from "./AboutMeCard";
-import { ApiKeysSection } from "./ApiKeysSection";
-import { AppearanceSection } from "./AppearanceSection";
-import { BabiesSection } from "./BabiesSection";
-import { CareDaysSection } from "./CareDaysSection";
-import { CalendarFeedCard } from "./CalendarFeedCard";
-import { ContactsSection } from "./ContactsSection";
-import { DevicesSection } from "./DevicesSection";
-import { FamilySection } from "./FamilySection";
-import { InstallSection } from "./InstallSection";
-import { MedicinesSection } from "./MedicinesSection";
-import { NapGuideSection } from "./NapGuideSection";
-import { PhotoUsageLine } from "./PhotoUsageLine";
-import { SectionTitle } from "./lib";
-import { NotificationsSection } from "./NotificationsSection";
-import { ReportCard } from "./ReportCard";
-import { SleepLocationsSection } from "./SleepLocationsSection";
+import { formatAge } from "@/lib/time";
+import { NavRow, SectionTitle } from "./lib";
 
+// Settings is a hub, not a list: what belongs to the family, what belongs
+// to one child, and a pointer to what belongs to you (which lives on
+// /profile, behind your face, where the person already was). The old
+// screen was twenty sections in the order they shipped, and its per-baby
+// cards acted on whichever baby Home had selected without saying so.
 export function SettingsScreen() {
-  // The family role used to be derived by matching the session's user id
-  // against the member list; /api/me reports it directly, from the same
-  // membership row the server enforces on.
   const me = useMe();
-
-  const myRole = me.data?.memberRole;
-  const isAdmin = myRole === "admin" || myRole === "owner";
+  const babies = useBabies();
+  const members = useMembers();
+  const [adding, setAdding] = useState(false);
+  const caretakers = members.data?.length ?? 0;
 
   return (
     <div className="mx-auto max-w-md px-4 pt-safe md:max-w-lg md:px-6">
       <h1 className="py-4 text-2xl font-extrabold text-ink">{t("Settings")}</h1>
       <div className="pb-tabbar">
-        <FamilySection isAdmin={isAdmin} />
-        {isAdmin && <DevicesSection />}
-        <BabiesSection isAdmin={isAdmin} />
-        <ContactsSection />
-        <MedicinesSection />
-        <CareDaysSection isAdmin={isAdmin} />
-
-        {isAdmin && (
-          <>
-            <SectionTitle>{t("Sleep locations")}</SectionTitle>
-            <SleepLocationsSection />
-          </>
-        )}
-
-        <NapGuideSection />
-
-        <SectionTitle>{t("Notifications")}</SectionTitle>
-        <NotificationsSection />
-
-        <AppearanceSection />
-
-        {isAdmin && (
-          <>
-            <SectionTitle>{t("API keys")}</SectionTitle>
-            <ApiKeysSection />
-          </>
-        )}
-
-        <InstallSection />
-
-        <SectionTitle>{t("Data")}</SectionTitle>
-        <Card className="space-y-3">
-          <p className="text-sm text-muted">
-            {t("Everything ever logged, one row per entry — plain CSV.")}{" "}
-            {t("Always metric (ml, kg, cm, °C), whatever your display units.")}
-          </p>
-          {/* Never paywalled: this is how a family exercises their right of
-              access and portability. */}
-          <Button
-            size="full"
-            variant="outline"
-            onClick={() => window.location.assign(`${API_BASE}/api/export.csv`)}
-          >
-            {t("Export CSV")}
-          </Button>
-          <PhotoUsageLine />
+        <SectionTitle>{t("Family")}</SectionTitle>
+        <Card className="p-0">
+          <NavRow
+            to="/settings/family"
+            label={t("Family")}
+            sub={
+              caretakers > 0
+                ? `${caretakers} ${caretakers === 1 ? t("caretaker") : t("caretakers")} · ${t("shared lists · data")}`
+                : t("shared lists · data")
+            }
+            leading={
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink-soft">
+                <IconUsers className="h-5 w-5" />
+              </span>
+            }
+          />
         </Card>
 
-        <SectionTitle>{t("PDF report")}</SectionTitle>
-        <ReportCard />
+        <SectionTitle>{t("Babies")}</SectionTitle>
+        <Card className="divide-y divide-line p-0">
+          {(babies.data ?? []).map((b) => (
+            <NavRow
+              key={b.id}
+              to="/settings/baby/$babyId"
+              params={{ babyId: b.id }}
+              label={b.name}
+              sub={`${formatAge(new Date(b.birthDate))}${b.sex ? "" : ` · ${t("sex not set")}`}`}
+              leading={<Avatar src={null} name={b.name} size={9} />}
+            />
+          ))}
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="flex w-full items-center gap-2 px-4 py-3 text-left font-semibold text-ink-soft active:bg-surface-2"
+          >
+            <IconPlus className="h-5 w-5" />
+            {t("Add baby")}
+          </button>
+        </Card>
+        <BabySheet open={adding} onOpenChange={setAdding} />
 
-        <SectionTitle>{t("About the child, for daycare")}</SectionTitle>
-        <AboutMeCard />
-
-        <SectionTitle>{t("Calendar subscription")}</SectionTitle>
-        <CalendarFeedCard />
+        <SectionTitle>{t("You")}</SectionTitle>
+        <Card className="p-0">
+          <NavRow
+            to="/profile"
+            label={me.data?.displayName || me.data?.email || t("Your profile")}
+            sub={t("Notifications · appearance · account")}
+            leading={
+              <Avatar
+                src={me.data?.avatarUrl}
+                name={me.data?.displayName || me.data?.email || "?"}
+                size={9}
+              />
+            }
+          />
+        </Card>
 
         <SectionTitle>{t("About")}</SectionTitle>
         <Card className="divide-y divide-line p-0">
@@ -113,46 +99,6 @@ export function SettingsScreen() {
           >
             {t("Terms")}
           </a>
-        </Card>
-
-        <SectionTitle>{t("Account")}</SectionTitle>
-        <Card className="space-y-3">
-          {me.data?.role === "admin" && (
-            <Link
-              to="/admin"
-              className="block rounded-xl2 border border-line px-4 py-3 font-semibold text-ink active:bg-surface-2"
-            >
-              {t("Admin console")}
-            </Link>
-          )}
-          <Link
-            to="/profile"
-            className="flex min-h-14 items-center gap-3 rounded-xl2 border border-line px-4 py-2 active:bg-surface-2"
-          >
-            <Avatar
-              src={me.data?.avatarUrl}
-              name={me.data?.displayName ?? "?"}
-              size={9}
-            />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate font-semibold text-ink">
-                {me.data?.displayName}
-              </span>
-              <span className="block truncate text-xs text-muted">
-                {me.data?.email}
-              </span>
-            </span>
-            <IconChevronRight className="h-5 w-5 text-muted" />
-          </Link>
-          <Button
-            size="full"
-            variant="outline"
-            onClick={() =>
-              void signOut().then(() => window.location.assign("/login"))
-            }
-          >
-            {t("Sign out")}
-          </Button>
         </Card>
 
         <p className="py-6 text-center text-xs text-muted">

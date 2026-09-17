@@ -18,6 +18,9 @@ import { KioskSetupScreen } from "@/screens/KioskSetup";
 import { LoginScreen } from "@/screens/Login";
 import { ProfileScreen } from "@/screens/Profile";
 import { SettingsScreen } from "@/screens/settings";
+import { BabyPage } from "@/screens/settings/BabyPage";
+import { FamilyPage } from "@/screens/settings/FamilyPage";
+import { FamilySubPage } from "@/screens/settings/FamilySubPage";
 import { AppShell } from "@/screens/shell";
 import { TimelineScreen } from "@/screens/Timeline";
 import { WelcomeScreen } from "@/screens/Welcome";
@@ -91,8 +94,37 @@ const settingsRoute = createRoute({
   component: SettingsScreen,
 });
 
+// Settings is a hub with two kinds of door (the third, the person, is
+// /profile below): the family, whose sections each open as a page of their
+// own, and one page per baby.
+const settingsFamilyRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/settings/family",
+  component: FamilyPage,
+});
+
+const settingsFamilySectionRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/settings/family/$section",
+  component: function FamilySectionRoute() {
+    const { section } = settingsFamilySectionRoute.useParams();
+    return <FamilySubPage section={section} />;
+  },
+});
+
+const settingsBabyRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/settings/baby/$babyId",
+  component: function BabySettingsRoute() {
+    const { babyId } = settingsBabyRoute.useParams();
+    // Keyed: the cards seed local state from the baby once.
+    return <BabyPage key={babyId} babyId={babyId} />;
+  },
+});
+
 // The person, not the family: reached from the account sheet on Home and
-// from Settings → Account.
+// from Settings → You. Also where the personal and per-device settings
+// live (notifications, appearance, night mode, sign out).
 const profileRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/profile",
@@ -265,6 +297,9 @@ export const routeTree = rootRoute.addChildren([
     statsRoute,
     vaccinesRoute,
     settingsRoute,
+    settingsFamilyRoute,
+    settingsFamilySectionRoute,
+    settingsBabyRoute,
     profileRoute,
   ]),
   loginRoute,
