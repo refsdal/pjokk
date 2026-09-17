@@ -21,6 +21,7 @@ import { SettingsScreen } from "@/screens/settings";
 import { BabyPage } from "@/screens/settings/BabyPage";
 import { FamilyPage } from "@/screens/settings/FamilyPage";
 import { FamilySubPage } from "@/screens/settings/FamilySubPage";
+import { TrackingPage } from "@/screens/settings/TrackingPage";
 import { AppShell } from "@/screens/shell";
 import { TimelineScreen } from "@/screens/Timeline";
 import { WelcomeScreen } from "@/screens/Welcome";
@@ -119,6 +120,24 @@ const settingsBabyRoute = createRoute({
     const { babyId } = settingsBabyRoute.useParams();
     // Keyed: the cards seed local state from the baby once.
     return <BabyPage key={babyId} babyId={babyId} />;
+  },
+});
+
+// What the family tracks for the baby (spec
+// docs/superpowers/specs/2026-09-17-per-baby-tracking-design.md): the
+// carousel, from the baby page and right after adding a baby (?new=1 makes
+// Done go to Home instead of back).
+const settingsBabyTrackingRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/settings/baby/$babyId/tracking",
+  validateSearch: (search: Record<string, unknown>): { new?: boolean } =>
+    search.new === true || search.new === "1" || search.new === 1
+      ? { new: true }
+      : {},
+  component: function BabyTrackingRoute() {
+    const { babyId } = settingsBabyTrackingRoute.useParams();
+    const { new: isNew } = settingsBabyTrackingRoute.useSearch();
+    return <TrackingPage key={babyId} babyId={babyId} isNew={!!isNew} />;
   },
 });
 
@@ -300,6 +319,7 @@ export const routeTree = rootRoute.addChildren([
     settingsFamilyRoute,
     settingsFamilySectionRoute,
     settingsBabyRoute,
+    settingsBabyTrackingRoute,
     profileRoute,
   ]),
   loginRoute,

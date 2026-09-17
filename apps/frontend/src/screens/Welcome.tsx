@@ -1,6 +1,7 @@
 import { Navigate, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import type { Baby } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,7 +75,7 @@ export function WelcomeScreen() {
   const createBaby = async () => {
     setBusy(true);
     try {
-      await unwrap(
+      const created = await unwrap<Baby>(
         client.POST("/api/babies", {
           body: {
             name: babyName.trim(),
@@ -84,7 +85,13 @@ export function WelcomeScreen() {
         }),
       );
       await queryClient.invalidateQueries();
-      void navigate({ to: "/home" });
+      // A new baby tracks nothing until the family chooses: the carousel
+      // is the next screen, and its Done lands on Home.
+      void navigate({
+        to: "/settings/baby/$babyId/tracking",
+        params: { babyId: created.id },
+        search: { new: true },
+      });
     } catch (err) {
       toast(err instanceof Error ? err.message : t("Failed"), "error");
     } finally {

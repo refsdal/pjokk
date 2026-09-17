@@ -245,6 +245,42 @@ input[type="number"] {
   transform-origin: 50% 90%;
 }
 
+/* The tracking carousel (components/tracking/): off is asleep, on lights
+   up. The mock dims through a filter so any component inside reads the
+   same; .tracking-anim is the one part that moves, once, when the switch
+   comes on (on the two StatusCard mocks it is the card itself). The ring
+   reuses ring-ping in the card's category tint (TrackingCard sets
+   --ping-color), so night mode's amber comes through. */
+.tracking-mock {
+  transition:
+    filter 0.4s ease,
+    opacity 0.4s ease;
+}
+.tracking-mock[data-on="false"] {
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+@keyframes tracking-pop {
+  0% {
+    transform: scale(0.8);
+  }
+  55% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.tracking-mock[data-on="true"] .tracking-anim,
+.tracking-mock.tracking-anim[data-on="true"] {
+  animation: tracking-pop 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) 1;
+}
+.animate-tracking-lit {
+  --ping-start: 60%;
+  --ping-spread: 16px;
+  animation: ring-ping 0.4s ease-out 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-pulse-soft {
     animation: none;
@@ -253,6 +289,12 @@ input[type="number"] {
   .animate-help-ping,
   .animate-help-wave,
   .animate-sleep-breathe {
+    animation: none;
+  }
+  /* The light-up becomes a crossfade: the dim/undim transition alone. */
+  .tracking-mock[data-on="true"] .tracking-anim,
+  .tracking-mock.tracking-anim[data-on="true"],
+  .animate-tracking-lit {
     animation: none;
   }
   * {

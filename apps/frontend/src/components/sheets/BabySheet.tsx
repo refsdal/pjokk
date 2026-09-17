@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Baby } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
@@ -25,6 +26,7 @@ export function BabySheet({
   canDelete?: boolean;
 }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [sex, setSex] = useState<"girl" | "boy" | null>(null);
@@ -48,19 +50,30 @@ export function BabySheet({
         sex,
       };
       return baby
-        ? unwrap(
+        ? unwrap<Baby>(
             client.PATCH("/api/babies/{id}", {
               params: { path: { id: baby.id } },
               body: json,
             }),
           )
-        : unwrap(
+        : unwrap<Baby>(
             client.POST("/api/babies", {
               body: { ...json, sex: sex ?? undefined },
             }),
           );
     },
-    onSuccess: done,
+    onSuccess: (created) => {
+      done();
+      // A new baby tracks nothing until the family chooses (spec
+      // 2026-09-17-per-baby-tracking-design.md): straight to the carousel.
+      if (!baby) {
+        void navigate({
+          to: "/settings/baby/$babyId/tracking",
+          params: { babyId: created.id },
+          search: { new: true },
+        });
+      }
+    },
     onError: (err) => toast(err.message, "error"),
   });
 
