@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { registerFeedTimerMutationDefaults } from "./feed-timer";
+import { registerIllnessMutationDefaults } from "./illness";
 import { registerLogMutationDefaults } from "./logs";
 import { registerOtherMutationDefaults } from "./other";
 import { registerDaycareMutationDefaults } from "./daycare";
@@ -13,6 +14,7 @@ export * from "./devices";
 export * from "./family";
 export * from "./feed-timer";
 export * from "./help";
+export * from "./illness";
 export * from "./insights";
 export * from "./keys";
 export * from "./logs";
@@ -32,4 +34,5 @@ export function registerMutationDefaults(qc: QueryClient) {
   registerOtherMutationDefaults(qc);
   registerPlayMutationDefaults(qc);
   registerDaycareMutationDefaults(qc);
+  registerIllnessMutationDefaults(qc);
 }

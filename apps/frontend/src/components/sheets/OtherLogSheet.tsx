@@ -55,6 +55,7 @@ import { measurementScale, useUnits } from "@/lib/units";
 import { t } from "@/lib/i18n";
 import { nextDoseFrom } from "@/lib/medicine-ui";
 import { daycareMeta } from "@/lib/daycare-ui";
+import { illnessMeta } from "@/lib/illness-ui";
 import { playKindMeta, playTypeOrder } from "@/lib/play-ui";
 import { formatClock } from "@/lib/time";
 import { toast } from "@/lib/toast";
@@ -88,6 +89,7 @@ export type MoreHandlers = {
   onPick: (kind: OtherKind) => void;
   onPickPlay: (type: PlayType) => void;
   onPickDaycare: () => void;
+  onPickIllness: () => void;
   onPickHelp: () => void;
   onVaccines: () => void;
 };
@@ -117,6 +119,13 @@ export function moreActions(h: MoreHandlers): MoreAction[] {
       ...daycareMeta,
       pick: h.onPickDaycare,
     },
+    // An illness episode (issue #107): state until Recovered, like a day
+    // at barnehage until Pick up.
+    {
+      key: "illness",
+      ...illnessMeta,
+      pick: h.onPickIllness,
+    },
     // Vaccines open a screen, not a sheet — the programme schedule needs
     // more room than a tray.
     {
@@ -144,6 +153,7 @@ export function MoreSheet({
   onPick,
   onPickPlay,
   onPickDaycare,
+  onPickIllness,
   onPickHelp,
 }: {
   open: boolean;
@@ -151,6 +161,7 @@ export function MoreSheet({
   onPick: (kind: OtherKind) => void;
   onPickPlay: (type: PlayType) => void;
   onPickDaycare: () => void;
+  onPickIllness: () => void;
   onPickHelp: () => void;
 }) {
   const navigate = useNavigate();
@@ -159,6 +170,7 @@ export function MoreSheet({
     onPick,
     onPickPlay,
     onPickDaycare,
+    onPickIllness,
     onPickHelp,
     onVaccines: () => {
       onOpenChange(false);

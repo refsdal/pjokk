@@ -226,6 +226,30 @@ const nb: Record<string, string> = {
   "ate some": "spiste litt",
   "ate little": "spiste lite",
 
+  // Illness episodes (issue #107).
+  Illness: "Sykdom",
+  None: "Ingen",
+  "Edit illness": "Rediger sykdom",
+  Symptoms: "Symptomer",
+  Vomiting: "Oppkast",
+  Diarrhoea: "Diaré",
+  Cough: "Hoste",
+  Cold: "Forkjølelse",
+  Rash: "Utslett",
+  "Eye infection": "Øyebetennelse",
+  Earache: "Øreverk",
+  "Symptom-free hours before daycare": "Symptomfrie timer før barnehagen",
+  "Your own rule for this illness. FHI advises 48 hours after vomiting or diarrhoea, and otherwise going by how she is.":
+    "Deres egen regel for denne sykdommen. FHI anbefaler 48 timer etter oppkast eller diaré, og ellers å gå etter allmenntilstanden.",
+  "Ill since": "Syk siden",
+  "Still has symptoms": "Har fortsatt symptomer",
+  "Symptom-free since": "Symptomfri siden",
+  "h on": "t",
+  "h symptom-free since": "t symptomfri siden",
+  "Symptom-free now": "Symptomfri nå",
+  "Symptoms again": "Symptomer igjen",
+  Recovered: "Frisk",
+
   // The pick-up handover (issue #106).
   Handover: "Overlevering",
   "How was the day at daycare?": "Hvordan var dagen i barnehagen?",

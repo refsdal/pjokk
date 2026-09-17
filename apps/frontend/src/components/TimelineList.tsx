@@ -18,6 +18,7 @@ import {
 } from "@/components/sheets/OtherLogSheet";
 import { DaycareSheet } from "@/components/sheets/DaycareSheet";
 import { HandoverSheet } from "@/components/sheets/HandoverSheet";
+import { IllnessSheet } from "@/components/sheets/IllnessSheet";
 import { PlaySheet } from "@/components/sheets/PlaySheet";
 import { SleepSheet } from "@/components/sheets/SleepSheet";
 import { VaccineSheet } from "@/components/sheets/VaccineSheet";
@@ -33,6 +34,7 @@ import {
   useUnits,
 } from "@/lib/units";
 import { daycareMeta } from "@/lib/daycare-ui";
+import { illnessDays, illnessMeta, symptomsLine } from "@/lib/illness-ui";
 import { playKindMeta } from "@/lib/play-ui";
 import { nextDoseFrom } from "@/lib/medicine-ui";
 import { formatClock, formatDay, formatDuration } from "@/lib/time";
@@ -47,8 +49,14 @@ import { cn } from "@/lib/utils";
 // start time.
 const isSession = (
   e: TimelineEntry,
-): e is Extract<TimelineEntry, { kind: "sleep" | "play" | "daycare" }> =>
-  e.kind === "sleep" || e.kind === "play" || e.kind === "daycare";
+): e is Extract<
+  TimelineEntry,
+  { kind: "sleep" | "play" | "daycare" | "illness" }
+> =>
+  e.kind === "sleep" ||
+  e.kind === "play" ||
+  e.kind === "daycare" ||
+  e.kind === "illness";
 // A row the barnehage reported at pick-up (issue #106) carries the day's id.
 // `in`, not a kind list: only sleep, feed and diaper rows have the field.
 export const isFromHandover = (e: TimelineEntry): boolean =>
@@ -195,6 +203,20 @@ export function entryMain(
         .join(" · "),
     };
   }
+  if (e.kind === "illness") {
+    // Days, not a clock span: an illness runs over several, and the row's
+    // own time already says when it began.
+    const days = illnessDays(e);
+    return {
+      title: t(illnessMeta.label),
+      detail: [
+        e.symptoms.length > 0 ? symptomsLine(e.symptoms) : null,
+        days === 1 ? `1 ${t("day")}` : `${days} ${t("days")}`,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    };
+  }
   if (e.kind === "vaccine") {
     return {
       title: e.name,
@@ -228,6 +250,7 @@ const kindStyle: Record<
   // Every play type shares the row icon; the title carries which one.
   play: { icon: playKindMeta.tummy.icon, tint: playKindMeta.tummy.tint },
   daycare: { icon: daycareMeta.icon, tint: daycareMeta.tint },
+  illness: { icon: illnessMeta.icon, tint: illnessMeta.tint },
   vaccine: { icon: IconVaccine, tint: "text-growth" },
 };
 
@@ -367,6 +390,7 @@ export function TimelineList({
     editEntry.kind !== "sleep" &&
     editEntry.kind !== "play" &&
     editEntry.kind !== "daycare" &&
+    editEntry.kind !== "illness" &&
     editEntry.kind !== "vaccine"
       ? (editEntry as OtherEntry)
       : null;
@@ -428,6 +452,12 @@ export function TimelineList({
         babyId={babyId ?? ""}
         edit={editEntry?.kind === "daycare" ? editEntry : null}
         onHandover={setHandoverDay}
+      />
+      <IllnessSheet
+        open={editEntry?.kind === "illness"}
+        onOpenChange={(o) => !o && setEditEntry(null)}
+        babyId={babyId ?? ""}
+        edit={editEntry?.kind === "illness" ? editEntry : null}
       />
       <HandoverSheet
         open={!!handoverDay}
