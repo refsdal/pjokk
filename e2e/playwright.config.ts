@@ -15,7 +15,11 @@ import { defineConfig, devices } from "@playwright/test";
 // window (the wide tier), so the rest of the suite keeps its single run.
 export default defineConfig({
   testDir: ".",
-  workers: 1,
+  // Every spec creates its own family and sends its own client address
+  // (fixtures.ts), so the specs are independent and can run side by side.
+  // Measured 2026-09-18 on the full suite: 1 worker 385 s, 2 workers
+  // 204 s, 4 workers 113 s. The CI runner has two vCPUs; a laptop has more.
+  workers: process.env.CI ? 2 : 4,
   timeout: 30_000,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : [["list"]],
