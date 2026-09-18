@@ -33,8 +33,19 @@ test("stats show the night/day split, the longest stretch and feeds by type", as
     expect(res.status(), await res.text()).toBe(201);
   };
   // Last night: 3 h, then a 3 h 30 stretch after a waking; a 1 h nap today.
-  await post("/api/sleep", { startTime: iso(20 * h), endTime: iso(17 * h), type: "night" });
-  await post("/api/sleep", { startTime: iso(16.5 * h), endTime: iso(13 * h), type: "night" });
+  // A night runs local noon to noon and belongs to the day it began on
+  // (stats.go), so the two sessions are anchored to YESTERDAY AFTERNOON
+  // rather than "N hours ago": seeded relative to now they fell into the
+  // night before last whenever the suite ran before 04:30 local, and CI
+  // runs in UTC at any hour.
+  const yesterday = (hour: number, minute = 0) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 1);
+    d.setHours(hour, minute, 0, 0);
+    return d.toISOString();
+  };
+  await post("/api/sleep", { startTime: yesterday(14), endTime: yesterday(17), type: "night" });
+  await post("/api/sleep", { startTime: yesterday(17, 30), endTime: yesterday(21), type: "night" });
   await post("/api/sleep", { startTime: iso(4 * h), endTime: iso(3 * h), type: "nap" });
   await post("/api/feeds", { time: iso(12 * h), type: "bottle", amountMl: 120 });
   await post("/api/feeds", { time: iso(8 * h), type: "breast", side: "left" });
