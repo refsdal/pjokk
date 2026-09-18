@@ -44,8 +44,16 @@ export function BabyRow({
     const b = babies[0]!;
     return (
       <div className="flex min-w-0 items-center gap-2.5">
+        {/* flex, not a plain block: the face is inline-flex, and inside a
+            block it sits on a text line — with a photo (an image, whose
+            baseline is its bottom edge) the line's descender space went
+            underneath and the ring became an oval 7 px taller than the face.
+            As a flex item the face is a box and the ring hugs it. */}
         <span
-          className={cn("shrink-0 rounded-full", status && ["ring-2", ring])}
+          className={cn(
+            "flex shrink-0 rounded-full",
+            status && ["ring-2", ring],
+          )}
           data-status={status ?? "none"}
         >
           <Avatar src={b.avatarUrl} name={b.name} size={11} />
@@ -88,7 +96,7 @@ export function BabyRow({
             aria-label={b.name}
             onClick={() => onSelect(b.id)}
             className={cn(
-              "shrink-0 rounded-full opacity-70 active:scale-95",
+              "flex shrink-0 rounded-full opacity-70 active:scale-95",
               focusRing,
             )}
           >
@@ -135,7 +143,7 @@ export function BabyHeader() {
         type="button"
         aria-label={t("Account")}
         onClick={() => setAccount(true)}
-        className={cn("shrink-0 rounded-full active:scale-95", focusRing)}
+        className={cn("flex shrink-0 rounded-full active:scale-95", focusRing)}
       >
         <Avatar
           src={me.data?.avatarUrl}
