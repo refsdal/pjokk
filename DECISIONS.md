@@ -3300,3 +3300,29 @@ of thirteen switches per baby (spec
   no switch, so More never disappears on its own; the whole grid gives
   way to the nothing-tracked card when the set is empty.
 
+## 2026-09-18 — the header ring is the baby's status, and barnehage gets a colour
+
+Owner: "I want the ring to have the color of the current status of the
+kid. If it sleeps, the same color as the sleep card; if they are in the
+kindergarten, the same color as that card would be, preferably dark
+green."
+
+- **The ring's colour is the status** (`lib/baby-status.ts`): sleep
+  purple while a session runs, barnehage green while she is there, the
+  accent otherwise; sleeping wins if both, the more immediate thing. Read
+  off the summary the screen already loads — no request of its own — and
+  the pill says it in `data-status` for the tests. Night mode is one amber
+  ramp, so the ring is amber there whatever she is doing, like every tint.
+- **Barnehage became a fifth category colour** (owner picked this over
+  "the ring only"). It had borrowed the accent; "the same colour as that
+  card" only holds if the card has a colour of its own. `--color-daycare`
+  is a dark green in light mode, a lighter green in dark and kiosk, amber
+  at night, held to the 3:1 graphics floor by `contrast.test.ts` — and the
+  banner icon, the More tile, the carousel card, the calendar category
+  and the Stats day marks all moved to it. The place block's phone and
+  map icons stay accent: they are links, not the category.
+- **A single baby gets a ring only while something is happening.** The
+  header is a heading, not a control, for a one-baby family — the common
+  case — so a ring there means "she is asleep / at barnehage", never
+  "selected".
+

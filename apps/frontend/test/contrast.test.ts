@@ -113,6 +113,7 @@ describe("palette contrast", () => {
     ["feed", "bg"],
     ["diaper", "bg"],
     ["growth", "bg"],
+    ["daycare", "bg"],
     // Temperature-trend statuses. These carry meaning — whether a fever is
     // climbing — so they are held to the graphics floor like the tints.
     ["ok", "bg"],

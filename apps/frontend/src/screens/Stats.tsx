@@ -446,7 +446,7 @@ export function StatsScreen() {
                   // under their bars. An HTML row rather than a chart series: the
                   // chart has no margins and no Y axis, so n equal cells sit
                   // exactly under n bands. Two SHAPES, a dot and a ring, because
-                  // the accent and the coral are close, colour alone fails for
+                  // the green and the coral could be close, colour alone fails for
                   // colour blindness, and night mode collapses both onto amber.
                   <>
                     <div
@@ -465,7 +465,7 @@ export function StatsScreen() {
                         its label. The fixed height keeps an empty cell's
                         row. */}
                           {d.daycare && (
-                            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-daycare" />
                           )}
                           {d.ill && (
                             <span
@@ -479,7 +479,7 @@ export function StatsScreen() {
                     <p className="flex flex-wrap gap-x-4 pt-2 text-xs text-muted">
                       {anyDaycare && (
                         <span>
-                          <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-accent align-middle" />
+                          <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-daycare align-middle" />
                           {t("at daycare that day")}
                         </span>
                       )}
@@ -523,7 +523,7 @@ export function StatsScreen() {
                 className="flex items-start gap-3"
                 data-testid="daycare-split"
               >
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-2 text-accent">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-2 text-daycare">
                   <daycareMeta.icon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1 space-y-1.5">

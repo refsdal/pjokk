@@ -42,6 +42,8 @@
   --color-feed: #5795cf; /* was #5b9bd8, 2.80:1 */
   --color-diaper: #37a095; /* was #3fb8ab, 2.31:1 */
   --color-growth: #cc7c5b; /* was #e88d67, 2.37:1 */
+  /* Barnehage (a fifth category, 2026-09-18): dark green, 4.6:1 on bg. */
+  --color-daycare: #2f7d5b;
 
   --radius-xl2: 1.25rem;
 }
@@ -71,6 +73,7 @@
   --color-feed: #7fb3e8;
   --color-diaper: #56c6b9;
   --color-growth: #efa07e;
+  --color-daycare: #5fc391;
 }
 
 /* Kiosk mode (spec §3): the care station's own palette — cool, dark, one
@@ -96,6 +99,7 @@
   --color-feed: #7fb3e8;
   --color-diaper: #56c6b9;
   --color-growth: #efa07e;
+  --color-daycare: #5fc391;
 }
 
 /* Night mode: near-black warm background, single amber ramp, no blue light.
@@ -128,6 +132,7 @@
   --color-feed: #c2a06a;
   --color-diaper: #c2a06a;
   --color-growth: #c2a06a;
+  --color-daycare: #c2a06a;
 }
 
 html,

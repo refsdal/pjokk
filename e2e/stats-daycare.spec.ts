@@ -53,7 +53,7 @@ test("the split appears once there are barnehage days and home days", async ({
   // Seven cells under seven bars, four of them marked.
   const marks = page.getByTestId("daycare-marks").locator("> span");
   await expect(marks).toHaveCount(7);
-  await expect(page.getByTestId("daycare-marks").locator(".bg-accent")).toHaveCount(4);
+  await expect(page.getByTestId("daycare-marks").locator(".bg-daycare")).toHaveCount(4);
   await card.scrollIntoViewIfNeeded();
   await page.screenshot({ path: shot("stats.png"), fullPage: true });
 });

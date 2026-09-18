@@ -36,11 +36,11 @@ export const calendarCategoryMeta: Record<
     colorVar: "var(--color-feed)",
   },
   // Barnehage (issue #110): planning days, parent meetings, photo day. The
-  // accent, as the barnehage banner and its timeline row use.
+  // barnehage green, as the banner, the tile and the header ring use.
   daycare: {
     label: "Daycare",
     icon: IconBackpack,
-    colorVar: "var(--color-accent)",
+    colorVar: "var(--color-daycare)",
   },
   other: {
     label: "Other",
