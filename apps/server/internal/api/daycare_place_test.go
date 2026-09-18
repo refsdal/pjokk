@@ -32,6 +32,7 @@ func placeBody(w twoParents, extra map[string]any) map[string]any {
 }
 
 func TestDaycarePlaceIsWrittenByParentsAndReadByEveryone(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 
@@ -86,6 +87,7 @@ func TestDaycarePlaceIsWrittenByParentsAndReadByEveryone(t *testing.T) {
 }
 
 func TestDaycarePlaceRefusesAZoneThatDoesNotLoadAndAStrangersBaby(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 	if res := a.Do(http.MethodPost, "/api/daycare-places", w.cookie, placeBody(w, map[string]any{"tz": "Oslo/Nowhere"})); res.Status != http.StatusBadRequest || res.JSON["code"] != "BAD_TZ" {
@@ -117,6 +119,7 @@ func TestDaycarePlaceRefusesAZoneThatDoesNotLoadAndAStrangersBaby(t *testing.T) 
 
 // A baby attends one place: naming her on a second place moves her.
 func TestEnrollingABabyMovesHerFromTheOtherPlace(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 	first := a.Do(http.MethodPost, "/api/daycare-places", w.cookie, placeBody(w, nil))
@@ -142,6 +145,7 @@ func TestEnrollingABabyMovesHerFromTheOtherPlace(t *testing.T) {
 }
 
 func TestPickupPlanIsReplacedWholeByAParent(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 	path := "/api/babies/" + w.babyID + "/pickup-plan"
@@ -190,6 +194,7 @@ func TestPickupPlanIsReplacedWholeByAParent(t *testing.T) {
 }
 
 func TestPickupOverrideIsAnyMembersAndClears(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 	path := "/api/babies/" + w.babyID + "/pickup-override"
@@ -230,6 +235,7 @@ func TestPickupOverrideIsAnyMembersAndClears(t *testing.T) {
 }
 
 func TestSummaryCarriesThePlaceAndThePlan(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 	summary := a.Do(http.MethodGet, "/api/summary?babyId="+w.babyID, w.cookie, nil)
@@ -257,6 +263,7 @@ func TestSummaryCarriesThePlaceAndThePlan(t *testing.T) {
 // A removed member is no longer anyone's planned pick-up: the day keeps
 // its time and loses the person, and their one-day exceptions go.
 func TestRemovedMemberLeavesThePickupPlan(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 	a.Do(http.MethodPut, "/api/babies/"+w.babyID+"/pickup-plan", w.cookie, map[string]any{"days": []map[string]any{{"weekday": 2, "minute": 930, "userId": w.memberID}}})

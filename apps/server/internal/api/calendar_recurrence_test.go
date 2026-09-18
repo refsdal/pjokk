@@ -13,6 +13,7 @@ import (
 // Issue #52: recurring events are one row expanded at read time.
 
 func TestListCalendarEventsExpandsSeriesInWindow(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	// Weekly physio, Mondays 10:00 Oslo, ending after three weeks.
@@ -89,6 +90,7 @@ func TestListCalendarEventsExpandsSeriesInWindow(t *testing.T) {
 }
 
 func TestUpdateCalendarEventRecurrenceRearmsLatch(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	created := a.Do(http.MethodPost, "/api/calendar/events", cookie, map[string]any{

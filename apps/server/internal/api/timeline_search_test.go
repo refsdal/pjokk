@@ -12,6 +12,7 @@ import (
 // Issue #52: ?q searches the free text of every kind, case-insensitively,
 // with ILIKE wildcards treated as literals.
 func TestListTimelineSearch(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

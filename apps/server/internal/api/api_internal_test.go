@@ -11,6 +11,7 @@ import (
 // shape of this exemption) would silently exempt any future JSON route
 // mounted under /api/users/ too — this test would have caught that.
 func TestSkipSpecValidationAvatarPatternIsAnchored(t *testing.T) {
+	t.Parallel()
 	cases := map[string]bool{
 		"/api/users/abc/avatar":  true,
 		"/api/users/abc/profile": false,

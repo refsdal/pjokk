@@ -18,6 +18,7 @@ import (
 // -----------------------------------------------------------------------
 
 func TestFeedContentsRoundTripAndClear(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -58,6 +59,7 @@ func TestFeedContentsRoundTripAndClear(t *testing.T) {
 }
 
 func TestFeedSolidsFoodAndReaction(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -92,6 +94,7 @@ func TestFeedSolidsFoodAndReaction(t *testing.T) {
 }
 
 func TestFeedContentsRejectsUnknownValue(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -108,6 +111,7 @@ func TestFeedContentsRejectsUnknownValue(t *testing.T) {
 }
 
 func TestDiaperDryTypeAndDetail(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -164,6 +168,7 @@ func TestDiaperDryTypeAndDetail(t *testing.T) {
 }
 
 func TestSleepKindRoundTripAndClear(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -208,6 +213,7 @@ func TestSleepKindRoundTripAndClear(t *testing.T) {
 }
 
 func TestSummaryTodayCountsDryDiapers(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -231,6 +237,7 @@ func TestSummaryTodayCountsDryDiapers(t *testing.T) {
 }
 
 func TestTimelineCarriesDetailFields(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -271,6 +278,7 @@ func TestTimelineCarriesDetailFields(t *testing.T) {
 // lands in the existing free `detail` column so downstream spreadsheets keep
 // their column positions.
 func TestExportCSVDetailColumnCarriesCoreLogDetail(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

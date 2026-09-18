@@ -40,6 +40,7 @@ import (
 // RequireSession) never touches Deps.Q when no pjk_ bearer is present, so
 // the closed pool is guaranteed to fail inside the GetMe method itself.
 func TestInternalErrorsUseTheStandardEnvelope(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "kari-broken@example.com")
 

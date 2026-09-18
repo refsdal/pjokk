@@ -17,6 +17,7 @@ import (
 // -----------------------------------------------------------------------
 
 func TestCreateContactWithBabyLinkHydrates(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -47,6 +48,7 @@ func TestCreateContactWithBabyLinkHydrates(t *testing.T) {
 }
 
 func TestCreateContactZeroBabiesIsFamilyWide(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -64,6 +66,7 @@ func TestCreateContactZeroBabiesIsFamilyWide(t *testing.T) {
 }
 
 func TestCreateContactSharedAcrossSeveralBabies(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -83,6 +86,7 @@ func TestCreateContactSharedAcrossSeveralBabies(t *testing.T) {
 }
 
 func TestListContactsByNameFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	_, otherCookie := a.NewFamily("Other family", "stranger@example.com")
@@ -109,6 +113,7 @@ func TestListContactsByNameFamilyScoped(t *testing.T) {
 }
 
 func TestUpdateContactReplacesLinkSetOmittedUntouched(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -155,6 +160,7 @@ func TestUpdateContactReplacesLinkSetOmittedUntouched(t *testing.T) {
 }
 
 func TestContactCrossFamilyUpdateDeleteIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	created := a.Do(http.MethodPost, "/api/contacts", cookie, map[string]any{"name": "Ours"})
@@ -183,6 +189,7 @@ func TestContactCrossFamilyUpdateDeleteIs404(t *testing.T) {
 // 402-then-premium test: creation needs no plan at all on this port, and
 // read/edit/delete were always open.
 func TestCreateContactIsFreeFullCRUD(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -221,6 +228,7 @@ func TestCreateContactIsFreeFullCRUD(t *testing.T) {
 }
 
 func TestCreateContactRejectsForeignBabyId(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	familyB, _ := a.NewFamily("Other family", "other@example.com")
@@ -239,6 +247,7 @@ func TestCreateContactRejectsForeignBabyId(t *testing.T) {
 }
 
 func TestUpdateContactRejectsForeignBabyId(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	created := a.Do(http.MethodPost, "/api/contacts", cookie, map[string]any{"name": "Mormor"})
@@ -260,6 +269,7 @@ func TestUpdateContactRejectsForeignBabyId(t *testing.T) {
 }
 
 func TestContactsNeverLeakAcrossFamilies(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	if res := a.Do(http.MethodPost, "/api/contacts", cookie, map[string]any{"name": "Ours"}); res.Status != http.StatusCreated {
@@ -277,6 +287,7 @@ func TestContactsNeverLeakAcrossFamilies(t *testing.T) {
 }
 
 func TestCreateContactDedupesRepeatedBabyIds(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -295,6 +306,7 @@ func TestCreateContactDedupesRepeatedBabyIds(t *testing.T) {
 }
 
 func TestCreateContactBadEmailIs400AndUnknownIdIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -319,6 +331,7 @@ func TestCreateContactBadEmailIs400AndUnknownIdIs404(t *testing.T) {
 // answers 400 INVALID_REFERENCE, not 404 — the reference check never gets
 // to see that the contact doesn't exist.
 func TestUpdateContactUnknownIdWithInvalidBabyIdIs400(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	familyB, _ := a.NewFamily("Other family", "other@example.com")
@@ -339,6 +352,7 @@ func TestUpdateContactUnknownIdWithInvalidBabyIdIs400(t *testing.T) {
 // once the babyIds themselves are all valid, the same PATCH against a
 // nonexistent contact id falls through to the ordinary 404.
 func TestUpdateContactUnknownIdWithValidBabyIdsIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

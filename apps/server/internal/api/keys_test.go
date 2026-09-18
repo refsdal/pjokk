@@ -49,6 +49,7 @@ func bearerDo(a *testrig.AppRig, method, path, token string, body any) *testrig.
 }
 
 func TestCreateApiKeyShowsFullKeyOnceListHidesIt(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -91,6 +92,7 @@ func TestCreateApiKeyShowsFullKeyOnceListHidesIt(t *testing.T) {
 }
 
 func TestApiKeyReadsAndWritesLogsAttributedToCreator(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -121,6 +123,7 @@ func TestApiKeyReadsAndWritesLogsAttributedToCreator(t *testing.T) {
 }
 
 func TestApiKeyRefusedByAdminAndDeviceBoundEndpoints(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -145,6 +148,7 @@ func TestApiKeyRefusedByAdminAndDeviceBoundEndpoints(t *testing.T) {
 }
 
 func TestReadOnlyApiKeyCanReadNotWrite(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -177,6 +181,7 @@ func TestReadOnlyApiKeyCanReadNotWrite(t *testing.T) {
 }
 
 func TestApiKeyExpiryIsEnforced(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -214,6 +219,7 @@ func TestApiKeyExpiryIsEnforced(t *testing.T) {
 }
 
 func TestRevokedAndBogusApiKeysGet401(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -262,6 +268,7 @@ func TestRevokedAndBogusApiKeysGet401(t *testing.T) {
 }
 
 func TestApiKeysMemberForbiddenAdminFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, adminCookie := a.NewFamily("Hansen", "parent@example.com")
 

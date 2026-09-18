@@ -35,6 +35,7 @@ func rangeQuery(from, to time.Time) string {
 }
 
 func TestCreateCalendarEventWithBabiesAndAssigneesHydrates(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -73,6 +74,7 @@ func TestCreateCalendarEventWithBabiesAndAssigneesHydrates(t *testing.T) {
 }
 
 func TestListCalendarEventsRangeAscendingFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	base := time.Now()
@@ -116,6 +118,7 @@ func TestListCalendarEventsRangeAscendingFamilyScoped(t *testing.T) {
 }
 
 func TestUpdateCalendarEventReplacesLinkRowsOmittedUntouched(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -168,6 +171,7 @@ func TestUpdateCalendarEventReplacesLinkRowsOmittedUntouched(t *testing.T) {
 }
 
 func TestCalendarEventCrossFamilyUpdateDeleteIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	created := a.Do(http.MethodPost, "/api/calendar/events", cookie, map[string]any{
@@ -200,6 +204,7 @@ func TestCalendarEventCrossFamilyUpdateDeleteIs404(t *testing.T) {
 // TestCreateCalendarEventIsFreeFullCRUD replaces the TS predecessor's
 // 402-then-premium test: creation needs no plan at all on this port.
 func TestCreateCalendarEventIsFreeFullCRUD(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -239,6 +244,7 @@ func TestCreateCalendarEventIsFreeFullCRUD(t *testing.T) {
 }
 
 func TestCreateCalendarEventDedupesBabyIds(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -258,6 +264,7 @@ func TestCreateCalendarEventDedupesBabyIds(t *testing.T) {
 }
 
 func TestCreateCalendarEventRejectsForeignBabyAndAssignee(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookieA := a.NewFamily("Hansen", "parent@example.com")
 	familyB, _ := a.NewFamily("Other family", "other@example.com")
@@ -288,6 +295,7 @@ func TestCreateCalendarEventRejectsForeignBabyAndAssignee(t *testing.T) {
 }
 
 func TestCalendarEventRangeValidation(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -305,6 +313,7 @@ func TestCalendarEventRangeValidation(t *testing.T) {
 }
 
 func TestCalendarEventAllDayCreateNullsDuration(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -326,6 +335,7 @@ func TestCalendarEventAllDayCreateNullsDuration(t *testing.T) {
 // Ports the TS test asserting the allDay/durationMin invariant holds
 // against the RESULTING state, not just an incoming allDay:true.
 func TestUpdateCalendarEventAllDayDurationInvariant(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -376,6 +386,7 @@ func TestUpdateCalendarEventAllDayDurationInvariant(t *testing.T) {
 // through the rig's Pool — same as the TS test reading schema.calendarEvent
 // straight from Drizzle.
 func TestUpdateCalendarEventRearmsReminderLatch(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -415,6 +426,7 @@ func TestUpdateCalendarEventRearmsReminderLatch(t *testing.T) {
 // undefined`) — this covers the lead-time-only half the previous test
 // doesn't.
 func TestUpdateCalendarEventRearmsReminderLatchOnLeadTimeChange(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 

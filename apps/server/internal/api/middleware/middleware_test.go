@@ -200,6 +200,7 @@ func assertRejected(t *testing.T, rec *httptest.ResponseRecorder, p *probe, want
 // -------------------------------------------------------------------------
 
 func TestRequireFamilyRejectsAnonymousRequests(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	p := &probe{}
 	handler := middleware.Session(f.deps)(middleware.RequireFamily(f.deps)(p.handler()))
@@ -211,6 +212,7 @@ func TestRequireFamilyRejectsAnonymousRequests(t *testing.T) {
 }
 
 func TestRequireFamilyRejectsASessionWithoutAnActiveFamily(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	_, cookie := f.signIn("No Family", "nofamily@example.com")
 	p := &probe{}
@@ -226,6 +228,7 @@ func TestRequireFamilyRejectsASessionWithoutAnActiveFamily(t *testing.T) {
 
 // An active_organization_id is not proof of membership: the membership row is.
 func TestRequireFamilyRejectsWhenTheMembershipRowIsGone(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	userID, cookie := f.signIn("Ex Member", "ex@example.com")
 	familyID := f.family(userID, cookie.Value, "Hansen")
@@ -246,6 +249,7 @@ func TestRequireFamilyRejectsWhenTheMembershipRowIsGone(t *testing.T) {
 }
 
 func TestRequireFamilyPopulatesTheFamilyContext(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	userID, cookie := f.signIn("Kari Nordmann", "kari@example.com")
 	familyID := f.family(userID, cookie.Value, "Hansen")
@@ -282,6 +286,7 @@ func TestRequireFamilyPopulatesTheFamilyContext(t *testing.T) {
 // role must be the most privileged one — sorting by the role NAME would rank
 // "member" ahead of "owner" and silently demote the caller.
 func TestRequireFamilyResolvesTheMostPrivilegedRole(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	userID, cookie := f.signIn("Two Roles", "tworoles@example.com")
 	familyID := f.family(userID, cookie.Value, "Hansen")
@@ -315,6 +320,7 @@ func TestRequireFamilyResolvesTheMostPrivilegedRole(t *testing.T) {
 // NOT_MEMBER — would lock a family out of its own data over a missing role
 // row, which is the wrong direction to fail.
 func TestRequireFamilyAdmitsARolelessMembership(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	userID, cookie := f.signIn("Roleless", "roleless@example.com")
 	familyID := f.family(userID, cookie.Value, "Hansen")
@@ -401,6 +407,7 @@ func (f *fixture) auditRows() []struct{ AdminID, Action, Target, Detail string }
 }
 
 func TestImpersonatedWriteIsAudited(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	targetID, targetCookie := f.signIn("Target Parent", "target@example.com")
 	familyID := f.family(targetID, targetCookie.Value, "Hansen")
@@ -442,6 +449,7 @@ func TestImpersonatedWriteIsAudited(t *testing.T) {
 }
 
 func TestImpersonatedReadIsNotAudited(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	targetID, targetCookie := f.signIn("Target Parent", "target@example.com")
 	familyID := f.family(targetID, targetCookie.Value, "Hansen")
@@ -473,6 +481,7 @@ func TestImpersonatedReadIsNotAudited(t *testing.T) {
 // -------------------------------------------------------------------------
 
 func TestRequireAdminAllowsAFamilyAdmin(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	userID, cookie := f.signIn("Parent", "parent@example.com")
 	f.family(userID, cookie.Value, "Hansen")
@@ -491,6 +500,7 @@ func TestRequireAdminAllowsAFamilyAdmin(t *testing.T) {
 }
 
 func TestRequireAdminRejectsAPlainMember(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	ownerID, ownerCookie := f.signIn("Parent", "parent@example.com")
 	familyID := f.family(ownerID, ownerCookie.Value, "Hansen")
@@ -515,6 +525,7 @@ func TestRequireAdminRejectsAPlainMember(t *testing.T) {
 }
 
 func TestRequireAdminRejectsAPIKeys(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	userID, cookie := f.signIn("Parent", "parent@example.com")
 	familyID := f.family(userID, cookie.Value, "Hansen")
@@ -548,6 +559,7 @@ func (f *fixture) apiKeyChain(p *probe) http.Handler {
 }
 
 func TestAPIKeyAuthAcceptsALiveKey(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	userID, cookie := f.signIn("Parent", "parent@example.com")
 	familyID := f.family(userID, cookie.Value, "Hansen")
@@ -575,6 +587,7 @@ func TestAPIKeyAuthAcceptsALiveKey(t *testing.T) {
 }
 
 func TestAPIKeyAuthRejectsAnUnknownKey(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	p := &probe{}
 
@@ -588,6 +601,7 @@ func TestAPIKeyAuthRejectsAnUnknownKey(t *testing.T) {
 
 // A revoked key must be indistinguishable from one that never existed.
 func TestAPIKeyAuthRejectsARevokedKey(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	userID, cookie := f.signIn("Parent", "parent@example.com")
 	familyID := f.family(userID, cookie.Value, "Hansen")
@@ -608,6 +622,7 @@ func TestAPIKeyAuthRejectsARevokedKey(t *testing.T) {
 // at the authentication join is the only place that closes for every route
 // at once, since a key authenticates AS its creator.
 func TestAPIKeyAuthRejectsAKeyWhoseCreatorIsBanned(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	userID, cookie := f.signIn("Parent", "parent@example.com")
 	familyID := f.family(userID, cookie.Value, "Hansen")
@@ -635,6 +650,7 @@ func TestAPIKeyAuthRejectsAKeyWhoseCreatorIsBanned(t *testing.T) {
 }
 
 func TestAPIKeyAuthRejectsAnExpiredKey(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	userID, cookie := f.signIn("Parent", "parent@example.com")
 	familyID := f.family(userID, cookie.Value, "Hansen")
@@ -651,6 +667,7 @@ func TestAPIKeyAuthRejectsAnExpiredKey(t *testing.T) {
 }
 
 func TestAPIKeyAuthRejectsWritesFromAReadOnlyKey(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	userID, cookie := f.signIn("Parent", "parent@example.com")
 	familyID := f.family(userID, cookie.Value, "Hansen")
@@ -666,6 +683,7 @@ func TestAPIKeyAuthRejectsWritesFromAReadOnlyKey(t *testing.T) {
 }
 
 func TestAPIKeyAuthAllowsReadsFromAReadOnlyKey(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	userID, cookie := f.signIn("Parent", "parent@example.com")
 	familyID := f.family(userID, cookie.Value, "Hansen")
@@ -686,6 +704,7 @@ func TestAPIKeyAuthAllowsReadsFromAReadOnlyKey(t *testing.T) {
 // bearer plugin accepts session tokens the same way) and must fall through
 // to the session middleware untouched.
 func TestAPIKeyAuthIgnoresOtherBearerTokens(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	userID, cookie := f.signIn("Parent", "parent@example.com")
 	familyID := f.family(userID, cookie.Value, "Hansen")
@@ -710,6 +729,7 @@ func TestAPIKeyAuthIgnoresOtherBearerTokens(t *testing.T) {
 // last_used_at is coarse on purpose: one write per five minutes per key, not
 // one per request.
 func TestAPIKeyAuthStampsLastUsedAtMostEveryFiveMinutes(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	userID, cookie := f.signIn("Parent", "parent@example.com")
 	familyID := f.family(userID, cookie.Value, "Hansen")
@@ -760,6 +780,7 @@ func TestAPIKeyAuthStampsLastUsedAtMostEveryFiveMinutes(t *testing.T) {
 // -------------------------------------------------------------------------
 
 func TestRejectAPIKeyBlocksKeysAndAllowsSessions(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	userID, cookie := f.signIn("Parent", "parent@example.com")
 	familyID := f.family(userID, cookie.Value, "Hansen")
@@ -794,6 +815,7 @@ func TestRejectAPIKeyBlocksKeysAndAllowsSessions(t *testing.T) {
 // -------------------------------------------------------------------------
 
 func TestRequireSysadmin(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	userID, cookie := f.signIn("Parent", "parent@example.com")
 	familyID := f.family(userID, cookie.Value, "Hansen")
@@ -851,6 +873,7 @@ func TestRequireSysadmin(t *testing.T) {
 // -------------------------------------------------------------------------
 
 func TestRateLimitAllowsUpToTheLimitThenRefuses(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	p := &probe{}
 	handler := middleware.RateLimit(f.deps.RateLimit, "test-limit", 3, 600, false, 0)(p.handler())
@@ -877,6 +900,7 @@ func TestRateLimitAllowsUpToTheLimitThenRefuses(t *testing.T) {
 // Buckets are per client, and the client is only read off X-Forwarded-For
 // when the operator has declared trusted hops.
 func TestRateLimitBucketsPerClientAddress(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	p := &probe{}
 	handler := middleware.RateLimit(f.deps.RateLimit, "test-per-ip", 1, 600, false, 1)(p.handler())
@@ -903,6 +927,7 @@ func TestRateLimitBucketsPerClientAddress(t *testing.T) {
 // The bucket is a hash, never the address (a privacy commitment that outlived
 // the KV namespace that forced it).
 func TestRateLimitStoresHashedAddressesOnly(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	p := &probe{}
 	handler := middleware.RateLimit(f.deps.RateLimit, "test-hash", 5, 600, false, 1)(p.handler())
@@ -931,6 +956,7 @@ func TestRateLimitStoresHashedAddressesOnly(t *testing.T) {
 // A global bucket is shared by every client: it defeats distributed guessing
 // at the cost of shared-fate 429s.
 func TestRateLimitGlobalScopeSharesOneBucket(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	p := &probe{}
 	handler := middleware.RateLimit(f.deps.RateLimit, "test-global", 1, 600, true, 1)(p.handler())
@@ -964,6 +990,7 @@ func TestRateLimitGlobalScopeSharesOneBucket(t *testing.T) {
 // -------------------------------------------------------------------------
 
 func TestTrustedProxyRewritesRemoteAddr(t *testing.T) {
+	t.Parallel()
 	var seen string
 	next := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { seen = r.RemoteAddr })
 
@@ -988,6 +1015,7 @@ func TestTrustedProxyRewritesRemoteAddr(t *testing.T) {
 // hop-counting inside client-supplied data while the trusted proxy's actual
 // observation sat unseen in the second — a forged client address.
 func TestTrustedProxyReadsEveryForwardedForLine(t *testing.T) {
+	t.Parallel()
 	var seen string
 	next := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { seen = r.RemoteAddr })
 
@@ -1013,6 +1041,7 @@ func TestTrustedProxyReadsEveryForwardedForLine(t *testing.T) {
 // multi-line header and the equivalent single-line one must land in the SAME
 // bucket, or an attacker splits the header and gets a fresh one per request.
 func TestRateLimitReadsEveryForwardedForLine(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	p := &probe{}
 	handler := middleware.RateLimit(f.deps.RateLimit, "test-multiline", 1, 600, false, 1)(p.handler())
@@ -1036,6 +1065,7 @@ func TestRateLimitReadsEveryForwardedForLine(t *testing.T) {
 }
 
 func TestTrustedProxyIsInertWithoutTrustedHops(t *testing.T) {
+	t.Parallel()
 	var seen string
 	next := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { seen = r.RemoteAddr })
 

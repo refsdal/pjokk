@@ -110,6 +110,7 @@ func sameOrder(t *testing.T, what string, got, want []string) {
 }
 
 func TestAdminListsWalkEveryRowOnceNewestFirst(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Ops")
 	for i := range 4 {
 		a.SignUp(fmt.Sprintf("Person %d", i), fmt.Sprintf("person%d@example.com", i))
@@ -136,6 +137,7 @@ func TestAdminListsWalkEveryRowOnceNewestFirst(t *testing.T) {
 }
 
 func TestAdminAuditPageIsStableWhileRowsArrive(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Ops")
 	for i := range 4 {
 		note(t, a, cookie, "support.call", fmt.Sprintf("ticket-%d", i))
@@ -170,6 +172,7 @@ func TestAdminAuditPageIsStableWhileRowsArrive(t *testing.T) {
 }
 
 func TestAdminListsRejectAMalformedCursor(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Ops")
 	for _, path := range []string{"/api/admin/users", "/api/admin/families", "/api/admin/audit"} {
 		for _, cursor := range []string{"not-a-cursor", "bm90LWEtdGltZXxpZA"} { // the second is base64 of "not-a-time|id"
@@ -182,6 +185,7 @@ func TestAdminListsRejectAMalformedCursor(t *testing.T) {
 }
 
 func TestAdminListsBoundTheLimit(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Ops")
 	for _, path := range []string{"/api/admin/users", "/api/admin/families", "/api/admin/audit"} {
 		for _, limit := range []string{"0", "201"} {
@@ -204,6 +208,7 @@ func TestAdminListsBoundTheLimit(t *testing.T) {
 }
 
 func TestAdminListFiltersCombineWithTheCursor(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Ops")
 	for i := range 3 {
 		a.SignUp(fmt.Sprintf("Kari Berg %d", i), fmt.Sprintf("berg%d@example.com", i))

@@ -12,6 +12,7 @@ import (
 // Home's ?log= deep link; a custom reminder carries none. Every reminder
 // also ends with the Snooze button (snooze_test.go).
 func TestRunRemindersCarriesLogAction(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

@@ -31,6 +31,7 @@ import (
 // --- 1:1 ports of tenancy.test.ts's five `it` blocks ---
 
 func TestTenancyRejectsUnauthenticatedRequest(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	res := a.Do(http.MethodGet, "/api/feeds", "", nil)
 	if res.Status != http.StatusUnauthorized {
@@ -39,6 +40,7 @@ func TestTenancyRejectsUnauthenticatedRequest(t *testing.T) {
 }
 
 func TestTenancyRejectsSignedInUserWithNoFamily(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	loner := a.SignUp("No family", "loner@example.com")
 	_ = loner
@@ -54,6 +56,7 @@ func TestTenancyRejectsSignedInUserWithNoFamily(t *testing.T) {
 }
 
 func TestTenancyScopesListsToActiveFamily(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -83,6 +86,7 @@ func TestTenancyScopesListsToActiveFamily(t *testing.T) {
 }
 
 func TestTenancyBlocksCrossFamilyReadsAndWritesById(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -113,6 +117,7 @@ func TestTenancyBlocksCrossFamilyReadsAndWritesById(t *testing.T) {
 }
 
 func TestTenancyBlocksLoggingAgainstAnotherFamilysBaby(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, _ := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -139,6 +144,7 @@ func TestTenancyBlocksLoggingAgainstAnotherFamilysBaby(t *testing.T) {
 // member being removed") and middleware_test.go's own version of this case;
 // this is the tenancy suite's copy of the same guarantee.
 func TestTenancyRejectsStaleActiveFamilyClaimWithoutMembership(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("Family A", "a@example.com")
 
@@ -189,6 +195,7 @@ func simpleLogKinds() []simpleLogKind {
 // id (PATCH and DELETE), the row surviving the refused hijack, and refusal
 // to log against another family's baby.
 func TestTenancySweepSimpleLogKinds(t *testing.T) {
+	t.Parallel()
 	for _, k := range simpleLogKinds() {
 		t.Run(k.base, func(t *testing.T) {
 			a := testrig.App(t)
@@ -240,6 +247,7 @@ func TestTenancySweepSimpleLogKinds(t *testing.T) {
 // simpleLogKind table above can't express (create/patch/stop/delete plus an
 // /active probe, not create/patch/delete alone).
 func TestTenancySweepPlay(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -281,6 +289,7 @@ func TestTenancySweepPlay(t *testing.T) {
 // TestTenancySweepSleepLocations covers the one admin-gated, non-baby-scoped
 // resource: custom sleep-location chips are family-wide, not per-baby.
 func TestTenancySweepSleepLocations(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -306,6 +315,7 @@ func TestTenancySweepSleepLocations(t *testing.T) {
 // TestTenancySweepCalendarEvents covers the premium calendar's cross-family
 // isolation (list within the query window, and by-id PATCH/DELETE).
 func TestTenancySweepCalendarEvents(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -333,6 +343,7 @@ func TestTenancySweepCalendarEvents(t *testing.T) {
 
 // TestTenancySweepContacts covers the family address book's isolation.
 func TestTenancySweepContacts(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -359,6 +370,7 @@ func TestTenancySweepContacts(t *testing.T) {
 // TestTenancySweepTimelineForeignBabyId probes the merged timeline endpoint
 // with another family's babyId.
 func TestTenancySweepTimelineForeignBabyId(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -379,6 +391,7 @@ func TestTenancySweepTimelineForeignBabyId(t *testing.T) {
 // TestTenancySweepSummaryForeignBabyId probes /api/summary with another
 // family's babyId.
 func TestTenancySweepSummaryForeignBabyId(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, _ := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -393,6 +406,7 @@ func TestTenancySweepSummaryForeignBabyId(t *testing.T) {
 // TestTenancySweepStatsForeignBabyId probes /api/stats with another family's
 // babyId.
 func TestTenancySweepStatsForeignBabyId(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, _ := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -408,6 +422,7 @@ func TestTenancySweepStatsForeignBabyId(t *testing.T) {
 // document seeded under a different family. Reuses files_test.go's
 // seedVaccineDocument/pngBytes/adminUserID helpers (same package).
 func TestTenancySweepFiles(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("Family A", "a@example.com")
 	babyA := a.NewBaby(familyA, "Baby A")
@@ -433,6 +448,7 @@ func TestTenancySweepFiles(t *testing.T) {
 // TestTenancySweepInvites probes invite list scoping and cross-family
 // revoke by code.
 func TestTenancySweepInvites(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -460,6 +476,7 @@ func TestTenancySweepInvites(t *testing.T) {
 // TestTenancySweepKeys probes API-key list scoping and cross-family delete
 // by id.
 func TestTenancySweepKeys(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -495,6 +512,7 @@ func TestTenancySweepKeys(t *testing.T) {
 // gen.GetFamilyMemberParams{OrganizationID: familyID, ID: memberID}) rather
 // than a 404 that a route could accidentally return for ANY unknown string.
 func TestTenancySweepMemberManagementForeignMemberId(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -535,6 +553,7 @@ func TestTenancySweepMemberManagementForeignMemberId(t *testing.T) {
 // also proves that scope holds across families, not merely across users
 // within one.
 func TestTenancySweepPushEndpointOwnership(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")

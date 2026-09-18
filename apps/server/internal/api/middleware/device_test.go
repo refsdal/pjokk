@@ -87,6 +87,7 @@ func deviceCookieIn(rec *httptest.ResponseRecorder) *http.Cookie {
 }
 
 func TestDeviceAuthResolvesTheDevicesFamily(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	familyID, adminID := f.deviceFamily()
 	token := f.createDevice(familyID, adminID, deviceOpts{})
@@ -114,6 +115,7 @@ func TestDeviceAuthResolvesTheDevicesFamily(t *testing.T) {
 }
 
 func TestDeviceAuthRejectsARevokedDeviceAndClearsTheCookie(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	familyID, adminID := f.deviceFamily()
 	token := f.createDevice(familyID, adminID, deviceOpts{revoked: true})
@@ -130,6 +132,7 @@ func TestDeviceAuthRejectsARevokedDeviceAndClearsTheCookie(t *testing.T) {
 }
 
 func TestDeviceAuthRejectsAnUnknownToken(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 
 	p := &probe{}
@@ -140,6 +143,7 @@ func TestDeviceAuthRejectsAnUnknownToken(t *testing.T) {
 }
 
 func TestDeviceAuthPassesThroughWithoutACookie(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 
 	p := &probe{}
@@ -151,6 +155,7 @@ func TestDeviceAuthPassesThroughWithoutACookie(t *testing.T) {
 }
 
 func TestDeviceWriteRequiresACaretaker(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	familyID, adminID := f.deviceFamily()
 	token := f.createDevice(familyID, adminID, deviceOpts{})
@@ -163,6 +168,7 @@ func TestDeviceWriteRequiresACaretaker(t *testing.T) {
 }
 
 func TestDeviceCaretakerMustBeAMember(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	familyID, adminID := f.deviceFamily()
 	token := f.createDevice(familyID, adminID, deviceOpts{})
@@ -177,6 +183,7 @@ func TestDeviceCaretakerMustBeAMember(t *testing.T) {
 }
 
 func TestDeviceCaretakerBecomesTheUserButNeverAnAdmin(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	familyID, adminID := f.deviceFamily()
 	token := f.createDevice(familyID, adminID, deviceOpts{})
@@ -204,6 +211,7 @@ func TestDeviceCaretakerBecomesTheUserButNeverAnAdmin(t *testing.T) {
 }
 
 func TestRequireAdminRejectsDevices(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	familyID, adminID := f.deviceFamily()
 	token := f.createDevice(familyID, adminID, deviceOpts{})
@@ -216,6 +224,7 @@ func TestRequireAdminRejectsDevices(t *testing.T) {
 }
 
 func TestDeviceCookieIsReissuedOncePerDay(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	familyID, adminID := f.deviceFamily()
 	yesterday := time.Now().Add(-25 * time.Hour)
@@ -238,6 +247,7 @@ func TestDeviceCookieIsReissuedOncePerDay(t *testing.T) {
 }
 
 func TestAPIKeyWinsOverADeviceCookie(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	familyID, adminID := f.deviceFamily()
 	deviceToken := f.createDevice(familyID, adminID, deviceOpts{})
@@ -258,6 +268,7 @@ func TestAPIKeyWinsOverADeviceCookie(t *testing.T) {
 }
 
 func TestDeviceCookieAttributes(t *testing.T) {
+	t.Parallel()
 	rec := httptest.NewRecorder()
 	middleware.SetDeviceCookie(rec, "pjd_token", true)
 	c := deviceCookieIn(rec)

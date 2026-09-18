@@ -255,8 +255,8 @@ any invite link already handed out stops working, because those embed
 
 ## Verified automatically
 
-- **397 Go tests** (`cd apps/server && go test -p 1 ./...`, against a real
-  Postgres; `-p 1` is required, several packages truncate shared tables) —
+- **397 Go tests** (`cd apps/server && go test ./...`, against a real
+  Postgres, every test in a database of its own) —
   tenancy isolation (cross-family reads/writes impossible, stale session
   claims re-verified), invite lifecycle (transactional redeem, expiry /
   revoke / exhaustion, rate limiting), the active sleep and play state

@@ -66,6 +66,7 @@ func osloMarch16(h, m int) time.Time {
 }
 
 func TestClosingAlertGoesOnceToThePlannedPerson(t *testing.T) {
+	t.Parallel()
 	w := newClosingWorld(t)
 	w.plan(t, map[string]any{"weekday": 1, "minute": 15*60 + 30, "userId": w.memberID})
 	dropOff(t, w.a, w.cookie, w.babyID, osloMarch16(8, 0))
@@ -94,6 +95,7 @@ func TestClosingAlertGoesOnceToThePlannedPerson(t *testing.T) {
 }
 
 func TestClosingAlertPrefersTodaysException(t *testing.T) {
+	t.Parallel()
 	w := newClosingWorld(t)
 	w.plan(t, map[string]any{"weekday": 1, "minute": 930, "userId": w.memberID})
 	if res := w.a.Do(http.MethodPut, "/api/babies/"+w.babyID+"/pickup-override", w.cookie, map[string]any{"date": "2026-03-16", "userId": w.adminID}); res.Status != http.StatusOK {
@@ -109,6 +111,7 @@ func TestClosingAlertPrefersTodaysException(t *testing.T) {
 }
 
 func TestClosingAlertFallsBackToTheParents(t *testing.T) {
+	t.Parallel()
 	t.Run("nobody named", func(t *testing.T) {
 		w := newClosingWorld(t)
 		w.plan(t, map[string]any{"weekday": 1, "minute": 930, "userId": nil})
@@ -141,6 +144,7 @@ func TestClosingAlertFallsBackToTheParents(t *testing.T) {
 }
 
 func TestClosingAlertStaysQuietWhenItShould(t *testing.T) {
+	t.Parallel()
 	t.Run("picked up in time", func(t *testing.T) {
 		w := newClosingWorld(t)
 		id := dropOff(t, w.a, w.cookie, w.babyID, osloMarch16(8, 0))
@@ -173,6 +177,7 @@ func TestClosingAlertStaysQuietWhenItShould(t *testing.T) {
 // After an outage: within the hour it still says so, in the past tense;
 // beyond it the day is latched without a word.
 func TestClosingAlertAfterClosing(t *testing.T) {
+	t.Parallel()
 	w := newClosingWorld(t)
 	dropOff(t, w.a, w.cookie, w.babyID, osloMarch16(8, 0))
 	if sent := runClosing(t, w.a, osloMarch16(16, 50)); sent != 1 {
@@ -199,6 +204,7 @@ func TestClosingAlertAfterClosing(t *testing.T) {
 // 29 March 2026: Oslo's clocks go forward at 02:00, so local midnight plus
 // 16.5 hours is 17:30 on the wall. Closing is 16:30 on the wall all the same.
 func TestClosingAlertOnAClockChangeDay(t *testing.T) {
+	t.Parallel()
 	w := newClosingWorld(t)
 	oslo := func(h, m int) time.Time { return time.Date(2026, 3, 29, h-2, m, 0, 0, time.UTC) } // CEST from 03:00
 	dropOff(t, w.a, w.cookie, w.babyID, oslo(8, 0))
@@ -211,6 +217,7 @@ func TestClosingAlertOnAClockChangeDay(t *testing.T) {
 }
 
 func TestClosingAlertIsInThePersonsLanguage(t *testing.T) {
+	t.Parallel()
 	w := newClosingWorld(t)
 	speaksNorwegian(t, w.a, w.cookie)
 	dropOff(t, w.a, w.cookie, w.babyID, osloMarch16(8, 0))
@@ -224,6 +231,7 @@ func TestClosingAlertIsInThePersonsLanguage(t *testing.T) {
 // Barnehage switched off for the baby (spec
 // 2026-09-17-per-baby-tracking-design.md): enrolled or not, no alert.
 func TestClosingAlertSkipsABabyNotTrackingDaycare(t *testing.T) {
+	t.Parallel()
 	w := newClosingWorld(t)
 	if res := w.a.Do(http.MethodPut, "/api/babies/"+w.babyID+"/features", w.cookie, map[string]any{"features": []string{"sleep"}}); res.Status != http.StatusOK {
 		t.Fatalf("set features: %d %s", res.Status, res.Raw)

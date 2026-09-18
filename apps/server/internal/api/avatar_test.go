@@ -86,6 +86,7 @@ func avatarKeys(t *testing.T, a *testrig.AppRig) []string {
 }
 
 func TestAvatarUploadStoresAJPEGAndReplacesThePrevious(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	a.SignUp("Solo", "solo@example.com")
 	cookie := a.SignIn("solo@example.com")
@@ -122,6 +123,7 @@ func TestAvatarUploadStoresAJPEGAndReplacesThePrevious(t *testing.T) {
 }
 
 func TestAvatarUploadRejectsWhatIsNotASmallImage(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	a.SignUp("Solo", "solo@example.com")
 	cookie := a.SignIn("solo@example.com")
@@ -157,6 +159,7 @@ func TestAvatarUploadRejectsWhatIsNotASmallImage(t *testing.T) {
 }
 
 func TestAvatarIsVisibleToSelfAndCoMembersOnly(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, ownerCookie := a.NewFamily("Hansen", "owner@example.com")
 	var ownerID string
@@ -226,6 +229,7 @@ func TestAvatarIsVisibleToSelfAndCoMembersOnly(t *testing.T) {
 }
 
 func TestAvatarDeleteRemovesTheObject(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	id := a.SignUp("Solo", "solo@example.com")
 	cookie := a.SignIn("solo@example.com")
@@ -265,6 +269,7 @@ func (failingDelete) Delete(ctx context.Context, keys ...string) error {
 }
 
 func TestAvatarDeleteLeavesTheKeyInPlaceWhenStorageFails(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	a.SignUp("Solo", "solo@example.com")
 	cookie := a.SignIn("solo@example.com")

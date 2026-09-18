@@ -18,6 +18,7 @@ import (
 // created over the API — she chooses second, on the carousel.
 
 func TestBabyFeaturesDefaultEmptyOverTheAPI(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	res := a.Do(http.MethodPost, "/api/babies", cookie, map[string]any{
@@ -33,6 +34,7 @@ func TestBabyFeaturesDefaultEmptyOverTheAPI(t *testing.T) {
 }
 
 func TestSeededBabyTracksEverything(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	a.NewBaby(familyID, "Nora")
@@ -50,6 +52,7 @@ func TestSeededBabyTracksEverything(t *testing.T) {
 }
 
 func TestAllFeaturesMatchTheSpec(t *testing.T) {
+	t.Parallel()
 	doc, err := openapi3.NewLoader().LoadFromData(api.SpecYAML)
 	if err != nil {
 		t.Fatal(err)
@@ -66,6 +69,7 @@ func TestAllFeaturesMatchTheSpec(t *testing.T) {
 }
 
 func TestSetBabyFeaturesReplacesTheSetInSpecOrder(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -93,6 +97,7 @@ func TestSetBabyFeaturesReplacesTheSetInSpecOrder(t *testing.T) {
 }
 
 func TestSetBabyFeaturesIsAdminOnlyAndValidated(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, adminCookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

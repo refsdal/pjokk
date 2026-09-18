@@ -18,6 +18,7 @@ import (
 // route (api.NewHandler's own requireSession helper, not the middleware
 // chain) answers 401 without a cookie and 200 with the one SignIn returns.
 func TestAppRigSignUpSignInGatesOnSession(t *testing.T) {
+	t.Parallel()
 	app := testrig.App(t)
 
 	const email = "kari@example.test"
@@ -49,6 +50,7 @@ func TestAppRigSignUpSignInGatesOnSession(t *testing.T) {
 // TestAppRigNewFamilyAndBaby exercises NewFamily/NewBaby against the real
 // GET /api/babies route (internal/api/babies.go).
 func TestAppRigNewFamilyAndBaby(t *testing.T) {
+	t.Parallel()
 	app := testrig.App(t)
 
 	familyID, cookie := app.NewFamily("Nordmann family", "admin@example.test")
@@ -98,6 +100,7 @@ func probeArray(w http.ResponseWriter, r *http.Request) {
 // session with no active family (403 NO_FAMILY), and a session with one
 // (200, with the resolved family/role echoed back).
 func TestAppRigMountProtectedProvesTheMiddlewareChain(t *testing.T) {
+	t.Parallel()
 	app := testrig.App(t)
 	app.MountProtected("GET /api/_test/probe", probe)
 
@@ -132,6 +135,7 @@ func TestAppRigMountProtectedProvesTheMiddlewareChain(t *testing.T) {
 // a JSON array, the shape most list endpoints (babies, timeline entries, …)
 // answer with.
 func TestAppRigDoArray(t *testing.T) {
+	t.Parallel()
 	app := testrig.App(t)
 	app.MountProtected("GET /api/_test/probe-array", probeArray)
 	_, cookie := app.NewFamily("Array family", "arr@example.test")
@@ -149,6 +153,7 @@ func TestAppRigDoArray(t *testing.T) {
 // into api.Deps, so a route test can assert on it after driving a request
 // that triggers a notification.
 func TestAppRigRecordingPush(t *testing.T) {
+	t.Parallel()
 	app := testrig.App(t)
 
 	if got := app.Push.Count("user-1"); got != 0 {
@@ -180,6 +185,7 @@ func TestAppRigRecordingPush(t *testing.T) {
 // wall clock, ahead of any test that needs it (rate-limit windows, API-key
 // expiry, reminder scheduling).
 func TestAppRigSetNow(t *testing.T) {
+	t.Parallel()
 	app := testrig.App(t)
 
 	before := app.Deps.Now()

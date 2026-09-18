@@ -14,6 +14,7 @@ import (
 // barnehage reports for a lunch nobody weighed.
 
 func TestFeedAppetiteRoundTripClearAndNoAmount(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -50,6 +51,7 @@ func TestFeedAppetiteRoundTripClearAndNoAmount(t *testing.T) {
 }
 
 func TestFeedAppetiteRejectsUnknownValue(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -62,6 +64,7 @@ func TestFeedAppetiteRejectsUnknownValue(t *testing.T) {
 }
 
 func TestAppetiteOnTheTimelineSummaryAndExport(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

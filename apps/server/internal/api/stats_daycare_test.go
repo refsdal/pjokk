@@ -12,6 +12,7 @@ import (
 // clock, tz=0: "today" is Saturday 2026-01-10, so the 7-day window is
 // Sunday 4th to Saturday 10th and today is left out of both groups.
 func TestStatsDaycareSplit(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -81,6 +82,7 @@ func TestStatsDaycareSplit(t *testing.T) {
 // Ill days through the API (issue #127). Fixed clock, tz=0: today is
 // Saturday 2026-01-10, the 7-day window is the 4th to the 10th.
 func TestStatsIllDays(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

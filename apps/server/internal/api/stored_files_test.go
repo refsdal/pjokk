@@ -57,6 +57,7 @@ func allStoredKeys(t *testing.T, mem *storage.Memory) []string {
 }
 
 func TestDeleteFamilyErasesItsStoredFiles(t *testing.T) {
+	t.Parallel()
 	a, opsFamily, opsCookie, _ := sysadminRig(t, "Ops family")
 	mem := a.Deps.Storage.(*storage.Memory)
 
@@ -81,6 +82,7 @@ func TestDeleteFamilyErasesItsStoredFiles(t *testing.T) {
 }
 
 func TestDeleteBabyErasesItsStoredFilesAndSparesASibling(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	mem := a.Deps.Storage.(*storage.Memory)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")

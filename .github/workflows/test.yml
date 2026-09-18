@@ -78,9 +78,9 @@ jobs:
 
       # apps/server is the backend: a Go module, outside the bun workspace,
       # so the steps above never touch it. Same TEST_DATABASE_URL, same
-      # Postgres service — -p 1 because several Go test packages truncate
-      # shared tables between tests and are not safe to run as concurrent
-      # packages against one database.
+      # Postgres service. Packages and tests run in parallel: the rig
+      # (apps/server/internal/testrig) gives every test a database of its
+      # own, cloned from a migrated template, so nothing is shared.
       # golangci-lint's default set is errcheck, govet, ineffassign,
       # staticcheck and unused, so this subsumes the bare `go vet` it
       # replaces. Config and rationale: apps/server/.golangci.yml.
@@ -88,7 +88,7 @@ jobs:
         run: cd apps/server && golangci-lint run
 
       - name: Go tests
-        run: cd apps/server && go test -p 1 -count=1 ./...
+        run: cd apps/server && go test -count=1 ./...
 
       # The SPA build is exercised by ci.yml's image job (build-artifacts)
       # and by GoReleaser's before hook on release — only the landing site

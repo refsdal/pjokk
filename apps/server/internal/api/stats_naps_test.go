@@ -22,6 +22,7 @@ import (
 //     SleepsInRange's overlap test returns it;
 //   - a running nap has no length yet and is excluded entirely.
 func TestGetStatsAverageNapLengthAndNapsPerDay(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -80,6 +81,7 @@ func TestGetStatsAverageNapLengthAndNapsPerDay(t *testing.T) {
 // absent — the SPA decides whether to render the line, and a required
 // field keeps the generated client types free of optionals.
 func TestGetStatsNapAveragesAreZeroWithoutNaps(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

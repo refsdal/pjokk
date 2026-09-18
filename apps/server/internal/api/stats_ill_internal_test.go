@@ -5,6 +5,7 @@ import "testing"
 // illDayIndexes' edges (issue #127), without a database. Days are 24 h from
 // zero here; GetStats passes its own local-day function.
 func TestIllDayIndexes(t *testing.T) {
+	t.Parallel()
 	const day = int64(86_400_000)
 	idx := func(ms int64) int64 { return ms / day }
 	at := func(d int64, hours float64) int64 { return d*day + int64(hours*3_600_000) }

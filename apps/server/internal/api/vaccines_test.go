@@ -15,6 +15,7 @@ import (
 // -----------------------------------------------------------------------
 
 func TestCreateVaccineIsFreeAndDocumentsStartEmpty(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -42,6 +43,7 @@ func TestCreateVaccineIsFreeAndDocumentsStartEmpty(t *testing.T) {
 }
 
 func TestUpdateVaccineAcceptsOffProgrammeClears(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -77,6 +79,7 @@ func TestUpdateVaccineAcceptsOffProgrammeClears(t *testing.T) {
 }
 
 func TestCreateVaccineUnknownBabyIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookieA := a.NewFamily("Hansen", "parent@example.com")
 	familyB, _ := a.NewFamily("Other family", "other@example.com")
@@ -100,6 +103,7 @@ func TestCreateVaccineUnknownBabyIs404(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestListVaccinesNewestFirstWithCaretakerName(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -132,6 +136,7 @@ func TestListVaccinesNewestFirstWithCaretakerName(t *testing.T) {
 }
 
 func TestVaccinesAreFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -165,6 +170,7 @@ func TestVaccinesAreFamilyScoped(t *testing.T) {
 }
 
 func TestDeleteVaccineRemovesItAndUnknownIDIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -189,6 +195,7 @@ func TestDeleteVaccineRemovesItAndUnknownIDIs404(t *testing.T) {
 }
 
 func TestVaccinesRejectsUnauthenticated(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	res := a.Do(http.MethodGet, "/api/vaccines", "", nil)
 	if res.Status != http.StatusUnauthorized {
@@ -202,6 +209,7 @@ func TestVaccinesRejectsUnauthenticated(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestDismissRestoreVaccineSlot(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Dismissal family", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Dismiss baby")
@@ -234,6 +242,7 @@ func TestDismissRestoreVaccineSlot(t *testing.T) {
 }
 
 func TestCreateVaccineDismissalIsIdempotent(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Dismissal family", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Idempotent baby")
@@ -258,6 +267,7 @@ func TestCreateVaccineDismissalIsIdempotent(t *testing.T) {
 }
 
 func TestVaccineDismissalsArePerBabyNotPerFamily(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Dismissal family", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Has dismissal")
@@ -276,6 +286,7 @@ func TestVaccineDismissalsArePerBabyNotPerFamily(t *testing.T) {
 }
 
 func TestVaccineDismissalDoesNotBlockLoggingTheVaccine(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Dismissal family", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Logs anyway")
@@ -299,6 +310,7 @@ func TestVaccineDismissalDoesNotBlockLoggingTheVaccine(t *testing.T) {
 }
 
 func TestCreateVaccineDismissalUnknownBabyIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookieA := a.NewFamily("Dismissal family", "parent@example.com")
 	familyB, _ := a.NewFamily("Other dismissal family", "other@example.com")
@@ -313,6 +325,7 @@ func TestCreateVaccineDismissalUnknownBabyIs404(t *testing.T) {
 }
 
 func TestVaccineDismissalIsFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Dismissal family", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Guarded baby")
@@ -343,6 +356,7 @@ func TestVaccineDismissalIsFamilyScoped(t *testing.T) {
 // registration order, but this proves it end to end rather than trusting
 // that guarantee blind.
 func TestVaccineDismissalsPathIsNotCapturedAsAnId(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Routing family", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Routing baby")

@@ -19,6 +19,7 @@ import (
 // table does not grow forever. Seven days, matching the orphan-account
 // grace period.
 func TestPurgeHelpRequestsRemovesWeekOldRows(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	familyID, _ := a.NewFamily("Hansen", "parent@example.com")

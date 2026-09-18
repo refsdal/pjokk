@@ -16,6 +16,7 @@ import (
 // excluded (jobs.DeliberatelyExcluded) — a table in neither set is silent
 // data loss on restore.
 func TestBackupTablesCoversEveryLiveTable(t *testing.T) {
+	t.Parallel()
 	rig := testrig.Setup(t)
 
 	tables, err := livePublicTables(t, rig)
@@ -43,6 +44,7 @@ func TestBackupTablesCoversEveryLiveTable(t *testing.T) {
 }
 
 func TestBackupTablesHasNoStaleEntry(t *testing.T) {
+	t.Parallel()
 	rig := testrig.Setup(t)
 
 	tables, err := livePublicTables(t, rig)

@@ -59,6 +59,7 @@ func (w twoParents) diaper(extra map[string]any) *testrig.Result {
 }
 
 func TestCreateWithoutCaretakerIdRecordsTheCallerTwice(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	res := w.diaper(nil)
 	if res.Status != http.StatusCreated {
@@ -73,6 +74,7 @@ func TestCreateWithoutCaretakerIdRecordsTheCallerTwice(t *testing.T) {
 }
 
 func TestCreateForAPartnerSplitsCaretakerAndLogger(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	res := w.diaper(map[string]any{"caretakerId": w.memberID})
 	if res.Status != http.StatusCreated {
@@ -107,6 +109,7 @@ func TestCreateForAPartnerSplitsCaretakerAndLogger(t *testing.T) {
 }
 
 func TestCreateNamingAStrangerIs403(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	strangerID := w.a.SignUp("Ola Nordmann", "ola@example.com")
 	for _, id := range []string{strangerID, "no-such-user", ""} {
@@ -122,6 +125,7 @@ func TestCreateNamingAStrangerIs403(t *testing.T) {
 }
 
 func TestUpdateChangesTheCaretakerAndKeepsTheLogger(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	created := w.diaper(nil)
 	id, _ := created.JSON["id"].(string)
@@ -152,6 +156,7 @@ func TestUpdateChangesTheCaretakerAndKeepsTheLogger(t *testing.T) {
 }
 
 func TestSleepCreateHonoursCaretakerId(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	res := w.a.Do(http.MethodPost, "/api/sleep", w.cookie, map[string]any{
 		"babyId":      w.babyID,
@@ -176,6 +181,7 @@ func TestSleepCreateHonoursCaretakerId(t *testing.T) {
 }
 
 func TestTimerStopInheritsTheTimersCaretaker(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	partner := w.partner
 
@@ -216,6 +222,7 @@ func TestTimerStopInheritsTheTimersCaretaker(t *testing.T) {
 }
 
 func TestDeviceLogHasBothColumnsEqual(t *testing.T) {
+	t.Parallel()
 	w := newDeviceWorld(t)
 	res := w.do(http.MethodPost, "/api/diapers", w.memberID, map[string]any{
 		"babyId": w.babyID,

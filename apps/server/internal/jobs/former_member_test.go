@@ -154,6 +154,7 @@ func (f formerMember) assertOnlyTheFamilyIsReminded(t *testing.T) {
 }
 
 func TestRemovedMemberReceivesNoFamilyPushes(t *testing.T) {
+	t.Parallel()
 	f := newFormerMember(t)
 	res := f.a.Do(http.MethodDelete, "/api/family/members/"+f.membershipID, f.adminCookie, nil)
 	if res.Status != http.StatusOK {
@@ -166,6 +167,7 @@ func TestRemovedMemberReceivesNoFamilyPushes(t *testing.T) {
 // cleanup (a future path, a hand edit) leaves B's rows behind, and the job
 // must still not deliver them.
 func TestStaleRowsOfAFormerMemberNeverDeliver(t *testing.T) {
+	t.Parallel()
 	f := newFormerMember(t)
 	ctx := context.Background()
 	if _, err := f.a.Rig.Pool.Exec(ctx,
@@ -180,6 +182,7 @@ func TestStaleRowsOfAFormerMemberNeverDeliver(t *testing.T) {
 }
 
 func TestBannedMemberReceivesNoFamilyPushes(t *testing.T) {
+	t.Parallel()
 	f := newFormerMember(t)
 	if _, err := f.a.Rig.Pool.Exec(context.Background(),
 		`UPDATE "users" SET "banned" = true WHERE "id" = $1`, f.memberID); err != nil {
@@ -197,6 +200,7 @@ func TestBannedMemberReceivesNoFamilyPushes(t *testing.T) {
 // leave none of B's scheduled-push rows in that family, and touch none of
 // B's rows in another family B still belongs to.
 func TestRemovingAMemberDeletesTheirPushRowsInThatFamilyOnly(t *testing.T) {
+	t.Parallel()
 	for _, path := range []struct {
 		name   string
 		remove func(t *testing.T, f formerMember) *testrig.Result

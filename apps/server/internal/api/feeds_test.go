@@ -19,6 +19,7 @@ import (
 // -----------------------------------------------------------------------
 
 func TestListFeedsEmptyFamily(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -32,6 +33,7 @@ func TestListFeedsEmptyFamily(t *testing.T) {
 }
 
 func TestCreateFeedUnknownBabyIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -49,6 +51,7 @@ func TestCreateFeedUnknownBabyIs404(t *testing.T) {
 }
 
 func TestCreateFeedAndListNewestFirstWithCaretakerName(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -96,6 +99,7 @@ func TestCreateFeedAndListNewestFirstWithCaretakerName(t *testing.T) {
 }
 
 func TestListFeedsLimitBounds(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -134,6 +138,7 @@ func TestListFeedsLimitBounds(t *testing.T) {
 }
 
 func TestDeleteFeedUnknownIDIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -147,6 +152,7 @@ func TestDeleteFeedUnknownIDIs404(t *testing.T) {
 }
 
 func TestDeleteFeedRemovesIt(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -170,6 +176,7 @@ func TestDeleteFeedRemovesIt(t *testing.T) {
 }
 
 func TestUpdateFeedUnknownIDIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -184,6 +191,7 @@ func TestUpdateFeedUnknownIDIs404(t *testing.T) {
 
 // Ports defects.test.ts's "empty PATCH bodies are no-ops, not 500s" for feeds.
 func TestUpdateFeedEmptyPatchIsANoOp(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -210,6 +218,7 @@ func TestUpdateFeedEmptyPatchIsANoOp(t *testing.T) {
 // amountMl == null, distinguishing "clear" from "leave unchanged" (a
 // following PATCH with amountMl simply omitted, tested alongside).
 func TestUpdateFeedPatchClearsAmountMl(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -248,6 +257,7 @@ func TestUpdateFeedPatchClearsAmountMl(t *testing.T) {
 }
 
 func TestUpdateFeedPatchSetsFieldsAndTime(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -291,6 +301,7 @@ func TestUpdateFeedPatchSetsFieldsAndTime(t *testing.T) {
 // Ports feedback-batch.test.ts's "per-side nursing minutes" case, plus the
 // PATCH-clearing half the TS test didn't cover.
 func TestFeedLeftRightMinRoundTripAndClear(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -331,6 +342,7 @@ func TestFeedLeftRightMinRoundTripAndClear(t *testing.T) {
 // Ports tenancy.test.ts's feed-scoped cases: list scoping, cross-family 404
 // by id (both PATCH and DELETE), and logging against another family's baby.
 func TestFeedsAreFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -383,6 +395,7 @@ func TestFeedsAreFamilyScoped(t *testing.T) {
 }
 
 func TestFeedsRejectUnauthenticated(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	res := a.Do(http.MethodGet, "/api/feeds", "", nil)
 	if res.Status != http.StatusUnauthorized {
@@ -397,6 +410,7 @@ func TestFeedsRejectUnauthenticated(t *testing.T) {
 // requests afterward (proving withRawBody's io.ReadAll-over-MaxBytesReader
 // doesn't crash or wedge anything on overflow).
 func TestUpdateFeedOversizedBodyIsRejected(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

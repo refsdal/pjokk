@@ -61,6 +61,7 @@ func babyAvatarKeys(t *testing.T, a *testrig.AppRig) []string {
 }
 
 func TestBabyAvatarUploadStoresAJPEGAndReplacesThePrevious(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, adminCookie := a.NewFamily("Hansen", "anne@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -108,6 +109,7 @@ func TestBabyAvatarUploadStoresAJPEGAndReplacesThePrevious(t *testing.T) {
 }
 
 func TestBabyAvatarUploadRejectsWhatIsNotASmallImage(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "anne@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -147,6 +149,7 @@ func TestBabyAvatarUploadRejectsWhatIsNotASmallImage(t *testing.T) {
 }
 
 func TestBabyAvatarIsVisibleToTheFamilyAndItsDevices(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, ownerCookie := a.NewFamily("Hansen", "anne@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -229,6 +232,7 @@ func TestBabyAvatarIsVisibleToTheFamilyAndItsDevices(t *testing.T) {
 }
 
 func TestBabyAvatarDeleteRemovesTheObject(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "anne@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -263,6 +267,7 @@ func TestBabyAvatarDeleteRemovesTheObject(t *testing.T) {
 // Deleting the baby (issue #95: erasure reaches the bytes) removes the
 // photo object with the row.
 func TestDeleteBabyRemovesItsAvatarObject(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "anne@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -280,6 +285,7 @@ func TestDeleteBabyRemovesItsAvatarObject(t *testing.T) {
 // The family cascade delete (admin.go) takes the babies' photo objects
 // with everything else the family owned.
 func TestAdminDeleteFamilyRemovesBabyAvatarObjects(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Admin family")
 	victimID, victimCookie := a.NewFamily("Doomed family", "doomed@example.com")
 	babyID := a.NewBaby(victimID, "Ada")

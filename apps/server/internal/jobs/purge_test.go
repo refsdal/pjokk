@@ -14,6 +14,7 @@ import (
 // Ports apps/api/test/security.test.ts's "purges week-old accounts with no
 // family; keeps members and admins (H2)".
 func TestPurgeOrphanUsersKeepsMembersAndAdmins(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 
@@ -56,6 +57,7 @@ func TestPurgeOrphanUsersKeepsMembersAndAdmins(t *testing.T) {
 }
 
 func TestPurgeOrphanUsersIsANoOpWhenNoneQualify(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, _ = a.NewFamily("Hansen", "parent@example.com")
 
@@ -76,6 +78,7 @@ func TestPurgeOrphanUsersIsANoOpWhenNoneQualify(t *testing.T) {
 // or panic — the delete is swallowed and the account stays exactly as it
 // was, so a later manual cleanup can still find it.
 func TestPurgeOrphanUsersSwallowsForeignKeyBlockedDeletes(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 
@@ -115,6 +118,7 @@ func TestPurgeOrphanUsersSwallowsForeignKeyBlockedDeletes(t *testing.T) {
 // deletes, so it must be removed explicitly or it survives the account
 // forever as an orphaned object nothing ever cleans up.
 func TestPurgeOrphanUsersRemovesTheAvatarObject(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	orphanID := a.SignUp("Orphan", "orphan@example.com")

@@ -3,6 +3,7 @@ package api
 import "testing"
 
 func TestUpsizeGoogleAvatar(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"https://lh3.googleusercontent.com/a/abc=s96-c": "https://lh3.googleusercontent.com/a/abc=s512-c",
 		"https://lh3.googleusercontent.com/a/abc":       "https://lh3.googleusercontent.com/a/abc",

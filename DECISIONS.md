@@ -3326,3 +3326,35 @@ green."
   case — so a ring there means "she is asleep / at barnehage", never
   "selected".
 
+## 2026-09-18 — one database per Go test, and Playwright workers
+
+Owner: "would a restructure of tests ... make the whole test suite
+faster?" Measured before deciding.
+
+- **Isolation by database, not by container.** Testcontainers would have
+  started one Postgres per package and bought nothing on the package that
+  matters: `internal/api` was 332 s serial because its 455 tests shared
+  one database that the rig truncated before each. The rig now clones a
+  database per test from a template (`CREATE DATABASE … TEMPLATE`, tens
+  of milliseconds), so tests are independent by construction and
+  `t.Parallel` is safe. `internal/api` 332 s → 33 s; the whole Go suite
+  ~400 s → ~50 s; `-p 1` is gone from CLAUDE.md, CI, mise and the README.
+- **The template is named after the migrations' content hash**, created
+  once per Postgres under an advisory lock (several package binaries
+  start at once) and never dropped while it can be cloned; a stale one
+  from another build is dropped under the same lock.
+- **Two caps keep Postgres's connection limit in view:** pools of four
+  (pgxpool's default is one per core: 44 here) and eight databases per
+  package binary at a time (`TEST_DB_PARALLEL`); the compose Postgres runs
+  with `max_connections=400`. Measured: sixteen-way and thirty-two-way
+  parallelism were the same, so eight per binary across parallel
+  packages loses nothing.
+- **What could not be parallel:** `internal/cron` (a shared job registry)
+  and `cmd/pjokk` (`t.Setenv`) — serial within their packages, seconds
+  each. The whole-restore tests, which need "an empty, migrated database"
+  mid-test, call `rig.Empty(t)` on their own database instead of a second
+  `Setup`; the migrator's tests take a schema-less `FreshDatabaseURL`.
+- **Playwright: two workers in CI, four locally** (PR #137). Specs were
+  already independent (own family, own client address): 385 s → 204 s →
+  113 s at one, two and four workers.
+

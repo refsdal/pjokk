@@ -13,6 +13,7 @@ import (
 // Issue #52: a series is reminded once per occurrence — the latch is the
 // occurrence's start — and a stale occurrence is skipped, not fired late.
 func TestCalendarRemindersFirePerOccurrence(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	adminID := userIDByEmail(t, a, "parent@example.com")
@@ -77,6 +78,7 @@ func TestCalendarRemindersFirePerOccurrence(t *testing.T) {
 // A skipped occurrence ("this event" deleted) is never reminded; the next
 // one is (spec 2026-09-11-calendar-occurrence-exceptions).
 func TestCalendarRemindersSkipASkippedOccurrence(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	adminID := userIDByEmail(t, a, "parent@example.com")

@@ -58,6 +58,7 @@ func countRows(t *testing.T, a *testrig.AppRig, query string, args ...any) int {
 // who is an admin of the very family in the path still gets 403, because
 // managing a family from outside it is a system-admin power.
 func TestAdminFamilyRoutesRequireSysadmin(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	userID := userIDByEmail(t, a, "parent@example.com")
@@ -105,6 +106,7 @@ func TestAdminFamilyRoutesRequireSysadmin(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestAdminCreateFamilyWithExistingAccount(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, adminID := sysadminRig(t, "Ops")
 	parentID := a.SignUp("Nora", "nora@example.com")
 
@@ -158,6 +160,7 @@ func TestAdminCreateFamilyWithExistingAccount(t *testing.T) {
 // password, which is what lets the person claim it by signing in with Google
 // on the same address (Limen's OAuth plugin links by email).
 func TestAdminCreateFamilyProvisionsPasswordlessAccount(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, adminID := sysadminRig(t, "Ops")
 
 	res := a.Do(http.MethodPost, "/api/admin/families", cookie, map[string]any{
@@ -194,6 +197,7 @@ func TestAdminCreateFamilyProvisionsPasswordlessAccount(t *testing.T) {
 // createAccount is an explicit flag rather than implied by "no account
 // exists".
 func TestAdminCreateFamilyRefusesUnknownEmailWithoutFlag(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Ops")
 
 	res := a.Do(http.MethodPost, "/api/admin/families", cookie, map[string]any{
@@ -214,6 +218,7 @@ func TestAdminCreateFamilyRefusesUnknownEmailWithoutFlag(t *testing.T) {
 // createAccount without a name is refused rather than defaulting to
 // something — a nameless caretaker shows up in every attribution line.
 func TestAdminCreateFamilyRequiresNameWhenProvisioning(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Ops")
 
 	res := a.Do(http.MethodPost, "/api/admin/families", cookie, map[string]any{
@@ -234,6 +239,7 @@ func TestAdminCreateFamilyRequiresNameWhenProvisioning(t *testing.T) {
 // the family comes out genuinely EMPTY — the operator must not be left
 // inside it.
 func TestAdminCreateFamilyWithInviteLeavesItEmpty(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, adminID := sysadminRig(t, "Ops")
 
 	res := a.Do(http.MethodPost, "/api/admin/families", cookie, map[string]any{"name": "Solo"})
@@ -283,6 +289,7 @@ func TestAdminCreateFamilyWithInviteLeavesItEmpty(t *testing.T) {
 // working and silently cannot be administered; hasAdmin is what makes that
 // visible in the console.
 func TestListAdminFamiliesReportsHasAdminAndFilters(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Ops")
 
 	empty := a.Do(http.MethodPost, "/api/admin/families", cookie, map[string]any{"name": "Stranded"})
@@ -321,6 +328,7 @@ func TestListAdminFamiliesReportsHasAdminAndFilters(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestAdminFamilyDetail(t *testing.T) {
+	t.Parallel()
 	a, familyID, cookie, adminID := sysadminRig(t, "Hansen")
 	a.NewBaby(familyID, "Ada")
 	a.CreateAPIKey(familyID, adminID)
@@ -366,6 +374,7 @@ func TestAdminFamilyDetail(t *testing.T) {
 }
 
 func TestAdminRenameFamily(t *testing.T) {
+	t.Parallel()
 	a, familyID, cookie, adminID := sysadminRig(t, "Hansen")
 
 	before := a.Do(http.MethodGet, "/api/admin/families/"+familyID, cookie, nil)
@@ -402,6 +411,7 @@ func TestAdminRenameFamily(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestAdminAddFamilyMember(t *testing.T) {
+	t.Parallel()
 	a, familyID, cookie, adminID := sysadminRig(t, "Hansen")
 	a.SignUp("Kari", "kari@example.com")
 
@@ -443,6 +453,7 @@ func TestAdminAddFamilyMember(t *testing.T) {
 // whole family — that outcome is understood — but must not leave one running
 // with nobody able to administer it.
 func TestAdminMemberGuardsProtectTheLastAdmin(t *testing.T) {
+	t.Parallel()
 	a, familyID, cookie, _ := sysadminRig(t, "Hansen")
 	adminID := userIDByEmail(t, a, "sysadmin@example.com")
 
@@ -496,6 +507,7 @@ func TestAdminMemberGuardsProtectTheLastAdmin(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestAdminFamilyRoutesAreScopedToTheFamilyInThePath(t *testing.T) {
+	t.Parallel()
 	a, familyID, cookie, adminID := sysadminRig(t, "Hansen")
 	otherID, otherCookie := a.NewFamily("Berg", "other@example.com")
 	otherUserID := userIDByEmail(t, a, "other@example.com")
@@ -555,6 +567,7 @@ func TestAdminFamilyRoutesAreScopedToTheFamilyInThePath(t *testing.T) {
 // The happy paths of the two revocation routes, so the 404s above are known
 // to be about scoping rather than about the routes not working at all.
 func TestAdminRevokeFamilyInviteAndKey(t *testing.T) {
+	t.Parallel()
 	a, familyID, cookie, adminID := sysadminRig(t, "Hansen")
 
 	minted := a.Do(http.MethodPost, "/api/admin/families/"+familyID+"/invites", cookie,
@@ -611,6 +624,7 @@ func TestAdminRevokeFamilyInviteAndKey(t *testing.T) {
 // set rather than per-route so that adding a route without auditing it fails
 // here even if its own test forgets.
 func TestAdminFamilyMutationsAreAllAudited(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, adminID := sysadminRig(t, "Ops")
 	a.SignUp("Kari", "kari@example.com")
 

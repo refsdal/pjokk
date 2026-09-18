@@ -24,6 +24,7 @@ import (
 // --- medicine (deep coverage) ---
 
 func TestListMedicineEmptyFamily(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -37,6 +38,7 @@ func TestListMedicineEmptyFamily(t *testing.T) {
 }
 
 func TestCreateMedicineUnknownBabyIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -56,6 +58,7 @@ func TestCreateMedicineUnknownBabyIs404(t *testing.T) {
 // Ports other-logs.test.ts's "medicine: full CRUD with null-to-clear
 // patches, family-scoped" case end to end.
 func TestMedicineFullCRUDWithNullToClearPatches(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -136,6 +139,7 @@ func TestMedicineFullCRUDWithNullToClearPatches(t *testing.T) {
 }
 
 func TestListMedicineNewestFirstWithLimitBounds(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -180,6 +184,7 @@ func TestListMedicineNewestFirstWithLimitBounds(t *testing.T) {
 // The bounds the spec enforces (openapi/pjokk.yaml):
 // name 1..100, amount 0..1000, unit must be one of the fixed enum.
 func TestCreateMedicineBounds(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -214,6 +219,7 @@ func TestCreateMedicineBounds(t *testing.T) {
 // (content/title/measurement.value/pump.amountMl/pump.durationMin) — cheap
 // since it's the same table-driven shape TestOtherKindsCRUD already uses.
 func TestOtherKindsCreateBounds(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name  string
 		base  string
@@ -247,6 +253,7 @@ func TestOtherKindsCreateBounds(t *testing.T) {
 }
 
 func TestDeleteMedicineUnknownIDIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -260,6 +267,7 @@ func TestDeleteMedicineUnknownIDIs404(t *testing.T) {
 }
 
 func TestUpdateMedicineUnknownIDIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -271,6 +279,7 @@ func TestUpdateMedicineUnknownIDIs404(t *testing.T) {
 
 // Ports defects.test.ts's "empty PATCH bodies are no-ops" for medicine.
 func TestUpdateMedicineEmptyPatchIsANoOp(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -303,6 +312,7 @@ func TestUpdateMedicineEmptyPatchIsANoOp(t *testing.T) {
 // asserting the OTHER outcome for a non-clearable field, previously
 // unverified anywhere in the suite.
 func TestUpdateMedicineRejectsNullOnRequiredField(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -335,6 +345,7 @@ func TestUpdateMedicineRejectsNullOnRequiredField(t *testing.T) {
 // measurement.value is required and not nullable, so `{"value": null}` must
 // 400 rather than clear it (there is no "cleared" state for value to be in).
 func TestUpdateMeasurementRejectsNullOnRequiredField(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -363,6 +374,7 @@ func TestUpdateMeasurementRejectsNullOnRequiredField(t *testing.T) {
 }
 
 func TestMedicineRejectUnauthenticated(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	res := a.Do(http.MethodGet, "/api/medicine", "", nil)
 	if res.Status != http.StatusUnauthorized {
@@ -379,6 +391,7 @@ func TestMedicineRejectUnauthenticated(t *testing.T) {
 // create, list and PATCH so a regression on any one of the three paths
 // fails this test.
 func TestMeasurementValuePreservesDoublePrecision(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -461,6 +474,7 @@ func otherKindCases() []otherKindCase {
 // create/list/patch/delete each, through the exact same shared engine
 // (other_logs.go) medicine uses.
 func TestOtherKindsCRUD(t *testing.T) {
+	t.Parallel()
 	for _, c := range otherKindCases() {
 		t.Run(c.base, func(t *testing.T) {
 			a := testrig.App(t)
@@ -538,6 +552,7 @@ func allSixKinds() []otherKindCase {
 // kinds: list scoping, cross-family 404 by id (PATCH and DELETE), and
 // logging against another family's baby.
 func TestOtherKindsAreFamilyScoped(t *testing.T) {
+	t.Parallel()
 	for _, c := range allSixKinds() {
 		t.Run(c.base, func(t *testing.T) {
 			a := testrig.App(t)
@@ -588,6 +603,7 @@ func TestOtherKindsAreFamilyScoped(t *testing.T) {
 // a fresh, untouched (therefore `free`) family — no setPlan, no
 // PLAN_REQUIRED anywhere in this route surface.
 func TestOtherKindsCreateIsFreeOnDefaultPlan(t *testing.T) {
+	t.Parallel()
 	for _, c := range allSixKinds() {
 		t.Run(c.base, func(t *testing.T) {
 			a := testrig.App(t)
@@ -623,6 +639,7 @@ func stringOfLen(n int) string {
 // never a column, which is what keeps a future Fahrenheit toggle a display
 // concern instead of a migration.
 func TestMeasurementAcceptsTemperature(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

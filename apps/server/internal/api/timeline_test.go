@@ -64,6 +64,7 @@ func timelineEntryKinds(entries []any) []string {
 }
 
 func TestTimelineMergesAllKindsNewestFirstSleepByStartTime(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -95,6 +96,7 @@ func TestTimelineMergesAllKindsNewestFirstSleepByStartTime(t *testing.T) {
 }
 
 func TestTimelineFiltersByKind(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -129,6 +131,7 @@ func TestTimelineFiltersByKind(t *testing.T) {
 // check would stall after the first page since the merge never holds more
 // than the single source's own rows.
 func TestTimelinePaginatesWithBeforeCursorSingleKindTails(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -180,6 +183,7 @@ func TestTimelinePaginatesWithBeforeCursorSingleKindTails(t *testing.T) {
 // Ports "paginates a mixed-kind page where no single source fills the
 // quota": seedDay's 5 entries (2 feeds, 1 diaper, 2 sleeps), limit=3.
 func TestTimelinePaginatesMixedKindPageNoSingleSourceFillsQuota(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -215,6 +219,7 @@ func TestTimelinePaginatesMixedKindPageNoSingleSourceFillsQuota(t *testing.T) {
 }
 
 func TestTimelineIsFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -229,6 +234,7 @@ func TestTimelineIsFamilyScoped(t *testing.T) {
 }
 
 func TestTimelineUnknownBabyIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -242,6 +248,7 @@ func TestTimelineUnknownBabyIs404(t *testing.T) {
 }
 
 func TestTimelineRejectsUnauthenticated(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	res := a.Do(http.MethodGet, "/api/timeline?babyId=whatever", "", nil)
 	if res.Status != http.StatusUnauthorized {
@@ -257,6 +264,7 @@ func TestTimelineRejectsUnauthenticated(t *testing.T) {
 // "time < cursor" clause would drop or duplicate whichever of the tied pair
 // landed on the cut.
 func TestTimelineSameTimestampPaginationNeverDropsEntries(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -316,6 +324,7 @@ func TestTimelineSameTimestampPaginationNeverDropsEntries(t *testing.T) {
 // proves that holds for a tie wider than the page size, not just the
 // two-row case defects.test.ts happens to use.
 func TestTimelineManySameTimestampRowsPaginateWithoutLossOrDuplication(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

@@ -11,6 +11,7 @@ import (
 // by default, settable to imperial, rejected otherwise, and untouched by a
 // PATCH that does not mention them.
 func TestMeUnitsPreference(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 

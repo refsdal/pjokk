@@ -12,6 +12,7 @@ import (
 // Ports apps/api/test/sleep.test.ts's "summary bundles last feed, last
 // diaper and sleep state" case.
 func TestSummaryBundlesLastFeedLastDiaperAndSleepState(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -59,6 +60,7 @@ func TestSummaryBundlesLastFeedLastDiaperAndSleepState(t *testing.T) {
 }
 
 func TestSummaryUnknownBabyIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -74,6 +76,7 @@ func TestSummaryUnknownBabyIs404(t *testing.T) {
 // Ports apps/api/test/feedback-batch.test.ts's "summary today block" case
 // (tz=0, the default/UTC window).
 func TestSummaryTodayBlockCountsFeedsDiapersSleep(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -139,6 +142,7 @@ func TestSummaryTodayBlockCountsFeedsDiapersSleep(t *testing.T) {
 // session counts as soon as it starts. Backs the Home screen's "3 naps ·
 // 2:10 today" line on the awake card.
 func TestSummaryTodayCountsSleepSessionsOverlappingTheWindow(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -186,6 +190,7 @@ func TestSummaryTodayCountsSleepSessionsOverlappingTheWindow(t *testing.T) {
 // by hand: tz=-120 (local = UTC+2h) shifts the local day boundary to
 // 22:00 UTC the previous day.
 func TestSummaryTzEdgeChangesTodaysWindow(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -221,6 +226,7 @@ func TestSummaryTzEdgeChangesTodaysWindow(t *testing.T) {
 // row is seeded by direct SQL here (rather than through POST /api/play) so
 // this test stays independent of play.go's own route tests.
 func TestSummaryActivePlayField(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -261,6 +267,7 @@ func TestSummaryActivePlayField(t *testing.T) {
 }
 
 func TestSummaryFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -283,6 +290,7 @@ func TestSummaryFamilyScoped(t *testing.T) {
 // weighing the baby after taking her temperature must not blank the card, and
 // must certainly not put 8.4 on it as if it were degrees.
 func TestSummaryLastTemperatureIgnoresOtherMeasurementTypes(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -329,6 +337,7 @@ func TestSummaryLastTemperatureIgnoresOtherMeasurementTypes(t *testing.T) {
 // missing key — the field is required-and-nullable, so the SPA can render the
 // card's absence without probing for undefined.
 func TestSummaryLastTemperatureIsNullWhenNoneRecorded(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

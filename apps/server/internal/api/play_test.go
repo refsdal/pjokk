@@ -16,6 +16,7 @@ import (
 // -----------------------------------------------------------------------
 
 func TestPlayStartRunningStopInactive(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -67,6 +68,7 @@ func TestPlayStartRunningStopInactive(t *testing.T) {
 // A completed entry (endTime supplied at create) is not "active" — logging
 // one retroactively must not touch a baby's ability to also start a timer.
 func TestCreatePlayRetroactiveDoesNotBlockActive(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -94,6 +96,7 @@ func TestCreatePlayRetroactiveDoesNotBlockActive(t *testing.T) {
 }
 
 func TestCreatePlayUnknownBabyIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -111,6 +114,7 @@ func TestCreatePlayUnknownBabyIs404(t *testing.T) {
 }
 
 func TestCreatePlayRefusesSecondRunningSession(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -134,6 +138,7 @@ func TestCreatePlayRefusesSecondRunningSession(t *testing.T) {
 // Two babies in the same family each get their own running session — the
 // partial unique index is scoped per baby_id, not per family.
 func TestCreatePlayAllowsRunningSessionPerBabyIndependently(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyA := a.NewBaby(familyID, "Nora")
@@ -155,6 +160,7 @@ func TestCreatePlayAllowsRunningSessionPerBabyIndependently(t *testing.T) {
 // API — the partial unique index must still turn this into 409
 // ALREADY_ACTIVE, not a raw 500 from an unhandled 23505.
 func TestCreatePlayRunningSessionDBEnforcedRace(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -187,6 +193,7 @@ func TestCreatePlayRunningSessionDBEnforcedRace(t *testing.T) {
 }
 
 func TestStopPlayTwiceIsNoOpErrorNotDataCorruption(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -237,6 +244,7 @@ func TestStopPlayTwiceIsNoOpErrorNotDataCorruption(t *testing.T) {
 // Stopping frees the per-baby slot: a new running session can start right
 // after.
 func TestStopPlayFreesSlotForNewRunningSession(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -260,6 +268,7 @@ func TestStopPlayFreesSlotForNewRunningSession(t *testing.T) {
 }
 
 func TestStopPlayUnknownIDIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -274,6 +283,7 @@ func TestStopPlayUnknownIDIs404(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestUpdatePlaySetsClearsAndLeavesFields(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -319,6 +329,7 @@ func TestUpdatePlaySetsClearsAndLeavesFields(t *testing.T) {
 }
 
 func TestUpdatePlayClearEndTimeReopensSession(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -349,6 +360,7 @@ func TestUpdatePlayClearEndTimeReopensSession(t *testing.T) {
 }
 
 func TestUpdatePlayClearEndTimeConflictsWithAnotherRunningSession(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -387,6 +399,7 @@ func TestUpdatePlayClearEndTimeConflictsWithAnotherRunningSession(t *testing.T) 
 }
 
 func TestUpdatePlayUnknownIDIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -401,6 +414,7 @@ func TestUpdatePlayUnknownIDIs404(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestDeletePlayRemovesItAndUnknownIDIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -432,6 +446,7 @@ func TestDeletePlayRemovesItAndUnknownIDIs404(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestListPlaysNewestFirstWithCaretakerName(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -475,6 +490,7 @@ func TestListPlaysNewestFirstWithCaretakerName(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestPlaysAreFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -532,6 +548,7 @@ func TestPlaysAreFamilyScoped(t *testing.T) {
 }
 
 func TestPlayRejectsUnauthenticated(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	res := a.Do(http.MethodGet, "/api/play", "", nil)
 	if res.Status != http.StatusUnauthorized {

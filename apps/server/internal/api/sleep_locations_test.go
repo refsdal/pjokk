@@ -13,6 +13,7 @@ import (
 // describe block.
 
 func TestSleepLocationsMemberReadsOnlyAdminWritesFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, adminCookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -54,6 +55,7 @@ func TestSleepLocationsMemberReadsOnlyAdminWritesFamilyScoped(t *testing.T) {
 }
 
 func TestSleepLocationsRejectsDuplicateNamesIncludingDefaults(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -81,6 +83,7 @@ func TestSleepLocationsRejectsDuplicateNamesIncludingDefaults(t *testing.T) {
 }
 
 func TestSleepLocationsEnforcesCapAt20Custom(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -101,6 +104,7 @@ func TestSleepLocationsEnforcesCapAt20Custom(t *testing.T) {
 }
 
 func TestSleepLocationsMemberDeleteForbiddenAdminDeleteRemovesUnknownIDIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, adminCookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -145,6 +149,7 @@ func TestSleepLocationsMemberDeleteForbiddenAdminDeleteRemovesUnknownIDIs404(t *
 // z.string().trim().min(1).max(40), and rejects the result with the same
 // 400 VALIDATION envelope api.go's own spec-validation failures use.
 func TestSleepLocationsRejectsWhitespaceOnlyName(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 

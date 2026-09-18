@@ -8,9 +8,12 @@ package db
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"io/fs"
+	"sort"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver
 	"github.com/pressly/goose/v3"
@@ -49,6 +52,32 @@ const MigrationLockKey int64 = 72450001
 // second, independent connection genuinely block on pg_advisory_lock while
 // this one holds it, using pg_stat_activity as ground truth rather than a
 // fixed sleep.
+// MigrationsFingerprint is a short hash of every embedded migration's
+// content, in name order: the test rig names its template database after
+// it, so editing a migration — not only adding one — yields a fresh
+// template.
+func MigrationsFingerprint() (string, error) {
+	dir, err := fs.Sub(migrationsFS, "migrations")
+	if err != nil {
+		return "", fmt.Errorf("db: resolve embedded migrations dir: %w", err)
+	}
+	names, err := fs.Glob(dir, "*.sql")
+	if err != nil {
+		return "", err
+	}
+	sort.Strings(names)
+	h := sha256.New()
+	for _, name := range names {
+		b, err := fs.ReadFile(dir, name)
+		if err != nil {
+			return "", err
+		}
+		h.Write([]byte(name))
+		h.Write(b)
+	}
+	return hex.EncodeToString(h.Sum(nil))[:12], nil
+}
+
 func ApplyMigrations(ctx context.Context, databaseURL string) error {
 	sqlDB, err := sql.Open("pgx", databaseURL)
 	if err != nil {

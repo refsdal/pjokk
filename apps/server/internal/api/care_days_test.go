@@ -27,6 +27,7 @@ func careTotals(t *testing.T, w twoParents, year string) map[string]map[string]a
 }
 
 func TestCareDaysCountPerPersonPerYear(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 	for _, body := range []map[string]any{
@@ -69,6 +70,7 @@ func TestCareDaysCountPerPersonPerYear(t *testing.T) {
 
 // No default, no entitlement: a person who has set no number has none.
 func TestCareDayQuotaIsEachPersonsOwnNumber(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 	if got := careTotals(t, w, "2026")[w.adminID]["quota"]; got != nil {
@@ -99,6 +101,7 @@ func TestCareDayQuotaIsEachPersonsOwnNumber(t *testing.T) {
 }
 
 func TestCareDayBelongsToAnIllnessOrToNone(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 	ill := a.Do(http.MethodPost, "/api/illness", w.cookie, map[string]any{"babyId": w.babyID, "startTime": rfc(time.Now().Add(-24 * time.Hour)), "symptoms": []string{"fever"}})
@@ -120,6 +123,7 @@ func TestCareDayBelongsToAnIllnessOrToNone(t *testing.T) {
 }
 
 func TestCareDayValidationPatchAndDelete(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 	for name, body := range map[string]map[string]any{
@@ -159,6 +163,7 @@ func TestCareDayValidationPatchAndDelete(t *testing.T) {
 }
 
 func TestCareDaysAreFamilyScopedAndLeaveWithTheirPerson(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 	mine := a.Do(http.MethodPost, "/api/care-days", w.cookie, map[string]any{"date": "2026-03-16"})

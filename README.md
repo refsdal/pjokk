@@ -302,7 +302,7 @@ to the apex with no server and no JavaScript of its own.
 | Auth | [Limen](https://github.com/thecodearcher/limen) — Google + email/password, its Organizations plugin (an organization *is* a family), invite-code redeem as the only signup door. Confined to `internal/auth` behind one interface, with its HTTP routes on an allowlist |
 | Frontend | Vite + React, TanStack Router/Query, Tailwind + shadcn-style components, vaul bottom sheets, `openapi-fetch` against the generated schema |
 | Offline | TanStack Query persisted to IndexedDB + paused-mutation queue; Workbox PWA with update toast |
-| Tests | `go test -p 1 ./...` against a real Postgres — tenancy, invite redeem, and sleep-session logic run against the database they ship on |
+| Tests | `go test ./...` against a real Postgres, one database per test — tenancy, invite redeem, and sleep-session logic run against the database they ship on |
 
 Every domain table carries a `family_id`, and the scope is written into the
 SQL of every query rather than left to a handler to remember — cross-family
@@ -343,7 +343,7 @@ through the UI, then set it back to `0` — the same bootstrap a self-hoster
 does, so it is the path that stays tested.
 
 ```sh
-cd apps/server && go test -p 1 ./...   # against the Postgres from docker-compose.test.yml
+cd apps/server && go test ./...        # against the Postgres from docker-compose.test.yml
 cd apps/server && go vet ./...
 bun run test                           # SPA + landing unit tests
 bun run check                          # lint + i18n coverage + typecheck
@@ -351,8 +351,9 @@ bun run build                          # SPA and the landing site
 bun run gen:client                     # regenerate the SPA's types from openapi/pjokk.yaml
 ```
 
-`-p 1` is not optional: several Go packages truncate shared tables between
-tests and cannot run as concurrent packages against one database.
+Every Go test gets a database of its own, cloned from a migrated template
+(`apps/server/internal/testrig`), so packages and tests run in parallel and
+the whole suite takes about a minute.
 
 After editing `openapi/pjokk.yaml`, run `go generate ./...` from `apps/server`
 (needs `oapi-codegen` v2.8.0 on `PATH`) and `bun run gen:client` from the root.

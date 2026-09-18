@@ -25,6 +25,7 @@ import (
 const statsHour = time.Hour
 
 func TestGetStatsBucketsPerLocalDaySplittingSleepAcrossMidnight(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -111,6 +112,7 @@ func TestGetStatsBucketsPerLocalDaySplittingSleepAcrossMidnight(t *testing.T) {
 }
 
 func TestGetStatsReturnsLatestWeightWithPredecessor(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -148,6 +150,7 @@ func TestGetStatsReturnsLatestWeightWithPredecessor(t *testing.T) {
 }
 
 func TestGetStatsIsFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, _ := a.NewFamily("Family A", "a@example.com")
 	babyA := a.NewBaby(familyA, "Nora")
@@ -160,6 +163,7 @@ func TestGetStatsIsFamilyScoped(t *testing.T) {
 }
 
 func TestGetStatsIntakeSumsBottleMlOnly(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -196,6 +200,7 @@ func TestGetStatsIntakeSumsBottleMlOnly(t *testing.T) {
 // internal/api/stats.go's package doc comment), so a days=30 request on a
 // family with NO plan set up at all (default "free") must still succeed.
 func TestGetStatsDaysAbove7IsFreeOnDefaultPlan(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -216,6 +221,7 @@ func TestGetStatsDaysAbove7IsFreeOnDefaultPlan(t *testing.T) {
 }
 
 func TestGetStatsUnknownBabyIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -229,6 +235,7 @@ func TestGetStatsUnknownBabyIs404(t *testing.T) {
 }
 
 func TestGetStatsRejectUnauthenticated(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	res := a.Do(http.MethodGet, "/api/stats?babyId=x&tz=0", "", nil)
 	if res.Status != http.StatusUnauthorized {

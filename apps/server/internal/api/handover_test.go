@@ -64,6 +64,7 @@ func (h handoverRig) list(t *testing.T, path string) []any {
 }
 
 func TestHandoverWritesOrdinaryRowsThatKnowTheirDay(t *testing.T) {
+	t.Parallel()
 	h := newHandoverRig(t)
 
 	empty := h.a.Do(http.MethodGet, "/api/daycare/"+h.dayID+"/handover", h.cookie, nil)
@@ -137,6 +138,7 @@ func TestHandoverWritesOrdinaryRowsThatKnowTheirDay(t *testing.T) {
 }
 
 func TestHandoverPutReplacesRatherThanDoubles(t *testing.T) {
+	t.Parallel()
 	h := newHandoverRig(t)
 	for range 2 { // a replayed offline save
 		if res := h.put(t, h.usual()); res.Status != http.StatusOK {
@@ -167,6 +169,7 @@ func TestHandoverPutReplacesRatherThanDoubles(t *testing.T) {
 // A row edited through its own sheet stays in the handover; the document is
 // a view over the rows, not a copy of them.
 func TestHandoverReadsBackEditedRows(t *testing.T) {
+	t.Parallel()
 	h := newHandoverRig(t)
 	h.put(t, h.usual())
 	meal := h.list(t, "/api/feeds")[0].(map[string]any)
@@ -183,6 +186,7 @@ func TestHandoverReadsBackEditedRows(t *testing.T) {
 }
 
 func TestHandoverValidation(t *testing.T) {
+	t.Parallel()
 	h := newHandoverRig(t)
 	nap := func(from, to time.Duration) map[string]any {
 		return map[string]any{"startTime": rfc(h.start.Add(from)), "endTime": rfc(h.start.Add(to))}
@@ -231,6 +235,7 @@ func TestHandoverValidation(t *testing.T) {
 }
 
 func TestHandoverIsFamilyScoped(t *testing.T) {
+	t.Parallel()
 	h := newHandoverRig(t)
 	_, other := h.a.NewFamily("Olsen", "other@example.com")
 	if res := h.a.Do(http.MethodGet, "/api/daycare/"+h.dayID+"/handover", other, nil); res.Status != http.StatusNotFound {
@@ -246,6 +251,7 @@ func TestHandoverIsFamilyScoped(t *testing.T) {
 
 // Deleting the day keeps what happened during it: the rows stay, unlinked.
 func TestHandoverRowsSurviveTheirDay(t *testing.T) {
+	t.Parallel()
 	h := newHandoverRig(t)
 	h.put(t, h.usual())
 	if res := h.a.Do(http.MethodDelete, "/api/daycare/"+h.dayID, h.cookie, nil); res.Status != http.StatusOK {
@@ -258,6 +264,7 @@ func TestHandoverRowsSurviveTheirDay(t *testing.T) {
 }
 
 func TestSummaryOffersTheHandoverUntilItIsAnswered(t *testing.T) {
+	t.Parallel()
 	h := newHandoverRig(t)
 	due := func() any {
 		t.Helper()

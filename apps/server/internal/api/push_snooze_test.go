@@ -20,6 +20,7 @@ func snoozeURL(token string) string {
 }
 
 func TestSnoozePushStoresOneSnoozePerNotification(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	userID := a.SignUp("Rig admin", "parent@example.com")
 	familyID, err := a.Deps.Auth.CreateFamily(context.Background(), userID, "Hansen")
@@ -55,6 +56,7 @@ func TestSnoozePushStoresOneSnoozePerNotification(t *testing.T) {
 }
 
 func TestSnoozePushRejectsAnInvalidToken(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	userID := a.SignUp("Rig admin", "parent@example.com")
 	familyID, err := a.Deps.Auth.CreateFamily(context.Background(), userID, "Hansen")

@@ -15,6 +15,7 @@ func day(daycare bool, napH float64, nightH float64, bedtimeH float64) daySleep 
 }
 
 func TestDaycareSplitNeedsTwoDaysOfEachKind(t *testing.T) {
+	t.Parallel()
 	week := []daySleep{day(true, 1, 11, 19), day(true, 1, 11, 19), day(true, 1, 11, 19), day(false, 2, 11, 19.5)}
 	if got := daycareSplit(week); got != nil {
 		t.Errorf("one home day gave a split %+v, want nil: one day is an anecdote", got)
@@ -28,6 +29,7 @@ func TestDaycareSplitNeedsTwoDaysOfEachKind(t *testing.T) {
 }
 
 func TestDaycareSplitAverages(t *testing.T) {
+	t.Parallel()
 	got := daycareSplit([]daySleep{
 		day(true, 1, 11, 18.75), day(true, 1.5, 10, 19), day(true, 0, 0, 0), // a barnehage day with no nap and no night logged
 		day(false, 2, 11.5, 19.25), day(false, 2.25, 11, 19.5),
@@ -58,6 +60,7 @@ func TestDaycareSplitAverages(t *testing.T) {
 // measured from the midnight that began the day, so 23:50 is 23.83 h and
 // 00:10 is 24.17 h.
 func TestDaycareSplitBedtimeAcrossMidnight(t *testing.T) {
+	t.Parallel()
 	got := daycareSplit([]daySleep{
 		day(true, 1, 8, 23.0+50.0/60), day(true, 1, 8, 24.0+10.0/60),
 		day(false, 1, 8, 20), day(false, 1, 8, 20),
