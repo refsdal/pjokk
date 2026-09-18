@@ -23,7 +23,7 @@ bun = "1.4"
 [tasks.test]
 description = "Full suite: Go (real Postgres from docker-compose.test.yml) + frontend/landing"
 run = [
-  "cd apps/server && go test -p 1 -count=1 ./...",
+  "cd apps/server && go test -count=1 ./...",
   "bun run test",
 ]
 

@@ -32,6 +32,7 @@ func inviteUsedCount(t *testing.T, a *testrig.AppRig, code string) int {
 }
 
 func TestCreateInviteDefaultsBoundsAndMemberForbidden(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -101,6 +102,7 @@ func TestCreateInviteDefaultsBoundsAndMemberForbidden(t *testing.T) {
 }
 
 func TestInvitesMemberForbiddenAdminFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, adminCookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -142,6 +144,7 @@ func TestInvitesMemberForbiddenAdminFamilyScoped(t *testing.T) {
 }
 
 func TestRevokeInvite(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -160,6 +163,7 @@ func TestRevokeInvite(t *testing.T) {
 }
 
 func TestRedeemAddsMembershipAndIncrementsUseAtomically(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -218,6 +222,7 @@ func TestRedeemAddsMembershipAndIncrementsUseAtomically(t *testing.T) {
 }
 
 func TestRedeemAsExistingMemberBurnsNoUse(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -261,6 +266,7 @@ func TestRedeemAsExistingMemberBurnsNoUse(t *testing.T) {
 // window is open), and only then commit — at which point the goroutine's
 // INSERT resumes into a guaranteed 23505.
 func TestRedeemConcurrentDifferentCodesNeverSurfaceA500(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
@@ -349,6 +355,7 @@ func TestRedeemConcurrentDifferentCodesNeverSurfaceA500(t *testing.T) {
 }
 
 func TestRedeemRejectsExpiredRevokedExhaustedAndUnknownCodes(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	ctx := context.Background()
@@ -411,6 +418,7 @@ func TestRedeemRejectsExpiredRevokedExhaustedAndUnknownCodes(t *testing.T) {
 }
 
 func TestInviteInfoExposesSafeStatus(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("The Pjokk family", "parent@example.com")
 
@@ -441,6 +449,7 @@ func TestInviteInfoExposesSafeStatus(t *testing.T) {
 }
 
 func TestInviteCodesAreCaseInsensitive(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -462,6 +471,7 @@ func TestInviteCodesAreCaseInsensitive(t *testing.T) {
 }
 
 func TestRedeemRequiresSignIn(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	created := a.Do(http.MethodPost, "/api/invites", cookie, map[string]any{})
@@ -484,6 +494,7 @@ func TestRedeemRequiresSignIn(t *testing.T) {
 // by hand.
 
 func TestInviteInfoIsRateLimited(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	limited := false
 	for i := 0; i < 35; i++ {
@@ -505,6 +516,7 @@ func TestInviteInfoIsRateLimited(t *testing.T) {
 }
 
 func TestRedeemIsRateLimited(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	a.SignUp("Brute", "brute@example.com")
 	cookie := a.SignIn("brute@example.com")

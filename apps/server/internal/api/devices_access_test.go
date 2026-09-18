@@ -67,6 +67,7 @@ func (w deviceWorld) do(method, path, caretaker string, body any) *testrig.Resul
 }
 
 func TestDeviceReadsAnAllowlistedOperation(t *testing.T) {
+	t.Parallel()
 	w := newDeviceWorld(t)
 	res := w.do(http.MethodGet, "/api/summary?babyId="+w.babyID, "", nil)
 	if res.Status != http.StatusOK {
@@ -75,6 +76,7 @@ func TestDeviceReadsAnAllowlistedOperation(t *testing.T) {
 }
 
 func TestDeviceIsRefusedOutsideTheAllowlist(t *testing.T) {
+	t.Parallel()
 	w := newDeviceWorld(t)
 	for _, c := range []struct {
 		method, path string
@@ -95,6 +97,7 @@ func TestDeviceIsRefusedOutsideTheAllowlist(t *testing.T) {
 }
 
 func TestDeviceLogIsAttributedToTheCaretaker(t *testing.T) {
+	t.Parallel()
 	w := newDeviceWorld(t)
 	res := w.do(http.MethodPost, "/api/diapers", w.memberID, map[string]any{
 		"babyId": w.babyID,
@@ -110,6 +113,7 @@ func TestDeviceLogIsAttributedToTheCaretaker(t *testing.T) {
 }
 
 func TestDeviceWriteWithoutACaretakerIsRefused(t *testing.T) {
+	t.Parallel()
 	w := newDeviceWorld(t)
 	res := w.do(http.MethodPost, "/api/diapers", "", map[string]any{
 		"babyId": w.babyID,
@@ -122,6 +126,7 @@ func TestDeviceWriteWithoutACaretakerIsRefused(t *testing.T) {
 }
 
 func TestDeviceCannotReachAnotherFamily(t *testing.T) {
+	t.Parallel()
 	w := newDeviceWorld(t)
 	otherFamily, _ := w.a.NewFamily("Nordmann", "ola@example.com")
 	otherBaby := w.a.NewBaby(otherFamily, "Kari")
@@ -141,6 +146,7 @@ func TestDeviceCannotReachAnotherFamily(t *testing.T) {
 }
 
 func TestDeviceHandRoutedRoutes(t *testing.T) {
+	t.Parallel()
 	w := newDeviceWorld(t)
 
 	// The avatar READ is the kiosk's caretaker row: it must get past the

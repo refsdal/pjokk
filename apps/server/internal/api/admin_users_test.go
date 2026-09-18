@@ -92,6 +92,7 @@ func signedIn(a *testrig.AppRig, cookie string) bool {
 }
 
 func TestAdminUserDetailShowsFamiliesSignInAndSessions(t *testing.T) {
+	t.Parallel()
 	w := newSupportWorld(t)
 	second := w.a.SignIn("bo@example.com")
 	if _, err := w.a.Rig.Pool.Exec(context.Background(), `
@@ -162,6 +163,7 @@ func TestAdminUserDetailShowsFamiliesSignInAndSessions(t *testing.T) {
 }
 
 func TestAdminUserDetailMarksAnImpersonatedSession(t *testing.T) {
+	t.Parallel()
 	w := newSupportWorld(t)
 	start := w.a.Do(http.MethodPost, "/api/admin/users/"+w.boID+"/impersonate", w.adminCookie, nil)
 	if start.Status != http.StatusOK {
@@ -180,6 +182,7 @@ func TestAdminUserDetailMarksAnImpersonatedSession(t *testing.T) {
 }
 
 func TestAdminChangeEmail(t *testing.T) {
+	t.Parallel()
 	w := newSupportWorld(t)
 	path := "/api/admin/users/" + w.boID + "/email"
 
@@ -221,6 +224,7 @@ func (w supportWorld) secondOperator(t *testing.T) (id, cookie string) {
 }
 
 func TestAdminRevokeSystemAdmin(t *testing.T) {
+	t.Parallel()
 	w := newSupportWorld(t)
 	olaID, olaCookie := w.secondOperator(t)
 
@@ -256,6 +260,7 @@ func TestAdminRevokeSystemAdmin(t *testing.T) {
 // console with nobody able to run it: the revoke locks the active admins
 // before it counts them.
 func TestTwoOperatorsRevokingEachOtherLeaveOneStanding(t *testing.T) {
+	t.Parallel()
 	w := newSupportWorld(t)
 	olaID, olaCookie := w.secondOperator(t)
 
@@ -287,6 +292,7 @@ func TestTwoOperatorsRevokingEachOtherLeaveOneStanding(t *testing.T) {
 }
 
 func TestAdminSignsOutOneSession(t *testing.T) {
+	t.Parallel()
 	w := newSupportWorld(t)
 	second := w.a.SignIn("bo@example.com")
 
@@ -321,6 +327,7 @@ func TestAdminSignsOutOneSession(t *testing.T) {
 // `impersonation` row away, and the row is the only thing the sweep can
 // find the impersonated session by, so the revoke has to sweep first.
 func TestSigningOutAnOperatorsSessionEndsTheirImpersonation(t *testing.T) {
+	t.Parallel()
 	w := newSupportWorld(t)
 	olaID, olaCookie := w.secondOperator(t)
 

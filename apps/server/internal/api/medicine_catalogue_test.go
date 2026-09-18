@@ -14,6 +14,7 @@ import (
 // -----------------------------------------------------------------------
 
 func TestMedicineCatalogueCrudAndDoseLink(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -99,6 +100,7 @@ func TestMedicineCatalogueCrudAndDoseLink(t *testing.T) {
 }
 
 func TestMedicineCatalogueIsFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

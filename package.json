@@ -10,7 +10,7 @@
     "apps/landing",
     "packages/*"
   ],
-  "// backend": "The server has no bun script. It is Go: `cd apps/server && go run ./cmd/pjokk` for the default mode, `... ./cmd/pjokk migrate` / `cron <nightly|frequent>` / `server` / `worker` for the others; `go test -p 1 ./...` for its suite. In the image the same binary is /app/pjokk. The scripts below cover the SPA, the landing site and the OpenAPI-derived client only.",
+  "// backend": "The server has no bun script. It is Go: `cd apps/server && go run ./cmd/pjokk` for the default mode, `... ./cmd/pjokk migrate` / `cron <nightly|frequent>` / `server` / `worker` for the others; `go test ./...` for its suite (every test gets its own database, see apps/server/internal/testrig). In the image the same binary is /app/pjokk. The scripts below cover the SPA, the landing site and the OpenAPI-derived client only.",
   "scripts": {
     "dev": "bun run --filter @pjokk/frontend dev",
     "dev:server": "cd apps/server && go run ./cmd/pjokk",

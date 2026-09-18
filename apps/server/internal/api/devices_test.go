@@ -49,6 +49,7 @@ func sha256Of(s string) string {
 }
 
 func TestDeviceAdminCreateListRenewRevoke(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "anne@example.com")
 
@@ -105,6 +106,7 @@ func TestDeviceAdminCreateListRenewRevoke(t *testing.T) {
 }
 
 func TestDeviceAdminRenewRefusesAnEnrolledDevice(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "anne@example.com")
 	created := a.Do(http.MethodPost, "/api/devices", cookie, map[string]any{"name": "Kiosk"})
@@ -127,6 +129,7 @@ func TestDeviceAdminRenewRefusesAnEnrolledDevice(t *testing.T) {
 }
 
 func TestDeviceAdminIsFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookieA := a.NewFamily("Hansen", "anne@example.com")
 	_, cookieB := a.NewFamily("Nordmann", "ola@example.com")
@@ -145,6 +148,7 @@ func TestDeviceAdminIsFamilyScoped(t *testing.T) {
 }
 
 func TestDeviceAdminRefusesMembersAndKeys(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, _ := a.NewFamily("Hansen", "anne@example.com")
 	memberID := a.SignUp("Bo", "bo@example.com")
@@ -163,6 +167,7 @@ func TestDeviceAdminRefusesMembersAndKeys(t *testing.T) {
 }
 
 func TestDeviceAdminCapsAtTen(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "anne@example.com")
 	var first string
@@ -186,6 +191,7 @@ func TestDeviceAdminCapsAtTen(t *testing.T) {
 }
 
 func TestDeviceAdminValidatesTheName(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "anne@example.com")
 	for _, name := range []string{"", "   ", strings.Repeat("x", 61)} {

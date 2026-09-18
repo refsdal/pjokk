@@ -60,6 +60,7 @@ func logAt(t *testing.T, a *testrig.AppRig, cookie, path string, body map[string
 // Ports push.test.ts's "feed reminders: one nudge per gap, reset by a new
 // feed" onto a since_last reminder.
 func TestRunRemindersOneNudgePerGapResetByNewFeed(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -93,6 +94,7 @@ func TestRunRemindersOneNudgePerGapResetByNewFeed(t *testing.T) {
 }
 
 func TestRunRemindersSkipsKindNeverLogged(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	subscribe(t, a, cookie, "2")
@@ -105,6 +107,7 @@ func TestRunRemindersSkipsKindNeverLogged(t *testing.T) {
 // Quiet hours: a since_last reminder that comes due inside the window is
 // held, not latched, so it fires at the first tick after the window ends.
 func TestRunRemindersHonoursQuietHours(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -130,6 +133,7 @@ func TestRunRemindersHonoursQuietHours(t *testing.T) {
 // minute, never twice for the same slot, and not at all for a slot more than
 // an hour past (after a cron outage a late nudge is worse than none).
 func TestRunRemindersFixedTimeOncePerDayInLocalTime(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	subscribe(t, a, cookie, "4")
@@ -171,6 +175,7 @@ func TestRunRemindersFixedTimeOncePerDayInLocalTime(t *testing.T) {
 // Per-baby scoping and a medicine keyed on a name: a dose for the other
 // baby, or of another medicine, does not reset the gap.
 func TestRunRemindersPerBabyAndPerMedicine(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	nora := a.NewBaby(familyID, "Nora")
@@ -201,6 +206,7 @@ func TestRunRemindersPerBabyAndPerMedicine(t *testing.T) {
 // not mean a 3 a.m. nudge about a bottle nobody logs any more, and
 // switching it back on must not need a new reminder.
 func TestRunRemindersHoldForAnUntrackedKind(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -228,6 +234,7 @@ func TestRunRemindersHoldForAnUntrackedKind(t *testing.T) {
 
 // A family-wide reminder (no baby) is held only when NO baby tracks the kind.
 func TestRunRemindersFamilyWideHoldsOnlyWhenNoBabyTracks(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	nora := a.NewBaby(familyID, "Nora")

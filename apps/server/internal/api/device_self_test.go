@@ -58,6 +58,7 @@ func enrolledDevice(t *testing.T, a *testrig.AppRig, adminCookie string) string 
 }
 
 func TestDeviceEnrolSetsTheCookieOnce(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, admin := a.NewFamily("Hansen", "anne@example.com")
 	id, code := addDevice(t, a, admin)
@@ -89,6 +90,7 @@ func TestDeviceEnrolSetsTheCookieOnce(t *testing.T) {
 }
 
 func TestDeviceEnrolAcceptsALowercaseCode(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, admin := a.NewFamily("Hansen", "anne@example.com")
 	_, code := addDevice(t, a, admin)
@@ -98,6 +100,7 @@ func TestDeviceEnrolAcceptsALowercaseCode(t *testing.T) {
 }
 
 func TestDeviceEnrolRefusesAnExpiredCode(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, admin := a.NewFamily("Hansen", "anne@example.com")
 	_, code := addDevice(t, a, admin)
@@ -108,6 +111,7 @@ func TestDeviceEnrolRefusesAnExpiredCode(t *testing.T) {
 }
 
 func TestDeviceEnrolRefusesADeviceRevokedBeforeSetUp(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, admin := a.NewFamily("Hansen", "anne@example.com")
 	id, code := addDevice(t, a, admin)
@@ -118,6 +122,7 @@ func TestDeviceEnrolRefusesADeviceRevokedBeforeSetUp(t *testing.T) {
 }
 
 func TestDeviceEnrolValidatesThePin(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, admin := a.NewFamily("Hansen", "anne@example.com")
 	_, code := addDevice(t, a, admin)
@@ -133,6 +138,7 @@ func TestDeviceEnrolValidatesThePin(t *testing.T) {
 }
 
 func TestDeviceRoutesRefuseEveryoneButDevices(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, admin := a.NewFamily("Hansen", "anne@example.com")
 	for _, cookie := range []string{admin, ""} {
@@ -146,6 +152,7 @@ func TestDeviceRoutesRefuseEveryoneButDevices(t *testing.T) {
 }
 
 func TestDeviceUnenrolWithThePin(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, admin := a.NewFamily("Hansen", "anne@example.com")
 	dev := enrolledDevice(t, a, admin)
@@ -171,6 +178,7 @@ func TestDeviceUnenrolWithThePin(t *testing.T) {
 }
 
 func TestDeviceUnenrolIsRateLimitedPerDevice(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, admin := a.NewFamily("Hansen", "anne@example.com")
 	dev := enrolledDevice(t, a, admin)
@@ -186,6 +194,7 @@ func TestDeviceUnenrolIsRateLimitedPerDevice(t *testing.T) {
 }
 
 func TestDevicePinHashIsKeyedAndPerDevice(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, admin := a.NewFamily("Hansen", "anne@example.com")
 	enrolledDevice(t, a, admin)
@@ -218,6 +227,7 @@ func TestDevicePinHashIsKeyedAndPerDevice(t *testing.T) {
 }
 
 func TestDeviceThresholds(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, admin := a.NewFamily("Hansen", "anne@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

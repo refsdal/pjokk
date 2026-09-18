@@ -61,6 +61,7 @@ func march(t *testing.T, a *testrig.AppRig, cookie string) []string {
 }
 
 func TestDeleteOneOccurrenceSkipsItEverywhere(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	id := createWeekly(t, a, cookie, nil)
@@ -109,6 +110,7 @@ func TestDeleteOneOccurrenceSkipsItEverywhere(t *testing.T) {
 }
 
 func TestEditOneOccurrenceDetachesIt(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	baby := a.NewBaby(familyID, "Nora")
@@ -151,6 +153,7 @@ func TestEditOneOccurrenceDetachesIt(t *testing.T) {
 
 // Editing the whole series keeps its skips unless its occurrences move.
 func TestSeriesEditsKeepSkipsUnlessTheSeriesMoves(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	id := createWeekly(t, a, cookie, nil)

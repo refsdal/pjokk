@@ -57,6 +57,7 @@ func (f *fixture) resolves(cookie *http.Cookie) bool {
 }
 
 func TestUserSessionsListsEachDeviceWithoutItsToken(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 	userID, first := f.signIn("Anne", "anne@example.com")
 	second := f.signInAgain("anne@example.com", androidChrome)
@@ -95,6 +96,7 @@ func TestUserSessionsListsEachDeviceWithoutItsToken(t *testing.T) {
 }
 
 func TestRevokeSessionSignsOutOnlyThatOne(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 	userID, first := f.signIn("Anne", "anne@example.com")
 	second := f.signInAgain("anne@example.com", androidChrome)
@@ -121,6 +123,7 @@ func TestRevokeSessionSignsOutOnlyThatOne(t *testing.T) {
 }
 
 func TestChangeEmailKeepsSignInWorking(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 	userID, cookie := f.signIn("Anne", "anne@example.com")
 	f.signIn("Bo", "bo@example.com")
@@ -156,6 +159,7 @@ func TestChangeEmailKeepsSignInWorking(t *testing.T) {
 }
 
 func TestSessionActivityIsRecorded(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 	_, cookie := f.signIn("Anne", "anne@example.com")
 	if _, err := f.rig.Pool.Exec(f.ctx,

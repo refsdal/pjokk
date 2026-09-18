@@ -10,6 +10,7 @@ import (
 // The app's language on the person (me.go, 00018; DECISIONS 2026-09-11).
 
 func TestMeLanguageStartsUnsetAndIsSaved(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -33,6 +34,7 @@ func TestMeLanguageStartsUnsetAndIsSaved(t *testing.T) {
 }
 
 func TestMeLanguageRejectsUnknownValues(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	for _, body := range []map[string]any{
@@ -49,6 +51,7 @@ func TestMeLanguageRejectsUnknownValues(t *testing.T) {
 }
 
 func TestTestPushIsInThePersonsLanguage(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	userID, _ := a.Do(http.MethodGet, "/api/me", cookie, nil).JSON["userId"].(string)

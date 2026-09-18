@@ -71,6 +71,7 @@ func newMilestone(t *testing.T, a *testrig.AppRig, cookie, babyID, title string)
 }
 
 func TestMilestonePhotoUploadServeListDelete(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -148,6 +149,7 @@ func TestMilestonePhotoUploadServeListDelete(t *testing.T) {
 }
 
 func TestMilestonePhotoLimitsAndQuota(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -193,6 +195,7 @@ func TestMilestonePhotoLimitsAndQuota(t *testing.T) {
 }
 
 func TestMilestonePhotosAreFamilyScopedAndGoWithTheMilestone(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

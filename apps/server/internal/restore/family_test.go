@@ -81,6 +81,7 @@ func scalar[T any](t *testing.T, a *testrig.AppRig, sql string, args ...any) T {
 }
 
 func TestFamilyRestoreBringsBackADeletedFamily(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	hansen, _, milestone := seedFamily(t, a, "Hansen", "parent@example.com")
@@ -128,6 +129,7 @@ func TestFamilyRestoreBringsBackADeletedFamily(t *testing.T) {
 }
 
 func TestFamilyRestoreRefusesALiveOrUnknownFamily(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	hansen, _, _ := seedFamily(t, a, "Hansen", "parent@example.com")
@@ -149,6 +151,7 @@ func TestFamilyRestoreRefusesALiveOrUnknownFamily(t *testing.T) {
 // A member whose account was deleted since: their membership, roles and
 // reminders stay gone, and what they logged is the Deleted user's.
 func TestFamilyRestoreDropsGoneMembersAndCreditsTheirEntries(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	hansen, baby, _ := seedFamily(t, a, "Hansen", "parent@example.com")
@@ -187,6 +190,7 @@ func TestFamilyRestoreDropsGoneMembersAndCreditsTheirEntries(t *testing.T) {
 }
 
 func TestFamilyRestoreWithEveryAdminGone(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	hansen, _, _ := seedFamily(t, a, "Hansen", "parent@example.com")
@@ -208,6 +212,7 @@ func TestFamilyRestoreWithEveryAdminGone(t *testing.T) {
 }
 
 func TestFamilyRestoreRenamesATakenSlug(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	hansen, _, _ := seedFamily(t, a, "Hansen", "parent@example.com")
@@ -230,6 +235,7 @@ func TestFamilyRestoreRenamesATakenSlug(t *testing.T) {
 // The console's audit row is written in the restore's transaction: when it
 // fails, nothing is restored.
 func TestFamilyRestoreRollsBackWhenTheHookFails(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	hansen, _, _ := seedFamily(t, a, "Hansen", "parent@example.com")
@@ -249,6 +255,7 @@ func TestFamilyRestoreRollsBackWhenTheHookFails(t *testing.T) {
 // Every table has a rule: a new one without fails here until someone
 // decides whether a family restore brings it back.
 func TestEveryTableHasAFamilyRestoreRule(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	unplaced, err := restore.UnclassifiedTables(ctx, a.Deps.Pool)
@@ -270,6 +277,7 @@ func TestEveryTableHasAFamilyRestoreRule(t *testing.T) {
 }
 
 func TestDeletedFamiliesListsOnlyTheGoneOnes(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	hansen, _, _ := seedFamily(t, a, "Hansen", "parent@example.com")
 	seedFamily(t, a, "Berg", "berg@example.com")
@@ -287,6 +295,7 @@ func TestDeletedFamiliesListsOnlyTheGoneOnes(t *testing.T) {
 // A baby's photo (baby.avatar_key) comes back with the family, from the
 // photo backup's trees like a milestone photo.
 func TestFamilyRestoreBringsBackABabyPhoto(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	hansen, baby, _ := seedFamily(t, a, "Hansen", "parent@example.com")

@@ -19,6 +19,7 @@ import (
 // -----------------------------------------------------------------------
 
 func TestFeedTimerStartSwitchStopBecomesBreastFeed(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -119,6 +120,7 @@ func TestFeedTimerStartSwitchStopBecomesBreastFeed(t *testing.T) {
 }
 
 func TestFeedTimerStopOverridesAndSubMinuteRounding(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -145,6 +147,7 @@ func TestFeedTimerStopOverridesAndSubMinuteRounding(t *testing.T) {
 }
 
 func TestPumpTimerStopBecomesPumpLog(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -179,6 +182,7 @@ func TestPumpTimerStopBecomesPumpLog(t *testing.T) {
 }
 
 func TestFeedTimerDiscardAndSummary(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -219,6 +223,7 @@ func TestFeedTimerDiscardAndSummary(t *testing.T) {
 }
 
 func TestFeedTimerIsFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("A", "a@example.com")
 	babyA := a.NewBaby(familyA, "Nora")
@@ -248,6 +253,7 @@ func TestFeedTimerIsFamilyScoped(t *testing.T) {
 // mutation that reaches the server minutes later still starts the clock
 // where the parent did.
 func TestFeedTimerHonoursClientStartTime(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -275,6 +281,7 @@ func TestFeedTimerHonoursClientStartTime(t *testing.T) {
 // the family's clock with it: a co-parent may still be feeding. The timer
 // lands on the tombstone exactly as the feed it becomes would.
 func TestFeedTimerSurvivesCaretakerDeletion(t *testing.T) {
+	t.Parallel()
 	a, familyID, cookie, _ := sysadminRig(t, "Hansen")
 	babyID := a.NewBaby(familyID, "Ada")
 	victimID := a.SignUp("Leaving caretaker", "victim@example.com")

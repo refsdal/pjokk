@@ -20,6 +20,7 @@ import (
 // -----------------------------------------------------------------------
 
 func TestExportCSVOrderingEscapingFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("Family A", "a@example.com")
 	babyA := a.NewBaby(familyA, "Nora")
@@ -120,6 +121,7 @@ func TestExportCSVOrderingEscapingFamilyScoped(t *testing.T) {
 }
 
 func TestExportCSVEmptyFamilyIsHeaderOnly(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -139,6 +141,7 @@ func TestExportCSVEmptyFamilyIsHeaderOnly(t *testing.T) {
 // three-type world could get away with) exports every temperature as a
 // length, so this pins the whole mapping rather than just the new arm.
 func TestExportCSVDerivesMeasurementUnitFromType(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

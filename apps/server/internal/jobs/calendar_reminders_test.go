@@ -54,6 +54,7 @@ func userIDByEmail(t *testing.T, a *testrig.AppRig, email string) string {
 // Ports calendar-reminders.test.ts's "fires once inside the window, to all
 // members when unassigned".
 func TestCalendarRemindersFireOnceToAllMembersWhenUnassigned(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	adminID := userIDByEmail(t, a, "parent@example.com")
@@ -99,6 +100,7 @@ func TestCalendarRemindersFireOnceToAllMembersWhenUnassigned(t *testing.T) {
 
 // Ports "targets only assignees when set".
 func TestCalendarRemindersTargetOnlyAssigneesWhenSet(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	adminID := userIDByEmail(t, a, "parent@example.com")
@@ -134,6 +136,7 @@ func TestCalendarRemindersTargetOnlyAssigneesWhenSet(t *testing.T) {
 
 // Ports "not yet due -> nothing; long-past -> latched silently".
 func TestCalendarRemindersGraceLatchesLongPastEventsSilently(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	adminID := userIDByEmail(t, a, "parent@example.com")
@@ -191,6 +194,7 @@ func calendarEventRemindedAt(t *testing.T, a *testrig.AppRig, id string) *time.T
 // Ports "formats the reminder clock in Europe/Oslo, not workerd's UTC
 // default" — the direct clockFmt assertions, plus one round trip.
 func TestFormatOsloClock(t *testing.T) {
+	t.Parallel()
 	// 2026-08-25T12:00:00Z is during CEST (UTC+2) -> 14:00 Oslo-local.
 	summer := time.Date(2026, 8, 25, 12, 0, 0, 0, time.UTC)
 	if got := jobs.FormatOsloClock(summer); got != "14:00" {
@@ -205,6 +209,7 @@ func TestFormatOsloClock(t *testing.T) {
 }
 
 func TestCalendarRemindersRoundTripDeliversExactlyOncePerDueEvent(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	subscribePush(t, a, cookie, "https://fcm.googleapis.com/cal4/admin")

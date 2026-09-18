@@ -135,6 +135,7 @@ func (f *fixture) signIn(name, email string) (string, *http.Cookie) {
 
 // (a) Closed signup means the credential signup route does not exist.
 func TestSignupRouteDisabledWhenSignupClosed(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	rec := f.post(auth.BasePath+"/signup/credential", `{"email":"nope@example.com","password":"Testpass123"}`)
@@ -145,6 +146,7 @@ func TestSignupRouteDisabledWhenSignupClosed(t *testing.T) {
 }
 
 func TestSignupRouteEnabledWhenSignupOpen(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, true)
 
 	// Reached, and therefore answered by the handler rather than the router.
@@ -162,6 +164,7 @@ func TestSignupRouteEnabledWhenSignupOpen(t *testing.T) {
 // under our base path, so the callback URL registered with Google
 // ({APP_URL}/api/auth/oauth/google/callback) actually resolves.
 func TestGoogleOAuthRoutesMountUnderBasePath(t *testing.T) {
+	t.Parallel()
 	rig := testrig.Setup(t)
 	svc, err := auth.New(auth.Config{
 		AppURL:             "http://localhost:3000",
@@ -201,6 +204,7 @@ func TestGoogleOAuthRoutesMountUnderBasePath(t *testing.T) {
 // self-hoster who never set up Google still gets a working instance rather
 // than a route that 500s halfway through a redirect.
 func TestGoogleOAuthAbsentWithoutCredentials(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	rec := httptest.NewRecorder()
@@ -214,6 +218,7 @@ func TestGoogleOAuthAbsentWithoutCredentials(t *testing.T) {
 // (b) CreateUser + sign-in over HTTP yields a cookie SessionFromRequest
 // resolves back to the user, with our own columns attached.
 func TestSignInThenSessionFromRequest(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	userID, cookie := f.signIn("Kari Nordmann", "kari@example.com")
@@ -264,6 +269,7 @@ func TestSignInThenSessionFromRequest(t *testing.T) {
 // whose (expires_at - created_at) is under the full duration as a short,
 // deliberately non-extending "remember me was unchecked" session.
 func TestSessionFromRequestRefreshingReissuesTheCookie(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	_, cookie := f.signIn("Refresh Me", "refresh@example.com")
@@ -309,6 +315,7 @@ func TestSessionFromRequestRefreshingReissuesTheCookie(t *testing.T) {
 // The other half of the contract: a session nowhere near its refresh window
 // must not have its cookie rewritten on every request.
 func TestSessionFromRequestRefreshingLeavesFreshSessionsAlone(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	_, cookie := f.signIn("Fresh", "fresh@example.com")
@@ -327,6 +334,7 @@ func TestSessionFromRequestRefreshingLeavesFreshSessionsAlone(t *testing.T) {
 }
 
 func TestSessionFromRequestWithoutCookie(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	session, err := f.svc.SessionFromRequest(httptest.NewRequest(http.MethodGet, "/api/summary", nil))
@@ -340,6 +348,7 @@ func TestSessionFromRequestWithoutCookie(t *testing.T) {
 
 // A banned user is indistinguishable from a signed-out one.
 func TestBannedUserHasNoSession(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	userID, cookie := f.signIn("Banned Person", "banned@example.com")
@@ -358,6 +367,7 @@ func TestBannedUserHasNoSession(t *testing.T) {
 // the Handler has to reject a banned session itself. Signing out stays open,
 // or a banned user's browser keeps a cookie it can never clear.
 func TestBannedUserRejectedOnLimenRoutes(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	userID, cookie := f.signIn("Banned Person", "banned@example.com")
@@ -390,6 +400,7 @@ func TestBannedUserRejectedOnLimenRoutes(t *testing.T) {
 
 // An anonymous request is Limen's business, not the guard's.
 func TestBannedGuardIgnoresAnonymousRequests(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	rec := f.get(auth.BasePath+"/me", nil)
@@ -404,6 +415,7 @@ func TestBannedGuardIgnoresAnonymousRequests(t *testing.T) {
 // Limen mounts a large default API. Only the routes the SPA needs may be
 // reachable; everything else has to be off, not merely undocumented.
 func TestLimenRouteAllowlist(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	_, cookie := f.signIn("Kari", "kari@example.com")
@@ -472,6 +484,7 @@ func TestLimenRouteAllowlist(t *testing.T) {
 
 // (c) CreateFamily + AddMember + SetActiveFamily is reflected in the session.
 func TestFamilyLifecycleReachesSession(t *testing.T) {
+	t.Parallel()
 	// Open signup: a family-less founder self-creates in the bootstrap window
 	// (the only path allowOrgCreation now leaves open to a non-sysadmin).
 	f := newFixture(t, true)
@@ -558,6 +571,7 @@ func TestFamilyLifecycleReachesSession(t *testing.T) {
 // for every subsequent query, so pointing a session at a family the user is
 // not in would be a straight cross-tenant read.
 func TestSetActiveFamilyRejectsNonMember(t *testing.T) {
+	t.Parallel()
 	// Open signup so both family-less owners can found their families (the
 	// non-sysadmin bootstrap path); the test itself is about cross-family scope.
 	f := newFixture(t, true)
@@ -603,6 +617,7 @@ func TestSetActiveFamilyRejectsNonMember(t *testing.T) {
 // be creatable — through our API and through Limen's own create route, which
 // the allowlist keeps open for the SPA.
 func TestFamilyNamesMayRepeat(t *testing.T) {
+	t.Parallel()
 	// Open signup so the three family-less founders below can self-create
 	// (bootstrap window); the test is about repeated family names, not the gate.
 	f := newFixture(t, true)
@@ -656,6 +671,7 @@ func TestFamilyNamesMayRepeat(t *testing.T) {
 // family-less user (an uninvited OAuth account included) is refused, and only
 // a system admin may create.
 func TestOrgCreationRouteRestrictedToSysadminOrBootstrap(t *testing.T) {
+	t.Parallel()
 	create := func(f *fixture, cookie *http.Cookie) int {
 		req := httptest.NewRequest(http.MethodPost, auth.BasePath+"/organizations", strings.NewReader(`{"name":"Rogue family"}`))
 		req.Header.Set("Content-Type", "application/json")
@@ -704,6 +720,7 @@ func TestOrgCreationRouteRestrictedToSysadminOrBootstrap(t *testing.T) {
 }
 
 func TestSetMemberRoleRejectsUnknownRole(t *testing.T) {
+	t.Parallel()
 	// Open signup so the family-less owner can self-create (bootstrap window).
 	f := newFixture(t, true)
 
@@ -721,6 +738,7 @@ func TestSetMemberRoleRejectsUnknownRole(t *testing.T) {
 
 // A member id from another family must not be mutable through this family.
 func TestMemberMutationIsFamilyScoped(t *testing.T) {
+	t.Parallel()
 	// Open signup so both family-less owners can self-create (bootstrap window);
 	// the test is about cross-family member mutation.
 	f := newFixture(t, true)
@@ -749,6 +767,7 @@ func TestMemberMutationIsFamilyScoped(t *testing.T) {
 
 // (d) Impersonation round trip.
 func TestImpersonateAndStopImpersonating(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	adminID, adminCookie := f.signIn("Sysadmin", "admin@example.com")
@@ -832,6 +851,7 @@ func TestImpersonateAndStopImpersonating(t *testing.T) {
 // so a token there is a privilege escalation. Only the marker belongs in
 // metadata; the token lives in the server-only impersonation table.
 func TestImpersonatedSessionMetadataHoldsNoAdminToken(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	adminID, adminCookie := f.signIn("Sysadmin", "admin@example.com")
@@ -877,6 +897,7 @@ func TestImpersonatedSessionMetadataHoldsNoAdminToken(t *testing.T) {
 // Revoking either session takes the impersonation record with it, so no code
 // path has to remember to tidy up.
 func TestImpersonationRecordCascadesWithTheSession(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	adminID, adminCookie := f.signIn("Sysadmin", "admin@example.com")
@@ -908,6 +929,7 @@ func TestImpersonationRecordCascadesWithTheSession(t *testing.T) {
 // If the admin's own session is gone, stopping must still end the
 // impersonation rather than strand the operator as the target.
 func TestStopImpersonatingIsTerminalWhenAdminSessionIsGone(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	adminID, adminCookie := f.signIn("Sysadmin", "admin@example.com")
@@ -959,6 +981,7 @@ func TestStopImpersonatingIsTerminalWhenAdminSessionIsGone(t *testing.T) {
 }
 
 func TestImpersonateRequiresSystemAdmin(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	_, cookie := f.signIn("Ordinary", "ordinary@example.com")
@@ -976,6 +999,7 @@ func TestImpersonateRequiresSystemAdmin(t *testing.T) {
 }
 
 func TestStopImpersonatingOnOrdinarySession(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	_, cookie := f.signIn("Ordinary", "ordinary@example.com")
@@ -992,6 +1016,7 @@ func TestStopImpersonatingOnOrdinarySession(t *testing.T) {
 // A user provisioned without a password (the invite-redeem path) exists and
 // cannot sign in with the empty password.
 func TestCreateUserWithoutPassword(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	userID, err := f.svc.CreateUser(f.ctx, "Invited", "invited@example.com", "")
@@ -1019,6 +1044,7 @@ func TestCreateUserWithoutPassword(t *testing.T) {
 }
 
 func TestRevokeAllSessions(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	userID, cookie := f.signIn("Kari", "kari@example.com")
@@ -1039,6 +1065,7 @@ func TestRevokeAllSessions(t *testing.T) {
 // Sessions must not record the caller's address: the metadata Limen writes
 // carries a SHA-256 of it instead.
 func TestSessionMetadataStoresNoRawAddress(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	_, cookie := f.signIn("Kari", "kari@example.com")
@@ -1095,6 +1122,7 @@ func assertRoles(t *testing.T, f *fixture, familyID, userID string, want []strin
 // otherwise the SPA strands them on /welcome asking them to create a family
 // they already belong to. resolveSession auto-selects it.
 func TestFreshSignInAutoActivatesTheMembersFamily(t *testing.T) {
+	t.Parallel()
 	// Open signup so the family-less owner can self-create (bootstrap window);
 	// the test is about auto-activating a returning member's family.
 	f := newFixture(t, true)
@@ -1141,6 +1169,7 @@ func TestFreshSignInAutoActivatesTheMembersFamily(t *testing.T) {
 // the OPEN_SIGNUP founder-bootstrap window — never under closed signup,
 // where an uninvited OAuth account would otherwise mint itself a free family.
 func TestOrgCreationGuardMatrix(t *testing.T) {
+	t.Parallel()
 	// Closed signup: a family-less non-admin CANNOT create a family.
 	closed := newFixture(t, false)
 	lonerID, _ := closed.signIn("Loner", "loner@example.com")
@@ -1183,6 +1212,7 @@ func TestOrgCreationGuardMatrix(t *testing.T) {
 // any other way. It travels on an unexported context key, so a caller
 // holding only the Service interface has exactly one door to it.
 func TestCreateFamilyForUserBypassesTheGuardOnlyThroughItsOwnMethod(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false) // closed signup — the shipped default
 
 	// A provisioned, passwordless account, exactly as the admin console
@@ -1234,6 +1264,7 @@ func TestCreateFamilyForUserBypassesTheGuardOnlyThroughItsOwnMethod(t *testing.T
 // inside a family would hold ordinary in-app access to a child's health
 // record.
 func TestCreateEmptyFamilyLeavesNoMembers(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t, false)
 
 	operatorID, _ := f.signIn("Operator", "operator@example.com")

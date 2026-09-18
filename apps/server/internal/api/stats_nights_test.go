@@ -12,6 +12,7 @@ import (
 // and feeds by type on GET /api/stats. Extends stats_test.go's fixed-clock
 // rig; the night boundary is local noon (see the StatsNight schema).
 func TestGetStatsNightSplitLongestStretchAndWakings(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -113,6 +114,7 @@ func TestGetStatsNightSplitLongestStretchAndWakings(t *testing.T) {
 // the noon boundary puts a 23:00 bedtime and its 02:00 resettle on the
 // same night.
 func TestGetStatsRunningNightCountsToNow(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -146,6 +148,7 @@ func TestGetStatsRunningNightCountsToNow(t *testing.T) {
 // A one-day window still answers "last night": the night that ended this
 // morning began yesterday afternoon, outside the day range.
 func TestGetStatsOneDayWindowStillHasLastNight(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

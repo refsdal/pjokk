@@ -15,6 +15,7 @@ import (
 // -----------------------------------------------------------------------
 
 func TestSleepStartActiveWakeInactive(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -60,6 +61,7 @@ func TestSleepStartActiveWakeInactive(t *testing.T) {
 }
 
 func TestCreateSleepUnknownBabyIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -76,6 +78,7 @@ func TestCreateSleepUnknownBabyIs404(t *testing.T) {
 }
 
 func TestCreateSleepRefusesSecondActiveSession(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -101,6 +104,7 @@ func TestCreateSleepRefusesSecondActiveSession(t *testing.T) {
 // partial unique index must still turn this into 409 ALREADY_ACTIVE, not a
 // raw 500 from an unhandled 23505.
 func TestCreateSleepActiveSessionDBEnforcedRace(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -132,6 +136,7 @@ func TestCreateSleepActiveSessionDBEnforcedRace(t *testing.T) {
 }
 
 func TestWakeTwiceIsNoOpErrorNotDataCorruption(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -183,6 +188,7 @@ func TestWakeTwiceIsNoOpErrorNotDataCorruption(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestUpdateSleepSetsClearsAndLeavesFields(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -225,6 +231,7 @@ func TestUpdateSleepSetsClearsAndLeavesFields(t *testing.T) {
 }
 
 func TestUpdateSleepClearEndTimeReopensSession(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -254,6 +261,7 @@ func TestUpdateSleepClearEndTimeReopensSession(t *testing.T) {
 }
 
 func TestUpdateSleepClearEndTimeConflictsWithAnotherActiveSession(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -290,6 +298,7 @@ func TestUpdateSleepClearEndTimeConflictsWithAnotherActiveSession(t *testing.T) 
 }
 
 func TestUpdateSleepUnknownIDIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -304,6 +313,7 @@ func TestUpdateSleepUnknownIDIs404(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestDeleteSleepRemovesItAndUnknownIDIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -334,6 +344,7 @@ func TestDeleteSleepRemovesItAndUnknownIDIs404(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestListSleepsNewestFirstWithCaretakerName(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -375,6 +386,7 @@ func TestListSleepsNewestFirstWithCaretakerName(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestSleepsAreFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")
@@ -426,6 +438,7 @@ func TestSleepsAreFamilyScoped(t *testing.T) {
 }
 
 func TestSleepRejectsUnauthenticated(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	res := a.Do(http.MethodGet, "/api/sleep", "", nil)
 	if res.Status != http.StatusUnauthorized {

@@ -25,6 +25,7 @@ func createReminder(t *testing.T, a *testrig.AppRig, cookie string, body map[str
 }
 
 func TestRemindersCreateListDelete(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -68,6 +69,7 @@ func TestRemindersCreateListDelete(t *testing.T) {
 }
 
 func TestRemindersValidation(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	a.NewBaby(familyID, "Nora")
@@ -99,6 +101,7 @@ func TestRemindersValidation(t *testing.T) {
 // A reminder is a personal nag: another member of the same family neither
 // sees it nor can delete it.
 func TestRemindersArePerUser(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	otherID := a.SignUp("Other parent", "other@example.com")

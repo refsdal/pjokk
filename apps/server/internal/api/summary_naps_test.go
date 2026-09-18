@@ -40,6 +40,7 @@ func postSleep(t *testing.T, a *testrig.AppRig, cookie, babyID string, start, en
 }
 
 func TestSummaryNapsExcludeNightAndLastNightSumsItsSessions(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -87,6 +88,7 @@ func TestSummaryNapsExcludeNightAndLastNightSumsItsSessions(t *testing.T) {
 // A night that ended more than a day ago is not "last night": the line would
 // otherwise carry last week's number once a family stops typing nights.
 func TestSummaryLastNightIsNullOnceTheNightIsOverADayOld(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -111,6 +113,7 @@ func TestSummaryLastNightIsNullOnceTheNightIsOverADayOld(t *testing.T) {
 // A running night has no length yet: tonight's session in progress does not
 // displace last night's completed one.
 func TestSummaryLastNightIgnoresARunningNight(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

@@ -135,6 +135,7 @@ func addPhoto(t *testing.T, a *testrig.AppRig, familyID, milestoneID, id string)
 }
 
 func TestTableOrderPutsParentsFirst(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	order, err := restore.TableOrder(context.Background(), a.Deps.Pool)
 	if err != nil {
@@ -165,6 +166,7 @@ func TestTableOrderPutsParentsFirst(t *testing.T) {
 // but for the credentials the backup nulls and the sessions it cannot
 // bring back.
 func TestWholeRestoreRoundTrip(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	familyID, _, milestoneID := seedFamily(t, a, "Hansen", "parent@example.com")
@@ -183,7 +185,7 @@ func TestWholeRestoreRoundTrip(t *testing.T) {
 	if _, err := jobs.RunBackup(ctx, jobsDeps(a), time.Date(2026, 9, 10, 3, 15, 0, 0, time.UTC)); err != nil {
 		t.Fatalf("RunBackup: %v", err)
 	}
-	testrig.Setup(t) // an empty database, the tombstone reseeded
+	a.Rig.Empty(t) // an empty database, the tombstone reseeded
 
 	snap, err := restore.FromStorage(ctx, a.Deps.Storage, "2026-09-10")
 	if err != nil {
@@ -218,6 +220,7 @@ func TestWholeRestoreRoundTrip(t *testing.T) {
 }
 
 func TestWholeRestoreRefusesADatabaseInUse(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	empty := &restore.Snapshot{SchemaVersion: latest(t), Tables: map[string][]map[string]any{}}
@@ -227,7 +230,7 @@ func TestWholeRestoreRefusesADatabaseInUse(t *testing.T) {
 		t.Errorf("with a real user = %v, want ErrNotEmpty", err)
 	}
 
-	testrig.Setup(t)
+	a.Rig.Empty(t)
 	if _, err := a.Deps.Pool.Exec(ctx, `INSERT INTO "organizations" ("id", "name", "slug") VALUES ('f', 'F', 'f')`); err != nil {
 		t.Fatalf("seed family: %v", err)
 	}
@@ -235,7 +238,7 @@ func TestWholeRestoreRefusesADatabaseInUse(t *testing.T) {
 		t.Errorf("with a family = %v, want ErrNotEmpty", err)
 	}
 
-	testrig.Setup(t)
+	a.Rig.Empty(t)
 	if _, err := restore.Whole(ctx, restoreDeps(a), empty); err != nil {
 		t.Errorf("with only the tombstone = %v, want it to go ahead", err)
 	}
@@ -262,6 +265,7 @@ func readSnapshot(t *testing.T, js string) *restore.Snapshot {
 // A snapshot from another schema: a key the table no longer has, a column
 // it did not have yet, a table since dropped.
 func TestWholeRestoreToleratesSchemaDrift(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	snap := readSnapshot(t, fmt.Sprintf(`{"exportedAt":"2026-01-01T03:15:00Z","schemaVersion":%d,"tables":{
@@ -289,6 +293,7 @@ func TestWholeRestoreToleratesSchemaDrift(t *testing.T) {
 }
 
 func TestWholeRestoreLoadsLargeTablesInChunks(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	var b strings.Builder
 	for i := range 2500 {
@@ -315,6 +320,7 @@ func TestWholeRestoreLoadsLargeTablesInChunks(t *testing.T) {
 }
 
 func TestWholeRestoreChecksTheSnapshotsSchemaVersion(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 
@@ -333,6 +339,7 @@ func TestWholeRestoreChecksTheSnapshotsSchemaVersion(t *testing.T) {
 // Photos come back from the current tree, else the newest deleted tree; a
 // photo in place is left alone, and one with no copy is reported.
 func TestWholeRestorePutsPhotosBackFromTheBackupTrees(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	familyID, _, milestoneID := seedFamily(t, a, "Hansen", "parent@example.com")
@@ -349,7 +356,7 @@ func TestWholeRestorePutsPhotosBackFromTheBackupTrees(t *testing.T) {
 	if _, err := jobs.RunBackup(ctx, jobsDeps(a), time.Date(2026, 9, 10, 3, 15, 0, 0, time.UTC)); err != nil {
 		t.Fatalf("RunBackup: %v", err)
 	}
-	testrig.Setup(t)
+	a.Rig.Empty(t)
 	snap, err := restore.FromStorage(ctx, a.Deps.Storage, "2026-09-10")
 	if err != nil {
 		t.Fatal(err)
@@ -370,6 +377,7 @@ func TestWholeRestorePutsPhotosBackFromTheBackupTrees(t *testing.T) {
 }
 
 func TestFromStorageWithoutASnapshot(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	if _, err := restore.FromStorage(context.Background(), a.Deps.Storage, "2020-01-01"); !errors.Is(err, restore.ErrNoSnapshot) {
 		t.Errorf("err = %v, want ErrNoSnapshot", err)

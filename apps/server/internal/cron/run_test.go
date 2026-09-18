@@ -52,6 +52,10 @@ func withBody(t *testing.T, body func(context.Context, string, cron.Deps) error)
 	t.Cleanup(cron.SetJobBody(body))
 }
 
+// Not t.Parallel: these tests register jobs under shared names in the
+// package's registry and expect their own behaviour back, so they run one
+// after another. Each still gets a database of its own from the rig.
+
 func TestRunRecordsASuccessfulRun(t *testing.T) {
 	a := testrig.App(t)
 	d, _ := depsFor(a)

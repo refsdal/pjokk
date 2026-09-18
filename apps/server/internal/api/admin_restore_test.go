@@ -37,6 +37,7 @@ func deletedByTheConsole(t *testing.T, a *testrig.AppRig, cookie string) string 
 }
 
 func TestDeletedFamiliesSaysWhoDeletedThem(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Ops family")
 	familyID := deletedByTheConsole(t, a, cookie)
 
@@ -62,6 +63,7 @@ func TestDeletedFamiliesSaysWhoDeletedThem(t *testing.T) {
 }
 
 func TestRestoreDeletedFamilyFromTheConsole(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, adminID := sysadminRig(t, "Ops family")
 	familyID := deletedByTheConsole(t, a, cookie)
 	path := "/api/admin/backups/2026-09-10/families/" + familyID + "/restore"
@@ -107,6 +109,7 @@ func TestRestoreDeletedFamilyFromTheConsole(t *testing.T) {
 // and the family restore still gets them back — from the photo backup's
 // dated deleted tree, where the next night moves the family's copies.
 func TestRestoredFamilyGetsItsPhotoBackAfterTheDeleteErasedIt(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Ops family")
 	ctx := context.Background()
 	mem := a.Deps.Storage.(*storage.Memory)

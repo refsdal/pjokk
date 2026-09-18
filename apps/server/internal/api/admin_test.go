@@ -150,6 +150,7 @@ func sysadminRig(t *testing.T, familyName string) (a *testrig.AppRig, familyID, 
 // to the two callers the TypeScript predecessor's middleware could not
 // express: an API key, and an anonymous request.
 func TestAdminRoutesRequireSysadmin(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	userID := userIDByEmail(t, a, "parent@example.com")
@@ -227,6 +228,7 @@ func TestAdminRoutesRequireSysadmin(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestAdminStatsAndFamilyOverview(t *testing.T) {
+	t.Parallel()
 	a, familyID, cookie, _ := sysadminRig(t, "Admin family")
 	babyID := a.NewBaby(familyID, "Ada")
 
@@ -322,6 +324,7 @@ func TestAdminStatsAndFamilyOverview(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestAdminDeleteFamilyCascadesAndAudits(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, adminID := sysadminRig(t, "Admin family")
 
 	victimID, victimCookie := a.NewFamily("Doomed family", "doomed@example.com")
@@ -387,6 +390,7 @@ func assertCount(t *testing.T, a *testrig.AppRig, query string, want int, args .
 // -----------------------------------------------------------------------
 
 func TestAdminDeleteUserTombstonesAttributionThenDeletes(t *testing.T) {
+	t.Parallel()
 	a, familyID, cookie, adminID := sysadminRig(t, "Hansen")
 	babyID := a.NewBaby(familyID, "Ada")
 
@@ -452,6 +456,7 @@ func TestAdminDeleteUserTombstonesAttributionThenDeletes(t *testing.T) {
 // and API-key attributions. Without every branch of
 // ReassignUserReferences this delete fails on a foreign-key violation.
 func TestAdminDeleteUserCoversEveryAttributionTable(t *testing.T) {
+	t.Parallel()
 	a, familyID, cookie, _ := sysadminRig(t, "Hansen")
 	babyID := a.NewBaby(familyID, "Ada")
 
@@ -557,6 +562,7 @@ func TestAdminDeleteUserCoversEveryAttributionTable(t *testing.T) {
 // admin.test.ts's "deletes a user who created and was assigned to a calendar
 // event (calendar FKs)".
 func TestAdminDeleteUserKeepsCalendarEventDropsAssignment(t *testing.T) {
+	t.Parallel()
 	a, familyID, cookie, _ := sysadminRig(t, "Calendar admin family")
 
 	victimID := a.SignUp("Calendar victim", "victim@example.com")
@@ -595,6 +601,7 @@ func TestAdminDeleteUserKeepsCalendarEventDropsAssignment(t *testing.T) {
 // without adding it to ReassignUserReferences would turn an account deletion
 // into a silent family deletion.
 func TestAdminDeleteUserKeepsTheFamilyTheyCreated(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Admin family")
 
 	victimFamilyID, victimCookie := a.NewFamily("Victim family", "victim@example.com")
@@ -624,6 +631,7 @@ func TestAdminDeleteUserKeepsTheFamilyTheyCreated(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestAdminAuditNoteIsRecordedAndListed(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, adminID := sysadminRig(t, "Hansen")
 
 	res := a.Do(http.MethodPost, "/api/admin/audit", cookie, map[string]any{
@@ -664,6 +672,7 @@ func TestAdminAuditNoteIsRecordedAndListed(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestAdminListUsersFiltersAndLimits(t *testing.T) {
+	t.Parallel()
 	a, familyID, cookie, _ := sysadminRig(t, "Hansen")
 	bo := a.SignUp("Bo Berg", "bo@example.com")
 	a.AddMember(familyID, bo, auth.RoleMember, "bo@example.com")
@@ -708,6 +717,7 @@ func TestAdminListUsersFiltersAndLimits(t *testing.T) {
 }
 
 func TestAdminBanKillsSessionsAndAPIKeysUnbanRestores(t *testing.T) {
+	t.Parallel()
 	a, familyID, cookie, adminID := sysadminRig(t, "Hansen")
 
 	victimID := a.SignUp("Noisy caretaker", "victim@example.com")
@@ -799,6 +809,7 @@ func TestAdminBanKillsSessionsAndAPIKeysUnbanRestores(t *testing.T) {
 }
 
 func TestAdminSetPasswordAndRevokeSessions(t *testing.T) {
+	t.Parallel()
 	a, familyID, cookie, adminID := sysadminRig(t, "Hansen")
 
 	victimID := a.SignUp("Forgetful parent", "victim@example.com")
@@ -874,6 +885,7 @@ func TestAdminSetPasswordAndRevokeSessions(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestAdminImpersonationRoundTrip(t *testing.T) {
+	t.Parallel()
 	a, familyID, cookie, adminID := sysadminRig(t, "Hansen")
 	babyID := a.NewBaby(familyID, "Ada")
 
@@ -941,6 +953,7 @@ func TestAdminImpersonationRoundTrip(t *testing.T) {
 }
 
 func TestAdminImpersonateRefusesSelfBannedAndUnknown(t *testing.T) {
+	t.Parallel()
 	a, familyID, cookie, adminID := sysadminRig(t, "Hansen")
 
 	bannedID := a.SignUp("Banned parent", "banned@example.com")
@@ -969,6 +982,7 @@ func TestAdminImpersonateRefusesSelfBannedAndUnknown(t *testing.T) {
 // trap the operator inside it. An ordinary caller therefore reaches the
 // route, and gets a 400 rather than a 403 — the only thing they can do here.
 func TestStopImpersonatingIsReachableWithoutTheAdminRole(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -990,6 +1004,7 @@ func TestStopImpersonatingIsReachableWithoutTheAdminRole(t *testing.T) {
 // REAL operator, not the colleague whose session is being driven, and the
 // impersonation cannot be chained.
 func TestAdminActionsUnderImpersonationNameTheRealOperator(t *testing.T) {
+	t.Parallel()
 	a, familyID, cookie, adminID := sysadminRig(t, "Hansen")
 
 	colleagueID := a.SignUp("Second admin", "second@example.com")
@@ -1030,6 +1045,7 @@ func TestAdminActionsUnderImpersonationNameTheRealOperator(t *testing.T) {
 // sessions, which cascades the `impersonation` rows away, so a sweep that
 // ran AFTER it would find nothing. The reset has to sweep first.
 func TestCuttingOffAnOperatorKillsTheSessionsTheyDrive(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name string
 		// cut runs the action that must revoke the operator's driven
@@ -1112,6 +1128,7 @@ func impersonating(t *testing.T) (a *testrig.AppRig, operatorCookie, operatorID,
 // which is what a code path that forgot RevokeImpersonatedSessions would
 // leave behind.
 func TestImpersonatedSessionDiesWithABannedOperator(t *testing.T) {
+	t.Parallel()
 	a, _, operatorID, impersonated := impersonating(t)
 
 	// The column only — no session revocation, no impersonation-table sweep.
@@ -1140,6 +1157,7 @@ func TestImpersonatedSessionDiesWithABannedOperator(t *testing.T) {
 // valid while its operator still holds the role. Proven, as above, with the
 // column alone and no sweep; re-granting the role must not revive it.
 func TestImpersonatedSessionDiesWithADemotedOperator(t *testing.T) {
+	t.Parallel()
 	a, _, operatorID, impersonated := impersonating(t)
 
 	if _, err := a.Rig.Pool.Exec(context.Background(),
@@ -1162,6 +1180,7 @@ func TestImpersonatedSessionDiesWithADemotedOperator(t *testing.T) {
 // impersonated without one has lost its operator, whatever the operator's
 // account says.
 func TestImpersonatedSessionDiesWithItsImpersonationRecord(t *testing.T) {
+	t.Parallel()
 	a, operatorCookie, _, impersonated := impersonating(t)
 
 	if _, err := a.Rig.Pool.Exec(context.Background(),
@@ -1182,6 +1201,7 @@ func TestImpersonatedSessionDiesWithItsImpersonationRecord(t *testing.T) {
 // spec-valid but policy-failing password is the caller's mistake: 400
 // VALIDATION, never a 500.
 func TestAdminSetPasswordEnforcesTheSamePolicyOnBothBranches(t *testing.T) {
+	t.Parallel()
 	a, familyID, cookie, _ := sysadminRig(t, "Hansen")
 
 	// One account with no password at all (the invite-provisioned path),
@@ -1305,6 +1325,7 @@ var reassignedUserReferences = map[string]bool{
 // taking them with it (sessions, memberships, push subscriptions) is the
 // correct behaviour, not an omission.
 func TestUserDeleteCoversEveryNonCascadingUserReference(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 
 	rows, err := a.Rig.Pool.Query(context.Background(), `
@@ -1384,6 +1405,7 @@ func TestUserDeleteCoversEveryNonCascadingUserReference(t *testing.T) {
 // or the CASCADE-away tables touches it, so it must be deleted explicitly
 // or it survives as an orphaned object forever.
 func TestDeleteAdminUserRemovesTheAvatarObject(t *testing.T) {
+	t.Parallel()
 	a, _, adminCookie, _ := sysadminRig(t, "Hansen")
 	a.SignUp("Target", "target@example.com")
 	targetCookie := a.SignIn("target@example.com")

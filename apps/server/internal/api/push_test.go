@@ -39,6 +39,7 @@ func subscribeBody(endpoint string) map[string]any {
 }
 
 func TestGetPushConfigReturnsTheVAPIDPublicKey(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -58,6 +59,7 @@ func TestGetPushConfigReturnsTheVAPIDPublicKey(t *testing.T) {
 // suffix-confusion attempt (fcm.googleapis.com.evil.com — a naive
 // "contains" or unanchored suffix check would wrongly accept this).
 func TestSubscribeRejectsUnrecognizedEndpoints(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -83,6 +85,7 @@ func TestSubscribeRejectsUnrecognizedEndpoints(t *testing.T) {
 // of one of them (the regex `/(^|\.)fcm\.googleapis\.com$/` matches both the
 // bare host and any subdomain).
 func TestSubscribeAcceptsEveryAllowlistedPushServiceHost(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -106,6 +109,7 @@ func TestSubscribeAcceptsEveryAllowlistedPushServiceHost(t *testing.T) {
 // and removes subscriptions": subscribing the same endpoint twice is
 // idempotent (still one row), and unsubscribing removes it.
 func TestSubscribeUpsertsOnEndpoint(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	endpoint := "https://fcm.googleapis.com/sub/one"
@@ -146,6 +150,7 @@ func TestSubscribeUpsertsOnEndpoint(t *testing.T) {
 // stored P-256/auth keys, rather than failing the endpoint's unique
 // constraint (apps/api/src/routes/push.ts's onConflictDoUpdate).
 func TestSubscribeUpsertRebindsUserAndKeys(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	endpoint := "https://fcm.googleapis.com/sub/shared-device"
@@ -179,6 +184,7 @@ func TestSubscribeUpsertRebindsUserAndKeys(t *testing.T) {
 // scoped to own rows": one caretaker cannot remove another's subscription
 // by naming its endpoint, even within the same family.
 func TestUnsubscribeScopedToOwnRows(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	memberID := a.SignUp("Rig member", "member@example.com")
@@ -224,6 +230,7 @@ func TestUnsubscribeScopedToOwnRows(t *testing.T) {
 }
 
 func TestTestPushCountsDeliveriesViaRecordingPush(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -266,6 +273,7 @@ func TestTestPushCountsDeliveriesViaRecordingPush(t *testing.T) {
 // apps/api/src/app.ts's domainBase.use("/api/push/*", rejectApiKey), mounted
 // after requireFamily.
 func TestPushRoutesForbidAPIKeyAuth(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	userID := a.SignUp("Rig admin", "parent@example.com")
 	familyID, err := a.Deps.Auth.CreateFamily(context.Background(), userID, "Hansen")

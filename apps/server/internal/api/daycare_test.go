@@ -19,6 +19,7 @@ import (
 func rfc(t time.Time) string { return t.UTC().Format(time.RFC3339) }
 
 func TestDaycareDropOffThenPickUp(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 
@@ -82,6 +83,7 @@ func TestDaycareDropOffThenPickUp(t *testing.T) {
 }
 
 func TestDaycarePickUpNamesSomeoneElseAndATime(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 	start := time.Now().Add(-8 * time.Hour).Truncate(time.Second)
@@ -105,6 +107,7 @@ func TestDaycarePickUpNamesSomeoneElseAndATime(t *testing.T) {
 }
 
 func TestDaycareRefusesASecondRunningSession(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -130,6 +133,7 @@ func TestDaycareRefusesASecondRunningSession(t *testing.T) {
 }
 
 func TestDaycareFinishedDayLoggedAfterTheFact(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 	end := time.Now().Add(-time.Hour)
@@ -159,6 +163,7 @@ func TestDaycareFinishedDayLoggedAfterTheFact(t *testing.T) {
 
 // A drop-off has had no pick-up: the field is ignored there, not stored.
 func TestDaycareDropOffIgnoresAPickUpPerson(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	res := w.a.Do(http.MethodPost, "/api/daycare", w.cookie, map[string]any{
 		"babyId": w.babyID, "startTime": rfc(time.Now()), "pickupCaretakerId": w.memberID,
@@ -169,6 +174,7 @@ func TestDaycareDropOffIgnoresAPickUpPerson(t *testing.T) {
 }
 
 func TestDaycareStrangersAreRefusedEverywhere(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 	stranger := a.SignUp("Stranger", "stranger@example.com")
@@ -197,6 +203,7 @@ func TestDaycareStrangersAreRefusedEverywhere(t *testing.T) {
 }
 
 func TestDaycarePatchPeopleTimesAndReopen(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 	end := time.Now().Add(-time.Hour).Truncate(time.Second)
@@ -240,6 +247,7 @@ func TestDaycarePatchPeopleTimesAndReopen(t *testing.T) {
 
 // Tenancy: another family's day is invisible to every operation.
 func TestDaycareIsFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("Hansen", "a@example.com")
 	babyA := a.NewBaby(familyA, "Nora")
@@ -276,6 +284,7 @@ func TestDaycareIsFamilyScoped(t *testing.T) {
 
 // A kiosk is a nursery tablet at home: deviceOperations leaves daycare out.
 func TestDaycareIsNotForDevices(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	device := w.a.CreateDevice(w.familyID, w.adminID)
 	req, _ := http.NewRequest(http.MethodGet, "/api/daycare/active?babyId="+w.babyID, nil)
@@ -287,6 +296,7 @@ func TestDaycareIsNotForDevices(t *testing.T) {
 }
 
 func TestDaycareOnTheTimelineAndInTheExport(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 	end := time.Now().Add(-time.Hour).Truncate(time.Second)
@@ -344,6 +354,7 @@ func TestDaycareOnTheTimelineAndInTheExport(t *testing.T) {
 
 // Deleting an account must not trip over any of the three people on a row.
 func TestDaycareSurvivesTheDeletionOfEveryoneOnIt(t *testing.T) {
+	t.Parallel()
 	w := newTwoParents(t)
 	a := w.a
 	end := time.Now().Add(-time.Hour)

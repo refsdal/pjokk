@@ -18,6 +18,7 @@ func strp(s string) *string { return &s }
 // trimming), else the full name. It is the ONE place the rule lives
 // (spec §1), so this pins the column itself before any route uses it.
 func TestDisplayNameFallsBackToFullName(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	id := a.SignUp("Anders Olsen", "anders@example.com")
@@ -60,6 +61,7 @@ func TestDisplayNameFallsBackToFullName(t *testing.T) {
 // user's avatar_imported_at, so importGoogleAvatar's rows==0 branch has
 // something real to check.
 func TestMarkAvatarImportAttemptedClaimsOnce(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	id := a.SignUp("Google Person", "g2@example.com")
@@ -91,6 +93,7 @@ func TestMarkAvatarImportAttemptedClaimsOnce(t *testing.T) {
 // caretakerName on the logs the family sees — without the frontend knowing
 // the rule.
 func TestAttributionUsesDisplayName(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")

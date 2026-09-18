@@ -43,6 +43,7 @@ func setGoogleImage(t *testing.T, a *testrig.AppRig, userID, url string) {
 func allowAll(string) bool { return true }
 
 func TestGoogleAvatarIsImportedOnceOnFirstMe(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	srv, hits := pictureServer(t, http.StatusOK)
 	a.Configure(func(d *api.Deps) {
@@ -70,6 +71,7 @@ func TestGoogleAvatarIsImportedOnceOnFirstMe(t *testing.T) {
 }
 
 func TestGoogleAvatarImportNeverFetchesOtherHosts(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	srv, hits := pictureServer(t, http.StatusOK)
 	a.Configure(func(d *api.Deps) {
@@ -89,6 +91,7 @@ func TestGoogleAvatarImportNeverFetchesOtherHosts(t *testing.T) {
 }
 
 func TestGoogleAvatarImportFailureIsAttemptedOnce(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	srv, hits := pictureServer(t, http.StatusInternalServerError)
 	a.Configure(func(d *api.Deps) {
@@ -123,6 +126,7 @@ func TestGoogleAvatarImportFailureIsAttemptedOnce(t *testing.T) {
 // process, different hostname) must be refused before any request reaches
 // it.
 func TestGoogleAvatarImportRefusesRedirectsOffTheAllowlist(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	var hits int32
 	var srv *httptest.Server
@@ -158,6 +162,7 @@ func TestGoogleAvatarImportRefusesRedirectsOffTheAllowlist(t *testing.T) {
 // a stable pseudonymous Google identifier (the picture URL, host:port and
 // path included) into logs this project cannot later erase.
 func TestGoogleAvatarImportFailureLogDoesNotLeakURL(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		panic(http.ErrAbortHandler)
@@ -193,6 +198,7 @@ func TestGoogleAvatarImportFailureLogDoesNotLeakURL(t *testing.T) {
 }
 
 func TestGoogleAvatarHost(t *testing.T) {
+	t.Parallel()
 	for host, want := range map[string]bool{
 		"lh3.googleusercontent.com":       true,
 		"googleusercontent.com":           true,

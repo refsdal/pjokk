@@ -8,6 +8,7 @@ import (
 )
 
 func TestConfigIsPublicAndReflectsDeps(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)                                 // default rig: OpenSignup false, no OAuth providers
 	res := a.Do(http.MethodGet, "/api/config", "", nil) // no cookie
 	if res.Status != http.StatusOK {

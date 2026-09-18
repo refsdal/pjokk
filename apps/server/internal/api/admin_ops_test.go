@@ -55,6 +55,7 @@ func sameInstant(t *testing.T, got any, want time.Time) bool {
 }
 
 func TestAdminOpsReportsVersionSchemaStorageAndDatabase(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Ops family")
 	res := a.Do(http.MethodGet, "/api/admin/ops", cookie, nil)
 	if res.Status != http.StatusOK {
@@ -79,6 +80,7 @@ func TestAdminOpsReportsVersionSchemaStorageAndDatabase(t *testing.T) {
 
 // The storage description names where files live and nothing that opens it.
 func TestAdminOpsNeverShowsAStorageCredential(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Ops family")
 	a.Deps.StorageInfo.Driver = "s3"
 	a.Deps.StorageInfo.Bucket = "pjokk-prod"
@@ -100,6 +102,7 @@ func TestAdminOpsNeverShowsAStorageCredential(t *testing.T) {
 }
 
 func TestAdminOpsJobsStalenessAndStatus(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Ops family")
 	now := time.Date(2026, 3, 1, 12, 5, 0, 0, time.UTC)
 	a.SetNow(now)
@@ -161,6 +164,7 @@ func TestAdminOpsJobsStalenessAndStatus(t *testing.T) {
 }
 
 func TestAdminOpsListsOnlyTheLastTenRuns(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Ops family")
 	now := time.Date(2026, 3, 1, 12, 5, 0, 0, time.UTC)
 	a.SetNow(now)
@@ -193,6 +197,7 @@ func waitForRun(t *testing.T, a *testrig.AppRig, id string) (ok bool, trigger st
 }
 
 func TestRunAdminJobStartsARecordedAuditedRun(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, adminID := sysadminRig(t, "Ops family")
 
 	res := a.Do(http.MethodPost, "/api/admin/jobs/frequent/run", cookie, nil)
@@ -218,6 +223,7 @@ func TestRunAdminJobStartsARecordedAuditedRun(t *testing.T) {
 // Held by another process: the scheduler's tick, a CronJob, a second
 // operator. Refused with no run recorded and nothing in the trail.
 func TestRunAdminJobRefusesWhileTheJobRuns(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Ops family")
 	ctx := context.Background()
 	conn, err := a.Rig.Pool.Acquire(ctx)
@@ -246,6 +252,7 @@ func TestRunAdminJobRefusesWhileTheJobRuns(t *testing.T) {
 }
 
 func TestRunAdminJobRejectsAnUnknownJob(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Ops family")
 	if res := a.Do(http.MethodPost, "/api/admin/jobs/weekly/run", cookie, nil); res.Status != http.StatusBadRequest {
 		t.Errorf("run weekly = %d %s, want 400", res.Status, res.Raw)
@@ -261,6 +268,7 @@ func putObject(t *testing.T, a *testrig.AppRig, key string, size int) {
 }
 
 func TestAdminBackupsListsSnapshotsNewestFirst(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Ops family")
 	putObject(t, a, "backups/2026-08-30.json", 10)
 	putObject(t, a, "backups/2026-08-31.json", 20)
@@ -293,6 +301,7 @@ func TestAdminBackupsListsSnapshotsNewestFirst(t *testing.T) {
 // The download (spec §3): the snapshot as it is in storage, an attachment
 // nothing caches, and a trail entry naming the night.
 func TestAdminBackupDownloadStreamsTheSnapshotAudited(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, adminID := sysadminRig(t, "Ops family")
 	snapshot := `{"exportedAt":"2026-08-31T03:15:00Z","tables":{"baby":[]}}`
 	if err := a.Deps.Storage.Put(context.Background(), "backups/2026-08-31.json",
@@ -328,6 +337,7 @@ func TestAdminBackupDownloadStreamsTheSnapshotAudited(t *testing.T) {
 // A night with no snapshot is a 404 and not a download, so it leaves no
 // trail entry; a date that is not one never reaches storage.
 func TestAdminBackupDownloadRefusesMissingAndMalformedDates(t *testing.T) {
+	t.Parallel()
 	a, _, cookie, _ := sysadminRig(t, "Ops family")
 
 	if res := a.Do(http.MethodGet, "/api/admin/backups/2026-01-01", cookie, nil); res.Status != http.StatusNotFound {

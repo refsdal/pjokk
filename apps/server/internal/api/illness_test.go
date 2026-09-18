@@ -17,6 +17,7 @@ import (
 // -----------------------------------------------------------------------
 
 func TestIllnessOpenTrackAndRecover(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -73,6 +74,7 @@ func TestIllnessOpenTrackAndRecover(t *testing.T) {
 }
 
 func TestIllnessOneOpenEpisodePerBaby(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -107,6 +109,7 @@ func TestIllnessOneOpenEpisodePerBaby(t *testing.T) {
 }
 
 func TestIllnessValidation(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -134,6 +137,7 @@ func TestIllnessValidation(t *testing.T) {
 }
 
 func TestIllnessIsFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("Hansen", "a@example.com")
 	babyA := a.NewBaby(familyA, "Nora")
@@ -166,6 +170,7 @@ func TestIllnessIsFamilyScoped(t *testing.T) {
 }
 
 func TestIllnessOnTheTimelineAndInTheExport(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

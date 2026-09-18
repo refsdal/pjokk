@@ -18,6 +18,7 @@ import (
 // -----------------------------------------------------------------------
 
 func TestListBabiesEmptyFamily(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -31,6 +32,7 @@ func TestListBabiesEmptyFamily(t *testing.T) {
 }
 
 func TestCreateBabyIsFreeAndListsOldestFirst(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	nora := a.NewBaby(familyID, "Nora")
@@ -72,6 +74,7 @@ func TestCreateBabyIsFreeAndListsOldestFirst(t *testing.T) {
 }
 
 func TestDeleteBabyRequiresAdminAndCascadesLogs(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	familyID, adminCookie := a.NewFamily("Hansen", "parent@example.com")
@@ -119,6 +122,7 @@ func TestDeleteBabyRequiresAdminAndCascadesLogs(t *testing.T) {
 }
 
 func TestDeleteBabyUnknownIDIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -132,6 +136,7 @@ func TestDeleteBabyUnknownIDIs404(t *testing.T) {
 }
 
 func TestUpdateBabyEmptyPatchIsANoOp(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -150,6 +155,7 @@ func TestUpdateBabyEmptyPatchIsANoOp(t *testing.T) {
 
 // Ports apps/api/test/api-keys.test.ts's "baby sex" describe block.
 func TestUpdateBabyPatchesSexAndReflectsInList(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -170,6 +176,7 @@ func TestUpdateBabyPatchesSexAndReflectsInList(t *testing.T) {
 }
 
 func TestUpdateBabyUnknownIDIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -193,6 +200,7 @@ func TestUpdateBabyUnknownIDIs404(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestGetFamilyShape(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -212,6 +220,7 @@ func TestGetFamilyShape(t *testing.T) {
 }
 
 func TestListFamilyMembersShape(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -235,6 +244,7 @@ func TestListFamilyMembersShape(t *testing.T) {
 }
 
 func TestFamilyAdminChangesRoleAndRemovesMember(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, adminCookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -278,6 +288,7 @@ func TestFamilyAdminChangesRoleAndRemovesMember(t *testing.T) {
 }
 
 func TestPlainMembersCannotManageMembership(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, adminCookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -306,6 +317,7 @@ func TestPlainMembersCannotManageMembership(t *testing.T) {
 }
 
 func TestSetMemberRoleUnknownMemberIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -319,6 +331,7 @@ func TestSetMemberRoleUnknownMemberIs404(t *testing.T) {
 }
 
 func TestDeleteFamilyMemberUnknownMemberIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -355,6 +368,7 @@ func soleAdminMemberID(t *testing.T, a *testrig.AppRig, cookie string) string {
 }
 
 func TestSetMemberRoleRefusesToDemoteTheSoleAdmin(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	adminMemberID := soleAdminMemberID(t, a, cookie)
@@ -374,6 +388,7 @@ func TestSetMemberRoleRefusesToDemoteTheSoleAdmin(t *testing.T) {
 }
 
 func TestDeleteFamilyMemberRefusesToRemoveTheSoleAdmin(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	adminMemberID := soleAdminMemberID(t, a, cookie)
@@ -420,6 +435,7 @@ func twoAdmins(t *testing.T, a *testrig.AppRig, familyID, adminCookie string) (o
 }
 
 func TestSetMemberRoleAllowsDemotingANonLastAdmin(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, adminCookie := a.NewFamily("Hansen", "parent@example.com")
 	originalAdminMemberID, promotedMemberID := twoAdmins(t, a, familyID, adminCookie)
@@ -441,6 +457,7 @@ func TestSetMemberRoleAllowsDemotingANonLastAdmin(t *testing.T) {
 }
 
 func TestDeleteFamilyMemberAllowsRemovingANonLastAdmin(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, adminCookie := a.NewFamily("Hansen", "parent@example.com")
 	originalAdminMemberID, promotedMemberID := twoAdmins(t, a, familyID, adminCookie)
@@ -469,6 +486,7 @@ func TestDeleteFamilyMemberAllowsRemovingANonLastAdmin(t *testing.T) {
 // hasPush is what lets the help picker (HelpSheet) dim a member a ping
 // cannot reach. It flips as soon as ANY device of theirs subscribes.
 func TestListFamilyMembersReportsPushSubscriptions(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 

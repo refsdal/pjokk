@@ -44,6 +44,7 @@ func countBabies(t *testing.T, ctx context.Context, rig *testrig.Rig) int {
 // second test would fail with a leaked row from the first.
 
 func TestRigTruncation_A_SeedsARow(t *testing.T) {
+	t.Parallel()
 	rig := testrig.Setup(t)
 	ctx := context.Background()
 
@@ -64,6 +65,7 @@ func TestRigTruncation_A_SeedsARow(t *testing.T) {
 }
 
 func TestRigTruncation_B_SeesAnEmptyRig(t *testing.T) {
+	t.Parallel()
 	rig := testrig.Setup(t)
 	ctx := context.Background()
 
@@ -73,6 +75,7 @@ func TestRigTruncation_B_SeesAnEmptyRig(t *testing.T) {
 }
 
 func TestIsUniqueViolation_TrueOnDuplicateSlug(t *testing.T) {
+	t.Parallel()
 	rig := testrig.Setup(t)
 	ctx := context.Background()
 
@@ -91,6 +94,7 @@ func TestIsUniqueViolation_TrueOnDuplicateSlug(t *testing.T) {
 }
 
 func TestIsUniqueViolation_FalseOnForeignKeyViolation(t *testing.T) {
+	t.Parallel()
 	rig := testrig.Setup(t)
 	ctx := context.Background()
 
@@ -108,6 +112,7 @@ func TestIsUniqueViolation_FalseOnForeignKeyViolation(t *testing.T) {
 }
 
 func TestEnsureTombstone_Idempotent(t *testing.T) {
+	t.Parallel()
 	rig := testrig.Setup(t)
 	ctx := context.Background()
 

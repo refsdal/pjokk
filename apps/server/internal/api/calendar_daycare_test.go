@@ -12,6 +12,7 @@ import (
 // Barnehage on the calendar (issue #110): a category of its own and a
 // "closed" flag that means something only there.
 func TestCalendarDaycareCategoryAndClosedFlag(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	day := time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC)
@@ -68,6 +69,7 @@ func TestCalendarDaycareCategoryAndClosedFlag(t *testing.T) {
 // One closed day of a weekly series, detached: it keeps the category and
 // the flag it was given.
 func TestCalendarDetachedOccurrenceKeepsClosed(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 	start := time.Date(2026, 10, 5, 7, 0, 0, 0, time.UTC)
@@ -89,6 +91,7 @@ func TestCalendarDetachedOccurrenceKeepsClosed(t *testing.T) {
 // one row that lists once per weekday, takes the ordinary occurrence
 // exceptions, and reaches a subscribed calendar as a BYDAY rule.
 func TestCalendarWeekdaysSeries(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	_ = familyID

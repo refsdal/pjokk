@@ -37,6 +37,7 @@ type backupSnapshot struct {
 // Ports apps/api/test/backup.test.ts's "writes a dated JSON snapshot of
 // every table to object storage".
 func TestRunBackupWritesADatedSnapshotOfEveryTable(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -104,6 +105,7 @@ func TestRunBackupWritesADatedSnapshotOfEveryTable(t *testing.T) {
 // (users.email) survives intact, AND proves "impersonation" is excluded
 // entirely rather than merely redacted.
 func TestRunBackupNullsSecretsButKeepsOtherColumns(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 	const email = "secrets@example.com"
@@ -171,6 +173,7 @@ func TestRunBackupNullsSecretsButKeepsOtherColumns(t *testing.T) {
 // up to 720 hours — the full 30-day retention window. The whole table is
 // therefore left out, the way impersonation is.
 func TestRunBackupLeavesOutInviteCodes(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	ctx := context.Background()
 
@@ -219,6 +222,7 @@ func findRowByField(t *testing.T, rows []map[string]any, field, value string) ma
 
 // Ports the "backup retention" describe block of backup.test.ts.
 func TestPruneBackupsDeletesStaleSnapshotsAndKeepsTheRest(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	d := depsFor(a)
 	mem := d.Storage.(*storage.Memory)
@@ -254,6 +258,7 @@ func TestPruneBackupsDeletesStaleSnapshotsAndKeepsTheRest(t *testing.T) {
 }
 
 func TestPruneBackupsNeverTouchesAnythingOutsideThePrefix(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	d := depsFor(a)
 	mem := d.Storage.(*storage.Memory)
@@ -282,6 +287,7 @@ func TestPruneBackupsNeverTouchesAnythingOutsideThePrefix(t *testing.T) {
 }
 
 func TestPruneBackupsIsANoOpWhenEverySnapshotIsRecent(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	d := depsFor(a)
 	mem := d.Storage.(*storage.Memory)
@@ -304,6 +310,7 @@ func TestPruneBackupsIsANoOpWhenEverySnapshotIsRecent(t *testing.T) {
 // A restore needs to know which schema wrote a snapshot (spec
 // 2026-09-11-admin-restore §1).
 func TestRunBackupRecordsTheSchemaVersion(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	d := depsFor(a)
 	key, err := jobs.RunBackup(context.Background(), d, time.Date(2026, 9, 10, 3, 15, 0, 0, time.UTC))

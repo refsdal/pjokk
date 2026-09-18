@@ -60,6 +60,7 @@ func newHelpFamilyNamed(t *testing.T, a *testrig.AppRig, name, adminEmail, membe
 }
 
 func TestCreateHelpRequestPushesToTheTargetNamingTheSender(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	f := newHelpFamily(t, a)
 
@@ -96,6 +97,7 @@ func TestCreateHelpRequestPushesToTheTargetNamingTheSender(t *testing.T) {
 }
 
 func TestCreateHelpRequestDefaultsTheBody(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	f := newHelpFamily(t, a)
 
@@ -112,6 +114,7 @@ func TestCreateHelpRequestDefaultsTheBody(t *testing.T) {
 }
 
 func TestCreateHelpRequestRejectsSelfAndForeignMembers(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	f := newHelpFamily(t, a)
 	other := newHelpFamilyNamed(t, a, "Olsen", "other-parent@example.com", "other-kari@example.com")
@@ -131,6 +134,7 @@ func TestCreateHelpRequestRejectsSelfAndForeignMembers(t *testing.T) {
 }
 
 func TestCreateHelpRequestIsRateLimitedPerUser(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	f := newHelpFamily(t, a)
 	body := map[string]any{"memberId": f.kariMemberID}
@@ -152,6 +156,7 @@ func TestCreateHelpRequestIsRateLimitedPerUser(t *testing.T) {
 }
 
 func TestAcknowledgeHelpRequestPushesTheSenderOnce(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	f := newHelpFamily(t, a)
 
@@ -185,6 +190,7 @@ func TestAcknowledgeHelpRequestPushesTheSenderOnce(t *testing.T) {
 }
 
 func TestAcknowledgeOwnHelpRequestSendsNoPush(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	f := newHelpFamily(t, a)
 
@@ -201,6 +207,7 @@ func TestAcknowledgeOwnHelpRequestSendsNoPush(t *testing.T) {
 }
 
 func TestHelpRequestIsInvisibleToOtherFamilies(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	f := newHelpFamily(t, a)
 	other := newHelpFamilyNamed(t, a, "Olsen", "other-parent@example.com", "other-kari@example.com")
@@ -220,6 +227,7 @@ func TestHelpRequestIsInvisibleToOtherFamilies(t *testing.T) {
 }
 
 func TestDeleteHelpRequestSenderOrAdminOnly(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	f := newHelpFamily(t, a)
 	// A third, plain member who is neither sender nor admin.
@@ -252,6 +260,7 @@ func TestDeleteHelpRequestSenderOrAdminOnly(t *testing.T) {
 // Mirrors push_test.go's TestPushRoutesForbidAPIKeyAuth: a live pjk_ key
 // resolves through auth/tenancy and is refused only at the no-API-key gate.
 func TestHelpRoutesForbidAPIKeyAuth(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	userID := a.SignUp("Rig admin", "parent@example.com")
 	familyID, err := a.Deps.Auth.CreateFamily(context.Background(), userID, "Hansen")
@@ -290,6 +299,7 @@ func TestHelpRoutesForbidAPIKeyAuth(t *testing.T) {
 }
 
 func TestSummaryCarriesTheNewestHelpRequestWithinTwoHours(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	f := newHelpFamily(t, a)
 	babyID := a.NewBaby(f.familyID, "Nora")

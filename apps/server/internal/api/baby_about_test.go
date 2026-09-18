@@ -9,6 +9,7 @@ import (
 
 // What the logs cannot know about a child (issue #109).
 func TestBabyAboutRoundTripClearAndTenancy(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -59,6 +60,7 @@ func TestBabyAboutRoundTripClearAndTenancy(t *testing.T) {
 // The family's own nap anchor (issue #112): set, read on the summary,
 // cleared, and untouched by the text lines' PUT (and the reverse).
 func TestUsualNapAnchor(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

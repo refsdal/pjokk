@@ -10,6 +10,7 @@ import (
 // Help pushes are written in the RECIPIENT's language (help.go,
 // internal/push/text.go); a typed message is the sender's own words.
 func TestHelpPushesAreInTheRecipientsLanguage(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	f := newHelpFamily(t, a)
 	if res := a.Do(http.MethodPatch, "/api/me", f.kariCookie, map[string]any{"language": "nb"}); res.Status != http.StatusOK {

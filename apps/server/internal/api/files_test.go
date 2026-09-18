@@ -49,6 +49,7 @@ func pngBytes() []byte {
 }
 
 func TestUploadVaccineDocumentAlwaysRefusedFeatureDisabled(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -118,6 +119,7 @@ func seedVaccineDocument(t *testing.T, a *testrig.AppRig, familyID, vaccineID, o
 }
 
 func TestGetFileServesAndDeleteRemovesASeededDocument(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -180,6 +182,7 @@ func TestGetFileServesAndDeleteRemovesASeededDocument(t *testing.T) {
 // from storage, bypassing the row) must still 404 cleanly — check
 // existence BEFORE streaming — never a 200 with an empty or broken body.
 func TestGetFileMissingObjectBehindRowIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -204,6 +207,7 @@ func TestGetFileMissingObjectBehindRowIs404(t *testing.T) {
 }
 
 func TestGetFileUnknownIDIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -215,6 +219,7 @@ func TestGetFileUnknownIDIs404(t *testing.T) {
 
 // Another family's file id must 404, not leak whether it exists.
 func TestGetFileCrossFamilyIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("Family A", "a@example.com")
 	babyA := a.NewBaby(familyA, "Baby A")
@@ -242,6 +247,7 @@ func TestGetFileCrossFamilyIs404(t *testing.T) {
 // store does not, so internal/api/vaccines.go's DeleteVaccine deletes them
 // itself.
 func TestDeleteVaccineRemovesStoredObjects(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")

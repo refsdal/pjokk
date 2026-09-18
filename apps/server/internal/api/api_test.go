@@ -52,6 +52,7 @@ func newDeps(t *testing.T) (api.Deps, *testrig.Rig) {
 // of the Postgres-backed limiter is that it is shared across replicas, where
 // Limen's is per-process.
 func TestCredentialSignInIsRateLimited(t *testing.T) {
+	t.Parallel()
 	deps, _ := newDeps(t)
 	handler := api.NewHandler(deps)
 
@@ -95,6 +96,7 @@ func TestCredentialSignInIsRateLimited(t *testing.T) {
 }
 
 func TestHealthzDoesNotTouchTheDatabase(t *testing.T) {
+	t.Parallel()
 	deps, rig := newDeps(t)
 	// Prove Healthz never dereferences the pool: close it, then call
 	// Healthz through a Deps still pointing at the closed pool.
@@ -118,6 +120,7 @@ func TestHealthzDoesNotTouchTheDatabase(t *testing.T) {
 }
 
 func TestReadyzOkWithLivePool(t *testing.T) {
+	t.Parallel()
 	deps, _ := newDeps(t)
 	handler := api.NewHandler(deps)
 
@@ -138,6 +141,7 @@ func TestReadyzOkWithLivePool(t *testing.T) {
 }
 
 func TestReadyzServiceUnavailableWithClosedPool(t *testing.T) {
+	t.Parallel()
 	deps, _ := newDeps(t)
 
 	// A second pool against the same database, closed before use, is the
@@ -174,6 +178,7 @@ func TestReadyzServiceUnavailableWithClosedPool(t *testing.T) {
 }
 
 func TestUnmatchedAPIPathReturns404Envelope(t *testing.T) {
+	t.Parallel()
 	deps, _ := newDeps(t)
 	handler := api.NewHandler(deps)
 
@@ -194,6 +199,7 @@ func TestUnmatchedAPIPathReturns404Envelope(t *testing.T) {
 }
 
 func TestDocsRequireSession(t *testing.T) {
+	t.Parallel()
 	deps, _ := newDeps(t)
 	handler := api.NewHandler(deps)
 
@@ -216,6 +222,7 @@ func TestDocsRequireSession(t *testing.T) {
 }
 
 func TestDocsServeWithASession(t *testing.T) {
+	t.Parallel()
 	deps, rig := newDeps(t)
 	handler := api.NewHandler(deps)
 

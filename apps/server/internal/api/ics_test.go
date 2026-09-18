@@ -14,6 +14,7 @@ import (
 // Issue #52: GET /api/calendar.ics — a subscription feed authenticated by
 // a pjk_ key in the query string, series as RRULEs.
 func TestCalendarICSFeed(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -85,6 +86,7 @@ func TestCalendarICSFeed(t *testing.T) {
 // begins on the Monday, and a Saturday DTSTART beside BYDAY=MO..FR shows up
 // as a stray extra event in some calendar clients.
 func TestCalendarICSWeekdaysSeries(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	var userID string

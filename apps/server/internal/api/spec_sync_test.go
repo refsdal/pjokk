@@ -16,6 +16,7 @@ import (
 // directory, so both paths below are relative to
 // apps/server/internal/api.
 func TestEmbeddedSpecMatchesRepoRoot(t *testing.T) {
+	t.Parallel()
 	embedded, err := os.ReadFile("pjokk.yaml")
 	if err != nil {
 		t.Fatalf("read embedded copy (internal/api/pjokk.yaml): %v", err)

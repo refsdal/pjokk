@@ -32,6 +32,7 @@ func actionTitles(p push.PushPayload) []string {
 }
 
 func TestReminderAndItsSnoozeAreInThePersonsLanguage(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	now := time.Date(2026, 3, 16, 12, 0, 0, 0, time.UTC)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
@@ -76,6 +77,7 @@ func TestReminderAndItsSnoozeAreInThePersonsLanguage(t *testing.T) {
 }
 
 func TestCalendarSnoozeButtonIsInEachMembersLanguage(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	adminID := userIDByEmail(t, a, "parent@example.com")

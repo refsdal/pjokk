@@ -887,11 +887,22 @@ sheet pattern — build the pattern well once.
   (`docker compose -f docker-compose.test.yml up -d`, which publishes 55432)
   — the database is the thing most likely to differ, so faking it defeats the
   purpose:
-  - `cd apps/server && go test -p 1 ./...` — **`-p 1` is required**: several
-    packages truncate shared tables between tests and are not safe to run as
-    concurrent packages against one database. Object storage is substituted
-    with an in-memory `Storage`. Prioritize the tenancy middleware, invite
-    redeem flow, and active-session logic.
+  - `cd apps/server && go test ./...` — packages and tests run in
+    parallel. The rig (`internal/testrig`) gives EVERY test a database of
+    its own, cloned from a template migrated once per Postgres (named after
+    a hash of the embedded migrations, made under an advisory lock), and
+    drops it when the test ends; `t.Parallel()` is the norm in every
+    database-backed package (exception: `internal/cron`, whose tests share
+    a job registry, and `cmd/pjokk`, which uses `t.Setenv`). A test that
+    needs "an empty, migrated database" mid-way calls `rig.Empty(t)`; a
+    test of the migrator asks `testrig.FreshDatabaseURL(t)` for a schema-
+    less one; `Rig.URL` is the plain URL for a CLI under test. Pools are
+    capped at four connections and at most eight tests per package binary
+    hold a database (`TEST_DB_PARALLEL`), so a many-core machine stays
+    under the compose Postgres's `max_connections=400`. The whole suite
+    takes about a minute (it took six serial). Object storage is
+    substituted with an in-memory `Storage`. Prioritize the tenancy
+    middleware, invite redeem flow, and active-session logic.
   - `bun test apps/frontend apps/landing` (or `bun run test`) — the SPA's own
     unit tests and the landing site's render tests. No database.
   - `bun run check` is lint + i18n coverage + typecheck for the TypeScript

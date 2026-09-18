@@ -15,6 +15,7 @@ import (
 // with the last four null when the caller has no active family.
 
 func TestGetMeAnonymousIsUnauthenticated(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 
 	res := a.Do(http.MethodGet, "/api/me", "", nil)
@@ -27,6 +28,7 @@ func TestGetMeAnonymousIsUnauthenticated(t *testing.T) {
 }
 
 func TestGetMeWithNoActiveFamilyIsAllNulls(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	a.SignUp("Solo", "solo@example.com")
 	cookie := a.SignIn("solo@example.com")
@@ -49,6 +51,7 @@ func TestGetMeWithNoActiveFamilyIsAllNulls(t *testing.T) {
 }
 
 func TestGetMeWithActiveFamily(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -76,6 +79,7 @@ func TestGetMeWithActiveFamily(t *testing.T) {
 // footer, the image tag and (later) OpenTelemetry's service.version can
 // never drift apart.
 func TestGetMeCarriesBuildVersion(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	a.SignUp("Solo", "solo@example.com")
 	cookie := a.SignIn("solo@example.com")
@@ -90,6 +94,7 @@ func TestGetMeCarriesBuildVersion(t *testing.T) {
 }
 
 func TestGetMeCarriesProfileFields(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	a.SignUp("Solo Person", "solo@example.com")
 	cookie := a.SignIn("solo@example.com")
@@ -109,6 +114,7 @@ func TestGetMeCarriesProfileFields(t *testing.T) {
 }
 
 func TestUpdateMeEditsTheProfile(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	a.SignUp("Solo Person", "solo@example.com")
 	cookie := a.SignIn("solo@example.com")
@@ -154,6 +160,7 @@ func TestUpdateMeEditsTheProfile(t *testing.T) {
 }
 
 func TestUpdateMeRejectsBadInput(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	a.SignUp("Solo Person", "solo@example.com")
 	cookie := a.SignIn("solo@example.com")
@@ -179,6 +186,7 @@ func TestUpdateMeRejectsBadInput(t *testing.T) {
 }
 
 func TestUpdateMeRequiresASession(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	res := a.Do(http.MethodPatch, "/api/me", "", map[string]any{"name": "x"})
 	if res.Status != http.StatusUnauthorized {

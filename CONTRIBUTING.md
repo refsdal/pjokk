@@ -36,8 +36,8 @@ first account) and `bun run dev` for the SPA.
 
 Notes that bite people:
 
-- Go tests must run `-p 1` (packages share one database); `mise run test`
-  does this for you.
+- Go tests run in parallel: every test gets a database of its own from the
+  rig (`apps/server/internal/testrig`), so mark new tests `t.Parallel()`.
 - Tests run against a **real Postgres**, never a mock — that is the point.
 - The container image is COPY-only: `bash scripts/build-artifacts.sh`
   before `docker build .`.

@@ -31,6 +31,7 @@ func pickUp(t *testing.T, a *testrig.AppRig, cookie, id string, at time.Time) {
 }
 
 func TestRemindersHoldWhileAtDaycareAndPickUpAnswersThem(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -67,6 +68,7 @@ func TestRemindersHoldWhileAtDaycareAndPickUpAnswersThem(t *testing.T) {
 // A reminder that already fired before the drop-off fires again for the gap
 // that opens at pick-up: the pick-up is newer than the last nudge.
 func TestPickUpStartsANewGapAfterAnEarlierNudge(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -88,6 +90,7 @@ func TestPickUpStartsANewGapAfterAnEarlierNudge(t *testing.T) {
 // A family-wide reminder (no baby) holds while ANY baby is there; one about
 // the sibling at home does not; pump and medicine are never held.
 func TestDaycareHoldIsPerBabyAndPerKind(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	nora := a.NewBaby(familyID, "Nora")
@@ -134,6 +137,7 @@ func TestDaycareHoldIsPerBabyAndPerKind(t *testing.T) {
 
 // A fixed-time feed reminder is the parent's own clock: never held.
 func TestDaycareDoesNotHoldFixedTimeReminders(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -149,6 +153,7 @@ func TestDaycareDoesNotHoldFixedTimeReminders(t *testing.T) {
 // A snooze that comes due after the drop-off is dropped, not held: by
 // pick-up it has been answered.
 func TestSnoozeIsDroppedAtDaycare(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	now := time.Date(2026, 3, 16, 7, 50, 0, 0, time.UTC)
 	cookie, babyID, _, first := feedReminderDue(t, a, now, feedEvery3h)

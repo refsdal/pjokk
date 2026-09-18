@@ -13,6 +13,7 @@ import (
 // -----------------------------------------------------------------------
 
 func TestListDiapersEmptyFamily(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -26,6 +27,7 @@ func TestListDiapersEmptyFamily(t *testing.T) {
 }
 
 func TestCreateDiaperUnknownBabyIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -43,6 +45,7 @@ func TestCreateDiaperUnknownBabyIs404(t *testing.T) {
 }
 
 func TestCreateDiaperAndListNewestFirstWithCaretakerName(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -84,6 +87,7 @@ func TestCreateDiaperAndListNewestFirstWithCaretakerName(t *testing.T) {
 }
 
 func TestDeleteDiaperUnknownIDIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -94,6 +98,7 @@ func TestDeleteDiaperUnknownIDIs404(t *testing.T) {
 }
 
 func TestDeleteDiaperRemovesIt(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -117,6 +122,7 @@ func TestDeleteDiaperRemovesIt(t *testing.T) {
 }
 
 func TestUpdateDiaperUnknownIDIs404(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	_, cookie := a.NewFamily("Hansen", "parent@example.com")
 
@@ -131,6 +137,7 @@ func TestUpdateDiaperUnknownIDIs404(t *testing.T) {
 // shares the exact same update() implementation via scoped.ts's logCrud, so
 // this closes that gap in the Go port).
 func TestUpdateDiaperEmptyPatchIsANoOp(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -158,6 +165,7 @@ func TestUpdateDiaperEmptyPatchIsANoOp(t *testing.T) {
 // The nullable-clear half of the PATCH tri-state pattern for diapers' one
 // clearable field.
 func TestUpdateDiaperPatchClearsNotes(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	babyID := a.NewBaby(familyID, "Nora")
@@ -197,6 +205,7 @@ func TestUpdateDiaperPatchClearsNotes(t *testing.T) {
 
 // Ports tenancy.test.ts's cross-family-by-id shape for diapers.
 func TestDiapersAreFamilyScoped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyA, cookieA := a.NewFamily("Family A", "a@example.com")
 	_, cookieB := a.NewFamily("Family B", "b@example.com")

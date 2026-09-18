@@ -17,9 +17,9 @@ import (
 	"github.com/refsdal/pjokk/server/internal/testrig"
 )
 
-func useTestConfig(t *testing.T) {
+func useTestConfig(t *testing.T, databaseURL string) {
 	t.Helper()
-	t.Setenv("DATABASE_URL", testrig.DatabaseURL())
+	t.Setenv("DATABASE_URL", databaseURL)
 	t.Setenv("APP_URL", "http://localhost:3300")
 	t.Setenv("AUTH_SECRET", "restore-cli-test-secret-restore-cli-test-secret")
 	t.Setenv("STORAGE_DRIVER", "fs")
@@ -62,8 +62,8 @@ func TestRestoreCommandsAgainstTheDatabase(t *testing.T) {
 	a.NewBaby(familyID, "Nora")
 	path := snapshotFile(t, a)
 
-	testrig.Setup(t) // an empty database
-	useTestConfig(t)
+	a.Rig.Empty(t) // an empty database
+	useTestConfig(t, a.Rig.URL)
 
 	if code := restoreMode([]string{"--file", path}); code != 0 {
 		t.Fatalf("restore --file = %d, want 0", code)

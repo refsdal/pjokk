@@ -68,6 +68,7 @@ func feedReminderDue(t *testing.T, a *testrig.AppRig, now time.Time, reminder ma
 var feedEvery3h = map[string]any{"kind": "feed", "mode": "since_last", "intervalMin": 180, "tz": "UTC"}
 
 func TestSnoozedReminderComesBackOneTickLater(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	now := time.Date(2026, 3, 16, 12, 0, 0, 0, time.UTC)
 	_, _, userID, first := feedReminderDue(t, a, now, feedEvery3h)
@@ -104,6 +105,7 @@ func TestSnoozedReminderComesBackOneTickLater(t *testing.T) {
 }
 
 func TestSnoozeIsCancelledByLoggingTheFeed(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 3, 16, 12, 0, 0, 0, time.UTC)
 	for name, fedAt := range map[string]time.Time{
 		"logged now":                    now.Add(5 * time.Minute),
@@ -133,6 +135,7 @@ func TestSnoozeIsCancelledByLoggingTheFeed(t *testing.T) {
 }
 
 func TestSnoozeOfADeletedReminderIsDropped(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	now := time.Date(2026, 3, 16, 12, 0, 0, 0, time.UTC)
 	cookie, _, userID, first := feedReminderDue(t, a, now, feedEvery3h)
@@ -152,6 +155,7 @@ func TestSnoozeOfADeletedReminderIsDropped(t *testing.T) {
 }
 
 func TestSnoozeWaitsOutQuietHours(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	now := time.Date(2026, 3, 16, 11, 50, 0, 0, time.UTC)
 	quiet := map[string]any{"kind": "feed", "mode": "since_last", "intervalMin": 180, "tz": "UTC", "quietStart": 12, "quietEnd": 14}
@@ -170,6 +174,7 @@ func TestSnoozeWaitsOutQuietHours(t *testing.T) {
 }
 
 func TestCalendarSnoozeComesBackToTheSnoozerOnly(t *testing.T) {
+	t.Parallel()
 	a := testrig.App(t)
 	familyID, cookie := a.NewFamily("Hansen", "parent@example.com")
 	adminID := userIDByEmail(t, a, "parent@example.com")

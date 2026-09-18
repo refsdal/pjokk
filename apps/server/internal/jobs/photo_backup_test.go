@@ -87,6 +87,7 @@ func (p *photoRig) run(now time.Time) jobs.PhotoBackupResult {
 // deleted photo into a dated tree the night after, and prunes that tree
 // after the 30-day window — never touching "backups/" (the row dumps).
 func TestRunPhotoBackupCopiesMovesAndPrunes(t *testing.T) {
+	t.Parallel()
 	p := newPhotoRig(t)
 	ctx := context.Background()
 	for _, name := range []string{"a", "b"} {
@@ -153,6 +154,7 @@ func TestRunPhotoBackupCopiesMovesAndPrunes(t *testing.T) {
 // to the dated tree like any deleted photo's, and the 30-day prune
 // reaches it.
 func TestRunPhotoBackupErasesAnOrphanedPhotoObject(t *testing.T) {
+	t.Parallel()
 	p := newPhotoRig(t)
 	for _, name := range []string{"kept", "orphan"} {
 		p.object(name)
@@ -201,6 +203,7 @@ func TestRunPhotoBackupErasesAnOrphanedPhotoObject(t *testing.T) {
 // orphan — and one that was never backed up goes straight into the dated
 // tree, so the 30-day clock starts for it too.
 func TestRunPhotoBackupSparesAPhotoMidUpload(t *testing.T) {
+	t.Parallel()
 	p := newPhotoRig(t)
 	p.object("uploading")
 
@@ -229,6 +232,7 @@ func TestRunPhotoBackupSparesAPhotoMidUpload(t *testing.T) {
 // trees, where a milestone photo's copy keeps the bare key — the older
 // tree came first and its copies stay where they are.
 func TestRunPhotoBackupCoversBabyPhotos(t *testing.T) {
+	t.Parallel()
 	p := newPhotoRig(t)
 	ctx := context.Background()
 	var babyID string
