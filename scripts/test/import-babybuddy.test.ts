@@ -1,7 +1,13 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+// Every test here spawns the importer as a node process and reads its
+// output; a cold CI runner has taken 5.9 s for the first one against bun's
+// 5 s default (Release verify, 2026-09-18). The work is milliseconds, the
+// budget is for process start-up.
+setDefaultTimeout(30_000);
 
 // Runs the real script under node (it is a node CLI, not a bun one) against
 // the Baby Buddy fixtures and reads the SQL it writes.
