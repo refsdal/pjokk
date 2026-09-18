@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, test } from "./fixtures";
 import { freshFamily } from "./helpers";
 
@@ -150,4 +151,68 @@ test("the ring follows the baby's status: sleeping, then at barnehage", async ({
   expect(res.ok()).toBeTruthy();
   await page.reload();
   await expect(page.locator("header [aria-pressed=true]")).toHaveAttribute("data-status", "daycare");
+});
+
+// With a PHOTO the face is an image, whose baseline is its bottom edge: in
+// a wrapper laid out as a text line the descender space went underneath,
+// and the single baby's status ring was an oval 7 px taller than the face.
+// The ring must hug the face exactly, photo or initial.
+test("the status ring hugs a face with a photo", async ({ page, request }) => {
+  await freshFamily(page, request, "ring-photo");
+  const [baby] = (await (await page.request.get("/api/babies")).json()) as { id: string }[];
+  const up = await page.request.put(`/api/babies/${baby.id}/avatar`, {
+    multipart: {
+      file: {
+        name: "baby.png",
+        mimeType: "image/png",
+        buffer: readFileSync(new URL("../apps/frontend/public/icon-192.png", import.meta.url)),
+      },
+    },
+  });
+  expect(up.ok(), `upload: ${up.status()}`).toBeTruthy();
+  const sleep = await page.request.post("/api/sleep", {
+    data: { babyId: baby.id, startTime: new Date(Date.now() - 60_000).toISOString(), type: "nap" },
+  });
+  expect(sleep.ok()).toBeTruthy();
+  await page.reload();
+  await expect(page.locator("header [data-status=sleeping] img")).toBeVisible();
+  const box = await page.evaluate(() => {
+    const ring = document.querySelector("header [data-status]") as HTMLElement;
+    const face = ring.firstElementChild as HTMLElement;
+    const r = ring.getBoundingClientRect();
+    const f = face.getBoundingClientRect();
+    return { dw: r.width - f.width, dh: r.height - f.height, dx: r.left - f.left, dy: r.top - f.top };
+  });
+  expect(box).toEqual({ dw: 0, dh: 0, dx: 0, dy: 0 });
+
+  // The same holds for every face in the header that has a photo: a second
+  // baby's bare face, and the caretaker's own face on the right.
+  await page.request.post("/api/babies", {
+    data: { name: "Oskar", birthDate: "2024-01-10T00:00:00Z" },
+  });
+  const babies = (await (await page.request.get("/api/babies")).json()) as {
+    id: string;
+    name: string;
+  }[];
+  const oskar = babies.find((b) => b.name === "Oskar")!;
+  const photo = readFileSync(new URL("../apps/frontend/public/icon-192.png", import.meta.url));
+  for (const path of [`/api/babies/${oskar.id}/avatar`, "/api/me/avatar"]) {
+    const res = await page.request.put(path, {
+      multipart: { file: { name: "p.png", mimeType: "image/png", buffer: photo } },
+    });
+    expect(res.ok(), `${path}: ${res.status()}`).toBeTruthy();
+  }
+  await page.reload();
+  await expect(page.locator("header img")).toHaveCount(3);
+  const faces = await page.evaluate(() =>
+    [...document.querySelectorAll("header button")]
+      .filter((b) => b.querySelector("img") && b.getAttribute("aria-pressed") !== "true")
+      .map((b) => {
+        const face = b.querySelector("span") as HTMLElement;
+        const r = b.getBoundingClientRect();
+        const f = face.getBoundingClientRect();
+        return r.height - f.height;
+      }),
+  );
+  expect(faces).toEqual([0, 0]);
 });
