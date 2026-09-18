@@ -11,12 +11,13 @@ import { toLocalDateInput } from "./time";
 
 // A day at barnehage (issue #105). The code says "daycare"; the UI says the
 // family's word through t(): "Barnehage" in Norwegian, "Daycare" in
-// English. The accent tint rather than a category colour — it is none of
-// sleep, feeds, diapers or growth — and on the icon only (CLAUDE.md §7).
+// English. Its own category colour since 2026-09-18 (--color-daycare, a
+// dark green): the header ring takes it while she is there, so the tile,
+// banner, calendar category and Stats marks must agree with the ring.
 export const daycareMeta = {
   label: "Daycare",
   icon: IconBackpack,
-  tint: "text-accent",
+  tint: "text-daycare",
 } as const;
 
 // The line a Last feed / Last diaper card gains while she is there: only

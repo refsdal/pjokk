@@ -49,7 +49,12 @@ separate test deploy).
    actions (Wake / Feed / Diaper), everything in the bottom half of the screen.
 7. **Calm, not cute.** One accent color + per-category tints used ONLY on icons
    and badges, never as backgrounds. Category colors: sleep=purple, feeds=blue,
-   diapers=teal, growth/measurements=coral.
+   diapers=teal, growth/measurements=coral, barnehage=dark green
+   (`--color-daycare`, 2026-09-18). The baby header's ring takes the
+   category of what she is doing right now — sleep purple while a session
+   runs, barnehage green while she is there, the accent otherwise
+   (`lib/baby-status.ts`) — which is why barnehage needed a colour of its
+   own: the ring and the card must agree.
 8. **Attribution is ambient.** Timeline entries show "by <caretaker>": the
    person who DID the care, which defaults to the session but can be a
    partner chosen on the sheet (spec

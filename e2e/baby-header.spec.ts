@@ -110,3 +110,44 @@ test("the selected pill's ring is not clipped by the row", async ({ page, reques
   ).toBeVisible();
   for (const side of Object.values(await room())) expect(side).toBeGreaterThanOrEqual(2);
 });
+
+// The ring's colour is what she is doing right now (lib/baby-status.ts):
+// the pill says so in data-status, and a single baby gets a ring only
+// while something is happening.
+test("the ring follows the baby's status: sleeping, then at barnehage", async ({ page, request }) => {
+  await freshFamily(page, request, "status");
+  const [baby] = (await (await page.request.get("/api/babies")).json()) as { id: string }[];
+  const face = page.locator("header [data-status]");
+  await expect(face).toHaveAttribute("data-status", "none");
+  await expect(face).not.toHaveClass(/ring-2/);
+
+  const sleep = await page.request.post("/api/sleep", {
+    data: { babyId: baby.id, startTime: new Date(Date.now() - 60_000).toISOString(), type: "nap" },
+  });
+  expect(sleep.ok()).toBeTruthy();
+  await page.reload();
+  await expect(face).toHaveAttribute("data-status", "sleeping");
+  await expect(face).toHaveClass(/ring-sleep/);
+
+  // Woken, then dropped off: the green.
+  const { id } = (await sleep.json()) as { id: string };
+  const wake = await page.request.patch(`/api/sleep/${id}`, {
+    data: { endTime: new Date().toISOString() },
+  });
+  expect(wake.ok(), `wake: ${wake.status()} ${await wake.text()}`).toBeTruthy();
+  const drop = await page.request.post("/api/daycare", {
+    data: { babyId: baby.id, startTime: new Date().toISOString() },
+  });
+  expect(drop.ok()).toBeTruthy();
+  await page.reload();
+  await expect(face).toHaveAttribute("data-status", "daycare");
+  await expect(face).toHaveClass(/ring-daycare/);
+
+  // With two babies the selected pill carries it the same way.
+  const res = await page.request.post("/api/babies", {
+    data: { name: "Oskar", birthDate: "2024-01-10T00:00:00Z" },
+  });
+  expect(res.ok()).toBeTruthy();
+  await page.reload();
+  await expect(page.locator("header [aria-pressed=true]")).toHaveAttribute("data-status", "daycare");
+});
