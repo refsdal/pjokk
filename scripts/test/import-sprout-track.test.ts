@@ -1,8 +1,14 @@
 import { Database } from "bun:sqlite";
-import { describe, expect, test } from "bun:test";
+import { describe, expect, setDefaultTimeout, test } from "bun:test";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+// Every test here spawns the importer as a node process and reads its
+// output; a cold CI runner has taken 5.9 s for the first one against bun's
+// 5 s default (Release verify, 2026-09-18). The work is milliseconds, the
+// budget is for process start-up.
+setDefaultTimeout(30_000);
 
 // A smoke run of the sprout-track importer after its move onto the shared
 // writer: a minimal sprout schema (every table the script reads, one baby
