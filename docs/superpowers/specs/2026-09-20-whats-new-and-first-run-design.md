@@ -228,16 +228,24 @@ and it degrades to an empty list, which renders nothing.
 
 ### 5. Returning: the Home line
 
-`apps/frontend/src/components/WhatsNewLine.tsx`, rendered beside
-`<InstallBanner />` at the foot of **day-mode** Home.
+`apps/frontend/src/components/WhatsNewLine.tsx`, rendered in **day-mode**
+Home's actions column, immediately after `<HomeActions>` — below the 2×2
+grid of log buttons.
 
-That placement does three jobs at once:
+Not beside `<InstallBanner />`, despite that being the obvious-looking slot:
+`InstallBanner` is `fixed inset-x-4 bottom-24 z-40` and floats over the
+content, so its position in the tree says nothing about where it appears.
+This row sits in the flow and needs a real slot.
+
+Nor in the left `space-y-3` column beside `ClosedDayLine`: in the compact
+layout that column is *above* the action grid, so a row there would push the
+log buttons down.
+
+The chosen placement does two jobs:
 
 - Day-mode Home returns early into `<NightHome>`, so the row is
   automatically absent at 03:00 — no night check to write and none to
   forget.
-- It is the slot already occupied by `InstallBanner`, under the comment
-  *"Day-mode Home only: night mode is three actions and nothing else."*
 - Nothing above it moves. Status cards and the 2×2 grid are untouched,
   which is the constraint that matters: this feature may not add a tap to
   logging a feed.
