@@ -1,6 +1,7 @@
-import { useNavigate } from "@tanstack/react-router";
+import { Navigate, useNavigate } from "@tanstack/react-router";
 import { Carousel } from "@/components/Carousel";
 import { gettingStarted, whatsNew } from "@/data/whats-new";
+import { useSession } from "@/lib/auth-client";
 import { useSaveWhatsNew } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -14,8 +15,19 @@ import { highestSeq } from "@/lib/whats-new";
 // Skip is as prominent as Done on purpose. Someone who wants to get on with
 // it must be able to, in one tap.
 export function GettingStartedScreen() {
+  // Parented at rootRoute like /welcome, so it carries no session gate of
+  // its own — a signed-out visitor could otherwise open it directly and
+  // have Skip 401. Same check as Welcome.tsx.
+  const { data: session, isPending } = useSession();
   const navigate = useNavigate();
   const save = useSaveWhatsNew();
+
+  if (isPending) {
+    return <div className="min-h-dvh" />;
+  }
+  if (!session) {
+    return <Navigate to="/login" />;
+  }
 
   // Finishing also marks the release notes caught up: a brand-new account
   // must never be shown what changed in versions it never missed.

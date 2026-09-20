@@ -5,12 +5,14 @@ import type { Baby } from "@pjokk/shared";
 import { ChipGroup } from "@/components/Chips";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { whatsNew } from "@/data/whats-new";
 import { client, unwrap } from "@/lib/api";
 import { authClient, signOut, useSession } from "@/lib/auth-client";
 import { useConfig, useMe } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { toLocalDateInput } from "@/lib/time";
 import { toast } from "@/lib/toast";
+import { highestSeq } from "@/lib/whats-new";
 
 // Family founders land here once (everyone else arrives via /join/CODE).
 // Two steps on one screen: name the family, then add the baby.
@@ -88,8 +90,15 @@ export function WelcomeScreen() {
       // A founder has just been through Welcome and is about to go through
       // the tracking carousel; a third screen would be the wall the first
       // run exists to avoid (spec §8). The invitee, who gets neither, is
-      // the one who needs orientation.
-      await unwrap(client.PATCH("/api/me", { body: { onboarded: true } }));
+      // the one who needs orientation. whatsNewSeq is caught up in the same
+      // PATCH as onboarded — a founder has been "away" zero seconds, and a
+      // new account is never shown release notes for versions it never
+      // missed (the same rule getting-started's own finish handler follows).
+      await unwrap(
+        client.PATCH("/api/me", {
+          body: { onboarded: true, whatsNewSeq: highestSeq(whatsNew()) },
+        }),
+      );
       await queryClient.invalidateQueries({ queryKey: ["me"] });
       // A new baby tracks nothing until the family chooses: the carousel
       // is the next screen, and its Done lands on Home.
