@@ -1,7 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import type { Feature } from "@pjokk/shared";
 import { IconSparkles } from "@tabler/icons-react";
-import { highestSeq, pending, type WhatsNewEntry } from "../src/lib/whats-new";
+import {
+  highestSeq,
+  pending,
+  visible,
+  type WhatsNewEntry,
+} from "../src/lib/whats-new";
 
 // What's new (issue #140): which entries a person is shown, and what
 // dismissal marks. The nag must never repeat, and must never announce a
@@ -45,6 +50,29 @@ describe("pending", () => {
 
   it("is empty for an empty catalogue", () => {
     expect(pending([], 0, all)).toEqual([]);
+  });
+});
+
+describe("visible", () => {
+  it("returns every entry, newest first, with no seq filtering", () => {
+    const got = visible([entry(1), entry(2), entry(3)], all);
+    expect(got.map((e) => e.seq)).toEqual([3, 2, 1]);
+  });
+
+  it("drops an entry whose feature the family does not track", () => {
+    const got = visible(
+      [entry(1), entry(2, "daycare")],
+      (k) => k !== "daycare",
+    );
+    expect(got.map((e) => e.seq)).toEqual([1]);
+  });
+
+  it("keeps an entry with no feature even when nothing is tracked", () => {
+    expect(visible([entry(1)], none).map((e) => e.seq)).toEqual([1]);
+  });
+
+  it("is empty for an empty catalogue", () => {
+    expect(visible([], all)).toEqual([]);
   });
 });
 

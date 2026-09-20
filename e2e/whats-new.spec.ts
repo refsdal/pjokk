@@ -78,10 +78,15 @@ test("the line appears on Home, opens the list, and one tap dismisses it", async
   const line = invitee.getByTestId("whats-new-line");
   await expect(line).toBeVisible();
 
-  // The log grid must not have moved: the row lives below it.
-  await expect(
-    invitee.getByRole("button", { name: "Feed", exact: true }),
-  ).toBeVisible();
+  // The log grid must not have moved: the row lives below it. Assert the
+  // actual geometry, not just that Feed is on screen (which would still
+  // pass if the row pushed the grid below the fold).
+  const feedButton = invitee.getByRole("button", { name: "Feed", exact: true });
+  await expect(feedButton).toBeVisible();
+  const feedBox = await feedButton.boundingBox();
+  const lineBox = await line.boundingBox();
+  if (!feedBox || !lineBox) throw new Error("expected both elements to have a layout box");
+  expect(lineBox.y).toBeGreaterThan(feedBox.y + feedBox.height);
 
   await invitee.getByTestId("whats-new-dismiss").click();
   await expect(line).toBeHidden();

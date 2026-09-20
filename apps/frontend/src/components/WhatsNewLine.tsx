@@ -1,5 +1,6 @@
 import { IconSparkles, IconX } from "@tabler/icons-react";
 import { useNavigate } from "@tanstack/react-router";
+import { useRef } from "react";
 import { whatsNew } from "@/data/whats-new";
 // The barrel, not "@/lib/data/profile": lib/data/index.ts re-exports it,
 // and every screen imports profile hooks from there.
@@ -23,14 +24,25 @@ export function WhatsNewLine() {
   const navigate = useNavigate();
   const save = useSaveWhatsNew();
 
+  // Latches shut the instant this tap fires (see markSeen), same idiom as
+  // shell.tsx's sawOnboarded: the PATCH is optimistic-then-async, but
+  // useMe refetches on every mount ("always"), so navigating away and back
+  // to Home before it lands can resolve a GET taken BEFORE the PATCH
+  // committed — the pre-dismissal whatsNewSeq — and without this, that
+  // stale response would resurrect the row the person already dismissed.
+  const dismissedThisSession = useRef(false);
+
   const seq = me.data?.whatsNewSeq;
-  if (seq === undefined) return null;
+  if (seq === undefined || dismissedThisSession.current) return null;
 
   const unseen = pending(whatsNew(), seq, (k) => familyTracks(babies.data, k));
   if (unseen.length === 0) return null;
 
   // Over the UNFILTERED list: see highestSeq's comment.
-  const markSeen = () => save.mutate({ whatsNewSeq: highestSeq(whatsNew()) });
+  const markSeen = () => {
+    dismissedThisSession.current = true;
+    save.mutate({ whatsNewSeq: highestSeq(whatsNew()) });
+  };
 
   return (
     <div className="px-4 pb-3" data-testid="whats-new-line">
@@ -40,7 +52,7 @@ export function WhatsNewLine() {
         </span>
         <button
           type="button"
-          className="flex-1 text-left font-semibold text-ink"
+          className="flex min-h-11 flex-1 items-center text-left font-semibold text-ink"
           data-testid="whats-new-open"
           onClick={() => {
             markSeen();

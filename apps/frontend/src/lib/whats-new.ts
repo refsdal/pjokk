@@ -39,19 +39,38 @@ export type GuideCard = {
 };
 
 /**
+ * The entries this family can use, newest first — no seq filtering. This is
+ * /whats-new's full-history list (spec §7: dismissal never loses an entry)
+ * AND the relevance half of `pending()` below; kept in one place so a future
+ * change to the relevance rule is made once, not twice.
+ */
+export function visible(
+  entries: WhatsNewEntry[],
+  tracks: (key: Feature) => boolean,
+): WhatsNewEntry[] {
+  return entries
+    .filter((e) => !e.feature || tracks(e.feature))
+    .sort((a, b) => b.seq - a.seq);
+}
+
+/**
  * The entries this person has not seen and this family can use, newest
  * first. `tracks` is the family-wide union — pass
  * `(k) => familyTracks(babies.data, k)` (lib/tracking.ts), which answers
- * true while the babies are still loading, so nothing flashes.
+ * true while the babies are still loading. That means a feature-gated entry
+ * the family does NOT track can show briefly and then disappear once
+ * `babies.data` resolves — a flash, but the direction chosen on purpose: for
+ * a non-urgent row, showing-then-hiding is a smaller mistake than hiding-
+ * then-showing, and gating on `babies.data !== undefined` instead would
+ * delay the row for EVERY family, tracked or not, just to avoid a flash
+ * that today's only unfiltered entry (no `feature`) can't even trigger.
  */
 export function pending(
   entries: WhatsNewEntry[],
   seq: number,
   tracks: (key: Feature) => boolean,
 ): WhatsNewEntry[] {
-  return entries
-    .filter((e) => e.seq > seq && (!e.feature || tracks(e.feature)))
-    .sort((a, b) => b.seq - a.seq);
+  return visible(entries, tracks).filter((e) => e.seq > seq);
 }
 
 /**
