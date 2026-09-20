@@ -1075,6 +1075,8 @@ const nb: Record<string, string> = {
   "A quiet note when something changes": "En rolig beskjed når noe endrer seg",
   "New things now show up as one line here on Home. Tap to read them, or brush it away — everything stays under Settings.":
     "Nye ting dukker opp som én linje her på Hjem. Trykk for å lese, eller børst den bort — alt ligger under Innstillinger.",
+  "1 new thing since you were away": "1 ny ting siden sist",
+  "new things since you were away": "nye ting siden sist",
   "A glance, not a log": "Et blikk, ikke en loggbok",
   "Home answers when she last ate, slept and was changed — before you tap anything.":
     "Hjem svarer på når hun sist spiste, sov og ble skiftet — før du trykker på noe.",
