@@ -151,50 +151,33 @@ ALTER TABLE "users" DROP COLUMN "whats_new_seq";
 ALTER TABLE "users" DROP COLUMN "onboarded_at";
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [ ] **Step 2: Note why this task ships no test of its own**
 
-Create `apps/server/internal/api/me_whats_new_test.go`:
+**Controller ruling (pre-flight scan).** This task adds no test file. The
+API-level test belongs to Task 2, where it can pass; leaving a red test
+committed here would make Task 1's commit red on CI.
 
-```go
-package api_test
+Task 1 is verified by two things instead: `sqlc generate` succeeding against
+the new schema, and the **existing** suite still passing. Every
+database-backed test in this repo migrates to head, so the migration is
+exercised broadly by the whole suite the moment it exists.
 
-import (
-	"net/http"
-	"testing"
+The spec's "a row created before `00034` comes out with
+`onboarded_at = created_at`" assertion is deliberately **not** implemented:
+`apps/server/internal/db/migrate_test.go` has no partial-migration harness
+(it only migrates to head), and the backfill is an unconditional `UPDATE`
+with no branching. Do not build a harness for it as part of this task.
 
-	"github.com/refsdal/pjokk/server/internal/testrig"
-)
-
-// What's new, and a first run (issue #140): the marker is the person's, it
-// only ever moves forward, and an account that predates the migration is
-// already onboarded.
-func TestMeWhatsNewDefaults(t *testing.T) {
-	t.Parallel()
-	a := testrig.App(t)
-	_, cookie := a.NewFamily("Hansen", "parent@example.com")
-
-	me := a.Do(http.MethodGet, "/api/me", cookie, nil)
-	if me.JSON["whatsNewSeq"] != float64(0) {
-		t.Errorf("default whatsNewSeq = %v, want 0", me.JSON["whatsNewSeq"])
-	}
-	// NewFamily creates the row through the ordinary signup path, i.e.
-	// after 00034 — so it is NOT backfilled and must start un-onboarded.
-	if me.JSON["onboarded"] != false {
-		t.Errorf("a fresh account's onboarded = %v, want false", me.JSON["onboarded"])
-	}
-}
-```
-
-- [ ] **Step 3: Run it to verify it fails**
+- [ ] **Step 3: Confirm the starting state is green**
 
 ```bash
 export PATH="$PATH:$HOME/.local/go/bin:$HOME/go/bin"
 docker compose -f docker-compose.test.yml up -d
-cd apps/server && go test ./internal/api -run TestMeWhatsNewDefaults -v
+cd apps/server && go test ./... ; echo "exit=$?"
 ```
 
-Expected: FAIL — `whatsNewSeq` and `onboarded` are absent from the response,
-so both comparisons read `<nil>`.
+Expected: exit 0. You cannot tell whether your migration broke something if
+the suite was already red.
 
 - [ ] **Step 4: Add the columns to the read query**
 
@@ -261,31 +244,27 @@ If the generated field names differ from those, **use whatever sqlc
 produced** and carry those names into Task 2 — do not hand-edit generated
 code.
 
-- [ ] **Step 7: Run the test again**
+- [ ] **Step 7: Verify the whole Go suite still builds and passes**
 
 ```bash
-cd apps/server && go test ./internal/api -run TestMeWhatsNewDefaults -v
+cd apps/server && go vet ./... && go test ./... ; echo "exit=$?"
 ```
 
-Expected: still FAIL, and that is correct — the columns exist but nothing
-puts them on the wire yet. Task 2 makes it pass. Confirm the failure is now
-only the two missing JSON fields and **not** a SQL or compile error.
+Expected: exit 0 — everything green. Task 1 leaves nothing red behind.
 
-- [ ] **Step 8: Verify the whole Go suite still builds and passes**
+A failure here almost certainly means the `CASE`/`GREATEST` expression did
+not type-check against Postgres, or `UpdateUserProfileParams` changed shape
+in a way `me.go`'s existing call site no longer satisfies. In the latter
+case add the two new fields to that struct literal now (Task 2 Step 7 will
+then find them already present) rather than leaving the package
+uncompilable.
 
-```bash
-cd apps/server && go vet ./... && go test ./...
-```
-
-Expected: everything passes except `TestMeWhatsNewDefaults`.
-
-- [ ] **Step 9: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add apps/server/internal/db/migrations/00034_user_whats_new.sql \
         apps/server/internal/db/queries/profile.sql \
-        apps/server/internal/db/gen \
-        apps/server/internal/api/me_whats_new_test.go
+        apps/server/internal/db/gen
 git commit -m "$(cat <<'EOF'
 feat(server): onboarded_at and whats_new_seq on users
 
@@ -318,9 +297,42 @@ EOF
 - Produces: `Me.onboarded: boolean`, `Me.whatsNewSeq: integer` on the wire;
   `UpdateMeVars` gains `onboarded?: boolean` and `whatsNewSeq?: number`.
 
-- [ ] **Step 1: Extend the failing test**
+- [ ] **Step 1: Write the failing tests**
 
-Append to `apps/server/internal/api/me_whats_new_test.go`:
+Create `apps/server/internal/api/me_whats_new_test.go` with the three tests
+below (the defaults test moved here from Task 1 by controller ruling — it
+cannot pass until this task puts the fields on the wire):
+
+```go
+package api_test
+
+import (
+	"net/http"
+	"testing"
+
+	"github.com/refsdal/pjokk/server/internal/testrig"
+)
+
+// What's new, and a first run (issue #140): the marker is the person's and
+// only ever moves forward, and a fresh account has not been onboarded.
+func TestMeWhatsNewDefaults(t *testing.T) {
+	t.Parallel()
+	a := testrig.App(t)
+	_, cookie := a.NewFamily("Hansen", "parent@example.com")
+
+	me := a.Do(http.MethodGet, "/api/me", cookie, nil)
+	if me.JSON["whatsNewSeq"] != float64(0) {
+		t.Errorf("default whatsNewSeq = %v, want 0", me.JSON["whatsNewSeq"])
+	}
+	// NewFamily creates the row through the ordinary signup path, i.e.
+	// after 00034 — so it is NOT backfilled and must start un-onboarded.
+	if me.JSON["onboarded"] != false {
+		t.Errorf("a fresh account's onboarded = %v, want false", me.JSON["onboarded"])
+	}
+}
+```
+
+and, in the same file:
 
 ```go
 // The marker only ever moves forward. Without GREATEST in the query, an
@@ -1961,30 +1973,24 @@ import { freshFamily } from "./helpers";
 // The invariant under test: a caretaker who has already onboarded is never
 // interrupted, dismissal is one tap, and dismissing loses nothing.
 
-// Rewinds the marker so the app believes there is something unseen,
-// whatever the catalogue holds today. Writing 0 is always valid and always
-// "behind", since seq is append-only and starts at 1.
-async function rewind(page: import("@playwright/test").Page): Promise<void> {
-  // GREATEST means a PATCH cannot lower it, so this only works while the
-  // account is still at 0 — which a fresh one is, and every test here uses
-  // a fresh one.
-  const me = await (await page.request.get("/api/me")).json();
-  expect(me.whatsNewSeq).toBe(0);
-}
+// A fresh account is already at whats_new_seq = 0 and seq starts at 1, so
+// every entry is unseen and the line shows with no setup. (An earlier draft
+// had a `rewind` helper here; it asserted that precondition rather than
+// establishing anything, so it was dropped by controller ruling.)
 
 test("the line appears on Home, opens the list, and one tap dismisses it", async ({
   page,
   request,
 }) => {
   await freshFamily(page, request, "whats-new");
-  await rewind(page);
-  await page.reload();
 
   const line = page.getByTestId("whats-new-line");
   await expect(line).toBeVisible();
 
   // The log grid must not have moved: the row lives below it.
-  await expect(page.getByRole("button", { name: "Feed" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Feed", exact: true }),
+  ).toBeVisible();
 
   await page.getByTestId("whats-new-dismiss").click();
   await expect(line).toBeHidden();
@@ -2019,7 +2025,9 @@ test("the line is absent in night mode", async ({ page, request, context }) => {
   });
   await page.reload();
   await expect(page.getByTestId("whats-new-line")).toBeHidden();
-  await expect(page.getByRole("button", { name: "Feed" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Feed", exact: true }),
+  ).toBeVisible();
 });
 ```
 
