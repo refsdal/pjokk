@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useRef } from "react";
 import type { Baby, Feature } from "@pjokk/shared";
+import { Carousel } from "@/components/Carousel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useSetBabyFeatures } from "@/lib/data";
@@ -16,11 +17,10 @@ import {
 import { cn } from "@/lib/utils";
 import { TrackingCard } from "./TrackingCard";
 
-// One card per switch, then a summary (spec §The carousel). A scroll-snap
-// strip with Back / Next as the primary control — the app's no-swipe rule
-// is about ROUTE navigation fighting the back gesture; swiping here is a
-// bonus nobody needs. Every flip saves at once (optimistic on the babies
-// list), so leaving mid-way keeps what was chosen; Done only navigates.
+// One card per switch, then a summary (spec §The carousel). Every flip saves
+// at once (optimistic on the babies list), so leaving mid-way keeps what was
+// chosen; Done only navigates. The strip itself is the generic
+// components/Carousel; this file only builds its steps.
 export function TrackingCarousel({
   baby,
   isAdmin,
@@ -31,54 +31,12 @@ export function TrackingCarousel({
   isNew: boolean;
 }) {
   const navigate = useNavigate();
-  const strip = useRef<HTMLDivElement>(null);
-  const [index, setIndex] = useState(0);
   const track = useTracking(baby);
   const save = useSetBabyFeatures();
   const months = ageMonths(new Date(baby.birthDate));
+  const controls = useRef<{ goTo: (i: number) => void } | null>(null);
   const last = featureCards.length; // the summary's index
 
-  // The card a button asked for, while the smooth scroll is still on its
-  // way there. Without it the scroll handler below reads the strip's
-  // position mid-flight and sets the index BACK, so Done turns into Next
-  // for a few frames after "Use the recommended set" — and a tap in
-  // those frames lands on Next (seen on a slow CI runner). A swipe has no
-  // target, so its position is trusted at once.
-  const target = useRef<number | null>(null);
-  const goTo = (i: number) => {
-    const el = strip.current;
-    if (!el) return;
-    target.current = i;
-    el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
-    setIndex(i);
-  };
-  const positionIndex = () => {
-    const el = strip.current;
-    if (!el || el.clientWidth === 0) return null;
-    return Math.round(el.scrollLeft / el.clientWidth);
-  };
-  const onScroll = () => {
-    const i = positionIndex();
-    if (i === null) return;
-    if (target.current !== null) {
-      if (i === target.current) target.current = null; // arrived
-      return;
-    }
-    setIndex(i);
-  };
-  // A programmatic scroll a swipe interrupted never "arrives": once the
-  // strip has come to rest anywhere, the position is the truth again.
-  useEffect(() => {
-    const el = strip.current;
-    if (!el) return;
-    const settle = () => {
-      target.current = null;
-      const i = positionIndex();
-      if (i !== null) setIndex(i);
-    };
-    el.addEventListener("scrollend", settle);
-    return () => el.removeEventListener("scrollend", settle);
-  }, []);
   const set = (features: Feature[]) =>
     save.mutate({ babyId: baby.id, features });
   const flip = (key: Feature, on: boolean) =>
@@ -91,121 +49,85 @@ export function TrackingCarousel({
           params: { babyId: baby.id },
         });
 
-  return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col pt-safe md:max-w-lg">
-      <div
-        ref={strip}
-        onScroll={onScroll}
-        // overflow-y-hidden: a scroll container clips its box-shadows, so
-        // the light-up ring must stay inside the strip and the strip must
-        // never scroll vertically (which would push the ring to the edge).
-        className="flex flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none]"
-        data-testid="tracking-strip"
-      >
-        {featureCards.map((meta, i) => (
-          <div
-            key={meta.key}
-            className="flex w-full shrink-0 snap-center flex-col"
-          >
-            {i === 0 && isNew && isAdmin && (
-              <Card className="mx-4 mt-4 space-y-3 text-center">
-                <p className="text-sm text-ink-soft">
-                  {t(
-                    "Swipe through what Pjokk can track, or take the set we suggest for a baby of",
-                  )}{" "}
-                  {formatAge(new Date(baby.birthDate))}.
-                </p>
-                <Button
-                  size="full"
-                  onClick={() => {
-                    set(recommended(months));
-                    goTo(last);
-                  }}
-                  data-testid="use-recommended"
-                >
-                  {t("Use the recommended set")}
-                </Button>
-              </Card>
-            )}
-            <TrackingCard
-              meta={meta}
-              on={track.has(meta.key)}
-              tag={
-                meta.key === "daycare"
-                  ? `${t("Recommended if")} ${baby.name} ${t("goes to barnehage")}`
-                  : recommendedByAge(meta.key, months)
-                    ? `${t("Recommended at")} ${baby.name}${t("'s age")}`
-                    : null
-              }
-              readOnly={!isAdmin}
-              onToggle={(on) => flip(meta.key, on)}
-            />
-          </div>
-        ))}
-        <section
-          className="flex w-full shrink-0 snap-center flex-col justify-center gap-4 px-4"
-          data-testid="tracking-summary"
-          aria-label={t("Summary")}
-        >
-          <h2 className="text-2xl font-extrabold text-ink">
-            {t("Tracking for")} {baby.name}
-          </h2>
-          {track.any ? (
-            <ul className="space-y-2">
-              {featureCards
-                .filter((m) => track.has(m.key))
-                .map((m) => {
-                  const Icon = m.icon;
-                  return (
-                    <li
-                      key={m.key}
-                      className="flex items-center gap-2 font-semibold text-ink"
-                    >
-                      <Icon className={cn("h-5 w-5", m.tint)} />
-                      {t(m.label)}
-                    </li>
-                  );
-                })}
-            </ul>
-          ) : (
-            <p className="text-ink-soft">{t("Nothing tracked yet")}</p>
-          )}
-          <p className="text-sm text-muted">
-            {t("Change this any time under Settings.")}
-          </p>
-        </section>
-      </div>
-      {/* pb-tabbar clears the bottom bar on the phone (styles.css). */}
-      <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-tabbar">
-        <Button
-          variant="outline"
-          onClick={() => goTo(index - 1)}
-          disabled={index === 0}
-        >
-          {t("Back")}
-        </Button>
-        <div className="flex gap-1" aria-hidden>
-          {Array.from({ length: last + 1 }, (_, i) => (
-            <span
-              // biome-ignore lint/suspicious/noArrayIndexKey: a fixed strip of dots
-              key={i}
-              className={cn(
-                "h-1.5 w-1.5 rounded-full",
-                i === index ? "bg-accent" : "bg-line",
-              )}
-            />
-          ))}
-        </div>
-        {index < last ? (
-          <Button onClick={() => goTo(index + 1)} data-testid="tracking-next">
-            {t("Next")}
-          </Button>
-        ) : (
-          <Button onClick={() => void done()} data-testid="tracking-done">
-            {t("Done")}
-          </Button>
+  const steps = [
+    ...featureCards.map((meta, i) => (
+      <Fragment key={meta.key}>
+        {i === 0 && isNew && isAdmin && (
+          <Card className="mx-4 mt-4 space-y-3 text-center">
+            <p className="text-sm text-ink-soft">
+              {t(
+                "Swipe through what Pjokk can track, or take the set we suggest for a baby of",
+              )}{" "}
+              {formatAge(new Date(baby.birthDate))}.
+            </p>
+            <Button
+              size="full"
+              onClick={() => {
+                set(recommended(months));
+                controls.current?.goTo(last);
+              }}
+              data-testid="use-recommended"
+            >
+              {t("Use the recommended set")}
+            </Button>
+          </Card>
         )}
-      </div>
-    </div>
+        <TrackingCard
+          meta={meta}
+          on={track.has(meta.key)}
+          tag={
+            meta.key === "daycare"
+              ? `${t("Recommended if")} ${baby.name} ${t("goes to barnehage")}`
+              : recommendedByAge(meta.key, months)
+                ? `${t("Recommended at")} ${baby.name}${t("'s age")}`
+                : null
+          }
+          readOnly={!isAdmin}
+          onToggle={(on) => flip(meta.key, on)}
+        />
+      </Fragment>
+    )),
+    <section
+      key="summary"
+      className="flex flex-1 flex-col justify-center gap-4 px-4"
+      data-testid="tracking-summary"
+      aria-label={t("Summary")}
+    >
+      <h2 className="text-2xl font-extrabold text-ink">
+        {t("Tracking for")} {baby.name}
+      </h2>
+      {track.any ? (
+        <ul className="space-y-2">
+          {featureCards
+            .filter((m) => track.has(m.key))
+            .map((m) => {
+              const Icon = m.icon;
+              return (
+                <li
+                  key={m.key}
+                  className="flex items-center gap-2 font-semibold text-ink"
+                >
+                  <Icon className={cn("h-5 w-5", m.tint)} />
+                  {t(m.label)}
+                </li>
+              );
+            })}
+        </ul>
+      ) : (
+        <p className="text-ink-soft">{t("Nothing tracked yet")}</p>
+      )}
+      <p className="text-sm text-muted">
+        {t("Change this any time under Settings.")}
+      </p>
+    </section>,
+  ];
+
+  return (
+    <Carousel
+      steps={steps}
+      onFinish={() => void done()}
+      testIdPrefix="tracking"
+      controls={controls}
+    />
   );
 }
