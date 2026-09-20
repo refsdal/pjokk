@@ -111,13 +111,17 @@ it inherits `familyTracks`' "babies still loading → true" guard for free.
 
 **Files:**
 - Create: `apps/server/internal/db/migrations/00034_user_whats_new.sql`
-- Create: `apps/server/internal/api/me_whats_new_test.go`
 - Modify: `apps/server/internal/db/queries/profile.sql`
+- Modify (generated, committed): `apps/server/internal/db/gen/*`
+
+No test file: see Step 2.
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `dbgen.GetUserProfileRow` gains `OnboardedAt *time.Time` and
-  `WhatsNewSeq int32`; `dbgen.UpdateUserProfileParams` gains
+- Produces: `dbgen.GetUserProfileRow` gains `OnboardedAt pgtype.Timestamptz`
+  (**not** `*time.Time` — it follows the sibling `AvatarImportedAt` in the
+  same generated file, so read it as `.Valid` / `.Time`, never a nil check)
+  and `WhatsNewSeq int32`; `dbgen.UpdateUserProfileParams` gains
   `Onboarded *bool` and `WhatsNewSeq *int32`.
 
 - [ ] **Step 1: Write the migration**
@@ -503,7 +507,11 @@ In `buildMe`, extend the `gen.Me` literal (after `LanguageMode`):
 		// A bool on the wire over a timestamptz in the row: the client has
 		// no use for the date, and a nullable timestamp is a shape we would
 		// spend the next year explaining.
-		Onboarded:   profile.OnboardedAt != nil,
+		//
+		// .Valid, NOT a nil check: sqlc generated OnboardedAt as
+		// pgtype.Timestamptz (following AvatarImportedAt in the same file),
+		// which is a struct, so `!= nil` does not compile.
+		Onboarded:   profile.OnboardedAt.Valid,
 		WhatsNewSeq: int(profile.WhatsNewSeq),
 ```
 
