@@ -71,6 +71,8 @@ func (d Deps) UpdateMe(ctx context.Context, _ gen.UpdateMeRequestObject) (gen.Up
 	unitsSet, unitsVal := patchField[string](p, "units")
 	modeSet, modeVal := patchField[string](p, "languageMode")
 	langSet, langVal := patchField[string](p, "language")
+	onboardedSet, onboardedVal := patchField[bool](p, "onboarded")
+	seqSet, seqVal := patchField[int32](p, "whatsNewSeq")
 	if err := p.Err(); err != nil {
 		return nil, err
 	}
@@ -122,6 +124,18 @@ func (d Deps) UpdateMe(ctx context.Context, _ gen.UpdateMeRequestObject) (gen.Up
 		return gen.UpdateMe400JSONResponse(gen.Error{Error: "Language must be en or nb", Code: "VALIDATION"}), nil
 	}
 
+	// What's new, and a first run (00034). Both are the spec's types, so
+	// validation already refused a literal null; guard the nil anyway, the
+	// same way units and the language pair do above.
+	if onboardedSet && onboardedVal == nil {
+		return gen.UpdateMe400JSONResponse(gen.Error{Error: "Onboarded must be true or false", Code: "VALIDATION"}), nil
+	}
+	if seqSet {
+		if seqVal == nil || *seqVal < 0 {
+			return gen.UpdateMe400JSONResponse(gen.Error{Error: "whatsNewSeq must be zero or more", Code: "VALIDATION"}), nil
+		}
+	}
+
 	if err := d.Q.UpdateUserProfile(ctx, dbgen.UpdateUserProfileParams{
 		ID:           session.UserID,
 		Name:         &name,
@@ -130,6 +144,8 @@ func (d Deps) UpdateMe(ctx context.Context, _ gen.UpdateMeRequestObject) (gen.Up
 		Units:        units,
 		LanguageMode: modeVal,
 		Language:     langVal,
+		Onboarded:    onboardedVal,
+		WhatsNewSeq:  seqVal,
 	}); err != nil {
 		return nil, err
 	}
@@ -187,6 +203,15 @@ func (d Deps) buildMe(ctx context.Context, session *auth.Session) (gen.Me, error
 		Language:    gen.MeLanguage(profile.Language),
 		// *string → *MeLanguageMode: nil stays nil (never sent by an app).
 		LanguageMode: (*gen.MeLanguageMode)(profile.LanguageMode),
+		// A bool on the wire over a timestamptz in the row: the client has
+		// no use for the date, and a nullable timestamp is a shape we would
+		// spend the next year explaining.
+		//
+		// .Valid, NOT a nil check: sqlc generated OnboardedAt as
+		// pgtype.Timestamptz (following AvatarImportedAt in the same file),
+		// which is a struct, so `!= nil` does not compile.
+		Onboarded:   profile.OnboardedAt.Valid,
+		WhatsNewSeq: int(profile.WhatsNewSeq),
 	}
 	if session.Role != "" {
 		role := session.Role

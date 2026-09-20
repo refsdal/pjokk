@@ -5086,6 +5086,20 @@ components:
         language:
           type: string
           enum: [en, nb]
+        onboarded:
+          type: boolean
+          description: >-
+            True once this person has finished or skipped the getting-started
+            carousel (issue #140). Stored as a timestamp; exposed as a bool
+            because the date is nobody's business but support's.
+        whatsNewSeq:
+          type: integer
+          minimum: 0
+          maximum: 100000
+          description: >-
+            The highest what's-new entry seq this person has seen. The
+            server keeps the GREATEST of stored and incoming — mutations
+            queue offline, and a stale replay must not walk it backwards.
     Member:
       type: object
       required: [memberId, userId, name, email, role, avatarUrl, hasPush]
@@ -5152,6 +5166,8 @@ components:
           units,
           language,
           languageMode,
+          onboarded,
+          whatsNewSeq,
         ]
       properties:
         userId:
@@ -5181,6 +5197,15 @@ components:
             The language in effect, as the app last resolved it (`auto`
             resolved on the device). Server-written text — push
             notifications — is in this language.
+        onboarded:
+          type: boolean
+          description: >-
+            False only for someone who has never finished or skipped the
+            getting-started carousel. Accounts predating migration 00034 are
+            backfilled true.
+        whatsNewSeq:
+          type: integer
+          minimum: 0
         displayName:
           type: string
           description: >-
