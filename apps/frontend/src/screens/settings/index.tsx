@@ -1,4 +1,5 @@
 import { IconPlus, IconUsers } from "@tabler/icons-react";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { BabySheet } from "@/components/sheets/BabySheet";
@@ -106,8 +107,17 @@ export function SettingsScreen() {
             {t("API docs")}
           </a>
           {/* The server's build version — the image tag, not a number kept
-              by hand (internal/buildinfo). */}
-          {me.data ? ` · Pjokk ${me.data.version}` : null}
+              by hand (internal/buildinfo). Tappable because the version
+              number is exactly what a person taps to ask what is in it
+              (issue #140). */}
+          {me.data ? (
+            <>
+              {" · "}
+              <Link to="/whats-new" className="underline">
+                {`Pjokk ${me.data.version}`}
+              </Link>
+            </>
+          ) : null}
         </p>
       </div>
     </div>
