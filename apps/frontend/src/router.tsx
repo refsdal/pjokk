@@ -18,6 +18,7 @@ import { KioskSetupScreen } from "@/screens/KioskSetup";
 import { LoginScreen } from "@/screens/Login";
 import { ProfileScreen } from "@/screens/Profile";
 import { SettingsScreen } from "@/screens/settings";
+import { WhatsNewScreen } from "@/screens/WhatsNew";
 import { BabyPage } from "@/screens/settings/BabyPage";
 import { FamilyPage } from "@/screens/settings/FamilyPage";
 import { FamilySubPage } from "@/screens/settings/FamilySubPage";
@@ -148,6 +149,14 @@ const profileRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/profile",
   component: ProfileScreen,
+});
+
+// What's new (issue #140). Inside the app shell like every other screen:
+// it names features, so it needs a session and a family.
+const whatsNewRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/whats-new",
+  component: WhatsNewScreen,
 });
 
 const loginRoute = createRoute({
@@ -321,6 +330,7 @@ export const routeTree = rootRoute.addChildren([
     settingsBabyRoute,
     settingsBabyTrackingRoute,
     profileRoute,
+    whatsNewRoute,
   ]),
   loginRoute,
   joinRoute,

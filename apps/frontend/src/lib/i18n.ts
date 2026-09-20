@@ -1070,6 +1070,8 @@ const nb: Record<string, string> = {
     "Slå på Søvn eller Måltider for å se statistikk",
 
   // What's new, and a first run (issue #140)
+  "What's new": "Nytt",
+  "Nothing new yet.": "Ingenting nytt ennå.",
   "A quiet note when something changes": "En rolig beskjed når noe endrer seg",
   "New things now show up as one line here on Home. Tap to read them, or brush it away — everything stays under Settings.":
     "Nye ting dukker opp som én linje her på Hjem. Trykk for å lese, eller børst den bort — alt ligger under Innstillinger.",
