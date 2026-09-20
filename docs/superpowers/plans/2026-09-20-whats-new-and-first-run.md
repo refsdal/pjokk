@@ -2027,8 +2027,9 @@ EOF
 Create `e2e/whats-new.spec.ts`:
 
 ```ts
-import { expect, test } from "./fixtures";
-import { freshFamily } from "./helpers";
+import type { APIRequestContext, Browser, Page, TestInfo } from "@playwright/test";
+import { asDevice, expect, seedDayMode, test } from "./fixtures";
+import { apiSignIn, apiSignup, freshEmail, freshFamily } from "./helpers";
 
 // What's new, and a first run (spec
 // docs/superpowers/specs/2026-09-20-whats-new-and-first-run-design.md).
@@ -2040,56 +2041,136 @@ import { freshFamily } from "./helpers";
 // had a `rewind` helper here; it asserted that precondition rather than
 // establishing anything, so it was dropped by controller ruling.)
 
+// Seeding the "has unseen entries" state: a FOUNDER is caught up at family
+// creation (Welcome sets whatsNewSeq, so a brand-new founder is never told
+// about versions they never missed), and the server's GREATEST guard means
+// a marker can never be rewound. An INVITEE is the one account that legally
+// sits at whats_new_seq = 0 with a family — skipGettingStarted() sets only
+// `onboarded`. So these tests join a second caretaker, the same way
+// e2e/who-did-it.spec.ts and e2e/help.spec.ts do.
+async function invitedCaretaker(
+  page: Page,
+  request: APIRequestContext,
+  browser: Browser,
+  testInfo: TestInfo,
+  tag: string,
+): Promise<Page> {
+  await freshFamily(page, request, tag);
+  await page.goto("/settings/family");
+  await page.getByRole("button", { name: "New invite link" }).click();
+  const link = await page.getByText(/\/join\//).first().textContent();
+  const code = link!.trim().split("/join/")[1]?.trim();
+
+  const ctx = await browser.newContext(asDevice(testInfo, 1));
+  await seedDayMode(ctx);
+  const invitee = await ctx.newPage();
+  const email = freshEmail(`${tag}-invitee`);
+  await apiSignup(request, email);
+  await apiSignIn(invitee, email);
+  await invitee.goto(`/join/${code}`);
+  // The invitee lands on the first-run tour; Skip leaves whatsNewSeq at 0.
+  await expect(invitee).toHaveURL(/\/getting-started/, { timeout: 10_000 });
+  await invitee.getByTestId("getting-started-skip").click();
+  await expect(invitee).toHaveURL(/\/home/, { timeout: 10_000 });
+  return invitee;
+}
+
 test("the line appears on Home, opens the list, and one tap dismisses it", async ({
   page,
   request,
-}) => {
-  await freshFamily(page, request, "whats-new");
+  browser,
+}, testInfo) => {
+  const invitee = await invitedCaretaker(page, request, browser, testInfo, "whats-new");
 
-  const line = page.getByTestId("whats-new-line");
+  const line = invitee.getByTestId("whats-new-line");
   await expect(line).toBeVisible();
 
   // The log grid must not have moved: the row lives below it.
   await expect(
-    page.getByRole("button", { name: "Feed", exact: true }),
+    invitee.getByRole("button", { name: "Feed", exact: true }),
   ).toBeVisible();
 
-  await page.getByTestId("whats-new-dismiss").click();
+  await invitee.getByTestId("whats-new-dismiss").click();
   await expect(line).toBeHidden();
   // Dismissing must not navigate anywhere.
-  await expect(page).toHaveURL(/\/home/);
+  await expect(invitee).toHaveURL(/\/home/);
 
-  // And it must stay gone across a reload — the marker is on the server.
-  await page.reload();
-  await expect(page.getByTestId("whats-new-line")).toBeHidden();
+  // And it must stay gone across a reload — the marker is on the server,
+  // not this device.
+  await invitee.reload();
+  await expect(invitee.getByTestId("whats-new-line")).toBeHidden();
 });
 
 test("dismissing loses nothing: the list still has every entry", async ({
   page,
   request,
-}) => {
-  await freshFamily(page, request, "whats-new-list");
-  await page.getByTestId("whats-new-dismiss").click();
-  await expect(page.getByTestId("whats-new-line")).toBeHidden();
+  browser,
+}, testInfo) => {
+  const invitee = await invitedCaretaker(page, request, browser, testInfo, "whats-new-list");
+  await invitee.getByTestId("whats-new-dismiss").click();
+  await expect(invitee.getByTestId("whats-new-line")).toBeHidden();
 
-  await page.goto("/whats-new");
-  await expect(page.getByTestId("whats-new-list")).toBeVisible();
-  await expect(page.getByTestId("whats-new-entry-1")).toBeVisible();
+  await invitee.goto("/whats-new");
+  await expect(invitee.getByTestId("whats-new-list")).toBeVisible();
+  await expect(invitee.getByTestId("whats-new-entry-1")).toBeVisible();
 });
 
-test("the line is absent in night mode", async ({ page, request, context }) => {
-  await freshFamily(page, request, "whats-new-night");
-  await expect(page.getByTestId("whats-new-line")).toBeVisible();
+test("the line is absent in night mode", async ({
+  page,
+  request,
+  browser,
+}, testInfo) => {
+  const invitee = await invitedCaretaker(page, request, browser, testInfo, "whats-new-night");
+  await expect(invitee.getByTestId("whats-new-line")).toBeVisible();
 
   // NightHome is a separate subtree: three actions and nothing else.
-  await context.addInitScript(() => {
+  await invitee.context().addInitScript(() => {
     localStorage.setItem("pjokk.night.mode", "on");
   });
-  await page.reload();
-  await expect(page.getByTestId("whats-new-line")).toBeHidden();
+  await invitee.reload();
+  await expect(invitee.getByTestId("whats-new-line")).toBeHidden();
   await expect(
-    page.getByRole("button", { name: "Feed", exact: true }),
+    invitee.getByRole("button", { name: "Feed", exact: true }),
   ).toBeVisible();
+});
+
+// The finish-the-tour race (the redirect loop) was only ever proven through
+// Skip. Done runs the same finish() and is what most people will tap, so it
+// gets its own pass — including the assertion that lands them on Home and
+// STAYS there rather than bouncing back into the tour.
+test("finishing the tour with Done lands on Home and stays there", async ({
+  page,
+  request,
+  browser,
+}, testInfo) => {
+  await freshFamily(page, request, "first-run-done");
+  await page.goto("/settings/family");
+  await page.getByRole("button", { name: "New invite link" }).click();
+  const link = await page.getByText(/\/join\//).first().textContent();
+  const code = link!.trim().split("/join/")[1]?.trim();
+
+  const ctx = await browser.newContext(asDevice(testInfo, 1));
+  await seedDayMode(ctx);
+  const invitee = await ctx.newPage();
+  const email = freshEmail("first-run-done-invitee");
+  await apiSignup(request, email);
+  await apiSignIn(invitee, email);
+  await invitee.goto(`/join/${code}`);
+
+  await expect(invitee).toHaveURL(/\/getting-started/, { timeout: 10_000 });
+  // Page through to the last card, then Done.
+  for (let i = 0; i < 3; i++) {
+    await invitee.getByTestId("getting-started-next").click();
+  }
+  await invitee.getByTestId("getting-started-done").click();
+  await expect(invitee).toHaveURL(/\/home/, { timeout: 10_000 });
+  // The bounce this guards against is a redirect landing a beat later, so
+  // assert Home is still Home after the mount refetch has had time to run.
+  await expect(
+    invitee.getByRole("button", { name: "Feed", exact: true }),
+  ).toBeVisible();
+  await invitee.waitForTimeout(1500);
+  await expect(invitee).toHaveURL(/\/home/);
 });
 ```
 
