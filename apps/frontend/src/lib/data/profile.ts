@@ -4,6 +4,7 @@ import { API_BASE, client, unwrap } from "../api";
 import { useAppearance } from "../appearance";
 import { getLanguageMode, resolveLanguage, type LanguageMode } from "../i18n";
 import { planLanguageSync } from "../language-sync";
+import { toast } from "../toast";
 import { type Me, useMe } from "./family";
 import { invalidateLogs } from "./keys";
 
@@ -86,12 +87,41 @@ export function useLanguageSync() {
 // The what's-new marker and the first-run flag (issue #140). No log row
 // shows either, so no log view is invalidated — the same reasoning as
 // useSaveLanguage above.
+//
+// Its own useMutation rather than the shared useProfileMutation helper
+// above: this is the one profile write that must be optimistic, and the
+// helper stays untouched so name/nickname/phone/avatar/language keep their
+// existing (server-confirmed) behaviour. Two screens gate visibility on the
+// very field this hook writes — WhatsNewLine on whatsNewSeq, and the
+// getting-started carousel's finish handler (next task) on onboarded,
+// which AppChrome reads to redirect to /getting-started — so on a slow or
+// queued (offline) connection the UI must update at once, not wait for the
+// PATCH to land. Same optimistic-write / rollback idiom as
+// useSetBabyFeatures (lib/data/family.ts).
 export function useSaveWhatsNew() {
-  return useProfileMutation(
-    (vars: Pick<UpdateMeVars, "onboarded" | "whatsNewSeq">) =>
-      unwrap<Me>(client.PATCH("/api/me", { body: vars })),
-    false,
-  );
+  const qc = useQueryClient();
+  return useMutation<
+    Me,
+    Error,
+    Pick<UpdateMeVars, "onboarded" | "whatsNewSeq">,
+    { previous?: Me }
+  >({
+    mutationFn: (vars) => unwrap<Me>(client.PATCH("/api/me", { body: vars })),
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: ["me"] });
+      const previous = qc.getQueryData<Me>(["me"]);
+      qc.setQueryData<Me>(["me"], (old) => (old ? { ...old, ...vars } : old));
+      return { previous };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.previous) qc.setQueryData(["me"], ctx.previous);
+      toast(err.message, "error");
+    },
+    onSuccess: (me) => {
+      qc.setQueryData(["me"], me);
+      void qc.invalidateQueries({ queryKey: ["members"] });
+    },
+  });
 }
 
 // Multipart and JPEG-streaming routes are outside the OpenAPI spec (see
