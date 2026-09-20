@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { useIsMutating } from "@tanstack/react-query";
 import { Navigate, Outlet } from "@tanstack/react-router";
 import { TabBar } from "@/components/TabBar";
@@ -137,10 +137,29 @@ function AppChrome() {
   // would send them forward again, since this redirect only runs one way.
   // While the mutation is in flight — including a save PAUSED offline,
   // whose status stays "pending" until it replays — trust the optimistic
-  // write over whatever the latest fetch says.
+  // write over whatever the latest fetch says. The predicate narrows this
+  // to a mutation that is actually FINISHING the first run: `saveWhatsNew`
+  // also carries a bare what's-new dismissal (whatsNewSeq only, no
+  // onboarded), which must not hold this guard up.
   const finishingFirstRun =
-    useIsMutating({ mutationKey: ["saveWhatsNew"] }) > 0;
+    useIsMutating({
+      mutationKey: ["saveWhatsNew"],
+      predicate: (m) =>
+        (m.state.variables as { onboarded?: boolean } | undefined)
+          ?.onboarded === true,
+    }) > 0;
   const onboarded = me.data?.onboarded;
+
+  // finishingFirstRun only covers the window while the mutation is in
+  // flight. Once its PATCH response lands (onSuccess, isMutating drops to
+  // 0), a STALE mount-triggered GET — issued after the PATCH started but
+  // carrying a snapshot taken before it committed — can still resolve
+  // afterwards and flip `me.onboarded` back to false with the guard
+  // already down. The redirect is one-way, so without a latch that stale
+  // response stranded the caretaker in a tour they had already finished.
+  // Once this session has seen onboarded === true, trust it for good.
+  const sawOnboarded = useRef(false);
+  if (onboarded === true) sawOnboarded.current = true;
 
   const { impersonatedBy, name } = me.data ?? {};
 
@@ -161,7 +180,7 @@ function AppChrome() {
     }
   };
 
-  if (onboarded === false && !finishingFirstRun) {
+  if (onboarded === false && !finishingFirstRun && !sawOnboarded.current) {
     return <Navigate to="/getting-started" />;
   }
 
