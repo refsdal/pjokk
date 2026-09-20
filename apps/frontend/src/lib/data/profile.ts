@@ -1,5 +1,9 @@
 import { useEffect } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { API_BASE, client, unwrap } from "../api";
 import { useAppearance } from "../appearance";
 import { getLanguageMode, resolveLanguage, type LanguageMode } from "../i18n";
@@ -84,43 +88,61 @@ export function useLanguageSync() {
   }, [serverMode, serverLanguage, setLanguage, mutate]);
 }
 
+type SaveWhatsNewVars = Pick<UpdateMeVars, "onboarded" | "whatsNewSeq">;
+
 // The what's-new marker and the first-run flag (issue #140). No log row
 // shows either, so no log view is invalidated — the same reasoning as
 // useSaveLanguage above.
 //
-// Its own useMutation rather than the shared useProfileMutation helper
-// above: this is the one profile write that must be optimistic, and the
+// Registered by mutationKey (registerProfileMutationDefaults below) rather
+// than the shared useProfileMutation helper above: this is the one profile
+// write that must be optimistic AND survive an offline reload, and the
 // helper stays untouched so name/nickname/phone/avatar/language keep their
-// existing (server-confirmed) behaviour. Two screens gate visibility on the
-// very field this hook writes — WhatsNewLine on whatsNewSeq, and the
-// getting-started carousel's finish handler (next task) on onboarded,
-// which AppChrome reads to redirect to /getting-started — so on a slow or
-// queued (offline) connection the UI must update at once, not wait for the
-// PATCH to land. Same optimistic-write / rollback idiom as
-// useSetBabyFeatures (lib/data/family.ts).
-export function useSaveWhatsNew() {
-  const qc = useQueryClient();
-  return useMutation<
-    Me,
-    Error,
-    Pick<UpdateMeVars, "onboarded" | "whatsNewSeq">,
-    { previous?: Me }
-  >({
-    mutationFn: (vars) => unwrap<Me>(client.PATCH("/api/me", { body: vars })),
-    onMutate: async (vars) => {
+// existing (server-confirmed) behaviour.
+//
+// Two screens gate visibility on the very field this hook writes —
+// WhatsNewLine on whatsNewSeq, and the getting-started carousel's finish
+// handler (next task) on onboarded, which AppChrome reads to redirect to
+// /getting-started — so on a slow connection the UI must update at once,
+// not wait for the PATCH to land: hence the optimistic onMutate + onError
+// rollback, the same idiom as useSetBabyFeatures (lib/data/family.ts).
+//
+// The mutationKey (not an inline mutationFn) is what makes that safe
+// offline, not just fast online: this app persists the query client to
+// IndexedDB and queues paused mutations while offline. A paused mutation
+// can only be dehydrated as { mutationKey, state, scope, meta } — a
+// function cannot be serialised — so on rehydrate TanStack recovers the
+// mutationFn (and onMutate/onError/onSuccess) solely by looking up
+// getMutationDefaults(mutationKey). A bare useMutation with an inline
+// mutationFn and no key resumes after a reload with mutationFn undefined:
+// .continue() throws "No mutationFn found", MutationCache silently
+// swallows it, and the dismissal (or the onboarded flag) is lost with no
+// error anywhere. Do not "simplify" this back into an inline mutationFn.
+export function registerProfileMutationDefaults(qc: QueryClient) {
+  qc.setMutationDefaults(["saveWhatsNew"], {
+    mutationFn: (vars: SaveWhatsNewVars) =>
+      unwrap<Me>(client.PATCH("/api/me", { body: vars })),
+    onMutate: async (vars: SaveWhatsNewVars) => {
       await qc.cancelQueries({ queryKey: ["me"] });
       const previous = qc.getQueryData<Me>(["me"]);
       qc.setQueryData<Me>(["me"], (old) => (old ? { ...old, ...vars } : old));
       return { previous };
     },
-    onError: (err, _vars, ctx) => {
-      if (ctx?.previous) qc.setQueryData(["me"], ctx.previous);
+    onError: (err: Error, _vars: SaveWhatsNewVars, ctx: unknown) => {
+      const snap = ctx as { previous?: Me } | undefined;
+      if (snap?.previous) qc.setQueryData(["me"], snap.previous);
       toast(err.message, "error");
     },
-    onSuccess: (me) => {
+    onSuccess: (me: Me) => {
       qc.setQueryData(["me"], me);
       void qc.invalidateQueries({ queryKey: ["members"] });
     },
+  });
+}
+
+export function useSaveWhatsNew() {
+  return useMutation<Me, Error, SaveWhatsNewVars>({
+    mutationKey: ["saveWhatsNew"],
   });
 }
 
