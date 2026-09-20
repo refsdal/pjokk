@@ -577,6 +577,8 @@ type Users struct {
 	Units            string
 	LanguageMode     *string
 	Language         string
+	OnboardedAt      pgtype.Timestamptz
+	WhatsNewSeq      int32
 }
 
 type VaccineDismissal struct {

@@ -16,20 +16,39 @@ SELECT
     "language",
     "avatar_key",
     "avatar_imported_at",
-    "image"
+    "image",
+    "onboarded_at",
+    "whats_new_seq"
 FROM "users"
 WHERE "id" = $1;
 
 -- name: UpdateUserProfile :exec
 -- Full-row write of the profile fields; the handler resolves the PATCH
--- tri-state (absent / null / value) before calling this. The two language
--- columns (00018) are the exception: NULL leaves them as they are, so a
--- caller that knows nothing of them cannot write "" over a person's choice
--- (neither is ever cleared back to NULL).
+-- tri-state (absent / null / value) before calling this. Three exceptions
+-- take sqlc.narg so a caller that knows nothing of them cannot overwrite a
+-- stored choice:
+--
+--   * the two language columns (00018): NULL leaves them as they are.
+--   * whats_new_seq (00034): GREATEST, never a plain assignment. Mutations
+--     queue offline and replay later, and a dismissal made on Tuesday and
+--     replayed on Thursday must not walk the marker backwards and re-show
+--     entries the person already dismissed.
+--
+-- onboarded_at is a CASE rather than a COALESCE because it has three wire
+-- states (absent / true / false) mapping to three outcomes (leave alone /
+-- set / clear), and COALESCE collapses two of them. Setting it uses
+-- coalesce(onboarded_at, now()) so re-running the tour from Settings does
+-- not rewrite the date this person actually first set the app up.
 UPDATE "users"
 SET "name" = @name, "nickname" = @nickname, "phone" = @phone, "units" = @units,
     "language_mode" = COALESCE(sqlc.narg('language_mode'), "language_mode"),
     "language" = COALESCE(sqlc.narg('language'), "language"),
+    "whats_new_seq" = GREATEST("whats_new_seq", COALESCE(sqlc.narg('whats_new_seq')::int, "whats_new_seq")),
+    "onboarded_at" = CASE
+      WHEN sqlc.narg('onboarded')::bool IS NULL THEN "onboarded_at"
+      WHEN sqlc.narg('onboarded')::bool         THEN COALESCE("onboarded_at", now())
+      ELSE NULL
+    END,
     "updated_at" = now()
 WHERE "id" = @id;
 
