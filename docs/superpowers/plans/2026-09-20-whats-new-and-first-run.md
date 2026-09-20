@@ -56,7 +56,11 @@ Router/Query, Tailwind, `bun:test`, Playwright.
 | Frontend + landing unit tests | `bun run test` |
 | Lint + i18n + typecheck | `bun run check` |
 | One frontend test file | `bun test apps/frontend/test/whats-new.test.ts` |
-| One e2e spec | `bunx playwright test e2e/whats-new.spec.ts --config e2e/playwright.config.ts` |
+| One e2e spec | `E2E_REBUILD=1 bash scripts/e2e-stack.sh up` then `cd e2e && bunx playwright test whats-new.spec.ts` |
+
+**`E2E_REBUILD=1` is not optional after a code change.** `e2e-stack.sh up`
+builds the image only when it is missing, so a plain `up` re-runs the suite
+against whatever was built last — possibly days old.
 
 ---
 
@@ -1758,8 +1762,15 @@ already in scope.
 
 - [ ] **Step 5: Run the e2e suite to SEE the breakage**
 
+**`E2E_REBUILD=1` is mandatory.** `scripts/e2e-stack.sh up` builds the image
+only when it is *missing*, so without this flag it silently serves a stale
+SPA and the run proves nothing about your change (Task 4 hit exactly this —
+the image was two days old).
+
 ```bash
-bunx playwright test e2e/invite.spec.ts --config e2e/playwright.config.ts
+export PATH="$PATH:$HOME/.local/go/bin:$HOME/go/bin"
+E2E_REBUILD=1 bash scripts/e2e-stack.sh up
+cd e2e && bunx playwright test invite.spec.ts
 ```
 
 Expected: **FAIL** — invitees now land on `/getting-started`, not `/home`.
@@ -1821,7 +1832,8 @@ behaviour rather than suppress it — replace each with:
 
 ```bash
 bun run check
-bunx playwright test --config e2e/playwright.config.ts
+E2E_REBUILD=1 bash scripts/e2e-stack.sh up   # rebuild: see Step 5
+cd e2e && bunx playwright test
 ```
 
 Expected: PASS. If a spec other than `invite.spec.ts` fails on a
@@ -2047,7 +2059,9 @@ the line. If a test above finds the line already hidden, check that
 - [ ] **Step 2: Run the new spec**
 
 ```bash
-bunx playwright test e2e/whats-new.spec.ts --config e2e/playwright.config.ts
+export PATH="$PATH:$HOME/.local/go/bin:$HOME/go/bin"
+E2E_REBUILD=1 bash scripts/e2e-stack.sh up   # mandatory: `up` alone reuses a stale image
+cd e2e && bunx playwright test whats-new.spec.ts
 ```
 
 Expected: PASS, 3 tests.
