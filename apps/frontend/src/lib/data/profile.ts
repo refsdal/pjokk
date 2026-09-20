@@ -123,9 +123,19 @@ export function registerProfileMutationDefaults(qc: QueryClient) {
     mutationFn: (vars: SaveWhatsNewVars) =>
       unwrap<Me>(client.PATCH("/api/me", { body: vars })),
     onMutate: async (vars: SaveWhatsNewVars) => {
-      await qc.cancelQueries({ queryKey: ["me"] });
+      // setQueryData runs BEFORE the await, in the same synchronous tick as
+      // the `mutate()` call that triggered it: the getting-started screen's
+      // finish handler calls `navigate({ to: "/home" })` right after
+      // `mutate()` returns, and AppChrome's redirect reads this same cache
+      // entry on the very next render. Awaiting cancelQueries first (the
+      // original order) yields control back to that navigate before the
+      // cache write lands, so `onboarded` is still `false` when Home's
+      // guard checks it — a one-frame bounce back into the carousel, seen
+      // intermittently in e2e (issue #140). Cancelling after the write still
+      // stops a stale in-flight `me` response from clobbering it.
       const previous = qc.getQueryData<Me>(["me"]);
       qc.setQueryData<Me>(["me"], (old) => (old ? { ...old, ...vars } : old));
+      await qc.cancelQueries({ queryKey: ["me"] });
       return { previous };
     },
     onError: (err: Error, _vars: SaveWhatsNewVars, ctx: unknown) => {

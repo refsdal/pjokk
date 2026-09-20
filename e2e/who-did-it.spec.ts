@@ -1,6 +1,12 @@
 import { join } from "node:path";
 import { asDevice, expect, seedDayMode, test } from "./fixtures";
-import { apiSignIn, apiSignup, freshEmail, freshFamily } from "./helpers";
+import {
+  apiSignIn,
+  apiSignup,
+  freshEmail,
+  freshFamily,
+  skipGettingStarted,
+} from "./helpers";
 
 // Screenshots of the chips and the "Logged by" line, for a human to look
 // at. Off in the repo by default (test-results/ is gitignored); point
@@ -41,6 +47,7 @@ test("a diaper logged for a partner shows the partner on the timeline", async ({
     data: { name: "Bo Partner" },
   });
   expect(renamed.ok(), `name the partner: ${renamed.status()}`).toBeTruthy();
+  await skipGettingStarted(partner);
   await partner.goto(`/join/${code}`);
   await expect(partner).toHaveURL(/\/home/, { timeout: 10_000 });
   await ctx.close();

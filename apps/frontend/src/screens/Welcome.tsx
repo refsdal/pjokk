@@ -85,6 +85,12 @@ export function WelcomeScreen() {
         }),
       );
       await queryClient.invalidateQueries();
+      // A founder has just been through Welcome and is about to go through
+      // the tracking carousel; a third screen would be the wall the first
+      // run exists to avoid (spec §8). The invitee, who gets neither, is
+      // the one who needs orientation.
+      await unwrap(client.PATCH("/api/me", { body: { onboarded: true } }));
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
       // A new baby tracks nothing until the family chooses: the carousel
       // is the next screen, and its Done lands on Home.
       void navigate({

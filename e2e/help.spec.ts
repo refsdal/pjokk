@@ -1,7 +1,13 @@
 import { join } from "node:path";
 import type { Locator, Page } from "@playwright/test";
 import { asDevice, expect, seedDayMode, test } from "./fixtures";
-import { apiSignIn, apiSignup, freshEmail, freshFamily } from "./helpers";
+import {
+  apiSignIn,
+  apiSignup,
+  freshEmail,
+  freshFamily,
+  skipGettingStarted,
+} from "./helpers";
 
 // The whole "Ask for help" round trip between two caretakers, against the
 // real artifact: More → Ask for help → Send → the card appears on BOTH
@@ -77,6 +83,7 @@ test("a caretaker asks another for help and gets an answer", async ({
   await seedDayMode(ctx);
   const target = await ctx.newPage();
   await apiSignIn(target, targetEmail);
+  await skipGettingStarted(target);
   await target.goto(`/join/${code}`);
   await expect(target).toHaveURL(/\/home/, { timeout: 10_000 });
 

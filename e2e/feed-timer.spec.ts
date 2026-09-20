@@ -1,7 +1,13 @@
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { asDevice, expect, seedDayMode, test } from "./fixtures";
-import { apiSignIn, apiSignup, freshEmail, freshFamily } from "./helpers";
+import {
+  apiSignIn,
+  apiSignup,
+  freshEmail,
+  freshFamily,
+  skipGettingStarted,
+} from "./helpers";
 
 // The shared nursing / pump timer (issue #44) between two caretakers,
 // against the real artifact: one phone starts the clock from the feed
@@ -49,6 +55,7 @@ test("a nursing timer started on one phone runs, and stops, on the other", async
   await seedDayMode(ctx);
   const other = await ctx.newPage();
   await apiSignIn(other, otherEmail);
+  await skipGettingStarted(other);
   await other.goto(`/join/${code}`);
   await expect(other).toHaveURL(/\/home/, { timeout: 10_000 });
 

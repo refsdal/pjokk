@@ -1,7 +1,13 @@
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { asDevice, expect, seedDayMode, test } from "./fixtures";
-import { apiSignIn, apiSignup, freshEmail, freshFamily } from "./helpers";
+import {
+  apiSignIn,
+  apiSignup,
+  freshEmail,
+  freshFamily,
+  skipGettingStarted,
+} from "./helpers";
 
 // The barnehage as a place, and who collects her (spec 2026-09-17-daycare-
 // place-and-pickup-plan): a parent sets the place and the week up in
@@ -40,6 +46,7 @@ test("set up the place and the week, then see the plan while she is there", asyn
   const partner = await ctx.newPage();
   await apiSignIn(partner, partnerEmail);
   await partner.request.patch("/api/me", { data: { name: "Bo Partner" } });
+  await skipGettingStarted(partner);
   await partner.goto(`/join/${code}`);
   await expect(partner).toHaveURL(/\/home/, { timeout: 10_000 });
 

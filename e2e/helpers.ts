@@ -105,6 +105,20 @@ export const ALL_FEATURES = [
   "vaccines",
 ];
 
+/**
+ * Marks the signed-in account onboarded so it is not redirected to the
+ * first-run carousel (issue #140). Every fixture wants the "existing
+ * caretaker" state — the carousel itself is e2e/whats-new.spec.ts's
+ * business — exactly as ALL_FEATURES above stands in for the 00033
+ * backfill.
+ */
+export async function skipGettingStarted(page: Page): Promise<void> {
+  const res = await page.request.patch("/api/me", {
+    data: { onboarded: true },
+  });
+  expect(res.ok(), `onboarded: ${res.status()} ${await res.text()}`).toBeTruthy();
+}
+
 /** Welcome flow: create the family, then the first baby, then land on Home. */
 export async function uiCreateFamily(
   page: Page,
@@ -138,6 +152,7 @@ export async function uiCreateFamily(
     });
     expect(res.ok(), `features: ${res.status()} ${await res.text()}`).toBeTruthy();
   }
+  await skipGettingStarted(page);
   await page.goto(landing.source.includes("kiosk") ? "/kiosk" : "/home");
   await expect(page).toHaveURL(landing, { timeout: 10_000 });
 }
