@@ -3468,6 +3468,9 @@ type Me struct {
 	Name         string          `json:"name"`
 	Nickname     *string         `json:"nickname"`
 
+	// Onboarded False only for someone who has never finished or skipped the getting-started carousel. Accounts predating migration 00034 are backfilled true.
+	Onboarded bool `json:"onboarded"`
+
 	// Phone Private to the user; never on Member.
 	Phone *string `json:"phone"`
 	Plan  *string `json:"plan"`
@@ -3480,7 +3483,8 @@ type Me struct {
 	UserId string  `json:"userId"`
 
 	// Version The server's build version — the same string the container image is tagged with ("0.8.0", "0.9.0-pr.42.abc1234"), or "dev" for an unstamped build. Shown in the Settings footer.
-	Version string `json:"version"`
+	Version     string `json:"version"`
+	WhatsNewSeq int    `json:"whatsNewSeq"`
 }
 
 // MeLanguage The language in effect, as the app last resolved it (`auto` resolved on the device). Server-written text — push notifications — is in this language.
@@ -4240,8 +4244,14 @@ type UpdateMe struct {
 	LanguageMode *UpdateMeLanguageMode `json:"languageMode,omitempty"`
 	Name         *string               `json:"name,omitempty"`
 	Nickname     *string               `json:"nickname,omitempty"`
-	Phone        *string               `json:"phone,omitempty"`
-	Units        *UpdateMeUnits        `json:"units,omitempty"`
+
+	// Onboarded True once this person has finished or skipped the getting-started carousel (issue #140). Stored as a timestamp; exposed as a bool because the date is nobody's business but support's.
+	Onboarded *bool          `json:"onboarded,omitempty"`
+	Phone     *string        `json:"phone,omitempty"`
+	Units     *UpdateMeUnits `json:"units,omitempty"`
+
+	// WhatsNewSeq The highest what's-new entry seq this person has seen. The server keeps the GREATEST of stored and incoming — mutations queue offline, and a stale replay must not walk it backwards.
+	WhatsNewSeq *int `json:"whatsNewSeq,omitempty"`
 }
 
 // UpdateMeLanguage defines model for UpdateMe.Language.

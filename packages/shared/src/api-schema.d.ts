@@ -2181,6 +2181,10 @@ export interface components {
             languageMode?: "auto" | "en" | "nb";
             /** @enum {string} */
             language?: "en" | "nb";
+            /** @description True once this person has finished or skipped the getting-started carousel (issue #140). Stored as a timestamp; exposed as a bool because the date is nobody's business but support's. */
+            onboarded?: boolean;
+            /** @description The highest what's-new entry seq this person has seen. The server keeps the GREATEST of stored and incoming — mutations queue offline, and a stale replay must not walk it backwards. */
+            whatsNewSeq?: number;
         };
         Member: {
             /** @description The family-membership row id (NOT the user id). */
@@ -2223,6 +2227,9 @@ export interface components {
              * @enum {string}
              */
             language: "en" | "nb";
+            /** @description False only for someone who has never finished or skipped the getting-started carousel. Accounts predating migration 00034 are backfilled true. */
+            onboarded: boolean;
+            whatsNewSeq: number;
             /** @description Nickname when set, else name — what every other member sees (users.display_name, a generated column). */
             displayName: string;
             nickname: string | null;

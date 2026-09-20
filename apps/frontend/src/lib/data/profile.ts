@@ -19,6 +19,8 @@ export interface UpdateMeVars {
   units?: "metric" | "imperial";
   languageMode?: LanguageMode;
   language?: "en" | "nb";
+  onboarded?: boolean;
+  whatsNewSeq?: number;
 }
 
 // Every mutation replaces the cached `me` and refreshes `members` (both show
@@ -79,6 +81,17 @@ export function useLanguageSync() {
     if (plan.adopt) setLanguage(plan.adopt);
     if (plan.patch) mutate(plan.patch);
   }, [serverMode, serverLanguage, setLanguage, mutate]);
+}
+
+// The what's-new marker and the first-run flag (issue #140). No log row
+// shows either, so no log view is invalidated — the same reasoning as
+// useSaveLanguage above.
+export function useSaveWhatsNew() {
+  return useProfileMutation(
+    (vars: Pick<UpdateMeVars, "onboarded" | "whatsNewSeq">) =>
+      unwrap<Me>(client.PATCH("/api/me", { body: vars })),
+    false,
+  );
 }
 
 // Multipart and JPEG-streaming routes are outside the OpenAPI spec (see
