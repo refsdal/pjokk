@@ -19,7 +19,7 @@ import { signOut } from "@/lib/auth-client";
 import { toast } from "@/lib/toast";
 import { AppearanceSection } from "./settings/AppearanceSection";
 import { InstallSection } from "./settings/InstallSection";
-import { SectionTitle } from "./settings/lib";
+import { NavRow, SectionTitle } from "./settings/lib";
 import { NapGuideSection } from "./settings/NapGuideSection";
 import { NotificationsSection } from "./settings/NotificationsSection";
 
@@ -243,6 +243,14 @@ export function ProfileScreen() {
           <AppearanceSection />
           <NapGuideSection />
           <InstallSection />
+
+          {/* Dismissing the line on Home must lose nothing (issue #140),
+              so both ways back live here. */}
+          <SectionTitle>{t("About")}</SectionTitle>
+          <Card className="divide-y divide-line p-0">
+            <NavRow to="/whats-new" label={t("What's new")} />
+            <NavRow to="/getting-started" label={t("Getting started")} />
+          </Card>
 
           <SectionTitle>{t("Account")}</SectionTitle>
           <Card className="space-y-3">
