@@ -610,8 +610,10 @@ EOF
 - Produces:
   - `type WhatsNewEntry = { seq: number; version: string; title: string; body: string; feature?: Feature; icon: TablerIcon; tint: string }`
   - `type GuideCard = { key: string; title: string; body: string; icon: TablerIcon; tint: string }`
-  - `whatsNew: WhatsNewEntry[]` (ascending `seq`)
-  - `gettingStarted: GuideCard[]`
+  - `whatsNew(): WhatsNewEntry[]` (ascending `seq`) — a FUNCTION, so `t()`
+    resolves against the current language; its strings are already
+    translated and must never be re-wrapped
+  - `gettingStarted(): GuideCard[]` — same
   - `pending(entries, seq, tracks): WhatsNewEntry[]` — newest first
   - `highestSeq(entries): number`
 
@@ -798,7 +800,18 @@ import type { GuideCard, WhatsNewEntry } from "@/lib/whats-new";
 // a feature that shipped before this mechanism existed. A first run that
 // listed every feature ever shipped would be the tutorial wall CLAUDE.md's
 // information architecture bans.
-export const whatsNew: WhatsNewEntry[] = [
+//
+// A FUNCTION, not a const: t() resolves against whichever language is
+// active WHEN IT IS CALLED. A module-level constant bakes the language the
+// app happened to load in, and since t() is `active?.[s] ?? s`, a
+// Norwegian-baked string can never be mapped back to English — switching
+// the app to English would leave this content in Norwegian while the rest
+// of the UI switched live. Keeping the t("…") literals here (rather than
+// storing English and calling t() at the render site) is also what keeps
+// scripts/check-i18n.mjs able to see them: it only greps literals.
+// Render sites therefore must NOT wrap these again.
+export function whatsNew(): WhatsNewEntry[] {
+  return [
   {
     seq: 1,
     version: "v0.48.0",
@@ -806,15 +819,19 @@ export const whatsNew: WhatsNewEntry[] = [
     body: t(
       "New things now show up as one line here on Home. Tap to read them, or brush it away — everything stays under Settings.",
     ),
-    icon: IconSparkles,
-    tint: "text-accent",
-  },
-];
+      icon: IconSparkles,
+      tint: "text-accent",
+    },
+  ];
+}
 
 // The first run, for someone who arrived by invite and has never seen the
 // app. Not generated from the entries above: a newcomer wants to know what
 // the app is for, not what changed last Tuesday.
-export const gettingStarted: GuideCard[] = [
+//
+// A function for the same reason as whatsNew() above.
+export function gettingStarted(): GuideCard[] {
+  return [
   {
     key: "status",
     title: t("A glance, not a log"),
@@ -848,11 +865,17 @@ export const gettingStarted: GuideCard[] = [
     body: t(
       "Timeline, Stats and Calendar are there when you want them. Nothing needs setting up first.",
     ),
-    icon: IconChartBar,
-    tint: "text-growth",
-  },
-];
+      icon: IconChartBar,
+      tint: "text-growth",
+    },
+  ];
+}
 ```
+
+The inner entries keep the exact fields shown above; only the wrapper
+changed from `export const X: T[] = [ … ]` to
+`export function X(): T[] { return [ … ] }`. Indent the entries one level
+further to match.
 
 **The tint tokens are not free-form.** The ones in use are `text-accent`,
 `text-diaper`, `text-feed` (singular), `text-growth`, `text-muted` and
@@ -1300,8 +1323,8 @@ EOF
 Create `apps/frontend/src/screens/WhatsNew.tsx`:
 
 ```tsx
-import { IconArrowLeft } from "@tabler/icons-react";
-import { Link } from "@tanstack/react-router";
+import { IconChevronLeft } from "@tabler/icons-react";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import { whatsNew } from "@/data/whats-new";
 import { useBabies } from "@/lib/data";
 import { t } from "@/lib/i18n";
@@ -1317,21 +1340,36 @@ import { cn } from "@/lib/utils";
 // the content. It IS filtered by what the family tracks, so the page never
 // advertises a feature they have switched off.
 export function WhatsNewScreen() {
+  const router = useRouter();
+  const navigate = useNavigate();
   const babies = useBabies();
-  const entries = whatsNew
+  // whatsNew() is a function so t() resolves against the CURRENT language;
+  // its strings are already translated, so nothing here re-wraps them.
+  const entries = whatsNew()
     .filter((e) => !e.feature || familyTracks(babies.data, e.feature))
     .sort((a, b) => b.seq - a.seq);
 
   return (
     <div className="mx-auto max-w-md px-4 pt-safe pb-tabbar md:max-w-lg">
       <div className="flex items-center gap-2 py-3">
-        <Link
-          to="/profile"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-ink"
+        {/* History back, not a fixed destination: this screen is reached
+            from Home's row AND from Settings, and sending a parent who
+            tapped the row on Home into Settings costs exactly the extra
+            taps this feature exists not to cost. Falls back to /profile
+            when there is no history to go back to (a deep link, or a fresh
+            PWA launch). 44 px and the house back-button idiom — see
+            Profile.tsx. */}
+        <button
+          type="button"
+          onClick={() => {
+            if (window.history.length > 1) router.history.back();
+            else void navigate({ to: "/profile" });
+          }}
+          className="-ml-2 flex h-11 w-11 items-center justify-center rounded-full text-ink-soft active:bg-surface-2"
           aria-label={t("Back")}
         >
-          <IconArrowLeft className="h-5 w-5" />
-        </Link>
+          <IconChevronLeft className="h-6 w-6" />
+        </button>
         <h1 className="text-2xl font-extrabold text-ink">{t("What's new")}</h1>
       </div>
 
@@ -1358,9 +1396,12 @@ export function WhatsNewScreen() {
                   >
                     <Icon className="h-4 w-4" />
                   </span>
+                  {/* Already translated by whatsNew() — do NOT wrap in
+                      t() again: a second pass cannot map a Norwegian
+                      string back to English. */}
                   <div className="space-y-1">
-                    <h2 className="font-semibold text-ink">{t(e.title)}</h2>
-                    <p className="text-sm text-ink-soft">{t(e.body)}</p>
+                    <h2 className="font-semibold text-ink">{e.title}</h2>
+                    <p className="text-sm text-ink-soft">{e.body}</p>
                     <p className="text-xs text-muted">{e.version}</p>
                   </div>
                 </div>
@@ -1479,11 +1520,11 @@ export function WhatsNewLine() {
   const seq = me.data?.whatsNewSeq;
   if (seq === undefined) return null;
 
-  const unseen = pending(whatsNew, seq, (k) => familyTracks(babies.data, k));
+  const unseen = pending(whatsNew(), seq, (k) => familyTracks(babies.data, k));
   if (unseen.length === 0) return null;
 
   // Over the UNFILTERED list: see highestSeq's comment.
-  const markSeen = () => save.mutate({ whatsNewSeq: highestSeq(whatsNew) });
+  const markSeen = () => save.mutate({ whatsNewSeq: highestSeq(whatsNew()) });
 
   return (
     <div className="px-4 pb-3" data-testid="whats-new-line">
@@ -1649,11 +1690,12 @@ export function GettingStartedScreen() {
   // Finishing also marks the release notes caught up: a brand-new account
   // must never be shown what changed in versions it never missed.
   const finish = () => {
-    save.mutate({ onboarded: true, whatsNewSeq: highestSeq(whatsNew) });
+    save.mutate({ onboarded: true, whatsNewSeq: highestSeq(whatsNew()) });
     void navigate({ to: "/home" });
   };
 
-  const steps = gettingStarted.map((card) => {
+  // Already-translated strings from gettingStarted(); never re-wrap in t().
+  const steps = gettingStarted().map((card) => {
     const Icon = card.icon;
     return (
       <section
@@ -1669,8 +1711,8 @@ export function GettingStartedScreen() {
         >
           <Icon className="h-8 w-8" />
         </span>
-        <h2 className="text-2xl font-extrabold text-ink">{t(card.title)}</h2>
-        <p className="max-w-xs text-ink-soft">{t(card.body)}</p>
+        <h2 className="text-2xl font-extrabold text-ink">{card.title}</h2>
+        <p className="max-w-xs text-ink-soft">{card.body}</p>
       </section>
     );
   });
