@@ -1068,6 +1068,23 @@ const nb: Record<string, string> = {
   "What to track": "Hva som følges",
   "Turn on Sleep or Feeds to see stats":
     "Slå på Søvn eller Måltider for å se statistikk",
+
+  // What's new, and a first run (issue #140)
+  "A quiet note when something changes": "En rolig beskjed når noe endrer seg",
+  "New things now show up as one line here on Home. Tap to read them, or brush it away — everything stays under Settings.":
+    "Nye ting dukker opp som én linje her på Hjem. Trykk for å lese, eller børst den bort — alt ligger under Innstillinger.",
+  "A glance, not a log": "Et blikk, ikke en loggbok",
+  "Home answers when she last ate, slept and was changed — before you tap anything.":
+    "Hjem svarer på når hun sist spiste, sov og ble skiftet — før du trykker på noe.",
+  "Two taps to log": "To trykk for å logge",
+  "Open, save. Every form remembers the last one, and you can always fix the time afterwards.":
+    "Åpne, lagre. Hvert skjema husker forrige gang, og du kan alltid rette tiden etterpå.",
+  "Everyone sees the same thing": "Alle ser det samme",
+  "Whoever is with her can log it. Entries say who did the care, which is useful the morning after.":
+    "Den som er med henne kan logge det. Oppføringene sier hvem som gjorde det, noe som er nyttig dagen etter.",
+  "The rest can wait": "Resten kan vente",
+  "Timeline, Stats and Calendar are there when you want them. Nothing needs setting up first.":
+    "Tidslinje, Statistikk og Kalender er der når du vil ha dem. Ingenting må settes opp først.",
 };
 
 function readMode(): LanguageMode {
