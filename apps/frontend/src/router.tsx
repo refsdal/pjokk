@@ -12,6 +12,7 @@ import { Toaster } from "@/components/Toaster";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { AppearanceProvider } from "@/lib/appearance";
 import { t } from "@/lib/i18n";
+import { GettingStartedScreen } from "@/screens/GettingStarted";
 import { HomeScreen } from "@/screens/Home";
 import { JoinScreen } from "@/screens/Join";
 import { KioskSetupScreen } from "@/screens/KioskSetup";
@@ -191,6 +192,14 @@ const welcomeRoute = createRoute({
   component: WelcomeScreen,
 });
 
+// The first run (issue #140). Outside the app shell, like /welcome: it is
+// full-screen and has no tab bar, and AppChrome is what redirects into it.
+const gettingStartedRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/getting-started",
+  component: GettingStartedScreen,
+});
+
 // app.pjokk.no/ is the app's front door now that the landing page has moved
 // to the apex (see CLAUDE.md, "everything lives on the apex" for the split).
 // A top-level route, parented at rootRoute rather than appRoute: nesting it
@@ -335,6 +344,7 @@ export const routeTree = rootRoute.addChildren([
   loginRoute,
   joinRoute,
   welcomeRoute,
+  gettingStartedRoute,
   kioskRoute,
   kioskSetupRoute,
   adminRoute.addChildren([

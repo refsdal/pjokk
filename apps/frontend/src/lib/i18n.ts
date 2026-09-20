@@ -1089,6 +1089,9 @@ const nb: Record<string, string> = {
   "The rest can wait": "Resten kan vente",
   "Timeline, Stats and Calendar are there when you want them. Nothing needs setting up first.":
     "Tidslinje, Statistikk og Kalender er der når du vil ha dem. Ingenting må settes opp først.",
+  Skip: "Hopp over",
+  "Start using Pjokk": "Kom i gang",
+  "Getting started": "Kom i gang",
 };
 
 function readMode(): LanguageMode {

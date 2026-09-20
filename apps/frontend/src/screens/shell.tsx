@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect } from "react";
+import { useIsMutating } from "@tanstack/react-query";
 import { Navigate, Outlet } from "@tanstack/react-router";
 import { TabBar } from "@/components/TabBar";
 import { client, unwrap } from "@/lib/api";
@@ -117,6 +118,30 @@ function AppChrome() {
   const me = useMe();
   useLanguageSync();
 
+  // The first run (issue #140). Here rather than in AuthGate because it
+  // needs a settled `me`, and below the kiosk check in AppShell because an
+  // enrolled tablet holds no person's session and must never land here.
+  //
+  // Founders never see it: Welcome.tsx sets onboarded when it creates the
+  // baby, so they go on to the tracking carousel instead of being pulled
+  // out of it into a second one.
+  //
+  // finishingFirstRun guards a real race, not a theoretical one: Done/Skip
+  // fires the optimistic saveWhatsNew mutation and navigates to /home in
+  // the same tick, but useMe refetches unconditionally on every mount
+  // (staleTime 0, refetchOnMount "always" — lib/data/family.ts), and Home's
+  // fresh mount under AppShell is exactly such a remount. If that GET
+  // resolves before the PATCH does, it can overwrite the optimistic
+  // onboarded:true with the server's still-false answer and bounce the
+  // caretaker straight back into the tour they just finished — nothing else
+  // would send them forward again, since this redirect only runs one way.
+  // While the mutation is in flight — including a save PAUSED offline,
+  // whose status stays "pending" until it replays — trust the optimistic
+  // write over whatever the latest fetch says.
+  const finishingFirstRun =
+    useIsMutating({ mutationKey: ["saveWhatsNew"] }) > 0;
+  const onboarded = me.data?.onboarded;
+
   const { impersonatedBy, name } = me.data ?? {};
 
   // The impersonated session IS the target user's, so ending it is a
@@ -135,6 +160,10 @@ function AppChrome() {
       );
     }
   };
+
+  if (onboarded === false && !finishingFirstRun) {
+    return <Navigate to="/getting-started" />;
+  }
 
   return (
     <div className="min-h-dvh">

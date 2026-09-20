@@ -1,7 +1,13 @@
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { asDevice, expect, seedDayMode, test } from "./fixtures";
-import { apiSignIn, apiSignup, freshEmail, freshFamily } from "./helpers";
+import {
+  apiSignIn,
+  apiSignup,
+  freshEmail,
+  freshFamily,
+  skipGettingStarted,
+} from "./helpers";
 
 // A day at barnehage (issue #105, spec 2026-09-17-daycare-session): dropped
 // off from More, a calm banner on Home while she is there, picked up with
@@ -114,6 +120,7 @@ test("a finished day names who dropped off and who picked up", async ({
   const partner = await ctx.newPage();
   await apiSignIn(partner, partnerEmail);
   await partner.request.patch("/api/me", { data: { name: "Bo Partner" } });
+  await skipGettingStarted(partner);
   await partner.goto(`/join/${code}`);
   await expect(partner).toHaveURL(/\/home/, { timeout: 10_000 });
   await ctx.close();

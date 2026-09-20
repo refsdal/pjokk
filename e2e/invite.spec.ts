@@ -30,6 +30,9 @@ test("a second caretaker joins via an invite link", async ({ browser, page, requ
   await apiSignIn(invitee, inviteeEmail);
   await invitee.goto(`/join/${code}`);
   // No button click: the join screen auto-redeems a signed-in visitor.
+  // A brand-new invitee is who the first run exists for (issue #140).
+  await expect(invitee).toHaveURL(/\/getting-started/, { timeout: 10_000 });
+  await invitee.getByTestId("getting-started-skip").click();
   await expect(invitee).toHaveURL(/\/home/, { timeout: 10_000 });
   await expect(invitee.getByText("Baby inviter").first()).toBeVisible();
   await ctx.close();
@@ -50,6 +53,9 @@ test("a brand-new invitee auto-redeems on opening the join link", async ({ page,
   await apiSignIn(invitee, inviteeEmail);
   await invitee.goto(`/join/${code}`);
   // No button click: the join screen auto-redeems a signed-in visitor.
+  // A brand-new invitee is who the first run exists for (issue #140).
+  await expect(invitee).toHaveURL(/\/getting-started/, { timeout: 10_000 });
+  await invitee.getByTestId("getting-started-skip").click();
   await expect(invitee).toHaveURL(/\/home/, { timeout: 10_000 });
   await expect(invitee.getByText("Baby autojoin").first()).toBeVisible();
   await ctx.close();

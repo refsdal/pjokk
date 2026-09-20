@@ -88,7 +88,7 @@ export function Carousel({
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col pt-safe md:max-w-lg">
-      {/* biome-ignore lint/a11y/useSemanticElements: a <div> scroll-snap strip; role only makes aria-label valid */}
+      {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label is only sent when role is "region" (a caller that passes no ariaLabel gets no landmark at all) */}
       <div
         ref={strip}
         onScroll={onScroll}
@@ -97,7 +97,7 @@ export function Carousel({
         // never scroll vertically (which would push the ring to the edge).
         className="flex flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none]"
         data-testid={`${testIdPrefix}-strip`}
-        role="region"
+        role={ariaLabel ? "region" : undefined}
         aria-label={ariaLabel}
       >
         {steps.map((step, i) => (
