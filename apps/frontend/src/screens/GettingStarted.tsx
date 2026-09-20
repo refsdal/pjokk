@@ -1,8 +1,9 @@
 import { Navigate, useNavigate } from "@tanstack/react-router";
+import { useRef } from "react";
 import { Carousel } from "@/components/Carousel";
 import { gettingStarted, whatsNew } from "@/data/whats-new";
 import { useSession } from "@/lib/auth-client";
-import { useSaveWhatsNew } from "@/lib/data";
+import { useMe, useSaveWhatsNew } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { highestSeq } from "@/lib/whats-new";
@@ -19,8 +20,18 @@ export function GettingStartedScreen() {
   // its own — a signed-out visitor could otherwise open it directly and
   // have Skip 401. Same check as Welcome.tsx.
   const { data: session, isPending } = useSession();
+  const me = useMe();
   const navigate = useNavigate();
   const save = useSaveWhatsNew();
+  // Capture whether this is a genuine first run at mount time. A ref, not
+  // derived state: by the time finish() runs, the optimistic update may
+  // already have flipped onboarded to true. Initialize to null so a slow
+  // first paint doesn't misclassify a genuine first run as a re-run — only
+  // latch once me.data exists.
+  const isFirstRun = useRef<boolean | null>(null);
+  if (me.data && isFirstRun.current === null) {
+    isFirstRun.current = me.data.onboarded === false;
+  }
 
   if (isPending) {
     return <div className="min-h-dvh" />;
@@ -29,10 +40,16 @@ export function GettingStartedScreen() {
     return <Navigate to="/login" />;
   }
 
-  // Finishing also marks the release notes caught up: a brand-new account
-  // must never be shown what changed in versions it never missed.
+  // Finishing marks the onboarded flag. For a genuine first run, also mark
+  // the release notes caught up: a brand-new account must never be shown
+  // what changed in versions it never missed. But re-running the tour out
+  // of curiosity should not mark release notes as read.
   const finish = () => {
-    save.mutate({ onboarded: true, whatsNewSeq: highestSeq(whatsNew()) });
+    save.mutate(
+      isFirstRun.current === true
+        ? { onboarded: true, whatsNewSeq: highestSeq(whatsNew()) }
+        : { onboarded: true },
+    );
     void navigate({ to: "/home" });
   };
 
