@@ -5,6 +5,7 @@ import { useBabies } from "@/lib/data";
 import { t } from "@/lib/i18n";
 import { familyTracks } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
+import { visible } from "@/lib/whats-new";
 
 // Every entry ever written, newest first (issue #140). Deliberately a list
 // and not a carousel: three new things are three cards read in one glance,
@@ -20,9 +21,7 @@ export function WhatsNewScreen() {
   const babies = useBabies();
   // whatsNew() is a function so t() resolves against the CURRENT language;
   // its strings are already translated, so nothing here re-wraps them.
-  const entries = whatsNew()
-    .filter((e) => !e.feature || familyTracks(babies.data, e.feature))
-    .sort((a, b) => b.seq - a.seq);
+  const entries = visible(whatsNew(), (k) => familyTracks(babies.data, k));
 
   return (
     <div className="mx-auto max-w-md px-4 pt-safe pb-tabbar md:max-w-lg">

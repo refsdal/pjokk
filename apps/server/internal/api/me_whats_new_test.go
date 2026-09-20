@@ -77,8 +77,9 @@ func TestMeOnboardedRoundTrip(t *testing.T) {
 // exposes onboarded as a bool, so a second "onboarded: true" PATCH looks
 // like a no-op through the wire. Assert directly against the row that the
 // stored onboarded_at timestamp does not move on a repeat set — the SQL
-// (00034 / GetUserProfile's WHERE onboarded_at IS NULL guard) is what makes
-// that true, and this test is the one thing pinning it.
+// (UpdateUserProfile's `onboarded_at = COALESCE("onboarded_at", now())`
+// case, internal/db/queries/profile.sql) is what makes that true, and this
+// test is the one thing pinning it.
 func TestMeOnboardedTimestampDoesNotMoveOnRepeatSet(t *testing.T) {
 	t.Parallel()
 	a := testrig.App(t)

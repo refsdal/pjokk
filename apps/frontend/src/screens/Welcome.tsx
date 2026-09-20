@@ -94,12 +94,24 @@ export function WelcomeScreen() {
       // PATCH as onboarded — a founder has been "away" zero seconds, and a
       // new account is never shown release notes for versions it never
       // missed (the same rule getting-started's own finish handler follows).
-      await unwrap(
-        client.PATCH("/api/me", {
-          body: { onboarded: true, whatsNewSeq: highestSeq(whatsNew()) },
-        }),
-      );
-      await queryClient.invalidateQueries({ queryKey: ["me"] });
+      //
+      // Its own try/catch, deliberately separate from the baby POST above:
+      // the baby already exists by this point, so a failure here must never
+      // stop the navigate below. Swallowing it is correct — the worst case
+      // is a stale "1 new thing" line the founder can dismiss later, which
+      // is recoverable, whereas retrying this whole handler after a baby-
+      // POST failure would create a SECOND baby (the first left with no
+      // `features` configured) and leave the founder stuck un-onboarded.
+      try {
+        await unwrap(
+          client.PATCH("/api/me", {
+            body: { onboarded: true, whatsNewSeq: highestSeq(whatsNew()) },
+          }),
+        );
+        await queryClient.invalidateQueries({ queryKey: ["me"] });
+      } catch {
+        // Swallowed — see comment above.
+      }
       // A new baby tracks nothing until the family chooses: the carousel
       // is the next screen, and its Done lands on Home.
       void navigate({
