@@ -1071,6 +1071,7 @@ const nb: Record<string, string> = {
 
   // What's new, and a first run (issue #140)
   "What's new": "Nytt",
+  "Dismiss what's new": "Skjul nytt",
   "Nothing new yet.": "Ingenting nytt ennå.",
   "A quiet note when something changes": "En rolig beskjed når noe endrer seg",
   "New things now show up as one line here on Home. Tap to read them, or brush it away — everything stays under Settings.":

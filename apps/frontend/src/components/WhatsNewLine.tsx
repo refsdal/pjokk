@@ -57,7 +57,7 @@ export function WhatsNewLine() {
           // tap and missing it means opening a screen nobody asked for.
           className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted"
           data-testid="whats-new-dismiss"
-          aria-label={t("Dismiss")}
+          aria-label={t("Dismiss what's new")}
           onClick={markSeen}
         >
           <IconX className="h-5 w-5" />
