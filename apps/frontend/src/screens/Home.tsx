@@ -25,6 +25,7 @@ import {
 import { BabyHeader } from "@/components/BabyHeader";
 import { HelpCard } from "@/components/HelpCard";
 import { InstallBanner } from "@/components/InstallBanner";
+import { WhatsNewLine } from "@/components/WhatsNewLine";
 import { ErrorState, LoadingState } from "@/components/QueryStates";
 import { HomeActions } from "@/components/HomeActions";
 import { NothingTrackedCard } from "@/components/NothingTrackedCard";
@@ -599,6 +600,10 @@ export function HomeScreen() {
             actions={actions}
           />
         )}
+        {/* Below the 2x2 grid, deliberately: the status cards and the log
+            buttons must not move a pixel for this (spec, the invariant).
+            Day-mode Home only — NightHome is a separate subtree. */}
+        <WhatsNewLine />
       </div>
 
       <FeedSheet
