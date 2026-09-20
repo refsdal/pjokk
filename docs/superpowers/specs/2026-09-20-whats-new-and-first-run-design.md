@@ -274,8 +274,12 @@ were away".
 
 A route inside the app shell (session required, like every other app
 screen): a plain scrollable list of **every** entry ever written, newest
-first, grouped under a version heading. Not a carousel — three cards in a
-column are read in one glance.
+first, each card carrying its version as a muted line. Not a carousel —
+three cards in a column are read in one glance.
+
+(An earlier draft said "grouped under a version heading". Dropped: with a
+handful of entries, and typically one entry per version, the headings are
+pure noise. Revisit if a release ever ships several entries at once.)
 
 Entries are relevance-filtered here too, so the page never advertises
 features the family has switched off. It is not filtered by `seq` — the
