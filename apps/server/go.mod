@@ -5,9 +5,9 @@ go 1.27.0
 require (
 	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/aws/aws-sdk-go-v2 v1.47.0
-	github.com/aws/aws-sdk-go-v2/credentials v1.20.4
+	github.com/aws/aws-sdk-go-v2/credentials v1.20.5
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.113.1
-	github.com/aws/smithy-go v1.28.1
+	github.com/aws/smithy-go v1.28.2
 	github.com/getkin/kin-openapi v0.149.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.11.0
@@ -15,12 +15,12 @@ require (
 	github.com/oapi-codegen/runtime v1.7.0
 	github.com/pressly/goose/v3 v3.28.0
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/thecodearcher/limen v0.2.1
-	github.com/thecodearcher/limen/adapters/sql v0.2.0
-	github.com/thecodearcher/limen/plugins/credential-password v0.2.0
-	github.com/thecodearcher/limen/plugins/oauth v0.2.0
-	github.com/thecodearcher/limen/plugins/oauth-google v0.2.0
-	github.com/thecodearcher/limen/plugins/organization v0.1.0
+	github.com/thecodearcher/limen v0.2.2
+	github.com/thecodearcher/limen/adapters/sql v0.2.1
+	github.com/thecodearcher/limen/plugins/credential-password v0.2.1
+	github.com/thecodearcher/limen/plugins/oauth v0.2.1
+	github.com/thecodearcher/limen/plugins/oauth-google v0.2.1
+	github.com/thecodearcher/limen/plugins/organization v0.1.1
 )
 
 require (
@@ -44,6 +44,7 @@ require (
 	github.com/mfridman/interpolate v0.0.2 // indirect
 	github.com/oasdiff/yaml v0.1.1 // indirect
 	github.com/oasdiff/yaml3 v0.0.14 // indirect
+	github.com/rogpeppe/go-internal v1.16.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
 	github.com/sethvargo/go-retry v0.4.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
