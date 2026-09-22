@@ -185,7 +185,7 @@ jobs:
       # buildx run — that needs the docker-container driver, which this
       # action creates and selects (the runner's default "docker" driver
       # supports neither attestations nor multi-platform pushes).
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to the container registry
         if: needs.version.outputs.publish == 'true'
