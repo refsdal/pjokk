@@ -16,7 +16,7 @@
     "idb-keyval": "^6.3.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
-    "limen-auth": "^0.1.1",
+    "limen-auth": "^0.2.0",
     "openapi-fetch": "^0.17.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.8",
