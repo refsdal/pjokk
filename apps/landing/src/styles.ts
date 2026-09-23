@@ -26,6 +26,9 @@ export const LANDING_CSS = `
   --feed: #5795cf;
   --diaper: #37a095;
   --growth: #cc7c5b;
+  /* Barnehage green, lifted verbatim from the app's --color-daycare: the ring
+     on the baby header and this band have to be the same colour. */
+  --daycare: #2f7d5b;
   --bezel: #29261f;
   --shadow: 0 24px 60px -24px rgba(41, 38, 31, .32);
   --cycle: 12s;
@@ -50,6 +53,7 @@ export const LANDING_CSS = `
     --feed: #7fb3e8;
     --diaper: #56c6b9;
     --growth: #efa07e;
+    --daycare: #5fc391;
     --bezel: #0d0c0a;
     --shadow: 0 24px 60px -24px rgba(0, 0, 0, .6);
   }
@@ -501,7 +505,7 @@ h1 {
 
 /* ---------- grows-with-you tiles ---------- */
 
-/* One line each, icon beside the text rather than above it: eight tiles
+/* One line each, icon beside the text rather than above it: eleven tiles
    stacked the way .points are would be a wall, and the section has to read
    as a list you can skim in the time a bottle takes to warm. */
 .tiles {
@@ -537,38 +541,48 @@ h1 {
   background: var(--surface-2);
 }
 .tile-mark svg { width: 19px; height: 19px; }
-/* Category tints on icons only, never as backgrounds, in the order the
-   copy lists them: night, nap, reminders, medicine, growth, vaccines,
-   calendar, milestones. */
+/* Category tints on icons only, never as backgrounds, in the order the copy
+   lists them: night, nap, reminders, medicine, illness, growth, patterns,
+   vaccines, calendar, milestones, siblings. Illness and siblings have no
+   category colour in the app either (illness rings in --color-danger, which
+   this page has no use for otherwise), so they take the accent rather than
+   borrowing a tint that means something else. */
 .tile:nth-child(1) .tile-mark { color: var(--sleep); }
 .tile:nth-child(2) .tile-mark { color: var(--sleep); }
 .tile:nth-child(3) .tile-mark { color: var(--feed); }
 .tile:nth-child(4) .tile-mark { color: var(--growth); }
-.tile:nth-child(5) .tile-mark { color: var(--growth); }
-.tile:nth-child(6) .tile-mark { color: var(--diaper); }
-.tile:nth-child(7) .tile-mark { color: var(--accent); }
-.tile:nth-child(8) .tile-mark { color: var(--feed); }
+.tile:nth-child(5) .tile-mark { color: var(--accent); }
+.tile:nth-child(6) .tile-mark { color: var(--growth); }
+.tile:nth-child(7) .tile-mark { color: var(--sleep); }
+.tile:nth-child(8) .tile-mark { color: var(--diaper); }
+.tile:nth-child(9) .tile-mark { color: var(--accent); }
+.tile:nth-child(10) .tile-mark { color: var(--feed); }
+.tile:nth-child(11) .tile-mark { color: var(--accent); }
 
-/* ---------- the care station ---------- */
+/* ---------- the two split bands: the care station, the barnehage ---------- */
 
-.station-section {
+/* Copy on the left, a still of the app on the right. Both bands use it, and
+   deliberately in the same orientation: alternating them would mean putting a
+   heading to the right of its own picture, and the mock-ups differ enough
+   already (one landscape tablet, one portrait phone) not to read as a repeat. */
+.split-section {
   display: grid;
   gap: 32px;
   align-items: center;
 }
 @media (min-width: 900px) {
-  .station-section {
+  .split-section {
     grid-template-columns: .8fr 1.2fr;
     gap: 56px;
   }
 }
-.station-body {
+.split-body {
   margin: 0;
   color: var(--ink-soft);
   max-width: 30em;
   text-wrap: pretty;
 }
-.station-col {
+.split-col {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -698,6 +712,78 @@ h1 {
   .station-card-value { grid-area: value; margin-top: 2px; font-size: 20px; }
   .station-card-detail { grid-area: detail; }
   .station-btn { grid-area: btn; margin-top: 0; padding-inline: 14px; }
+}
+
+/* ---------- the barnehage ---------- */
+
+/* A portrait phone, the same bezel as the hero's, holding the two things that
+   band is about: the banner that sits there all day, and the card that asks
+   about it afterwards. A still — the hero already carries the one animation
+   this page can afford. */
+.dc {
+  width: 100%;
+  max-width: 300px;
+  border: 9px solid var(--bezel);
+  border-radius: 42px;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+  padding: 16px 13px;
+  font-size: 12px;
+  user-select: none;
+}
+.dc-banner {
+  display: flex;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+/* No pulsing dot and no ring, unlike the sleep banner it resembles: this one
+   is on screen for eight hours a day, and the app keeps it the calmest of
+   the four running states. */
+.dc-mark {
+  flex: none;
+  width: 26px; height: 26px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--daycare);
+}
+.dc-mark svg { width: 15px; height: 15px; }
+.dc-banner-top {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.dc-banner-top b { color: var(--daycare); font-weight: 800; }
+.dc-banner-top span { color: var(--muted); font-variant-numeric: tabular-nums; }
+/* The quiet third line: the family's plan for today. */
+.dc-banner-plan {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.dc-card {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.dc-card-title { font-weight: 800; font-size: 13px; }
+.dc-card-body { margin-top: 2px; color: var(--muted); }
+.dc-btn {
+  margin-top: 10px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  text-align: center;
 }
 
 /* ---------- privacy band ---------- */

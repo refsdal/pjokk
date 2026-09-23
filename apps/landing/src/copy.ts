@@ -18,8 +18,23 @@ interface Point {
   body: string;
 }
 
-/** Eight one-line tiles, ordered the way a baby's first year unfolds. */
-type GrowTiles = [Point, Point, Point, Point, Point, Point, Point, Point];
+/** Eleven one-line tiles, ordered the way a baby's first years unfold — from
+ *  the first night to a second child. A tuple rather than Point[] so the count
+ *  is part of the type: the icon list and the tint rules in styles.ts are
+ *  index-parallel to it, and adding a tile has to break them loudly. */
+type GrowTiles = [
+  Point,
+  Point,
+  Point,
+  Point,
+  Point,
+  Point,
+  Point,
+  Point,
+  Point,
+  Point,
+  Point,
+];
 
 export interface LandingCopy {
   /** <html lang> */
@@ -51,6 +66,13 @@ export interface LandingCopy {
   stationCaption: string;
   /** Alt/aria text for the static care-station mock-up. */
   stationAlt: string;
+  /** The barnehage band. Its own section rather than a tile: it is the one
+   *  thing here no other tracker does, and a one-liner undersells it. */
+  daycareTitle: string;
+  daycareBody: string;
+  daycareCaption: string;
+  /** Alt/aria text for the static barnehage mock-up. */
+  daycareAlt: string;
   privacyTitle: string;
   privacyBody: string;
   /** Second paragraph of the privacy band: open source, self-hosting,
@@ -92,6 +114,16 @@ export interface LandingCopy {
     awakeFor: string;
     /** The nap-window guide line on the Awake card. */
     napWindow: string;
+  };
+  /** Strings baked into the barnehage mock-up: the Home banner as it reads
+   *  while she is there, and the card that asks about the day afterwards. */
+  daycare: {
+    banner: string;
+    bannerSince: string;
+    bannerPlan: string;
+    handoverTitle: string;
+    handoverBody: string;
+    handoverAction: string;
   };
   /** Strings baked into the care-station mock-up. */
   station: {
@@ -143,7 +175,7 @@ const en: LandingCopy = {
     },
     {
       title: "The whole family, in sync",
-      body: "Invite a partner, a grandparent or a nanny with a link or a QR code. Every entry records who logged it — which turns out to matter the morning after.",
+      body: "Invite a partner, a grandparent or a nanny with a link or a QR code. Every entry says who did the care, not merely who typed it in, and a nursing or pump timer runs on the server — so you are all watching the same clock.",
     },
   ],
   growTitle: "Then it grows with you",
@@ -154,19 +186,27 @@ const en: LandingCopy = {
     },
     {
       title: "Nap window",
-      body: "A typical nap window for her age, counted from the last wake-up. A guide, never a prediction — tired signs beat any table.",
+      body: "A typical nap window for her age, counted from the last wake-up — or, once she is past the tables, the usual nap time you set yourselves. A guide, never a prediction: tired signs beat any table.",
     },
     {
       title: "Reminders",
-      body: "Feed, pump and medicine nudges as push notifications, with quiet hours. Log it straight from the notification.",
+      body: "Feed, pump and medicine nudges as push notifications, with quiet hours. Log it straight from the notification, or snooze it fifteen minutes.",
     },
     {
       title: "Medicine and temperature",
       body: "Your own medicines with your own interval, so the timeline says when the next dose is OK. Temperatures flag a fever.",
     },
     {
+      title: "When she is ill",
+      body: "An episode holds the symptoms and a clock counting the hours since the last one — your number of hours, not ours. The days you stayed home are counted too, for each of you.",
+    },
+    {
       title: "Growth",
       body: "Weight, length and head circumference against the WHO curves, with the percentile — no more squinting at the paper chart.",
+    },
+    {
+      title: "Patterns",
+      body: "Last night's longest stretch and how it compares. Sleep per day, night against day. Daycare days against days at home. Numbers, never advice.",
     },
     {
       title: "Vaccines",
@@ -180,6 +220,10 @@ const en: LandingCopy = {
       title: "Milestones and the report",
       body: "Milestones with up to three photos, and a PDF of the last 30 days to bring along to the health nurse.",
     },
+    {
+      title: "Brothers and sisters",
+      body: "Switch child with one tap. Each of them shows only what you actually track, so a toddler's screen is not still a newborn's.",
+    },
   ],
   stationTitle: "On the nursery wall",
   stationBody:
@@ -187,6 +231,13 @@ const en: LandingCopy = {
   stationCaption: "The care station: one tap per card, nothing else on screen.",
   stationAlt:
     "A still of the care station: three cards for feed, sleep and diaper, each with the time since, a detail line and a one-tap log button.",
+  daycareTitle: "And when she starts at daycare",
+  daycareBody:
+    "Drop her off and Pjokk goes quiet: one calm line for the eight hours she is there, saying who is collecting her today and when the place closes — with a nudge if you are cutting it fine. Feed and nappy reminders hold until pick-up, because nobody needs telling at 11:00 that she has not eaten since 07:30.",
+  daycareCaption:
+    "Pick her up and it asks once. Naps, meals and nappies, in the same timeline as the rest of her day.",
+  daycareAlt:
+    "A still of the barnehage banner on the home screen — at daycare since 08:15, pick-up 15:30 by Anne — above a card asking how the day went.",
   privacyTitle: "Your child's data stays in Europe",
   privacyBody:
     "Pjokk is run from Norway by Refsdal Holding AS. Every database, file and backup lives in the EU. Nothing is sold, and this page carries no third-party trackers.",
@@ -198,6 +249,7 @@ const en: LandingCopy = {
     "CSV export",
     "API keys for Home Assistant and Grafana",
     "Calendar subscription (ICS)",
+    "Nightly backups you can restore",
   ],
   storyTitle: "Built by parents, for parents",
   storyBody: [
@@ -226,6 +278,14 @@ const en: LandingCopy = {
     awake: "Awake",
     awakeFor: "1 h 40 m",
     napWindow: "Nap window 13:10–14:25",
+  },
+  daycare: {
+    banner: "At daycare",
+    bannerSince: "since 08:15",
+    bannerPlan: "Pick-up 15:30 · Anne",
+    handoverTitle: "How was the day?",
+    handoverBody: "Two naps · lunch · one nappy",
+    handoverAction: "Add what they said",
   },
   station: {
     clock: "12:47",
@@ -276,7 +336,7 @@ const nb: LandingCopy = {
     },
     {
       title: "Hele familien, synkronisert",
-      body: "Inviter partneren, besteforeldre eller dagmammaen med en lenke eller en QR-kode. Hver registrering viser hvem som logget den — noe som viser seg å bety noe morgenen etter.",
+      body: "Inviter partneren, besteforeldre eller dagmammaen med en lenke eller en QR-kode. Hver registrering viser hvem som gjorde det, ikke bare hvem som skrev det inn, og ammings- og pumpeklokka går på serveren — så dere ser alle den samme tida.",
     },
   ],
   growTitle: "Og så vokser den med dere",
@@ -287,19 +347,27 @@ const nb: LandingCopy = {
     },
     {
       title: "Lurvindu",
-      body: "Et typisk lurvindu for alderen, regnet fra siste oppvåkning. En rettesnor, aldri en spådom — trøtthetstegn slår enhver tabell.",
+      body: "Et typisk lurvindu for alderen, regnet fra siste oppvåkning — eller, når hun er forbi tabellene, den vanlige sovetiden dere setter selv. En rettesnor, aldri en spådom: trøtthetstegn slår enhver tabell.",
     },
     {
       title: "Påminnelser",
-      body: "Et lite dult om måltid, pumping og medisin som pushvarsler, med stilletid. Logg rett fra varselet.",
+      body: "Et lite dult om måltid, pumping og medisin som pushvarsler, med stilletid. Logg rett fra varselet, eller utsett det et kvarter.",
     },
     {
       title: "Medisin og temperatur",
       body: "Familiens egne medisiner med eget intervall, så tidslinja sier når neste dose er OK. Temperaturer flagger feber.",
     },
     {
+      title: "Når hun er syk",
+      body: "En sykdomsperiode holder symptomene og en klokke som teller timene siden det siste — deres timetall, ikke vårt. Dagene dere var hjemme telles også, for hver av dere.",
+    },
+    {
       title: "Vekst",
       body: "Vekt, lengde og hodeomkrets mot WHO-kurvene, med persentil — slutt på myse mot papirskjemaet.",
+    },
+    {
+      title: "Mønstre",
+      body: "Den lengste strekken i natt, og hvordan den står seg. Søvn per dag, natt mot dag. Barnehagedager mot dager hjemme. Tall, aldri råd.",
     },
     {
       title: "Vaksiner",
@@ -313,6 +381,10 @@ const nb: LandingCopy = {
       title: "Milepæler og rapporten",
       body: "Milepæler med opptil tre bilder, og en PDF av de siste 30 dagene å ta med til helsestasjonen.",
     },
+    {
+      title: "Søsken",
+      body: "Bytt barn med ett trykk. Hvert av dem viser bare det dere faktisk følger med på, så en toårings skjerm ikke fortsatt er en nyfødts.",
+    },
   ],
   stationTitle: "På veggen på barnerommet",
   stationBody:
@@ -321,6 +393,13 @@ const nb: LandingCopy = {
     "Stellestasjonen: ett trykk per kort, ingenting annet på skjermen.",
   stationAlt:
     "Et stillbilde av stellestasjonen: tre kort for måltid, søvn og bleie, hvert med tiden siden sist, en detaljlinje og en loggknapp på ett trykk.",
+  daycareTitle: "Og når hun begynner i barnehagen",
+  daycareBody:
+    "Lever henne, og Pjokk blir stille: én rolig linje gjennom de åtte timene hun er der, som sier hvem som henter i dag og når barnehagen stenger — med et dult hvis det begynner å bli knapt. Påminnelser om måltid og bleie venter til hun er hentet, for ingen trenger å få vite klokka 11 at hun ikke har spist siden halv åtte.",
+  daycareCaption:
+    "Hent henne, og den spør én gang. Lurer, måltider og bleier havner i samme tidslinje som resten av dagen hennes.",
+  daycareAlt:
+    "Et stillbilde av barnehagebanneret på hjemskjermen — i barnehagen siden 08:15, hentes 15:30 av Anne — over et kort som spør hvordan dagen gikk.",
   privacyTitle: "Barnets data blir værende i Europa",
   privacyBody:
     "Pjokk drives fra Norge av Refsdal Holding AS. Hver database, fil og sikkerhetskopi ligger i EU. Ingenting selges videre, og denne siden har ingen sporing fra tredjepart.",
@@ -332,6 +411,7 @@ const nb: LandingCopy = {
     "CSV-eksport",
     "API-nøkler for Home Assistant og Grafana",
     "Kalenderabonnement (ICS)",
+    "Nattlige sikkerhetskopier du kan gjenopprette",
   ],
   storyTitle: "Laget av foreldre, for foreldre",
   storyBody: [
@@ -360,6 +440,14 @@ const nb: LandingCopy = {
     awake: "Våken",
     awakeFor: "1 t 40 min",
     napWindow: "Lurvindu 13:10–14:25",
+  },
+  daycare: {
+    banner: "I barnehagen",
+    bannerSince: "siden 08:15",
+    bannerPlan: "Hentes 15:30 · Anne",
+    handoverTitle: "Hvordan gikk dagen?",
+    handoverBody: "To lurer · lunsj · én bleie",
+    handoverAction: "Legg inn det de sa",
   },
   station: {
     clock: "12:47",

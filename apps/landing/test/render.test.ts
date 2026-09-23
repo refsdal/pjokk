@@ -42,6 +42,28 @@ describe("renderLandingPage", () => {
     expect(nb).toContain("Laget av foreldre, for foreldre");
   });
 
+  // Every band's copy is reachable from the render, in both languages: a new
+  // section that renders in English only is a whole missing pitch on the
+  // Norwegian page, and nothing else here would notice.
+  it("renders the barnehage band in both languages", () => {
+    for (const lang of ["en", "nb"] as const) {
+      const copy = LANDING_COPY[lang];
+      const html = renderLandingPage({
+        lang,
+        cta: { label: copy.ctaSignIn, href: `${APP_URL}/login` },
+        origin: SITE_URL,
+        noindex: false,
+      });
+      expect(html).toContain(copy.daycareTitle);
+      expect(html).toContain(copy.daycareBody);
+      expect(html).toContain(copy.daycareCaption);
+      // The mock-up is a picture: its strings are decoration, and the alt
+      // text is what a screen reader actually gets.
+      expect(html).toContain(`aria-label="${copy.daycareAlt}"`);
+      expect(html).toContain(copy.daycare.bannerPlan);
+    }
+  });
+
   it("follows OPEN_SIGNUP for the CTA label", () => {
     const copy = LANDING_COPY.en;
 
@@ -195,17 +217,25 @@ describe("renderLandingPage — the 2026-09 refresh", () => {
     }
   });
 
-  it("renders the eight grows-with-you tiles in the page's own language", () => {
+  it("renders the eleven grows-with-you tiles in the page's own language", () => {
     for (const lang of ["en", "nb"] as const) {
       const html = render(lang);
       const c = LANDING_COPY[lang];
-      expect(c.grow).toHaveLength(8);
+      expect(c.grow).toHaveLength(11);
       expect(html).toContain(`<h2>${c.growTitle}</h2>`);
-      expect(html.match(/class="tile"/g)).toHaveLength(8);
+      expect(html.match(/class="tile"/g)).toHaveLength(11);
       for (const tile of c.grow) {
         expect(html).toContain(`<h3>${tile.title}</h3>`);
         expect(html).toContain(tile.body);
       }
+      // Every tile draws its own icon and carries its own tint. Both lists
+      // are index-parallel to the copy and neither is type-checked against
+      // it: a twelfth tile would silently take growIcons' fallback eye — the
+      // icon the first .point already uses — and inherit no colour at all.
+      expect(html.match(/class="tile-mark"/g)).toHaveLength(11);
+      expect(html.match(/M2\.5 12S6 5\.5 12 5\.5/g)).toHaveLength(1);
+      expect(LANDING_STYLES).toContain(".tile:nth-child(11) .tile-mark");
+      expect(LANDING_STYLES).not.toContain(".tile:nth-child(12) .tile-mark");
     }
   });
 
@@ -415,6 +445,7 @@ describe("landing palette", () => {
     "feed",
     "diaper",
     "growth",
+    "daycare",
   ];
 
   for (const token of SHARED) {

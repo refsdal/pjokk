@@ -29,13 +29,31 @@ export function En() {
           each member's role, and invite codes you create.
         </li>
         <li>
-          <strong>Each child:</strong> name, date of birth, and optionally sex
-          (used only to draw growth percentiles).
+          <strong>Each child:</strong> name, date of birth, optionally sex (used
+          only to draw growth percentiles), a photo if you add one, and anything
+          you write on the child's own page — the routines and notes behind
+          &ldquo;About&rdquo;, and the usual nap time.
         </li>
         <li>
           <strong>What you log:</strong> feeds, nappies, sleep, play, medicine,
-          baths, notes, milestones, measurements, pumping, vaccines, and
-          calendar events — each with a time and the caretaker who recorded it.
+          baths, notes, milestones, measurements, pumping, vaccines, days at
+          daycare and what you were told at pick-up, illness episodes and their
+          symptoms, and calendar events — each with a time, the caretaker who
+          did the care, and the person who recorded it, which can be two
+          different people.
+        </li>
+        <li>
+          <strong>About the grown-ups, not the child:</strong> days a member
+          stayed home with an ill child and the yearly number they set for
+          themselves, and who is down to collect a child on which weekday. This
+          is information about the adult, and it is visible to the rest of the
+          family.
+        </li>
+        <li>
+          <strong>People outside your family:</strong> contacts you save — a
+          grandparent, a doctor, a health nurse — and the daycare&rsquo;s own
+          name, address, phone number and email. Only what you type in; we never
+          look anything up.
         </li>
         <li>
           <strong>Notification settings</strong> and, if you enable push, a
@@ -46,17 +64,20 @@ export function En() {
       <H>Health information</H>
       <p>
         Some of what you log is health information about a child — vaccines,
-        medicine, weight and length, and arguably the feeding and sleep record
-        itself. European data protection law treats this as a special category
-        requiring extra care, and we ask for your explicit consent before you
-        can record it. You can withdraw that consent at any time by deleting the
-        data or your family.
+        medicine, illness episodes and their symptoms, temperatures, weight and
+        length, and arguably the feeding and sleep record itself. European data
+        protection law treats this as a special category requiring extra care,
+        and we ask for your explicit consent before you can record it. You can
+        withdraw that consent at any time by deleting the data or your family.
       </p>
       <p>
-        Photos you attach to a milestone are personal data about the child as
-        well. They are stored with the same processors, inside the EU, are never
-        public, and are deleted with the entry or the family — the nightly
-        backup keeps a copy for the same thirty days as everything else.
+        Photos and files are personal data about the child as well: photos you
+        attach to a milestone, a photo of the child or of a caretaker, and
+        documents you attach to a vaccination. They are stored with the same
+        processors, inside the EU, are never public — every one of them is
+        served only to someone signed in to the family — and are deleted with
+        the entry or the family. The nightly backup keeps a copy for the same
+        thirty days as everything else.
       </p>
 
       <H>Why we store it, and on what basis</H>
@@ -130,8 +151,8 @@ export function En() {
       <p>You can, at any time and free of charge:</p>
       <List>
         <li>
-          <strong>Get a copy of everything</strong> — Settings → Data → Export
-          CSV gives you every entry ever recorded, one row each.
+          <strong>Get a copy of everything</strong> — Settings → Family → Export
+          → Export CSV gives you every entry ever recorded, one row each.
         </li>
         <li>
           <strong>Correct anything</strong> — every entry can be edited in the
@@ -208,13 +229,30 @@ export function Nb() {
           rollen til hver enkelt, og invitasjonskodene du lager.
         </li>
         <li>
-          <strong>Hvert barn:</strong> navn, fødselsdato, og eventuelt kjønn
-          (brukes kun til å tegne vekstpersentiler).
+          <strong>Hvert barn:</strong> navn, fødselsdato, eventuelt kjønn
+          (brukes kun til å tegne vekstpersentiler), et bilde hvis du legger det
+          inn, og det du skriver på barnets egen side — rutinene og notatene bak
+          «Om&nbsp;barnet», og den vanlige sovetiden.
         </li>
         <li>
           <strong>Det du logger:</strong> måltider, bleier, søvn, lek, medisin,
-          bad, notater, milepæler, målinger, pumping, vaksiner og
-          kalenderhendelser — hver med tidspunkt og hvem som registrerte det.
+          bad, notater, milepæler, målinger, pumping, vaksiner, dager i
+          barnehagen og det du fikk høre ved hentetid, sykdomsperioder og
+          symptomene i dem, og kalenderhendelser — hver med tidspunkt, hvem som
+          gjorde det, og hvem som registrerte det, som kan være to forskjellige
+          personer.
+        </li>
+        <li>
+          <strong>Om de voksne, ikke barnet:</strong> dager et familiemedlem var
+          hjemme med sykt barn og det årlige antallet de selv har satt, og hvem
+          som skal hente hvilken ukedag. Dette er opplysninger om den voksne, og
+          resten av familien ser dem.
+        </li>
+        <li>
+          <strong>Folk utenfor familien:</strong> kontaktene du lagrer — en
+          bestemor, en lege, en helsesykepleier — og barnehagens eget navn,
+          adresse, telefonnummer og e-postadresse. Bare det du skriver inn selv;
+          vi slår aldri opp noe.
         </li>
         <li>
           <strong>Varslingsinnstillinger</strong> og, hvis du slår på push, en
@@ -225,18 +263,21 @@ export function Nb() {
       <H>Helseopplysninger</H>
       <p>
         Noe av det du logger er helseopplysninger om et barn — vaksiner,
-        medisin, vekt og lengde, og til dels selve mat- og søvnregistreringen.
-        Europeisk personvernlovgivning regner dette som en særlig kategori som
-        krever ekstra varsomhet, og vi ber om ditt uttrykkelige samtykke før du
-        kan registrere det. Du kan når som helst trekke samtykket tilbake ved å
+        medisin, sykdomsperioder og symptomene i dem, temperaturer, vekt og
+        lengde, og til dels selve mat- og søvnregistreringen. Europeisk
+        personvernlovgivning regner dette som en særlig kategori som krever
+        ekstra varsomhet, og vi ber om ditt uttrykkelige samtykke før du kan
+        registrere det. Du kan når som helst trekke samtykket tilbake ved å
         slette opplysningene eller familien din.
       </p>
       <p>
-        Bilder du legger ved en milepæl er også personopplysninger om barnet. De
-        lagres hos de samme leverandørene, innenfor EU, er aldri offentlige, og
-        slettes sammen med oppføringen eller familien — den nattlige
-        sikkerhetskopien beholder en kopi i de samme tretti dagene som alt
-        annet.
+        Bilder og filer er også personopplysninger om barnet: bilder du legger
+        ved en milepæl, et bilde av barnet eller av en omsorgsperson, og
+        dokumenter du legger ved en vaksine. De lagres hos de samme
+        leverandørene, innenfor EU, er aldri offentlige — hver enkelt vises bare
+        for noen som er innlogget i familien — og slettes sammen med oppføringen
+        eller familien. Den nattlige sikkerhetskopien beholder en kopi i de
+        samme tretti dagene som alt annet.
       </p>
 
       <H>Hvorfor vi lagrer det, og på hvilket grunnlag</H>
@@ -311,9 +352,9 @@ export function Nb() {
       <p>Du kan når som helst, og gratis:</p>
       <List>
         <li>
-          <strong>Få en kopi av alt</strong> — Innstillinger → Data → Eksporter
-          CSV gir deg hver eneste oppføring som er registrert, én rad per
-          oppføring.
+          <strong>Få en kopi av alt</strong> — Innstillinger → Familie → Eksport
+          → Eksporter CSV gir deg hver eneste oppføring som er registrert, én
+          rad per oppføring.
         </li>
         <li>
           <strong>Rette hva som helst</strong> — hver oppføring kan redigeres i
