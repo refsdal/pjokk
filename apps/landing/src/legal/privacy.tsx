@@ -151,8 +151,8 @@ export function En() {
       <p>You can, at any time and free of charge:</p>
       <List>
         <li>
-          <strong>Get a copy of everything</strong> — Settings → Data → Export
-          CSV gives you every entry ever recorded, one row each.
+          <strong>Get a copy of everything</strong> — Settings → Family → Export
+          → Export CSV gives you every entry ever recorded, one row each.
         </li>
         <li>
           <strong>Correct anything</strong> — every entry can be edited in the
@@ -229,9 +229,9 @@ export function Nb() {
           rollen til hver enkelt, og invitasjonskodene du lager.
         </li>
         <li>
-          <strong>Hvert barn:</strong> navn, fødselsdato, eventuelt kjønn (brukes
-          kun til å tegne vekstpersentiler), et bilde hvis du legger det inn, og
-          det du skriver på barnets egen side — rutinene og notatene bak
+          <strong>Hvert barn:</strong> navn, fødselsdato, eventuelt kjønn
+          (brukes kun til å tegne vekstpersentiler), et bilde hvis du legger det
+          inn, og det du skriver på barnets egen side — rutinene og notatene bak
           «Om&nbsp;barnet», og den vanlige sovetiden.
         </li>
         <li>
@@ -352,9 +352,9 @@ export function Nb() {
       <p>Du kan når som helst, og gratis:</p>
       <List>
         <li>
-          <strong>Få en kopi av alt</strong> — Innstillinger → Data → Eksporter
-          CSV gir deg hver eneste oppføring som er registrert, én rad per
-          oppføring.
+          <strong>Få en kopi av alt</strong> — Innstillinger → Familie → Eksport
+          → Eksporter CSV gir deg hver eneste oppføring som er registrert, én
+          rad per oppføring.
         </li>
         <li>
           <strong>Rette hva som helst</strong> — hver oppføring kan redigeres i

@@ -36,6 +36,8 @@ const icons = {
   photo: `<rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><circle cx="9" cy="10.5" r="1.6"/><path d="M20.5 15.5 16 11.5l-6 6"/>`,
   // Care-station cards.
   sun: `<circle cx="12" cy="12" r="3.6"/><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M6 18l1.4-1.4M16.6 7.4 18 6"/>`,
+  // The barnehage: a building, not a house — it is not her home.
+  building: `<path d="M4 20V7.5L12 4l8 3.5V20"/><path d="M2.5 20h19"/><path d="M9.5 20v-5h5v5"/><path d="M9.5 10.5h5"/>`,
 };
 
 /** Where "Run it yourself" goes. The README's quick start is two commands
@@ -173,6 +175,7 @@ export function renderLandingPage({
     icons.photo,
   ];
   const st = c.station;
+  const dc = c.daycare;
 
   return `<!doctype html>
 <html lang="${c.htmlLang}">
@@ -319,12 +322,12 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
     </div>
   </section>
 
-  <section class="wrap section station-section">
+  <section class="wrap section split-section">
     <div>
       <h2>${esc(c.stationTitle)}</h2>
-      <p class="station-body">${esc(c.stationBody)}</p>
+      <p class="split-body">${esc(c.stationBody)}</p>
     </div>
-    <div class="station-col">
+    <div class="split-col">
       <div class="station" role="img" aria-label="${esc(c.stationAlt)}">
         <div class="station-top">
           <span class="station-name"><span class="demo-avatar">${esc(d.baby.slice(0, 1))}</span>${esc(d.baby)}</span>
@@ -353,6 +356,30 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
         <div class="station-undo"><span>${esc(st.undoLine)}</span><b>${esc(st.undo)}</b></div>
       </div>
       <p class="demo-caption">${esc(c.stationCaption)}</p>
+    </div>
+  </section>
+
+  <section class="wrap section split-section">
+    <div>
+      <h2>${esc(c.daycareTitle)}</h2>
+      <p class="split-body">${esc(c.daycareBody)}</p>
+    </div>
+    <div class="split-col">
+      <div class="dc" role="img" aria-label="${esc(c.daycareAlt)}">
+        <div class="dc-banner">
+          <div class="dc-mark">${svg(icons.building)}</div>
+          <div>
+            <div class="dc-banner-top"><b>${esc(dc.banner)}</b><span>${esc(dc.bannerSince)}</span></div>
+            <div class="dc-banner-plan">${esc(dc.bannerPlan)}</div>
+          </div>
+        </div>
+        <div class="dc-card">
+          <div class="dc-card-title">${esc(dc.handoverTitle)}</div>
+          <div class="dc-card-body">${esc(dc.handoverBody)}</div>
+          <div class="dc-btn">${esc(dc.handoverAction)}</div>
+        </div>
+      </div>
+      <p class="demo-caption">${esc(c.daycareCaption)}</p>
     </div>
   </section>
 

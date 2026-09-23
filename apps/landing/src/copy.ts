@@ -51,6 +51,13 @@ export interface LandingCopy {
   stationCaption: string;
   /** Alt/aria text for the static care-station mock-up. */
   stationAlt: string;
+  /** The barnehage band. Its own section rather than a tile: it is the one
+   *  thing here no other tracker does, and a one-liner undersells it. */
+  daycareTitle: string;
+  daycareBody: string;
+  daycareCaption: string;
+  /** Alt/aria text for the static barnehage mock-up. */
+  daycareAlt: string;
   privacyTitle: string;
   privacyBody: string;
   /** Second paragraph of the privacy band: open source, self-hosting,
@@ -92,6 +99,16 @@ export interface LandingCopy {
     awakeFor: string;
     /** The nap-window guide line on the Awake card. */
     napWindow: string;
+  };
+  /** Strings baked into the barnehage mock-up: the Home banner as it reads
+   *  while she is there, and the card that asks about the day afterwards. */
+  daycare: {
+    banner: string;
+    bannerSince: string;
+    bannerPlan: string;
+    handoverTitle: string;
+    handoverBody: string;
+    handoverAction: string;
   };
   /** Strings baked into the care-station mock-up. */
   station: {
@@ -187,6 +204,13 @@ const en: LandingCopy = {
   stationCaption: "The care station: one tap per card, nothing else on screen.",
   stationAlt:
     "A still of the care station: three cards for feed, sleep and diaper, each with the time since, a detail line and a one-tap log button.",
+  daycareTitle: "And when she starts at daycare",
+  daycareBody:
+    "Drop her off and Pjokk goes quiet: one calm line for the eight hours she is there, saying who is collecting her today and when the place closes — with a nudge if you are cutting it fine. Feed and nappy reminders hold until pick-up, because nobody needs telling at 11:00 that she has not eaten since 07:30.",
+  daycareCaption:
+    "Pick her up and it asks once. Naps, meals and nappies, in the same timeline as the rest of her day.",
+  daycareAlt:
+    "A still of the barnehage banner on the home screen — at daycare since 08:15, pick-up 15:30 by Anne — above a card asking how the day went.",
   privacyTitle: "Your child's data stays in Europe",
   privacyBody:
     "Pjokk is run from Norway by Refsdal Holding AS. Every database, file and backup lives in the EU. Nothing is sold, and this page carries no third-party trackers.",
@@ -226,6 +250,14 @@ const en: LandingCopy = {
     awake: "Awake",
     awakeFor: "1 h 40 m",
     napWindow: "Nap window 13:10–14:25",
+  },
+  daycare: {
+    banner: "At daycare",
+    bannerSince: "since 08:15",
+    bannerPlan: "Pick-up 15:30 · Anne",
+    handoverTitle: "How was the day?",
+    handoverBody: "Two naps · lunch · one nappy",
+    handoverAction: "Add what they said",
   },
   station: {
     clock: "12:47",
@@ -321,6 +353,13 @@ const nb: LandingCopy = {
     "Stellestasjonen: ett trykk per kort, ingenting annet på skjermen.",
   stationAlt:
     "Et stillbilde av stellestasjonen: tre kort for måltid, søvn og bleie, hvert med tiden siden sist, en detaljlinje og en loggknapp på ett trykk.",
+  daycareTitle: "Og når hun begynner i barnehagen",
+  daycareBody:
+    "Lever henne, og Pjokk blir stille: én rolig linje gjennom de åtte timene hun er der, som sier hvem som henter i dag og når barnehagen stenger — med et dult hvis det begynner å bli knapt. Påminnelser om måltid og bleie venter til hun er hentet, for ingen trenger å få vite klokka 11 at hun ikke har spist siden halv åtte.",
+  daycareCaption:
+    "Hent henne, og den spør én gang. Lurer, måltider og bleier havner i samme tidslinje som resten av dagen hennes.",
+  daycareAlt:
+    "Et stillbilde av barnehagebanneret på hjemskjermen — i barnehagen siden 08:15, hentes 15:30 av Anne — over et kort som spør hvordan dagen gikk.",
   privacyTitle: "Barnets data blir værende i Europa",
   privacyBody:
     "Pjokk drives fra Norge av Refsdal Holding AS. Hver database, fil og sikkerhetskopi ligger i EU. Ingenting selges videre, og denne siden har ingen sporing fra tredjepart.",
@@ -360,6 +399,14 @@ const nb: LandingCopy = {
     awake: "Våken",
     awakeFor: "1 t 40 min",
     napWindow: "Lurvindu 13:10–14:25",
+  },
+  daycare: {
+    banner: "I barnehagen",
+    bannerSince: "siden 08:15",
+    bannerPlan: "Hentes 15:30 · Anne",
+    handoverTitle: "Hvordan gikk dagen?",
+    handoverBody: "To lurer · lunsj · én bleie",
+    handoverAction: "Legg inn det de sa",
   },
   station: {
     clock: "12:47",

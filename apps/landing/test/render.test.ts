@@ -42,6 +42,28 @@ describe("renderLandingPage", () => {
     expect(nb).toContain("Laget av foreldre, for foreldre");
   });
 
+  // Every band's copy is reachable from the render, in both languages: a new
+  // section that renders in English only is a whole missing pitch on the
+  // Norwegian page, and nothing else here would notice.
+  it("renders the barnehage band in both languages", () => {
+    for (const lang of ["en", "nb"] as const) {
+      const copy = LANDING_COPY[lang];
+      const html = renderLandingPage({
+        lang,
+        cta: { label: copy.ctaSignIn, href: `${APP_URL}/login` },
+        origin: SITE_URL,
+        noindex: false,
+      });
+      expect(html).toContain(copy.daycareTitle);
+      expect(html).toContain(copy.daycareBody);
+      expect(html).toContain(copy.daycareCaption);
+      // The mock-up is a picture: its strings are decoration, and the alt
+      // text is what a screen reader actually gets.
+      expect(html).toContain(`aria-label="${copy.daycareAlt}"`);
+      expect(html).toContain(copy.daycare.bannerPlan);
+    }
+  });
+
   it("follows OPEN_SIGNUP for the CTA label", () => {
     const copy = LANDING_COPY.en;
 
@@ -415,6 +437,7 @@ describe("landing palette", () => {
     "feed",
     "diaper",
     "growth",
+    "daycare",
   ];
 
   for (const token of SHARED) {
