@@ -18,8 +18,23 @@ interface Point {
   body: string;
 }
 
-/** Eight one-line tiles, ordered the way a baby's first year unfolds. */
-type GrowTiles = [Point, Point, Point, Point, Point, Point, Point, Point];
+/** Eleven one-line tiles, ordered the way a baby's first years unfold — from
+ *  the first night to a second child. A tuple rather than Point[] so the count
+ *  is part of the type: the icon list and the tint rules in styles.ts are
+ *  index-parallel to it, and adding a tile has to break them loudly. */
+type GrowTiles = [
+  Point,
+  Point,
+  Point,
+  Point,
+  Point,
+  Point,
+  Point,
+  Point,
+  Point,
+  Point,
+  Point,
+];
 
 export interface LandingCopy {
   /** <html lang> */
@@ -160,7 +175,7 @@ const en: LandingCopy = {
     },
     {
       title: "The whole family, in sync",
-      body: "Invite a partner, a grandparent or a nanny with a link or a QR code. Every entry records who logged it — which turns out to matter the morning after.",
+      body: "Invite a partner, a grandparent or a nanny with a link or a QR code. Every entry says who did the care, not merely who typed it in, and a nursing or pump timer runs on the server — so you are all watching the same clock.",
     },
   ],
   growTitle: "Then it grows with you",
@@ -171,19 +186,27 @@ const en: LandingCopy = {
     },
     {
       title: "Nap window",
-      body: "A typical nap window for her age, counted from the last wake-up. A guide, never a prediction — tired signs beat any table.",
+      body: "A typical nap window for her age, counted from the last wake-up — or, once she is past the tables, the usual nap time you set yourselves. A guide, never a prediction: tired signs beat any table.",
     },
     {
       title: "Reminders",
-      body: "Feed, pump and medicine nudges as push notifications, with quiet hours. Log it straight from the notification.",
+      body: "Feed, pump and medicine nudges as push notifications, with quiet hours. Log it straight from the notification, or snooze it fifteen minutes.",
     },
     {
       title: "Medicine and temperature",
       body: "Your own medicines with your own interval, so the timeline says when the next dose is OK. Temperatures flag a fever.",
     },
     {
+      title: "When she is ill",
+      body: "An episode holds the symptoms and a clock counting the hours since the last one — your number of hours, not ours. The days you stayed home are counted too, for each of you.",
+    },
+    {
       title: "Growth",
       body: "Weight, length and head circumference against the WHO curves, with the percentile — no more squinting at the paper chart.",
+    },
+    {
+      title: "Patterns",
+      body: "Last night's longest stretch and how it compares. Sleep per day, night against day. Daycare days against days at home. Numbers, never advice.",
     },
     {
       title: "Vaccines",
@@ -196,6 +219,10 @@ const en: LandingCopy = {
     {
       title: "Milestones and the report",
       body: "Milestones with up to three photos, and a PDF of the last 30 days to bring along to the health nurse.",
+    },
+    {
+      title: "Brothers and sisters",
+      body: "Switch child with one tap. Each of them shows only what you actually track, so a toddler's screen is not still a newborn's.",
     },
   ],
   stationTitle: "On the nursery wall",
@@ -222,6 +249,7 @@ const en: LandingCopy = {
     "CSV export",
     "API keys for Home Assistant and Grafana",
     "Calendar subscription (ICS)",
+    "Nightly backups you can restore",
   ],
   storyTitle: "Built by parents, for parents",
   storyBody: [
@@ -308,7 +336,7 @@ const nb: LandingCopy = {
     },
     {
       title: "Hele familien, synkronisert",
-      body: "Inviter partneren, besteforeldre eller dagmammaen med en lenke eller en QR-kode. Hver registrering viser hvem som logget den — noe som viser seg å bety noe morgenen etter.",
+      body: "Inviter partneren, besteforeldre eller dagmammaen med en lenke eller en QR-kode. Hver registrering viser hvem som gjorde det, ikke bare hvem som skrev det inn, og ammings- og pumpeklokka går på serveren — så dere ser alle den samme tida.",
     },
   ],
   growTitle: "Og så vokser den med dere",
@@ -319,19 +347,27 @@ const nb: LandingCopy = {
     },
     {
       title: "Lurvindu",
-      body: "Et typisk lurvindu for alderen, regnet fra siste oppvåkning. En rettesnor, aldri en spådom — trøtthetstegn slår enhver tabell.",
+      body: "Et typisk lurvindu for alderen, regnet fra siste oppvåkning — eller, når hun er forbi tabellene, den vanlige sovetiden dere setter selv. En rettesnor, aldri en spådom: trøtthetstegn slår enhver tabell.",
     },
     {
       title: "Påminnelser",
-      body: "Et lite dult om måltid, pumping og medisin som pushvarsler, med stilletid. Logg rett fra varselet.",
+      body: "Et lite dult om måltid, pumping og medisin som pushvarsler, med stilletid. Logg rett fra varselet, eller utsett det et kvarter.",
     },
     {
       title: "Medisin og temperatur",
       body: "Familiens egne medisiner med eget intervall, så tidslinja sier når neste dose er OK. Temperaturer flagger feber.",
     },
     {
+      title: "Når hun er syk",
+      body: "En sykdomsperiode holder symptomene og en klokke som teller timene siden det siste — deres timetall, ikke vårt. Dagene dere var hjemme telles også, for hver av dere.",
+    },
+    {
       title: "Vekst",
       body: "Vekt, lengde og hodeomkrets mot WHO-kurvene, med persentil — slutt på myse mot papirskjemaet.",
+    },
+    {
+      title: "Mønstre",
+      body: "Den lengste strekken i natt, og hvordan den står seg. Søvn per dag, natt mot dag. Barnehagedager mot dager hjemme. Tall, aldri råd.",
     },
     {
       title: "Vaksiner",
@@ -344,6 +380,10 @@ const nb: LandingCopy = {
     {
       title: "Milepæler og rapporten",
       body: "Milepæler med opptil tre bilder, og en PDF av de siste 30 dagene å ta med til helsestasjonen.",
+    },
+    {
+      title: "Søsken",
+      body: "Bytt barn med ett trykk. Hvert av dem viser bare det dere faktisk følger med på, så en toårings skjerm ikke fortsatt er en nyfødts.",
     },
   ],
   stationTitle: "På veggen på barnerommet",
@@ -371,6 +411,7 @@ const nb: LandingCopy = {
     "CSV-eksport",
     "API-nøkler for Home Assistant og Grafana",
     "Kalenderabonnement (ICS)",
+    "Nattlige sikkerhetskopier du kan gjenopprette",
   ],
   storyTitle: "Laget av foreldre, for foreldre",
   storyBody: [

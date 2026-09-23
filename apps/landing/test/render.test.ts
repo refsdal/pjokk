@@ -217,17 +217,25 @@ describe("renderLandingPage — the 2026-09 refresh", () => {
     }
   });
 
-  it("renders the eight grows-with-you tiles in the page's own language", () => {
+  it("renders the eleven grows-with-you tiles in the page's own language", () => {
     for (const lang of ["en", "nb"] as const) {
       const html = render(lang);
       const c = LANDING_COPY[lang];
-      expect(c.grow).toHaveLength(8);
+      expect(c.grow).toHaveLength(11);
       expect(html).toContain(`<h2>${c.growTitle}</h2>`);
-      expect(html.match(/class="tile"/g)).toHaveLength(8);
+      expect(html.match(/class="tile"/g)).toHaveLength(11);
       for (const tile of c.grow) {
         expect(html).toContain(`<h3>${tile.title}</h3>`);
         expect(html).toContain(tile.body);
       }
+      // Every tile draws its own icon and carries its own tint. Both lists
+      // are index-parallel to the copy and neither is type-checked against
+      // it: a twelfth tile would silently take growIcons' fallback eye — the
+      // icon the first .point already uses — and inherit no colour at all.
+      expect(html.match(/class="tile-mark"/g)).toHaveLength(11);
+      expect(html.match(/M2\.5 12S6 5\.5 12 5\.5/g)).toHaveLength(1);
+      expect(LANDING_STYLES).toContain(".tile:nth-child(11) .tile-mark");
+      expect(LANDING_STYLES).not.toContain(".tile:nth-child(12) .tile-mark");
     }
   });
 

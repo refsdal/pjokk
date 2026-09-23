@@ -34,6 +34,11 @@ const icons = {
   shield: `<path d="M12 3.5 5 6v5.5c0 4.2 3 7.7 7 9 4-1.3 7-4.8 7-9V6z"/><path d="M9.5 12l1.8 1.8L15 10"/>`,
   calendar: `<rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 10h16"/><path d="M8.5 3.5v4"/><path d="M15.5 3.5v4"/>`,
   photo: `<rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><circle cx="9" cy="10.5" r="1.6"/><path d="M20.5 15.5 16 11.5l-6 6"/>`,
+  thermometer: `<path d="M10 13.6V6a2 2 0 0 1 4 0v7.6a4 4 0 1 1-4 0z"/><path d="M12 9.5v5.2"/>`,
+  bars: `<path d="M4 19.5h16"/><path d="M7.5 16.5v-4.5"/><path d="M12 16.5V7"/><path d="M16.5 16.5v-7.5"/>`,
+  // Two children, deliberately different sizes — this tile is about siblings,
+  // not about the grown-ups (icons.users, up in the points).
+  siblings: `<circle cx="8.5" cy="8.8" r="2.9"/><circle cx="16.6" cy="11" r="2.1"/><path d="M3.6 19.5a4.9 4.9 0 0 1 9.8 0"/><path d="M13.6 19.5a3.6 3.6 0 0 1 6.9 0"/>`,
   // Care-station cards.
   sun: `<circle cx="12" cy="12" r="3.6"/><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M6 18l1.4-1.4M16.6 7.4 18 6"/>`,
   // The barnehage: a building, not a house — it is not her home.
@@ -164,15 +169,19 @@ export function renderLandingPage({
   const legalPrefix = lang === "nb" ? "/nb" : "";
 
   const pointIcons = [icons.eye, icons.bolt, icons.users];
+  // Index-parallel to copy's GrowTiles, and to the tint rules in styles.ts.
   const growIcons = [
     icons.moonStars,
     icons.clockNap,
     icons.bell,
     icons.pill,
+    icons.thermometer,
     icons.chart,
+    icons.bars,
     icons.shield,
     icons.calendar,
     icons.photo,
+    icons.siblings,
   ];
   const st = c.station;
   const dc = c.daycare;

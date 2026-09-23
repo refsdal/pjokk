@@ -505,7 +505,7 @@ h1 {
 
 /* ---------- grows-with-you tiles ---------- */
 
-/* One line each, icon beside the text rather than above it: eight tiles
+/* One line each, icon beside the text rather than above it: eleven tiles
    stacked the way .points are would be a wall, and the section has to read
    as a list you can skim in the time a bottle takes to warm. */
 .tiles {
@@ -541,17 +541,23 @@ h1 {
   background: var(--surface-2);
 }
 .tile-mark svg { width: 19px; height: 19px; }
-/* Category tints on icons only, never as backgrounds, in the order the
-   copy lists them: night, nap, reminders, medicine, growth, vaccines,
-   calendar, milestones. */
+/* Category tints on icons only, never as backgrounds, in the order the copy
+   lists them: night, nap, reminders, medicine, illness, growth, patterns,
+   vaccines, calendar, milestones, siblings. Illness and siblings have no
+   category colour in the app either (illness rings in --color-danger, which
+   this page has no use for otherwise), so they take the accent rather than
+   borrowing a tint that means something else. */
 .tile:nth-child(1) .tile-mark { color: var(--sleep); }
 .tile:nth-child(2) .tile-mark { color: var(--sleep); }
 .tile:nth-child(3) .tile-mark { color: var(--feed); }
 .tile:nth-child(4) .tile-mark { color: var(--growth); }
-.tile:nth-child(5) .tile-mark { color: var(--growth); }
-.tile:nth-child(6) .tile-mark { color: var(--diaper); }
-.tile:nth-child(7) .tile-mark { color: var(--accent); }
-.tile:nth-child(8) .tile-mark { color: var(--feed); }
+.tile:nth-child(5) .tile-mark { color: var(--accent); }
+.tile:nth-child(6) .tile-mark { color: var(--growth); }
+.tile:nth-child(7) .tile-mark { color: var(--sleep); }
+.tile:nth-child(8) .tile-mark { color: var(--diaper); }
+.tile:nth-child(9) .tile-mark { color: var(--accent); }
+.tile:nth-child(10) .tile-mark { color: var(--feed); }
+.tile:nth-child(11) .tile-mark { color: var(--accent); }
 
 /* ---------- the two split bands: the care station, the barnehage ---------- */
 
