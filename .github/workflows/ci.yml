@@ -47,7 +47,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+      - uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
         with:
           # mise itself, pinned like every other tool: the action otherwise
           # resolves "latest", which once pointed at a tag with no assets.
@@ -92,7 +92,7 @@ jobs:
           PJOKK_VERSION: ${{ steps.version.outputs.pinned }}
         run: bash scripts/build-artifacts.sh
 
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       # A pull request from a fork gets a read-only GITHUB_TOKEN, so pushing
       # would fail on something unrelated to the change. Build-only there.

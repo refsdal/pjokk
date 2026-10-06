@@ -45,7 +45,7 @@ jobs:
       # Toolchain from .mise.toml — the same pins developers get from
       # `mise install`. Only what this job runs: the codegen tools in that
       # file are compiled from source and CI never runs `go generate`.
-      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+      - uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
         with:
           # mise itself, pinned like every other tool: the action otherwise
           # resolves "latest", which once pointed at a tag with no assets.
