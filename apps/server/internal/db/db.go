@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/refsdal/pjokk/server/internal/db/gen"
@@ -21,7 +24,24 @@ const TombstoneID = "user_tombstone"
 // per-session semantics hold), this pool is a normal multi-connection pool
 // for ordinary request traffic.
 func New(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
-	pool, err := pgxpool.New(ctx, databaseURL)
+	cfg, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("db: parse url: %w", err)
+	}
+	// pgx 5.12 returns timestamptz in time.Local when it reads the text
+	// format (it used to keep the server's offset), so every timestamp the
+	// API marshals would carry the HOST's zone. The image sets no TZ, which
+	// hides it in production and shows it on a developer's laptop. Pin the
+	// location: the wire format is UTC, as it always was.
+	cfg.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
+		if c, ok := conn.TypeMap().TypeForOID(pgtype.TimestamptzOID); ok {
+			if codec, ok := c.Codec.(*pgtype.TimestamptzCodec); ok {
+				codec.ScanLocation = time.UTC
+			}
+		}
+		return nil
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("db: open pool: %w", err)
 	}

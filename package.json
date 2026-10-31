@@ -26,10 +26,10 @@
     "build:landing": "bun run --filter @pjokk/landing build"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.10",
-    "@playwright/test": "^1.62.1",
-    "@types/bun": "^1.4.0",
-    "@types/node": "^26.2.0",
+    "@biomejs/biome": "^2.6.4",
+    "@playwright/test": "^1.64.1",
+    "@types/bun": "^1.4.4",
+    "@types/node": "^26.6.6",
     "@types/web-push": "^3.6.4",
     "typescript": "^7.0.2",
     "web-push": "^3.6.7"
