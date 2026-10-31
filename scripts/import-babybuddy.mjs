@@ -229,8 +229,8 @@ if (createBabies) {
 
 const base = (model, r, timeMs) => {
   const babyId = babyMap.get(r.child_id);
-  if (!babyId) return skip("unmapped child"), null;
-  if (timeMs == null) return skip("unparseable time"), null;
+  if (!babyId) return (skip("unmapped child"), null);
+  if (timeMs == null) return (skip("unparseable time"), null);
   return [
     esc(`bb-${model}-${r.id}`),
     familyExpr(),
